@@ -43,7 +43,7 @@ clang-format -i <path/to/edited-file>
 cmake -S. -Bbuild
 
 # Build (inside docker container)
-cmake --build build
+cmake --build build -j$(nproc)
 ```
 
 The executable is built at `build/src/PolangRepl`.
