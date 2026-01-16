@@ -29,6 +29,7 @@ void polang_reset_lexer_location() {
 "let"                   { return TOKEN(TLET); }
 "fun"                   { return TOKEN(TFUN); }
 "in"                    { return TOKEN(TIN); }
+"and"                   { return TOKEN(TAND); }
 "if"                    { return TOKEN(TIF); }
 "then"                  { return TOKEN(TTHEN); }
 "else"                  { return TOKEN(TELSE); }

@@ -17,6 +17,8 @@ void NBlock::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NIfExpression::accept(Visitor& visitor) const { visitor.visit(*this); }
 
+void NLetExpression::accept(Visitor& visitor) const { visitor.visit(*this); }
+
 void NExpressionStatement::accept(Visitor& visitor) const {
   visitor.visit(*this);
 }

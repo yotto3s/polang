@@ -10,6 +10,7 @@ class NBinaryOperator;
 class NAssignment;
 class NBlock;
 class NIfExpression;
+class NLetExpression;
 class NExpressionStatement;
 class NVariableDeclaration;
 class NFunctionDeclaration;
@@ -27,6 +28,7 @@ public:
   virtual void visit(const NAssignment& node) = 0;
   virtual void visit(const NBlock& node) = 0;
   virtual void visit(const NIfExpression& node) = 0;
+  virtual void visit(const NLetExpression& node) = 0;
 
   // Statement visitors
   virtual void visit(const NExpressionStatement& node) = 0;

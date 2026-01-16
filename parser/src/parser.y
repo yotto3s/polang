@@ -31,7 +31,7 @@ void yyerror(const char *s);
 %token <token> TCEQ TCNE TCLT TCLE TCGT TCGE TEQUAL
 %token <token> TLPAREN TRPAREN TLBRACE TRBRACE TCOMMA TDOT
 %token <token> TPLUS TMINUS TMUL TDIV
-%token <token> TLET TFUN TIN TCOLON TARROW
+%token <token> TLET TFUN TIN TCOLON TARROW TAND
 %token <token> TIF TTHEN TELSE
 
 /* Define the type of node our nonterminal symbols represent.
@@ -41,13 +41,14 @@ void yyerror(const char *s);
  */
 %type <ident> ident
 %type <expr> numeric expr
-%type <varvec> func_decl_args
+%type <varvec> func_decl_args let_bindings
 %type <exprvec> call_args
 %type <block> program stmts
 %type <stmt> stmt var_decl func_decl
 %type <token> comparison
 
 /* Operator precedence (lowest to highest) */
+%right TLET TIN TAND
 %right TIF TTHEN TELSE
 %right TEQUAL
 %nonassoc COMPARISON TCEQ TCNE TCLT TCLE TCGT TCGE
@@ -130,12 +131,33 @@ expr : ident TEQUAL expr { $$ = new NAssignment(*$<ident>1, *$3); }
      | expr TDIV expr { $$ = new NBinaryOperator(*$1, TDIV, *$3); }
      | TLPAREN expr TRPAREN { $$ = $2; }
      | TIF expr TTHEN expr TELSE expr { $$ = new NIfExpression(*$2, *$4, *$6); }
+     | TLET let_bindings TIN expr { $$ = new NLetExpression(*$2, *$4); delete $2; }
      ;
     
 call_args : /*blank*/  { $$ = new ExpressionList(); }
           | expr { $$ = new ExpressionList(); $$->push_back($1); }
           | call_args TCOMMA expr  { $1->push_back($3); }
           ;
+
+let_bindings : ident TEQUAL expr {
+                 NIdentifier *type = new NIdentifier("int");
+                 $$ = new VariableList();
+                 $$->push_back(new NVariableDeclaration(*type, *$1, $3));
+               }
+             | ident TCOLON ident TEQUAL expr {
+                 $$ = new VariableList();
+                 $$->push_back(new NVariableDeclaration(*$3, *$1, $5));
+               }
+             | let_bindings TAND ident TEQUAL expr {
+                 NIdentifier *type = new NIdentifier("int");
+                 $1->push_back(new NVariableDeclaration(*type, *$3, $5));
+                 $$ = $1;
+               }
+             | let_bindings TAND ident TCOLON ident TEQUAL expr {
+                 $1->push_back(new NVariableDeclaration(*$5, *$3, $7));
+                 $$ = $1;
+               }
+             ;
 
 comparison : TCEQ | TCNE | TCLT | TCLE | TCGT | TCGE
            ;

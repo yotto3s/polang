@@ -247,3 +247,29 @@ void CodeGenVisitor::visit(const NIfExpression& node) {
 
   result_ = phi;
 }
+
+void CodeGenVisitor::visit(const NLetExpression& node) {
+  // Save current locals to restore later (scoping)
+  const auto savedLocals = context_.locals();
+
+  // Generate code for each binding
+  for (const auto* binding : node.bindings) {
+    AllocaInst* alloc =
+        new AllocaInst(typeOf(binding->type, context_.context), 0,
+                       binding->id.name.c_str(), context_.currentBlock());
+    context_.locals()[binding->id.name] = alloc;
+
+    if (binding->assignmentExpr != nullptr) {
+      Value* value = generate(*binding->assignmentExpr);
+      new StoreInst(value, alloc, false, context_.currentBlock());
+    }
+  }
+
+  // Generate the body expression
+  Value* bodyValue = generate(node.body);
+
+  // Restore the original locals (remove bindings from scope)
+  context_.locals() = savedLocals;
+
+  result_ = bodyValue;
+}

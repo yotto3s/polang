@@ -23,6 +23,7 @@ public:
   void visit(const NAssignment& node) override;
   void visit(const NBlock& node) override;
   void visit(const NIfExpression& node) override;
+  void visit(const NLetExpression& node) override;
 
   // Statement visitors
   void visit(const NExpressionStatement& node) override;

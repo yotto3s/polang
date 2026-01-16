@@ -144,6 +144,40 @@ let abs (x : int) : int = if x < 0 then 0 - x else x
 let sign (n : int) : int = if n > 0 then 1 else if n < 0 then 0 - 1 else 0
 ```
 
+### Let Expression
+
+Let-expressions introduce local variable bindings that are only visible within the body expression:
+
+```
+let x = 1 in x + 1
+let x = 1 and y = 2 in x + y
+let x : int = 1 and y : double = 2.0 in x
+```
+
+**Syntax:**
+```
+let <binding> (and <binding>)* in <expression>
+```
+
+Where `<binding>` is:
+```
+<identifier> = <expression>
+<identifier> : <type> = <expression>
+```
+
+- Bindings are only visible within the body expression
+- Multiple bindings are separated by `and`
+- Each binding can optionally have a type annotation (defaults to `int`)
+- The entire let-expression evaluates to the value of the body expression
+
+**Examples:**
+
+```
+let a = 10 and b = 20 in a + b
+let x = 5 in let y = x + 1 in y * 2
+let sum (a : int) (b : int) : int = let result = a + b in result
+```
+
 ## Expressions
 
 Expressions can be:
@@ -156,6 +190,7 @@ Expressions can be:
 - **Assignments**: `x = 5`
 - **Parenthesized**: `(a + b) * c`
 - **If-expressions**: `if x > 0 then x else 0`
+- **Let-expressions**: `let x = 1 in x + 1`
 
 ## Operators
 
@@ -228,9 +263,15 @@ expression  ::= identifier "=" expression
               | expression binop expression
               | "(" expression ")"
               | "if" expression "then" expression "else" expression
+              | "let" let_bindings "in" expression
 
 call_args   ::= ε
               | expression ("," expression)*
+
+let_bindings ::= binding ("and" binding)*
+
+binding     ::= identifier "=" expression
+              | identifier ":" type "=" expression
 
 binop       ::= "+" | "-" | "*" | "/"
               | "==" | "!=" | "<" | "<=" | ">" | ">="

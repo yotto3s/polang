@@ -92,6 +92,15 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
+class NLetExpression : public NExpression {
+public:
+  VariableList bindings;
+  NExpression &body;
+  NLetExpression(VariableList &bindings, NExpression &body)
+      : bindings(bindings), body(body) {}
+  void accept(Visitor &visitor) const override;
+};
+
 class NExpressionStatement : public NStatement {
 public:
   NExpression &expression;
