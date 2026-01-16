@@ -40,6 +40,7 @@ public:
   GenericValue runCode();
   std::map<std::string, AllocaInst *> &locals() { return blocks.top()->locals; }
   BasicBlock *currentBlock() { return blocks.top()->block; }
+  void setCurrentBlock(BasicBlock *block) { blocks.top()->block = block; }
   void pushBlock(BasicBlock *block) {
     blocks.push(new CodeGenBlock());
     blocks.top()->block = block;

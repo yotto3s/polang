@@ -1,6 +1,6 @@
 #include "compiler/codegen.hpp"
 #include "parser/node.hpp"
-#include "parser.hpp"
+#include "parser.hpp" // Must be after node.hpp for bison union types
 
 /* Compile the AST into a module */
 void CodeGenContext::generateCode(NBlock &root) {
@@ -15,7 +15,7 @@ void CodeGenContext::generateCode(NBlock &root) {
   /* Push a new variable/block context */
   pushBlock(bblock);
   root.codeGen(*this); /* emit bytecode for the toplevel block */
-  ReturnInst::Create(context, bblock);
+  ReturnInst::Create(context, currentBlock());
   popBlock();
 }
 
@@ -129,8 +129,42 @@ Value *NBinaryOperator::codeGen(CodeGenContext &context) {
   case TDIV:
     instr = Instruction::SDiv;
     goto math;
-
-    /* TODO comparison */
+  case TCEQ:
+  case TCNE:
+  case TCLT:
+  case TCLE:
+  case TCGT:
+  case TCGE: {
+    CmpInst::Predicate pred;
+    switch (op) {
+    case TCEQ:
+      pred = CmpInst::ICMP_EQ;
+      break;
+    case TCNE:
+      pred = CmpInst::ICMP_NE;
+      break;
+    case TCLT:
+      pred = CmpInst::ICMP_SLT;
+      break;
+    case TCLE:
+      pred = CmpInst::ICMP_SLE;
+      break;
+    case TCGT:
+      pred = CmpInst::ICMP_SGT;
+      break;
+    case TCGE:
+      pred = CmpInst::ICMP_SGE;
+      break;
+    default:
+      return NULL;
+    }
+    Value *cmp =
+        CmpInst::Create(Instruction::ICmp, pred, lhs.codeGen(context),
+                        rhs.codeGen(context), "", context.currentBlock());
+    // Convert i1 to i64 for consistency with other integer operations
+    return new ZExtInst(cmp, Type::getInt64Ty(context.context), "",
+                        context.currentBlock());
+  }
   }
 
   return NULL;
@@ -145,7 +179,8 @@ Value *NAssignment::codeGen(CodeGenContext &context) {
     std::cerr << "undeclared variable " << lhs.name << std::endl;
     return NULL;
   }
-  return new StoreInst(rhs.codeGen(context), context.locals()[lhs.name], false,
+  Value *value = rhs.codeGen(context);
+  return new StoreInst(value, context.locals()[lhs.name], false,
                        context.currentBlock());
 }
 
@@ -198,8 +233,62 @@ Value *NFunctionDeclaration::codeGen(CodeGenContext &context) {
 
   // Generate code for the function body and return its value
   Value *retVal = block.codeGen(context);
-  ReturnInst::Create(context.context, retVal, bblock);
+  ReturnInst::Create(context.context, retVal, context.currentBlock());
 
   context.popBlock();
   return function;
+}
+
+Value *NIfExpression::codeGen(CodeGenContext &context) {
+  // Generate code for the condition
+  Value *condValue = condition.codeGen(context);
+  if (!condValue) {
+    return NULL;
+  }
+
+  // Convert condition to boolean (compare with 0)
+  Value *condBool =
+      CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_NE, condValue,
+                      ConstantInt::get(Type::getInt64Ty(context.context), 0),
+                      "ifcond", context.currentBlock());
+
+  // Get the current function
+  Function *func = context.currentBlock()->getParent();
+
+  // Create basic blocks for then, else, and merge
+  BasicBlock *thenBB = BasicBlock::Create(context.context, "then", func);
+  BasicBlock *elseBB = BasicBlock::Create(context.context, "else", func);
+  BasicBlock *mergeBB = BasicBlock::Create(context.context, "ifcont", func);
+
+  // Create conditional branch
+  BranchInst::Create(thenBB, elseBB, condBool, context.currentBlock());
+
+  // Emit then block
+  context.setCurrentBlock(thenBB);
+  Value *thenValue = thenExpr.codeGen(context);
+  if (!thenValue) {
+    return NULL;
+  }
+  BranchInst::Create(mergeBB, context.currentBlock());
+  // Save the block that then ends in (might be different due to nested ifs)
+  BasicBlock *thenEndBB = context.currentBlock();
+
+  // Emit else block
+  context.setCurrentBlock(elseBB);
+  Value *elseValue = elseExpr.codeGen(context);
+  if (!elseValue) {
+    return NULL;
+  }
+  BranchInst::Create(mergeBB, context.currentBlock());
+  // Save the block that else ends in
+  BasicBlock *elseEndBB = context.currentBlock();
+
+  // Emit merge block with PHI node
+  context.setCurrentBlock(mergeBB);
+  PHINode *phi =
+      PHINode::Create(Type::getInt64Ty(context.context), 2, "iftmp", mergeBB);
+  phi->addIncoming(thenValue, thenEndBB);
+  phi->addIncoming(elseValue, elseEndBB);
+
+  return phi;
 }

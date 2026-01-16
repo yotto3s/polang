@@ -77,6 +77,17 @@ public:
   virtual llvm::Value *codeGen(CodeGenContext &context);
 };
 
+class NIfExpression : public NExpression {
+public:
+  NExpression &condition;
+  NExpression &thenExpr;
+  NExpression &elseExpr;
+  NIfExpression(NExpression &condition, NExpression &thenExpr,
+                NExpression &elseExpr)
+      : condition(condition), thenExpr(thenExpr), elseExpr(elseExpr) {}
+  virtual llvm::Value *codeGen(CodeGenContext &context);
+};
+
 class NExpressionStatement : public NStatement {
 public:
   NExpression &expression;

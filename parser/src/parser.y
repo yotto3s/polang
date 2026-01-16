@@ -30,6 +30,7 @@ void yyerror(const char *s) { printf("ERROR: %sn", s); }
 %token <token> TLPAREN TRPAREN TLBRACE TRBRACE TCOMMA TDOT
 %token <token> TPLUS TMINUS TMUL TDIV
 %token <token> TLET TFUN TIN TCOLON TARROW
+%token <token> TIF TTHEN TELSE
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -45,6 +46,7 @@ void yyerror(const char *s) { printf("ERROR: %sn", s); }
 %type <token> comparison
 
 /* Operator precedence (lowest to highest) */
+%right TIF TTHEN TELSE
 %right TEQUAL
 %nonassoc COMPARISON TCEQ TCNE TCLT TCLE TCGT TCGE
 %left TPLUS TMINUS
@@ -125,6 +127,7 @@ expr : ident TEQUAL expr { $$ = new NAssignment(*$<ident>1, *$3); }
      | expr TMUL expr { $$ = new NBinaryOperator(*$1, TMUL, *$3); }
      | expr TDIV expr { $$ = new NBinaryOperator(*$1, TDIV, *$3); }
      | TLPAREN expr TRPAREN { $$ = $2; }
+     | TIF expr TTHEN expr TELSE expr { $$ = new NIfExpression(*$2, *$4, *$6); }
      ;
     
 call_args : /*blank*/  { $$ = new ExpressionList(); }

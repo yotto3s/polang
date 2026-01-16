@@ -8,6 +8,7 @@ Polang is a simple programming language with ML-inspired syntax and LLVM backend
 - [Literals](#literals)
 - [Variables](#variables)
 - [Functions](#functions)
+- [Control Flow](#control-flow)
 - [Expressions](#expressions)
 - [Operators](#operators)
 - [Comments](#comments)
@@ -114,6 +115,35 @@ print()
 <function_name>()
 ```
 
+## Control Flow
+
+### If Expression
+
+Polang supports conditional expressions using `if`/`then`/`else`:
+
+```
+if x > 0 then 1 else 0
+if a == b then a + 1 else b + 1
+```
+
+**Syntax:**
+```
+if <condition> then <then_expr> else <else_expr>
+```
+
+- The condition is evaluated and compared to 0 (non-zero is truthy)
+- Both `then` and `else` branches are required
+- If-expressions return a value and can be used anywhere an expression is expected
+- If-expressions can be nested
+
+**Examples:**
+
+```
+let max (a : int) (b : int) : int = if a > b then a else b
+let abs (x : int) : int = if x < 0 then 0 - x else x
+let sign (n : int) : int = if n > 0 then 1 else if n < 0 then 0 - 1 else 0
+```
+
 ## Expressions
 
 Expressions can be:
@@ -125,6 +155,7 @@ Expressions can be:
 - **Function calls**: `add(1, 2)`
 - **Assignments**: `x = 5`
 - **Parenthesized**: `(a + b) * c`
+- **If-expressions**: `if x > 0 then x else 0`
 
 ## Operators
 
@@ -196,6 +227,7 @@ expression  ::= identifier "=" expression
               | numeric
               | expression binop expression
               | "(" expression ")"
+              | "if" expression "then" expression "else" expression
 
 call_args   ::= ε
               | expression ("," expression)*
@@ -250,4 +282,11 @@ let is_less = a < b
 ```
 let compute (a : int) (b : int) (c : int) : int = (a + b) * c
 let answer = compute(1, 2, 3)
+```
+
+### If Expression
+
+```
+let max (a : int) (b : int) : int = if a > b then a else b
+let larger = max(10, 20)
 ```
