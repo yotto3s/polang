@@ -4,12 +4,12 @@
 #include <iostream>
 #include <sstream>
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   std::stringstream buffer;
   buffer << std::cin.rdbuf();
   std::string source = buffer.str();
 
-  NBlock *ast = polang_parse(source);
+  NBlock* ast = polang_parse(source);
   if (!ast) {
     return 1;
   }

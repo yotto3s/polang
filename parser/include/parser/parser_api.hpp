@@ -5,6 +5,6 @@
 
 class NBlock;
 
-NBlock *polang_parse(const std::string &source);
+NBlock* polang_parse(const std::string& source);
 
 #endif // POLANG_PARSER_API_HPP

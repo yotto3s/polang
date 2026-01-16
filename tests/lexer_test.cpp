@@ -12,14 +12,14 @@
 // clang-format on
 
 // Flex buffer type and functions
-typedef struct yy_buffer_state *YY_BUFFER_STATE;
-extern YY_BUFFER_STATE yy_scan_string(const char *str);
+typedef struct yy_buffer_state* YY_BUFFER_STATE;
+extern YY_BUFFER_STATE yy_scan_string(const char* str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 extern int yylex();
 extern YYSTYPE yylval;
 
 // Helper to get all tokens from a source string
-std::vector<int> tokenize(const std::string &source) {
+std::vector<int> tokenize(const std::string& source) {
   std::vector<int> tokens;
   YY_BUFFER_STATE buffer = yy_scan_string(source.c_str());
   int token;
@@ -36,7 +36,7 @@ struct TokenInfo {
   std::string value;
 };
 
-std::vector<TokenInfo> tokenizeWithValues(const std::string &source) {
+std::vector<TokenInfo> tokenizeWithValues(const std::string& source) {
   std::vector<TokenInfo> tokens;
   YY_BUFFER_STATE buffer = yy_scan_string(source.c_str());
   int token;

@@ -15,7 +15,6 @@ add_executable(lexer_test
 )
 target_link_libraries(lexer_test
     PRIVATE PolangParser
-    PRIVATE PolangNodeStubs
     PRIVATE GTest::gtest_main
 )
 target_compile_options(lexer_test PRIVATE -Wno-error)
@@ -26,7 +25,6 @@ add_executable(parser_test
 )
 target_link_libraries(parser_test
     PRIVATE PolangParser
-    PRIVATE PolangNodeStubs
     PRIVATE GTest::gtest_main
 )
 target_compile_options(parser_test PRIVATE -Wno-error)

@@ -22,31 +22,31 @@ class NBlock;
 
 class CodeGenBlock {
 public:
-  BasicBlock *block;
-  std::map<std::string, AllocaInst *> locals;
+  BasicBlock* block;
+  std::map<std::string, AllocaInst*> locals;
 };
 
 class CodeGenContext {
-  std::stack<CodeGenBlock *> blocks;
-  Function *mainFunction;
+  std::stack<CodeGenBlock*> blocks;
+  Function* mainFunction;
 
 public:
   LLVMContext context;
-  Module *module;
+  Module* module;
   CodeGenContext() { module = new Module("main", context); }
 
-  void generateCode(NBlock &root);
-  void printIR(raw_ostream &os);
+  void generateCode(NBlock& root);
+  void printIR(raw_ostream& os);
   GenericValue runCode();
-  std::map<std::string, AllocaInst *> &locals() { return blocks.top()->locals; }
-  BasicBlock *currentBlock() { return blocks.top()->block; }
-  void setCurrentBlock(BasicBlock *block) { blocks.top()->block = block; }
-  void pushBlock(BasicBlock *block) {
+  std::map<std::string, AllocaInst*>& locals() { return blocks.top()->locals; }
+  BasicBlock* currentBlock() { return blocks.top()->block; }
+  void setCurrentBlock(BasicBlock* block) { blocks.top()->block = block; }
+  void pushBlock(BasicBlock* block) {
     blocks.push(new CodeGenBlock());
     blocks.top()->block = block;
   }
   void popBlock() {
-    CodeGenBlock *top = blocks.top();
+    CodeGenBlock* top = blocks.top();
     blocks.pop();
     delete top;
   }

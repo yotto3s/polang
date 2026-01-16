@@ -15,7 +15,7 @@
 using namespace llvm;
 
 // Run PolangCompiler as subprocess, pass source via stdin, get IR from stdout
-static std::string runCompiler(const std::string &source) {
+static std::string runCompiler(const std::string& source) {
   int pipeIn[2];  // Parent writes, child reads (child's stdin)
   int pipeOut[2]; // Child writes, parent reads (child's stdout)
 
@@ -79,7 +79,7 @@ static std::string runCompiler(const std::string &source) {
 }
 
 // Parse IR string and execute with JIT
-static int executeIR(const std::string &ir) {
+static int executeIR(const std::string& ir) {
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
 
@@ -96,7 +96,8 @@ static int executeIR(const std::string &ir) {
   // Create JIT
   auto JTMB = orc::JITTargetMachineBuilder::detectHost();
   if (!JTMB) {
-    std::cerr << "Failed to detect host: " << toString(JTMB.takeError()) << "\n";
+    std::cerr << "Failed to detect host: " << toString(JTMB.takeError())
+              << "\n";
     return 1;
   }
   JTMB->setCPU("generic");
@@ -128,17 +129,18 @@ static int executeIR(const std::string &ir) {
   // Lookup and run main
   auto MainSym = (*JIT)->lookup("main");
   if (!MainSym) {
-    std::cerr << "Failed to find main: " << toString(MainSym.takeError()) << "\n";
+    std::cerr << "Failed to find main: " << toString(MainSym.takeError())
+              << "\n";
     return 1;
   }
 
-  auto *MainFn = MainSym->toPtr<void (*)()>();
+  auto* MainFn = MainSym->toPtr<void (*)()>();
   MainFn();
 
   return 0;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   // Read source from stdin
   std::stringstream buffer;
   buffer << std::cin.rdbuf();
