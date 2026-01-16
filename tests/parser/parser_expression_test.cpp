@@ -10,7 +10,7 @@ TEST(ParserTest, IntegerExpression) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
   ASSERT_NE(exprStmt, nullptr);
 
-  auto* intExpr = dynamic_cast<NInteger*>(&exprStmt->expression);
+  auto* intExpr = dynamic_cast<const NInteger*>(&exprStmt->expression);
   ASSERT_NE(intExpr, nullptr);
   EXPECT_EQ(intExpr->value, 42);
 }
@@ -23,7 +23,7 @@ TEST(ParserTest, DoubleExpression) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
   ASSERT_NE(exprStmt, nullptr);
 
-  auto* doubleExpr = dynamic_cast<NDouble*>(&exprStmt->expression);
+  auto* doubleExpr = dynamic_cast<const NDouble*>(&exprStmt->expression);
   ASSERT_NE(doubleExpr, nullptr);
   EXPECT_DOUBLE_EQ(doubleExpr->value, 3.14159);
 }
@@ -36,7 +36,7 @@ TEST(ParserTest, IdentifierExpression) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
   ASSERT_NE(exprStmt, nullptr);
 
-  auto* identExpr = dynamic_cast<NIdentifier*>(&exprStmt->expression);
+  auto* identExpr = dynamic_cast<const NIdentifier*>(&exprStmt->expression);
   ASSERT_NE(identExpr, nullptr);
   EXPECT_EQ(identExpr->name, "myVar");
 }
@@ -51,12 +51,12 @@ TEST(ParserTest, AdditionExpression) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
   ASSERT_NE(exprStmt, nullptr);
 
-  auto* binOp = dynamic_cast<NBinaryOperator*>(&exprStmt->expression);
+  auto* binOp = dynamic_cast<const NBinaryOperator*>(&exprStmt->expression);
   ASSERT_NE(binOp, nullptr);
   EXPECT_EQ(binOp->op, TPLUS);
 
-  auto* lhs = dynamic_cast<NInteger*>(&binOp->lhs);
-  auto* rhs = dynamic_cast<NInteger*>(&binOp->rhs);
+  auto* lhs = dynamic_cast<const NInteger*>(&binOp->lhs);
+  auto* rhs = dynamic_cast<const NInteger*>(&binOp->rhs);
   ASSERT_NE(lhs, nullptr);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(lhs->value, 1);
@@ -68,7 +68,7 @@ TEST(ParserTest, SubtractionExpression) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* binOp = dynamic_cast<NBinaryOperator*>(&exprStmt->expression);
+  auto* binOp = dynamic_cast<const NBinaryOperator*>(&exprStmt->expression);
   ASSERT_NE(binOp, nullptr);
   EXPECT_EQ(binOp->op, TMINUS);
 }
@@ -78,7 +78,7 @@ TEST(ParserTest, MultiplicationExpression) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* binOp = dynamic_cast<NBinaryOperator*>(&exprStmt->expression);
+  auto* binOp = dynamic_cast<const NBinaryOperator*>(&exprStmt->expression);
   ASSERT_NE(binOp, nullptr);
   EXPECT_EQ(binOp->op, TMUL);
 }
@@ -88,7 +88,7 @@ TEST(ParserTest, DivisionExpression) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* binOp = dynamic_cast<NBinaryOperator*>(&exprStmt->expression);
+  auto* binOp = dynamic_cast<const NBinaryOperator*>(&exprStmt->expression);
   ASSERT_NE(binOp, nullptr);
   EXPECT_EQ(binOp->op, TDIV);
 }
@@ -101,17 +101,17 @@ TEST(ParserTest, MulHigherThanAdd) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* addOp = dynamic_cast<NBinaryOperator*>(&exprStmt->expression);
+  auto* addOp = dynamic_cast<const NBinaryOperator*>(&exprStmt->expression);
   ASSERT_NE(addOp, nullptr);
   EXPECT_EQ(addOp->op, TPLUS);
 
   // LHS should be 1
-  auto* lhs = dynamic_cast<NInteger*>(&addOp->lhs);
+  auto* lhs = dynamic_cast<const NInteger*>(&addOp->lhs);
   ASSERT_NE(lhs, nullptr);
   EXPECT_EQ(lhs->value, 1);
 
   // RHS should be 2 * 3
-  auto* mulOp = dynamic_cast<NBinaryOperator*>(&addOp->rhs);
+  auto* mulOp = dynamic_cast<const NBinaryOperator*>(&addOp->rhs);
   ASSERT_NE(mulOp, nullptr);
   EXPECT_EQ(mulOp->op, TMUL);
 }
@@ -122,12 +122,12 @@ TEST(ParserTest, ParenthesesOverridePrecedence) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* mulOp = dynamic_cast<NBinaryOperator*>(&exprStmt->expression);
+  auto* mulOp = dynamic_cast<const NBinaryOperator*>(&exprStmt->expression);
   ASSERT_NE(mulOp, nullptr);
   EXPECT_EQ(mulOp->op, TMUL);
 
   // LHS should be 1 + 2
-  auto* addOp = dynamic_cast<NBinaryOperator*>(&mulOp->lhs);
+  auto* addOp = dynamic_cast<const NBinaryOperator*>(&mulOp->lhs);
   ASSERT_NE(addOp, nullptr);
   EXPECT_EQ(addOp->op, TPLUS);
 }
@@ -139,7 +139,7 @@ TEST(ParserTest, EqualComparison) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* binOp = dynamic_cast<NBinaryOperator*>(&exprStmt->expression);
+  auto* binOp = dynamic_cast<const NBinaryOperator*>(&exprStmt->expression);
   ASSERT_NE(binOp, nullptr);
   EXPECT_EQ(binOp->op, TCEQ);
 }
@@ -149,7 +149,7 @@ TEST(ParserTest, NotEqualComparison) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* binOp = dynamic_cast<NBinaryOperator*>(&exprStmt->expression);
+  auto* binOp = dynamic_cast<const NBinaryOperator*>(&exprStmt->expression);
   ASSERT_NE(binOp, nullptr);
   EXPECT_EQ(binOp->op, TCNE);
 }
@@ -159,7 +159,7 @@ TEST(ParserTest, LessThanComparison) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* binOp = dynamic_cast<NBinaryOperator*>(&exprStmt->expression);
+  auto* binOp = dynamic_cast<const NBinaryOperator*>(&exprStmt->expression);
   ASSERT_NE(binOp, nullptr);
   EXPECT_EQ(binOp->op, TCLT);
 }
@@ -169,7 +169,7 @@ TEST(ParserTest, GreaterThanComparison) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* binOp = dynamic_cast<NBinaryOperator*>(&exprStmt->expression);
+  auto* binOp = dynamic_cast<const NBinaryOperator*>(&exprStmt->expression);
   ASSERT_NE(binOp, nullptr);
   EXPECT_EQ(binOp->op, TCGT);
 }
@@ -181,7 +181,7 @@ TEST(ParserTest, FunctionCallNoArgs) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* call = dynamic_cast<NMethodCall*>(&exprStmt->expression);
+  auto* call = dynamic_cast<const NMethodCall*>(&exprStmt->expression);
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(call->id.name, "foo");
   EXPECT_EQ(call->arguments.size(), 0);
@@ -192,7 +192,7 @@ TEST(ParserTest, FunctionCallOneArg) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* call = dynamic_cast<NMethodCall*>(&exprStmt->expression);
+  auto* call = dynamic_cast<const NMethodCall*>(&exprStmt->expression);
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(call->id.name, "square");
   ASSERT_EQ(call->arguments.size(), 1);
@@ -207,7 +207,7 @@ TEST(ParserTest, FunctionCallMultipleArgs) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* call = dynamic_cast<NMethodCall*>(&exprStmt->expression);
+  auto* call = dynamic_cast<const NMethodCall*>(&exprStmt->expression);
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(call->id.name, "add");
   ASSERT_EQ(call->arguments.size(), 3);
@@ -220,11 +220,11 @@ TEST(ParserTest, SimpleAssignment) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* assign = dynamic_cast<NAssignment*>(&exprStmt->expression);
+  auto* assign = dynamic_cast<const NAssignment*>(&exprStmt->expression);
   ASSERT_NE(assign, nullptr);
   EXPECT_EQ(assign->lhs.name, "x");
 
-  auto* rhs = dynamic_cast<NInteger*>(&assign->rhs);
+  auto* rhs = dynamic_cast<const NInteger*>(&assign->rhs);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->value, 10);
 }
@@ -237,7 +237,7 @@ TEST(ParserTest, ComplexArithmeticExpression) {
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
   // Top level should be division
-  auto* divOp = dynamic_cast<NBinaryOperator*>(&exprStmt->expression);
+  auto* divOp = dynamic_cast<const NBinaryOperator*>(&exprStmt->expression);
   ASSERT_NE(divOp, nullptr);
   EXPECT_EQ(divOp->op, TDIV);
 }
@@ -247,15 +247,15 @@ TEST(ParserTest, FunctionCallInExpression) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* addOp = dynamic_cast<NBinaryOperator*>(&exprStmt->expression);
+  auto* addOp = dynamic_cast<const NBinaryOperator*>(&exprStmt->expression);
   ASSERT_NE(addOp, nullptr);
   EXPECT_EQ(addOp->op, TPLUS);
 
-  auto* lhs = dynamic_cast<NMethodCall*>(&addOp->lhs);
+  auto* lhs = dynamic_cast<const NMethodCall*>(&addOp->lhs);
   ASSERT_NE(lhs, nullptr);
   EXPECT_EQ(lhs->id.name, "foo");
 
-  auto* rhs = dynamic_cast<NMethodCall*>(&addOp->rhs);
+  auto* rhs = dynamic_cast<const NMethodCall*>(&addOp->rhs);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->id.name, "bar");
 }

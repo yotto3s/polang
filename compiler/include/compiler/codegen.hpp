@@ -1,3 +1,6 @@
+#ifndef POLANG_CODEGEN_HPP
+#define POLANG_CODEGEN_HPP
+
 #include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
@@ -38,19 +41,25 @@ public:
   void generateCode(NBlock& root);
   void printIR(raw_ostream& os) const;
   GenericValue runCode();
-  std::map<std::string, AllocaInst*>& locals() { return blocks.top()->locals; }
-  const std::map<std::string, AllocaInst*>& locals() const {
+  std::map<std::string, AllocaInst*>& locals() noexcept {
     return blocks.top()->locals;
   }
-  BasicBlock* currentBlock() const { return blocks.top()->block; }
-  void setCurrentBlock(BasicBlock* block) { blocks.top()->block = block; }
-  void pushBlock(BasicBlock* block) {
+  const std::map<std::string, AllocaInst*>& locals() const noexcept {
+    return blocks.top()->locals;
+  }
+  BasicBlock* currentBlock() const noexcept { return blocks.top()->block; }
+  void setCurrentBlock(BasicBlock* block) noexcept {
+    blocks.top()->block = block;
+  }
+  void pushBlock(BasicBlock* block) noexcept {
     blocks.push(new CodeGenBlock());
     blocks.top()->block = block;
   }
-  void popBlock() {
+  void popBlock() noexcept {
     CodeGenBlock* top = blocks.top();
     blocks.pop();
     delete top;
   }
 };
+
+#endif // POLANG_CODEGEN_HPP

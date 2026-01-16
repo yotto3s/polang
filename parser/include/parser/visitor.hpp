@@ -18,7 +18,7 @@ class NFunctionDeclaration;
 
 class Visitor {
 public:
-  virtual ~Visitor() = default;
+  virtual ~Visitor() noexcept = default;
 
   // Expression visitors
   virtual void visit(const NInteger& node) = 0;

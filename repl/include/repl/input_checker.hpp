@@ -9,7 +9,7 @@
 class InputChecker {
 public:
   // Check if input appears incomplete (needs more lines)
-  static bool isInputIncomplete(const std::string& input) {
+  static bool isInputIncomplete(const std::string& input) noexcept {
     int parenDepth = 0;
     int ifWithoutElse = 0;
     std::string lastToken;

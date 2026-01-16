@@ -30,7 +30,7 @@ TEST(ParserTest, FunctionAndCall) {
 
   auto* exprStmt = dynamic_cast<NExpressionStatement*>(block->statements[1]);
   ASSERT_NE(exprStmt, nullptr);
-  auto* call = dynamic_cast<NMethodCall*>(&exprStmt->expression);
+  auto* call = dynamic_cast<const NMethodCall*>(&exprStmt->expression);
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(call->id.name, "inc");
 }

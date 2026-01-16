@@ -26,8 +26,8 @@ struct EvalResult {
 // Manages persistent state for the REPL session
 class ReplSession {
 public:
-  ReplSession();
-  ~ReplSession();
+  ReplSession() noexcept;
+  ~ReplSession() noexcept;
 
   // Initialize LLVM - must be called before evaluate
   bool initialize();
@@ -36,13 +36,13 @@ public:
   EvalResult evaluate(const std::string& input);
 
   // Check if input appears incomplete (needs more lines)
-  static bool isInputIncomplete(const std::string& input);
+  static bool isInputIncomplete(const std::string& input) noexcept;
 
 private:
   bool initialized_ = false;
 
   // Accumulated source code from previous successful evaluations
-  std::string accumulatedCode_;
+  std::string accumulatedCode_ = "";
 };
 
 #endif // POLANG_REPL_SESSION_HPP
