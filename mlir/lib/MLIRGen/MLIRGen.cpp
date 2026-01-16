@@ -13,8 +13,11 @@
 #include "parser/node.hpp"
 #include "parser.hpp"  // Must be after node.hpp for bison union types
 // clang-format on
+#include "parser/polang_types.hpp"
 #include "parser/type_checker.hpp"
 #include "parser/visitor.hpp"
+
+using polang::TypeNames;
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -26,6 +29,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -65,47 +69,29 @@ public:
   // Visitor interface implementations
   void visit(const NInteger& node) override {
     result = builder.create<ConstantIntOp>(loc(), node.value);
-    resultType = "int";
+    resultType = TypeNames::INT;
   }
 
   void visit(const NDouble& node) override {
     result = builder.create<ConstantDoubleOp>(loc(), node.value);
-    resultType = "double";
+    resultType = TypeNames::DOUBLE;
   }
 
   void visit(const NBoolean& node) override {
     result = builder.create<ConstantBoolOp>(loc(), node.value);
-    resultType = "bool";
+    resultType = TypeNames::BOOL;
   }
 
   void visit(const NIdentifier& node) override {
-    // Check immutable values first (SSA values, no load needed)
-    auto immIt = immutableValues.find(node.name);
-    if (immIt != immutableValues.end()) {
-      result = immIt->second;
-      resultType = typeTable[node.name];
+    auto value = lookupVariable(node.name);
+    if (value) {
+      result = *value;
+      auto type = lookupType(node.name);
+      resultType = type.value_or(TypeNames::INT);
       return;
     }
 
-    // Check mutable variables (allocas, need load)
-    auto it = symbolTable.find(node.name);
-    if (it != symbolTable.end()) {
-      Value allocaOp = it->second;
-      result =
-          builder.create<LoadOp>(loc(), getTypeForName(node.name), allocaOp);
-      resultType = typeTable[node.name];
-      return;
-    }
-
-    // Check function arguments
-    auto argIt = argValues.find(node.name);
-    if (argIt != argValues.end()) {
-      result = argIt->second;
-      resultType = typeTable[node.name];
-      return;
-    }
-
-    llvm::errs() << "Unknown variable: " << node.name << "\n";
+    emitError(loc()) << "Unknown variable: " << node.name;
     result = nullptr;
   }
 
@@ -124,24 +110,9 @@ public:
     if (funcIt != functionCaptures.end()) {
       // Add captured variables as extra arguments
       for (const auto& captureName : funcIt->second) {
-        // Check immutable values first (SSA values)
-        auto immIt = immutableValues.find(captureName);
-        if (immIt != immutableValues.end()) {
-          args.push_back(immIt->second);
-        } else {
-          // Check mutable variables (allocas)
-          auto it = symbolTable.find(captureName);
-          if (it != symbolTable.end()) {
-            Value loadedVal = builder.create<LoadOp>(
-                loc(), getTypeForName(captureName), it->second);
-            args.push_back(loadedVal);
-          } else {
-            // Check function arguments
-            auto argIt = argValues.find(captureName);
-            if (argIt != argValues.end()) {
-              args.push_back(argIt->second);
-            }
-          }
+        auto capturedValue = lookupVariable(captureName);
+        if (capturedValue) {
+          args.push_back(*capturedValue);
         }
       }
     }
@@ -154,7 +125,7 @@ public:
       resultType = funcRetTypeIt->second;
     } else {
       resultTy = builder.getType<IntType>();
-      resultType = "int";
+      resultType = TypeNames::INT;
     }
 
     auto callOp =
@@ -191,24 +162,24 @@ public:
     // Comparison operations
     else if (node.op == TCEQ) {
       result = builder.create<CmpOp>(loc(), CmpPredicate::eq, lhs, rhs);
-      resultType = "bool";
+      resultType = TypeNames::BOOL;
     } else if (node.op == TCNE) {
       result = builder.create<CmpOp>(loc(), CmpPredicate::ne, lhs, rhs);
-      resultType = "bool";
+      resultType = TypeNames::BOOL;
     } else if (node.op == TCLT) {
       result = builder.create<CmpOp>(loc(), CmpPredicate::lt, lhs, rhs);
-      resultType = "bool";
+      resultType = TypeNames::BOOL;
     } else if (node.op == TCLE) {
       result = builder.create<CmpOp>(loc(), CmpPredicate::le, lhs, rhs);
-      resultType = "bool";
+      resultType = TypeNames::BOOL;
     } else if (node.op == TCGT) {
       result = builder.create<CmpOp>(loc(), CmpPredicate::gt, lhs, rhs);
-      resultType = "bool";
+      resultType = TypeNames::BOOL;
     } else if (node.op == TCGE) {
       result = builder.create<CmpOp>(loc(), CmpPredicate::ge, lhs, rhs);
-      resultType = "bool";
+      resultType = TypeNames::BOOL;
     } else {
-      llvm::errs() << "Unknown binary operator: " << node.op << "\n";
+      emitError(loc()) << "Unknown binary operator: " << node.op;
       result = nullptr;
     }
   }
@@ -223,8 +194,7 @@ public:
     // Get the alloca for the variable
     auto it = symbolTable.find(node.lhs.name);
     if (it == symbolTable.end()) {
-      llvm::errs() << "Unknown variable in assignment: " << node.lhs.name
-                   << "\n";
+      emitError(loc()) << "Unknown variable in assignment: " << node.lhs.name;
       result = nullptr;
       return;
     }
@@ -286,10 +256,8 @@ public:
   }
 
   void visit(const NLetExpression& node) override {
-    // Save current symbol table state
-    auto savedSymbolTable = symbolTable;
-    auto savedTypeTable = typeTable;
-    auto savedImmutableValues = immutableValues;
+    // RAII scope guard automatically saves/restores symbol tables
+    SymbolTableScope scope(*this);
 
     // Process bindings
     for (const auto* binding : node.bindings) {
@@ -302,11 +270,6 @@ public:
 
     // Evaluate body
     node.body.accept(*this);
-
-    // Restore symbol table (let bindings are scoped)
-    symbolTable = savedSymbolTable;
-    typeTable = savedTypeTable;
-    immutableValues = savedImmutableValues;
   }
 
   void visit(const NExpressionStatement& node) override {
@@ -315,7 +278,7 @@ public:
 
   void visit(const NVariableDeclaration& node) override {
     // Determine the type
-    std::string typeName = node.type ? node.type->name : "int";
+    std::string typeName = node.type ? node.type->name : TypeNames::INT;
     if (node.assignmentExpr) {
       // Infer type from assignment
       node.assignmentExpr->accept(*this);
@@ -353,7 +316,7 @@ public:
     std::vector<std::string> argNames;
 
     for (const auto* arg : node.arguments) {
-      std::string typeName = arg->type ? arg->type->name : "int";
+      std::string typeName = arg->type ? arg->type->name : TypeNames::INT;
       argTypes.push_back(getPolangType(typeName));
       argNames.push_back(arg->id.name);
     }
@@ -361,7 +324,7 @@ public:
     // Add captured variables as extra parameters
     std::vector<std::string> captureNames;
     for (const auto* capture : node.captures) {
-      std::string typeName = capture->type ? capture->type->name : "int";
+      std::string typeName = capture->type ? capture->type->name : TypeNames::INT;
       argTypes.push_back(getPolangType(typeName));
       captureNames.push_back(capture->id.name);
     }
@@ -370,7 +333,7 @@ public:
     functionCaptures[node.id.name] = captureNames;
 
     // Return type
-    std::string returnTypeName = node.type ? node.type->name : "int";
+    std::string returnTypeName = node.type ? node.type->name : TypeNames::INT;
     Type returnType = getPolangType(returnTypeName);
     functionReturnTypes[node.id.name] = returnTypeName;
 
@@ -392,21 +355,13 @@ public:
     Block* entryBlock = funcOp.addEntryBlock();
     builder.setInsertionPointToStart(entryBlock);
 
-    // Save current state
-    auto savedSymbolTable = symbolTable;
-    auto savedTypeTable = typeTable;
-    auto savedArgValues = argValues;
-    auto savedImmutableValues = immutableValues;
-
-    symbolTable.clear();
-    typeTable.clear();
-    argValues.clear();
-    immutableValues.clear();
+    // RAII scope guard clears and restores symbol tables for function body
+    SymbolTableScope scope(*this, /*clearAllTables=*/true);
 
     // Register function arguments
     size_t argIdx = 0;
     for (const auto* arg : node.arguments) {
-      std::string typeName = arg->type ? arg->type->name : "int";
+      std::string typeName = arg->type ? arg->type->name : TypeNames::INT;
       argValues[arg->id.name] = entryBlock->getArgument(argIdx);
       typeTable[arg->id.name] = typeName;
       ++argIdx;
@@ -414,7 +369,7 @@ public:
 
     // Register captured variables as arguments
     for (const auto* capture : node.captures) {
-      std::string typeName = capture->type ? capture->type->name : "int";
+      std::string typeName = capture->type ? capture->type->name : TypeNames::INT;
       argValues[capture->id.name] = entryBlock->getArgument(argIdx);
       typeTable[capture->id.name] = typeName;
       ++argIdx;
@@ -429,12 +384,6 @@ public:
     } else {
       builder.create<ReturnOp>(loc());
     }
-
-    // Restore state
-    symbolTable = savedSymbolTable;
-    typeTable = savedTypeTable;
-    argValues = savedArgValues;
-    immutableValues = savedImmutableValues;
 
     result = nullptr; // Function declarations don't produce a value
   }
@@ -456,14 +405,81 @@ private:
   std::map<std::string, std::vector<std::string>> functionCaptures;
   std::map<std::string, std::string> functionReturnTypes;
 
+  /// RAII helper class for scoped symbol table management.
+  /// Automatically saves and restores symbol tables when entering/exiting
+  /// scopes.
+  class SymbolTableScope {
+  public:
+    SymbolTableScope(MLIRGenVisitor& visitor, bool clearAllTables = false)
+        : visitor_(visitor), savedSymbolTable_(visitor.symbolTable),
+          savedTypeTable_(visitor.typeTable),
+          savedArgValues_(visitor.argValues),
+          savedImmutableValues_(visitor.immutableValues) {
+      if (clearAllTables) {
+        visitor_.symbolTable.clear();
+        visitor_.typeTable.clear();
+        visitor_.argValues.clear();
+        visitor_.immutableValues.clear();
+      }
+    }
+
+    ~SymbolTableScope() {
+      visitor_.symbolTable = savedSymbolTable_;
+      visitor_.typeTable = savedTypeTable_;
+      visitor_.argValues = savedArgValues_;
+      visitor_.immutableValues = savedImmutableValues_;
+    }
+
+  private:
+    MLIRGenVisitor& visitor_;
+    std::map<std::string, Value> savedSymbolTable_;
+    std::map<std::string, std::string> savedTypeTable_;
+    std::map<std::string, Value> savedArgValues_;
+    std::map<std::string, Value> savedImmutableValues_;
+  };
+
   Location loc() { return builder.getUnknownLoc(); }
 
+  /// Look up a variable by name in the symbol tables.
+  /// Checks immutable values, mutable allocas, and function arguments.
+  /// Returns nullopt if the variable is not found.
+  std::optional<Value> lookupVariable(const std::string& name) {
+    // Check immutable values first (SSA values, no load needed)
+    auto immIt = immutableValues.find(name);
+    if (immIt != immutableValues.end()) {
+      return immIt->second;
+    }
+
+    // Check mutable variables (allocas, need load)
+    auto it = symbolTable.find(name);
+    if (it != symbolTable.end()) {
+      return builder.create<LoadOp>(loc(), getTypeForName(name), it->second);
+    }
+
+    // Check function arguments
+    auto argIt = argValues.find(name);
+    if (argIt != argValues.end()) {
+      return argIt->second;
+    }
+
+    return std::nullopt;
+  }
+
+  /// Look up a variable's type by name.
+  std::optional<std::string> lookupType(const std::string& name) {
+    auto it = typeTable.find(name);
+    if (it != typeTable.end()) {
+      return it->second;
+    }
+    return std::nullopt;
+  }
+
   Type getPolangType(const std::string& typeName) {
-    if (typeName == "int")
+    if (typeName == TypeNames::INT)
       return builder.getType<IntType>();
-    if (typeName == "double")
+    if (typeName == TypeNames::DOUBLE)
       return builder.getType<DoubleType>();
-    if (typeName == "bool")
+    if (typeName == TypeNames::BOOL)
       return builder.getType<BoolType>();
     // Default to int
     return builder.getType<IntType>();
@@ -512,9 +528,9 @@ private:
     } else {
       // Create default value matching the return type
       Value defaultVal;
-      if (inferredType == "double") {
+      if (inferredType == TypeNames::DOUBLE) {
         defaultVal = builder.create<ConstantDoubleOp>(loc(), 0.0);
-      } else if (inferredType == "bool") {
+      } else if (inferredType == TypeNames::BOOL) {
         defaultVal = builder.create<ConstantBoolOp>(loc(), false);
       } else {
         defaultVal = builder.create<ConstantIntOp>(loc(), 0);

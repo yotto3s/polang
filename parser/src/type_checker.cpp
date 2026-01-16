@@ -1,16 +1,66 @@
 // clang-format off
 #include <parser/type_checker.hpp>
+#include <parser/error_reporter.hpp>
 #include <parser/node.hpp>
+#include <parser/operator_utils.hpp>
+#include <parser/polang_types.hpp>
 #include "parser.hpp"  // Must be after node.hpp for token constants
 // clang-format on
 
 #include <iostream>
 #include <set>
 
-// Helper visitor class to collect free variables (identifiers not locally
-// defined)
+using polang::TypeNames;
+using polang::ErrorReporter;
+using polang::ErrorSeverity;
+using polang::isArithmeticOperator;
+using polang::isComparisonOperator;
+using polang::operatorToString;
+
+/// FreeVariableCollector - A visitor that identifies free variables in an
+/// expression or block.
+///
+/// This class traverses an AST subtree (typically a function body) and collects
+/// all variable names that are referenced but not locally defined. These are
+/// the "free variables" that must be captured by closures.
+///
+/// ## Algorithm
+///
+/// 1. Initialize with a set of known local names (e.g., function parameters)
+/// 2. Traverse the AST:
+///    - When an identifier is encountered, if it's not in the local set, it's a
+///      free variable (add to result)
+///    - When a let binding or variable declaration is encountered, add its name
+///      to the local set for subsequent traversal
+///    - Assignment LHS is treated as a reference (for mutable captures)
+/// 3. Return the collected set of free variable names
+///
+/// ## Special Cases
+///
+/// - **Function names are not captured**: Functions are global, so when
+///   visiting a method call, only the arguments are traversed, not the function
+///   name itself.
+/// - **Nested functions are not traversed**: Nested function bodies are not
+///   recursed into because they handle their own capture analysis
+///   independently.
+/// - **Let bindings use parallel semantics**: In `let x = a and y = b in body`,
+///   initializers `a` and `b` are processed before `x` and `y` are added to
+///   scope.
+///
+/// ## Example
+///
+/// ```
+/// let outer = 10 in
+///   let f = fun(x: int) -> x + outer  ; 'outer' is a free variable of f
+///   in f(5)
+/// ```
+/// When analyzing the body of `f`, `outer` is not in the local names
+/// (only `x` is), so `outer` is collected as a free variable.
 class FreeVariableCollector : public Visitor {
 public:
+  /// Construct a collector with an initial set of locally-defined names.
+  /// @param initial_locals Names that should not be considered free variables
+  ///        (e.g., function parameters)
   FreeVariableCollector(const std::set<std::string>& initial_locals)
       : local_names_(initial_locals) {}
 
@@ -116,7 +166,7 @@ private:
   std::set<std::string> referenced_non_locals_;
 };
 
-TypeChecker::TypeChecker() : inferred_type_("int") {}
+TypeChecker::TypeChecker() : inferred_type_(TypeNames::INT) {}
 
 std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   errors_.clear();
@@ -135,19 +185,32 @@ std::string TypeChecker::inferType(const Node& node) {
 
 void TypeChecker::reportError(const std::string& message) {
   errors_.push_back(TypeCheckError(message));
-  std::cerr << "Type error: " << message << std::endl;
+  // Use unified error reporter if available
+  auto* reporter = ErrorReporter::current();
+  if (reporter) {
+    reporter->error(message);
+  } else {
+    // Fallback to stderr (for backwards compatibility)
+    std::cerr << "Type error: " << message << std::endl;
+  }
 }
 
-void TypeChecker::visit(const NInteger& node) { inferred_type_ = "int"; }
+void TypeChecker::visit(const NInteger& node) {
+  inferred_type_ = TypeNames::INT;
+}
 
-void TypeChecker::visit(const NDouble& node) { inferred_type_ = "double"; }
+void TypeChecker::visit(const NDouble& node) {
+  inferred_type_ = TypeNames::DOUBLE;
+}
 
-void TypeChecker::visit(const NBoolean& node) { inferred_type_ = "bool"; }
+void TypeChecker::visit(const NBoolean& node) {
+  inferred_type_ = TypeNames::BOOL;
+}
 
 void TypeChecker::visit(const NIdentifier& node) {
   if (local_types_.find(node.name) == local_types_.end()) {
     reportError("Undeclared variable: " + node.name);
-    inferred_type_ = "unknown";
+    inferred_type_ = TypeNames::UNKNOWN;
     return;
   }
   inferred_type_ = local_types_[node.name];
@@ -174,7 +237,8 @@ void TypeChecker::visit(const NMethodCall& node) {
     } else {
       // Check each argument type
       for (std::size_t i = 0; i < arg_types.size(); ++i) {
-        if (arg_types[i] != "unknown" && param_types[i] != "unknown" &&
+        if (arg_types[i] != TypeNames::UNKNOWN &&
+            param_types[i] != TypeNames::UNKNOWN &&
             arg_types[i] != param_types[i]) {
           reportError("Function '" + node.id.name + "' argument " +
                       std::to_string(i + 1) + " expects " + param_types[i] +
@@ -190,7 +254,7 @@ void TypeChecker::visit(const NMethodCall& node) {
     inferred_type_ = function_return_types_[node.id.name];
   } else {
     // Unknown function, assume int
-    inferred_type_ = "int";
+    inferred_type_ = TypeNames::INT;
   }
 }
 
@@ -204,50 +268,26 @@ void TypeChecker::visit(const NBinaryOperator& node) {
   const std::string rhs_type = inferred_type_;
 
   // Check for unknown types (from undeclared variables)
-  if (lhs_type == "unknown" || rhs_type == "unknown") {
-    inferred_type_ = "unknown";
+  if (lhs_type == TypeNames::UNKNOWN || rhs_type == TypeNames::UNKNOWN) {
+    inferred_type_ = TypeNames::UNKNOWN;
     return;
   }
 
-  const bool is_arithmetic = (node.op == TPLUS || node.op == TMINUS ||
-                              node.op == TMUL || node.op == TDIV);
-  const bool is_comparison =
-      (node.op == TCEQ || node.op == TCNE || node.op == TCLT ||
-       node.op == TCLE || node.op == TCGT || node.op == TCGE);
-
-  if (is_arithmetic) {
+  if (isArithmeticOperator(node.op)) {
     // Both operands must be the same type for arithmetic
     if (lhs_type != rhs_type) {
-      std::string op_name;
-      switch (node.op) {
-      case TPLUS:
-        op_name = "+";
-        break;
-      case TMINUS:
-        op_name = "-";
-        break;
-      case TMUL:
-        op_name = "*";
-        break;
-      case TDIV:
-        op_name = "/";
-        break;
-      default:
-        op_name = "?";
-        break;
-      }
-      reportError("Type mismatch in '" + op_name + "': " + lhs_type + " and " +
-                  rhs_type);
+      reportError("Type mismatch in '" + operatorToString(node.op) + "': " +
+                  lhs_type + " and " + rhs_type);
     }
     inferred_type_ = lhs_type; // Result has same type as operands
-  } else if (is_comparison) {
+  } else if (isComparisonOperator(node.op)) {
     // Comparisons also require same types
     if (lhs_type != rhs_type) {
       reportError("Type mismatch in comparison: " + lhs_type + " and " +
                   rhs_type);
     }
     // Comparison returns bool
-    inferred_type_ = "bool";
+    inferred_type_ = TypeNames::BOOL;
   }
 }
 
@@ -255,14 +295,14 @@ void TypeChecker::visit(const NAssignment& node) {
   // Check variable exists
   if (local_types_.find(node.lhs.name) == local_types_.end()) {
     reportError("Undeclared variable: " + node.lhs.name);
-    inferred_type_ = "unknown";
+    inferred_type_ = TypeNames::UNKNOWN;
     return;
   }
 
   // Check mutability
   if (!local_mutability_[node.lhs.name]) {
     reportError("Cannot reassign immutable variable: " + node.lhs.name);
-    inferred_type_ = "unknown";
+    inferred_type_ = TypeNames::UNKNOWN;
     return;
   }
 
@@ -272,7 +312,7 @@ void TypeChecker::visit(const NAssignment& node) {
   node.rhs.accept(*this);
   const std::string rhs_type = inferred_type_;
 
-  if (rhs_type != "unknown" && rhs_type != var_type) {
+  if (rhs_type != TypeNames::UNKNOWN && rhs_type != var_type) {
     reportError("Cannot assign " + rhs_type + " to variable '" + node.lhs.name +
                 "' of type " + var_type);
   }
@@ -292,7 +332,7 @@ void TypeChecker::visit(const NIfExpression& node) {
   const std::string cond_type = inferred_type_;
 
   // Condition must be bool
-  if (cond_type != "unknown" && cond_type != "bool") {
+  if (cond_type != TypeNames::UNKNOWN && cond_type != TypeNames::BOOL) {
     reportError("If condition must be bool, got " + cond_type);
   }
 
@@ -305,7 +345,7 @@ void TypeChecker::visit(const NIfExpression& node) {
   const std::string else_type = inferred_type_;
 
   // Both branches must have same type
-  if (then_type != "unknown" && else_type != "unknown" &&
+  if (then_type != TypeNames::UNKNOWN && else_type != TypeNames::UNKNOWN &&
       then_type != else_type) {
     reportError("If branches have different types: " + then_type + " and " +
                 else_type);
@@ -334,7 +374,7 @@ void TypeChecker::visit(const NLetExpression& node) {
       } else if (var->assignmentExpr != nullptr) {
         // Infer type from initializer (in original scope)
         var->assignmentExpr->accept(*this);
-        if (inferred_type_ != "unknown") {
+        if (inferred_type_ != TypeNames::UNKNOWN) {
           sibling_var_types[var->id.name] = inferred_type_;
           sibling_var_mutability[var->id.name] = var->isMutable;
         }
@@ -367,7 +407,7 @@ void TypeChecker::visit(const NLetExpression& node) {
         if (arg->type == nullptr) {
           reportError("Function parameter '" + arg->id.name +
                       "' must have type annotation");
-          param_types.push_back("unknown");
+          param_types.push_back(TypeNames::UNKNOWN);
           continue;
         }
         local_types_[arg->id.name] = arg->type->name;
@@ -423,18 +463,19 @@ void TypeChecker::visit(const NLetExpression& node) {
 
       // Handle return type inference
       if (func->type == nullptr) {
-        if (body_type != "unknown") {
+        if (body_type != TypeNames::UNKNOWN) {
           mutable_func.type = new NIdentifier(body_type);
         } else {
-          mutable_func.type = new NIdentifier("int");
+          mutable_func.type = new NIdentifier(TypeNames::INT);
         }
-      } else if (body_type != "unknown" && body_type != func->type->name) {
+      } else if (body_type != TypeNames::UNKNOWN &&
+                 body_type != func->type->name) {
         reportError("Function '" + func->id.name + "' declared to return " +
                     func->type->name + " but body has type " + body_type);
       }
 
       // Placeholder for function binding type and mutability
-      binding_types.push_back("function");
+      binding_types.push_back(TypeNames::FUNCTION);
       binding_mutability.push_back(false);
 
       // Restore scope (remove parameters)
@@ -450,7 +491,7 @@ void TypeChecker::visit(const NLetExpression& node) {
         if (var->type == nullptr) {
           reportError("Variable '" + var->id.name +
                       "' must have type annotation or initializer");
-          binding_types.push_back("unknown");
+          binding_types.push_back(TypeNames::UNKNOWN);
           binding_mutability.push_back(var->isMutable);
         } else {
           binding_types.push_back(var->type->name);
@@ -463,12 +504,12 @@ void TypeChecker::visit(const NLetExpression& node) {
       var->assignmentExpr->accept(*this);
       const std::string expr_type = inferred_type_;
 
-      if (expr_type == "unknown") {
+      if (expr_type == TypeNames::UNKNOWN) {
         if (var->type != nullptr) {
           binding_types.push_back(var->type->name);
           binding_mutability.push_back(var->isMutable);
         } else {
-          binding_types.push_back("unknown");
+          binding_types.push_back(TypeNames::UNKNOWN);
           binding_mutability.push_back(var->isMutable);
         }
         continue;
@@ -499,7 +540,7 @@ void TypeChecker::visit(const NLetExpression& node) {
       const auto* func = binding->func;
       function_param_types_[func->id.name] = func_param_types[func_idx++];
       function_return_types_[func->id.name] =
-          func->type ? func->type->name : "int";
+          func->type ? func->type->name : TypeNames::INT;
     } else {
       local_types_[binding->var->id.name] = binding_types[i];
       local_mutability_[binding->var->id.name] = binding_mutability[i];
@@ -530,7 +571,7 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
     if (node.type == nullptr) {
       reportError("Variable '" + node.id.name +
                   "' must have type annotation or initializer");
-      inferred_type_ = "unknown";
+      inferred_type_ = TypeNames::UNKNOWN;
       return;
     }
     local_types_[node.id.name] = node.type->name;
@@ -543,7 +584,7 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
   node.assignmentExpr->accept(*this);
   const std::string expr_type = inferred_type_;
 
-  if (expr_type == "unknown") {
+  if (expr_type == TypeNames::UNKNOWN) {
     // Error already reported for expression
     if (node.type != nullptr) {
       local_types_[node.id.name] = node.type->name;
@@ -591,7 +632,7 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
     if (arg->type == nullptr) {
       reportError("Function parameter '" + arg->id.name +
                   "' must have type annotation");
-      param_types.push_back("unknown");
+      param_types.push_back(TypeNames::UNKNOWN);
       continue;
     }
     local_types_[arg->id.name] = arg->type->name;
@@ -634,19 +675,19 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
 
   if (node.type == nullptr) {
     // Return type not annotated - infer from body
-    if (body_type != "unknown") {
+    if (body_type != TypeNames::UNKNOWN) {
       mutable_node.type = new NIdentifier(body_type);
       function_return_types_[node.id.name] = body_type;
     } else {
       // Default to int if we can't infer
-      mutable_node.type = new NIdentifier("int");
-      function_return_types_[node.id.name] = "int";
+      mutable_node.type = new NIdentifier(TypeNames::INT);
+      function_return_types_[node.id.name] = TypeNames::INT;
     }
   } else {
     // Return type annotated - validate
     const std::string decl_return_type = node.type->name;
 
-    if (body_type != "unknown" && body_type != decl_return_type) {
+    if (body_type != TypeNames::UNKNOWN && body_type != decl_return_type) {
       reportError("Function '" + node.id.name + "' declared to return " +
                   decl_return_type + " but body has type " + body_type +
                   " (no implicit conversion)");

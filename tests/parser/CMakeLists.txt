@@ -8,6 +8,9 @@ set(PARSER_TESTS
     error
     type_check
     ast_printer
+    polang_types
+    operator_utils
+    error_reporter
 )
 
 foreach(test_name ${PARSER_TESTS})

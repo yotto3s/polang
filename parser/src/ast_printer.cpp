@@ -1,9 +1,7 @@
 #include "parser/ast_printer.hpp"
 
-// clang-format off
 #include "parser/node.hpp"
-#include "parser.hpp" // Must be after node.hpp for token constants
-// clang-format on
+#include "parser/operator_utils.hpp"
 
 ASTPrinter::ASTPrinter(std::ostream& out) noexcept : out_(out) {}
 
@@ -28,30 +26,7 @@ void ASTPrinter::printPrefix() const {
 }
 
 std::string ASTPrinter::operatorToString(int op) noexcept {
-  switch (op) {
-  case TPLUS:
-    return "+";
-  case TMINUS:
-    return "-";
-  case TMUL:
-    return "*";
-  case TDIV:
-    return "/";
-  case TCEQ:
-    return "==";
-  case TCNE:
-    return "!=";
-  case TCLT:
-    return "<";
-  case TCLE:
-    return "<=";
-  case TCGT:
-    return ">";
-  case TCGE:
-    return ">=";
-  default:
-    return "?";
-  }
+  return polang::operatorToString(op);
 }
 
 ASTPrinter::DepthScope::DepthScope(ASTPrinter& printer, bool has_more) noexcept

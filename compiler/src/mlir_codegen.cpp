@@ -35,7 +35,23 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <mutex>
+
 using namespace mlir;
+
+namespace {
+
+/// Ensure LLVM targets are initialized exactly once.
+/// Thread-safe using std::call_once.
+void ensureLLVMTargetsInitialized() {
+  static std::once_flag llvmInitFlag;
+  std::call_once(llvmInitFlag, []() {
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
+  });
+}
+
+} // namespace
 
 namespace polang {
 
@@ -142,9 +158,8 @@ bool MLIRCodeGenContext::printLLVMIR(llvm::raw_ostream& os) {
     return false;
   }
 
-  // Initialize LLVM targets
-  llvm::InitializeNativeTarget();
-  llvm::InitializeNativeTargetAsmPrinter();
+  // Initialize LLVM targets (thread-safe, only executes once)
+  ensureLLVMTargetsInitialized();
 
   // Create LLVM context for translation
   llvm::LLVMContext llvmContext;
@@ -166,9 +181,8 @@ bool MLIRCodeGenContext::runCode(int64_t& result) {
     return false;
   }
 
-  // Initialize LLVM targets
-  llvm::InitializeNativeTarget();
-  llvm::InitializeNativeTargetAsmPrinter();
+  // Initialize LLVM targets (thread-safe, only executes once)
+  ensureLLVMTargetsInitialized();
 
   // Create execution engine
   auto optPipeline = makeOptimizingTransformer(

@@ -200,11 +200,18 @@ polang/
 │   │   ├── lexer.l             # Flex lexer
 │   │   ├── parser.y            # Bison grammar
 │   │   ├── parser_api.cpp      # Parser API implementation
-│   │   └── ast_printer.cpp     # AST printer implementation
+│   │   ├── ast_printer.cpp     # AST printer implementation
+│   │   ├── type_checker.cpp    # Type checking and inference
+│   │   ├── operator_utils.cpp  # Operator utility functions
+│   │   └── error_reporter.cpp  # Unified error reporting
 │   └── include/parser/
 │       ├── node.hpp            # AST node definitions
 │       ├── parser_api.hpp      # Parser API header
-│       └── ast_printer.hpp     # AST printer header
+│       ├── ast_printer.hpp     # AST printer header
+│       ├── visitor.hpp         # Visitor pattern base class
+│       ├── polang_types.hpp    # Type constants and utilities
+│       ├── operator_utils.hpp  # Operator classification utilities
+│       └── error_reporter.hpp  # Error reporting interface
 ├── compiler/                   # Compiler application
 │   ├── CMakeLists.txt
 │   ├── src/
@@ -224,8 +231,13 @@ polang/
 │   ├── CMakeLists.txt          # Root test config (fetches GTest)
 │   ├── common/
 │   │   └── process_helper.hpp  # Shared test utilities
-│   ├── parser/                 # Parser unit tests
-│   │   └── *_test.cpp          # Lexer, parser, type checker tests
+│   ├── parser/                 # Parser unit tests (11 test files)
+│   │   ├── lexer_test.cpp      # Lexer tokenization tests
+│   │   ├── parser_*_test.cpp   # Parser tests (declaration, expression, etc.)
+│   │   ├── type_check_test.cpp # Type checker tests
+│   │   ├── polang_types_test.cpp    # Type constants tests
+│   │   ├── operator_utils_test.cpp  # Operator utilities tests
+│   │   └── error_reporter_test.cpp  # Error reporter tests
 │   ├── compiler/               # Compiler tests
 │   │   └── compiler_test.cpp   # LLVM IR generation tests
 │   ├── repl/                   # REPL tests
@@ -263,6 +275,12 @@ Polang is a simple programming language compiler with an MLIR-based backend.
    - Receives source code string via `polang_parse()` API
    - Returns AST (`NBlock*`)
    - Built as static library `libPolangParser.a`
+   - Includes type checking, AST printing, and error reporting utilities
+   - Key modules:
+     - `polang_types.hpp` - Centralized type constants (`TypeNames::INT`, etc.)
+     - `operator_utils.hpp` - Operator classification and string conversion
+     - `error_reporter.hpp` - Unified error reporting across all components
+     - `visitor.hpp` - Visitor pattern base class for AST traversal
 
 2. **MLIR Dialect** (`mlir/`)
    - Custom Polang dialect with types (`!polang.int`, `!polang.double`, `!polang.bool`)
@@ -287,9 +305,10 @@ Polang is a simple programming language compiler with an MLIR-based backend.
 1. **Lexer** (`parser/src/lexer.l`) - Flex-based tokenizer
 2. **Parser** (`parser/src/parser.y`) - Bison grammar that builds AST
 3. **AST** (`parser/include/parser/node.hpp`) - Node class hierarchy
-4. **MLIR Generation** (`mlir/lib/MLIRGen/`) - Generates Polang dialect MLIR from AST
-5. **Lowering** (`mlir/lib/Conversion/`) - Lowers Polang dialect to standard dialects, then to LLVM dialect
-6. **LLVM IR** - Translates LLVM dialect to LLVM IR
+4. **Type Checking** (`parser/src/type_checker.cpp`) - Validates types and infers missing annotations
+5. **MLIR Generation** (`mlir/lib/MLIRGen/`) - Generates Polang dialect MLIR from AST
+6. **Lowering** (`mlir/lib/Conversion/`) - Lowers Polang dialect to standard dialects, then to LLVM dialect
+7. **LLVM IR** - Translates LLVM dialect to LLVM IR
 
 See `doc/Lowering.md` for detailed documentation of the MLIR lowering process.
 
@@ -297,6 +316,9 @@ See `doc/Lowering.md` for detailed documentation of the MLIR lowering process.
 
 - `NBlock` - Contains a `StatementList`; serves as the root AST node
 - `MLIRCodeGenContext` - MLIR-based code generation context
+- `Visitor` - Base class for AST visitors (type checking, code generation, etc.)
+- `ErrorReporter` - Unified error reporting with severity levels and location info
+- `TypeNames` - Compile-time type name constants (`INT`, `DOUBLE`, `BOOL`, etc.)
 
 ### Generated Files
 

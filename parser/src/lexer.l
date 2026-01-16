@@ -2,6 +2,10 @@
 #include <string>
 #include "parser/node.hpp"
 #include "parser.hpp"
+
+// Forward declaration for unified error reporting
+extern "C" void polang_report_error(const char* message, int line, int column);
+
 #define SAVE_TOKEN yylval.string = new std::string(yytext, yyleng)
 #define TOKEN(t) (yylval.token = t)
 
@@ -60,6 +64,6 @@ void polang_reset_lexer_location() {
 "-"                     { return TOKEN(TMINUS); }
 "*"                     { return TOKEN(TMUL); }
 "/"                     { return TOKEN(TDIV); }
-.                       { fprintf(stderr, "ERROR: unknown token '%s' at line %d, column %d\n", yytext, yylineno, yylloc.first_column); yyterminate(); }
+.                       { polang_report_error(yytext, yylineno, yylloc.first_column); yyterminate(); }
 
 %%
