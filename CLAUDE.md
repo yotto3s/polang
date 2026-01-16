@@ -56,7 +56,6 @@ Build outputs:
 - `build/bin/PolangCompiler` - Compiler executable (outputs LLVM IR to stdout)
 - `build/bin/PolangRepl` - Interactive REPL executable (executes code via JIT)
 - `build/lib/libPolangParser.a` - Parser static library
-- `build/lib/libPolangCodegen.a` - Legacy LLVM IR code generation library
 - `build/lib/libPolangMLIRCodegen.a` - MLIR-based code generation library
 - `build/lib/libPolangDialect.a` - Polang MLIR dialect library
 
@@ -135,10 +134,8 @@ polang/
 │   ├── CMakeLists.txt
 │   ├── src/
 │   │   ├── main.cpp            # Compiler entry point
-│   │   ├── codegen.cpp         # Legacy LLVM IR code generation
 │   │   └── mlir_codegen.cpp    # MLIR-based code generation
 │   └── include/compiler/
-│       ├── codegen.hpp         # Legacy code generation header
 │       └── mlir_codegen.hpp    # MLIR code generation header
 ├── repl/                       # REPL application
 │   ├── CMakeLists.txt
@@ -192,8 +189,7 @@ Polang is a simple programming language compiler with an MLIR-based backend.
 3. **Compiler** (`compiler/`)
    - Reads source from stdin or file
    - Uses parser library to build AST
-   - Default: MLIR backend generates Polang dialect, lowers to LLVM IR
-   - Legacy: Direct LLVM IR generation (with `--legacy` flag)
+   - MLIR backend generates Polang dialect, lowers to LLVM IR
    - Outputs IR to stdout
 
 4. **REPL** (`repl/`)
@@ -217,8 +213,7 @@ See `doc/Lowering.md` for detailed documentation of the MLIR lowering process.
 ### Key Types
 
 - `NBlock` - Contains a `StatementList`; serves as the root AST node
-- `MLIRCodeGenContext` - MLIR-based code generation context (default backend)
-- `CodeGenContext` - Legacy LLVM IR code generation context (with `--legacy`)
+- `MLIRCodeGenContext` - MLIR-based code generation context
 
 ### Generated Files
 
@@ -229,11 +224,8 @@ Bison and Flex generate files in `build/parser/`:
 ## Usage
 
 ```bash
-# Compile source to LLVM IR (using MLIR backend)
+# Compile source to LLVM IR
 echo "let x = 5" | ./build/bin/PolangCompiler
-
-# Compile with legacy LLVM IR backend
-echo "let x = 5" | ./build/bin/PolangCompiler --legacy
 
 # Output Polang dialect MLIR (for debugging)
 echo "let x = 5" | ./build/bin/PolangCompiler --emit-mlir
@@ -258,7 +250,6 @@ echo "let x = 5" | ./build/bin/PolangRepl
 
 | Flag | Description |
 |------|-------------|
-| (default) | Use MLIR backend, output LLVM IR |
+| (default) | Output LLVM IR |
 | `--emit-mlir` | Output Polang dialect MLIR instead of LLVM IR |
-| `--legacy` | Use legacy direct LLVM IR backend |
 | `--help` | Show help message |

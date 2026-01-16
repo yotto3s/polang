@@ -261,9 +261,8 @@ At the call site, the captured value is passed as an extra argument:
 
 | Flag | Description |
 |------|-------------|
-| (default) | Use MLIR backend, output LLVM IR |
+| (default) | Output LLVM IR |
 | `--emit-mlir` | Output Polang dialect MLIR |
-| `--legacy` | Use legacy direct LLVM IR backend |
 
 ## File Structure
 
