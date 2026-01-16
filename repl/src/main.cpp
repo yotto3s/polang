@@ -9,10 +9,56 @@
 #include <cstring>
 #include <iostream>
 #include <sstream>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 using namespace llvm;
+
+// Path to PolangCompiler (empty means use PATH search)
+static std::string compilerPath;
+
+// Check if file exists and is executable
+static bool isExecutable(const std::string& path) {
+  struct stat st;
+  if (stat(path.c_str(), &st) != 0) {
+    return false;
+  }
+  return (st.st_mode & S_IXUSR) != 0;
+}
+
+// Get directory containing the executable
+static std::string getExeDirectory(const char* argv0) {
+  // Try /proc/self/exe first (Linux)
+  char buf[4096];
+  const ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+  std::string exePath;
+  if (len > 0) {
+    buf[len] = '\0';
+    exePath = buf;
+  } else {
+    // Fall back to argv[0]
+    exePath = argv0;
+  }
+
+  const size_t pos = exePath.rfind('/');
+  if (pos == std::string::npos) {
+    return ".";
+  }
+  return exePath.substr(0, pos);
+}
+
+// Initialize compiler path - search in exe directory first, then fall back to
+// PATH
+static void initCompilerPath(const char* argv0) {
+  const std::string exeDir = getExeDirectory(argv0);
+  const std::string localCompiler = exeDir + "/PolangCompiler";
+
+  if (isExecutable(localCompiler)) {
+    compilerPath = localCompiler;
+  }
+  // If not found, compilerPath remains empty and we'll use execlp (PATH search)
+}
 
 // Run PolangCompiler as subprocess
 // If filename is provided, pass it as argument; otherwise pipe source via stdin
@@ -43,13 +89,21 @@ static std::string runCompiler(const std::string& source,
     close(pipeIn[0]);
     close(pipeOut[1]);
 
-    // Execute PolangCompiler (assumes it's in PATH or same directory)
-    if (filename != nullptr) {
-      // File mode: pass filename as argument
-      execlp("PolangCompiler", "PolangCompiler", filename, nullptr);
+    // Execute PolangCompiler
+    if (!compilerPath.empty()) {
+      // Use compiler found in same directory as REPL
+      if (filename != nullptr) {
+        execl(compilerPath.c_str(), "PolangCompiler", filename, nullptr);
+      } else {
+        execl(compilerPath.c_str(), "PolangCompiler", nullptr);
+      }
     } else {
-      // Stdin mode: no arguments
-      execlp("PolangCompiler", "PolangCompiler", nullptr);
+      // Fall back to PATH search
+      if (filename != nullptr) {
+        execlp("PolangCompiler", "PolangCompiler", filename, nullptr);
+      } else {
+        execlp("PolangCompiler", "PolangCompiler", nullptr);
+      }
     }
 
     // If exec fails, exit
@@ -151,6 +205,9 @@ static int executeIR(const std::string& ir) {
 }
 
 int main(int argc, char** argv) {
+  // Find PolangCompiler in same directory as REPL, or fall back to PATH
+  initCompilerPath(argv[0]);
+
   std::string ir;
 
   if (argc > 1) {
