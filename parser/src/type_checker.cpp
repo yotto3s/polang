@@ -62,7 +62,7 @@ void TypeChecker::visit(const NMethodCall& node) {
                   std::to_string(arg_types.size()));
     } else {
       // Check each argument type
-      for (size_t i = 0; i < arg_types.size(); ++i) {
+      for (std::size_t i = 0; i < arg_types.size(); ++i) {
         if (arg_types[i] != "unknown" && param_types[i] != "unknown" &&
             arg_types[i] != param_types[i]) {
           reportError("Function '" + node.id.name + "' argument " +
@@ -298,8 +298,8 @@ void TypeChecker::visit(const NLetExpression& node) {
   }
 
   // Pass 2: Add all bindings to scope
-  size_t i = 0;
-  size_t func_idx = 0;
+  std::size_t i = 0;
+  std::size_t func_idx = 0;
   for (const auto* binding : node.bindings) {
     if (binding->isFunction) {
       const auto* func = binding->func;
