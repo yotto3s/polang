@@ -3,51 +3,86 @@
 
 #include "integration_test_helper.hpp"
 
-// Test exit code verification - verify exit code 0 for valid programs
+using ::testing::HasSubstr;
+
+// Test output verification - verify result value and type
 
 TEST(ReplIntegration, IntegerLiteral) {
   const auto result = runRepl("42");
   EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("42 : int"));
 }
 
 TEST(ReplIntegration, DoubleLiteral) {
   const auto result = runRepl("3.14");
   EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("3.14 : double"));
 }
 
 TEST(ReplIntegration, BooleanLiteral) {
   const auto result = runRepl("true");
   EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("true : bool"));
+}
+
+TEST(ReplIntegration, BooleanLiteralFalse) {
+  const auto result = runRepl("false");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("false : bool"));
 }
 
 TEST(ReplIntegration, BinaryOperation) {
   const auto result = runRepl("1 + 2");
   EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("3 : int"));
+}
+
+TEST(ReplIntegration, DoubleBinaryOperation) {
+  const auto result = runRepl("1.5 + 2.5");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("4 : double"));
+}
+
+TEST(ReplIntegration, ComparisonOperation) {
+  const auto result = runRepl("1 == 1");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("true : bool"));
+}
+
+TEST(ReplIntegration, DoubleComparisonOperation) {
+  const auto result = runRepl("1.5 < 2.5");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("true : bool"));
 }
 
 TEST(ReplIntegration, VariableDeclaration) {
   const auto result = runRepl("let x: int = 5");
   EXPECT_EQ(result.exit_code, 0);
+  // Variable declaration returns alloca which is not printed as known type
 }
 
 TEST(ReplIntegration, FunctionDeclarationAndCall) {
   const auto result = runRepl("let double (x: int): int = x * 2\ndouble(5)");
   EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("10 : int"));
 }
 
 TEST(ReplIntegration, IfExpression) {
   const auto result = runRepl("if true then 1 else 2");
   EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("1 : int"));
 }
 
 TEST(ReplIntegration, LetExpression) {
   const auto result = runRepl("let x = 1 in x + 1");
   EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("2 : int"));
 }
 
 TEST(ReplIntegration, NestedLetExpression) {
   const auto result = runRepl("let x = 1 in let y = 2 in x + y");
   EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("3 : int"));
 }
 
 // Test error handling - verify exit code 1 on errors
