@@ -398,3 +398,37 @@ TEST(TypeCheckTest, ClosureUndeclaredCapture) {
   // Cannot capture undeclared variable
   EXPECT_TRUE(hasTypeError("let f() = y + 1\nf()"));
 }
+
+TEST(TypeCheckTest, ClosureCapturesDoubleType) {
+  // Function can capture double variable
+  EXPECT_TRUE(hasNoTypeError("let x = 3.14\nlet f() = x + 1.0\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureCapturesBoolType) {
+  // Function can capture bool variable
+  EXPECT_TRUE(hasNoTypeError("let flag = true\nlet f() = if flag then 1 else 0\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithParamsAndCaptures) {
+  // Function uses both parameters and captured variables
+  EXPECT_TRUE(hasNoTypeError(
+      "let base = 100\nlet add(x: int) = x + base\nadd(5)"));
+}
+
+TEST(TypeCheckTest, NestedLetWithClosure) {
+  // Closure in nested let expression
+  EXPECT_TRUE(hasNoTypeError(
+      "let x = 10 in let f() = x + 1 in f()"));
+}
+
+TEST(TypeCheckTest, ClosureInLetWithMultipleSiblings) {
+  // Function captures from multiple sibling bindings
+  EXPECT_TRUE(hasNoTypeError(
+      "let a = 1 and b = 2 and sum() = a + b in sum()"));
+}
+
+TEST(TypeCheckTest, ClosureCaptureFromOuterNotSibling) {
+  // Function captures from outer scope, not sibling
+  EXPECT_TRUE(hasNoTypeError(
+      "let outer = 5\nlet x = 10 and f() = outer + 1 in f()"));
+}

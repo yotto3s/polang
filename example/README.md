@@ -24,3 +24,5 @@ cat example/hello.po | ./build/bin/PolangCompiler
 | `types.po` | Different types (int, double, bool) | `84 : int` |
 | `fibonacci.po` | Fibonacci sequence (5th number) | `5 : int` |
 | `factorial.po` | Factorial of 5 | `120 : int` |
+| `mutability.po` | Mutable variables and reassignment | `23 : int` |
+| `closures.po` | Functions capturing variables from outer scope | `21 : int` |

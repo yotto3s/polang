@@ -1,11 +1,11 @@
 ; Closures - functions that capture variables from enclosing scope
 
-; Simple closure
+; Simple closure: function captures 'base' from outer scope
 let base = 10
 let add_base(x: int): int = x + base
 let result1 = add_base(5)    ; 15
 
-; Multiple captures
+; Multiple captures: function captures a, b, c
 let a = 1
 let b = 2
 let c = 3

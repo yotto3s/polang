@@ -290,3 +290,27 @@ TEST(ReplIntegration, ClosureCaptureByValue) {
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("21 : int"));
 }
+
+TEST(ReplIntegration, ClosureCapturesDouble) {
+  const auto result = runRepl("let x = 3.14\nlet f() = x + 1.0\nf()");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("4.14 : double"));
+}
+
+TEST(ReplIntegration, ClosureWithParamsAndCaptures) {
+  const auto result = runRepl("let base = 100\nlet add(x: int) = x + base\nadd(5)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("105 : int"));
+}
+
+TEST(ReplIntegration, NestedLetWithClosure) {
+  const auto result = runRepl("let x = 10 in let f() = x + 1 in f()");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("11 : int"));
+}
+
+TEST(ReplIntegration, ClosureMultipleSiblings) {
+  const auto result = runRepl("let a = 1 and b = 2 and sum() = a + b in sum()");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("3 : int"));
+}
