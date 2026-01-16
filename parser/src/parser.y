@@ -75,13 +75,12 @@ stmt : var_decl | func_decl
      ;
 
 var_decl : TLET ident TEQUAL expr {
-             /* let x = expr (type inferred as int for now) */
-             NIdentifier *type = new NIdentifier("int");
-             $$ = new NVariableDeclaration(*type, *$2, $4);
+             /* let x = expr (type to be inferred) */
+             $$ = new NVariableDeclaration(*$2, $4);
            }
          | TLET ident TCOLON ident TEQUAL expr {
              /* let x : type = expr */
-             $$ = new NVariableDeclaration(*$4, *$2, $6);
+             $$ = new NVariableDeclaration($4, *$2, $6);
            }
          ;
         
@@ -89,15 +88,14 @@ func_decl : TLET ident func_decl_args TCOLON ident TEQUAL expr {
               /* let fname (x : type) ... : rettype = expr */
               NBlock *body = new NBlock();
               body->statements.push_back(new NExpressionStatement(*$7));
-              $$ = new NFunctionDeclaration(*$5, *$2, *$3, *body);
+              $$ = new NFunctionDeclaration($5, *$2, *$3, *body);
               delete $3;
             }
           | TLET ident func_decl_args TEQUAL expr {
-              /* let fname (x : type) ... = expr (return type inferred) */
-              NIdentifier *retType = new NIdentifier("int");
+              /* let fname (x : type) ... = expr (return type to be inferred) */
               NBlock *body = new NBlock();
               body->statements.push_back(new NExpressionStatement(*$5));
-              $$ = new NFunctionDeclaration(*retType, *$2, *$3, *body);
+              $$ = new NFunctionDeclaration(*$2, *$3, *body);
               delete $3;
             }
           ;
@@ -105,11 +103,11 @@ func_decl : TLET ident func_decl_args TCOLON ident TEQUAL expr {
 func_decl_args : TLPAREN ident TCOLON ident TRPAREN {
               /* First argument: (x : type) */
               $$ = new VariableList();
-              $$->push_back(new NVariableDeclaration(*$4, *$2));
+              $$->push_back(new NVariableDeclaration($4, *$2, nullptr));
             }
           | func_decl_args TLPAREN ident TCOLON ident TRPAREN {
               /* Additional arguments: (x : type) */
-              $1->push_back(new NVariableDeclaration(*$5, *$3));
+              $1->push_back(new NVariableDeclaration($5, *$3, nullptr));
               $$ = $1;
             }
           ;
@@ -146,21 +144,23 @@ call_args : /*blank*/  { $$ = new ExpressionList(); }
           ;
 
 let_bindings : ident TEQUAL expr {
-                 NIdentifier *type = new NIdentifier("int");
+                 /* x = expr (type to be inferred) */
                  $$ = new VariableList();
-                 $$->push_back(new NVariableDeclaration(*type, *$1, $3));
+                 $$->push_back(new NVariableDeclaration(*$1, $3));
                }
              | ident TCOLON ident TEQUAL expr {
+                 /* x : type = expr */
                  $$ = new VariableList();
-                 $$->push_back(new NVariableDeclaration(*$3, *$1, $5));
+                 $$->push_back(new NVariableDeclaration($3, *$1, $5));
                }
              | let_bindings TAND ident TEQUAL expr {
-                 NIdentifier *type = new NIdentifier("int");
-                 $1->push_back(new NVariableDeclaration(*type, *$3, $5));
+                 /* and x = expr (type to be inferred) */
+                 $1->push_back(new NVariableDeclaration(*$3, $5));
                  $$ = $1;
                }
              | let_bindings TAND ident TCOLON ident TEQUAL expr {
-                 $1->push_back(new NVariableDeclaration(*$5, *$3, $7));
+                 /* and x : type = expr */
+                 $1->push_back(new NVariableDeclaration($5, *$3, $7));
                  $$ = $1;
                }
              ;

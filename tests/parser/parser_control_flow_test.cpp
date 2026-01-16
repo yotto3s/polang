@@ -99,7 +99,7 @@ TEST(ParserTest, SimpleLetExpression) {
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 1);
   EXPECT_EQ(letExpr->bindings[0]->id.name, "x");
-  EXPECT_EQ(letExpr->bindings[0]->type.name, "int");
+  EXPECT_EQ(letExpr->bindings[0]->type, nullptr); // type inferred, not yet set
 
   auto* initExpr =
       dynamic_cast<NInteger*>(letExpr->bindings[0]->assignmentExpr);
@@ -141,7 +141,8 @@ TEST(ParserTest, LetExpressionWithTypeAnnotation) {
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 1);
   EXPECT_EQ(letExpr->bindings[0]->id.name, "x");
-  EXPECT_EQ(letExpr->bindings[0]->type.name, "int");
+  ASSERT_NE(letExpr->bindings[0]->type, nullptr);
+  EXPECT_EQ(letExpr->bindings[0]->type->name, "int");
 }
 
 TEST(ParserTest, LetExpressionMixedTypeAnnotations) {
@@ -154,9 +155,11 @@ TEST(ParserTest, LetExpressionMixedTypeAnnotations) {
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 3);
 
-  EXPECT_EQ(letExpr->bindings[0]->type.name, "int");
-  EXPECT_EQ(letExpr->bindings[1]->type.name, "int"); // inferred
-  EXPECT_EQ(letExpr->bindings[2]->type.name, "double");
+  ASSERT_NE(letExpr->bindings[0]->type, nullptr);
+  EXPECT_EQ(letExpr->bindings[0]->type->name, "int");
+  EXPECT_EQ(letExpr->bindings[1]->type, nullptr); // type inferred, not yet set
+  ASSERT_NE(letExpr->bindings[2]->type, nullptr);
+  EXPECT_EQ(letExpr->bindings[2]->type->name, "double");
 }
 
 TEST(ParserTest, NestedLetExpression) {

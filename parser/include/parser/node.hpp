@@ -117,12 +117,14 @@ public:
 
 class NVariableDeclaration : public NStatement {
 public:
-  const NIdentifier &type;
+  NIdentifier *type;  // nullptr when type should be inferred
   NIdentifier &id;
   NExpression *assignmentExpr;
-  NVariableDeclaration(const NIdentifier &type, NIdentifier &id)
-      : type(type), id(id), assignmentExpr(nullptr) {}
-  NVariableDeclaration(const NIdentifier &type, NIdentifier &id,
+  // Constructor for inferred type (no annotation)
+  NVariableDeclaration(NIdentifier &id, NExpression *assignmentExpr)
+      : type(nullptr), id(id), assignmentExpr(assignmentExpr) {}
+  // Constructor for explicit type annotation
+  NVariableDeclaration(NIdentifier *type, NIdentifier &id,
                        NExpression *assignmentExpr)
       : type(type), id(id), assignmentExpr(assignmentExpr) {}
   void accept(Visitor &visitor) const override;
@@ -130,11 +132,16 @@ public:
 
 class NFunctionDeclaration : public NStatement {
 public:
-  const NIdentifier &type;
+  NIdentifier *type;  // nullptr when return type should be inferred
   const NIdentifier &id;
   VariableList arguments;
   NBlock &block;
-  NFunctionDeclaration(const NIdentifier &type, const NIdentifier &id,
+  // Constructor for inferred return type
+  NFunctionDeclaration(const NIdentifier &id, const VariableList &arguments,
+                       NBlock &block)
+      : type(nullptr), id(id), arguments(arguments), block(block) {}
+  // Constructor for explicit return type
+  NFunctionDeclaration(NIdentifier *type, const NIdentifier &id,
                        const VariableList &arguments, NBlock &block)
       : type(type), id(id), arguments(arguments), block(block) {}
   void accept(Visitor &visitor) const override;

@@ -65,9 +65,10 @@ false
 Variables are declared using the `let` keyword:
 
 ```
-let x = 5
-let y : int = 10
-let pi : double = 3.14159
+let x = 5           ; type inferred as int from literal
+let y = 3.14        ; type inferred as double from literal
+let z = true        ; type inferred as bool from literal
+let w : int = 10    ; explicit type annotation
 ```
 
 **Syntax:**
@@ -76,8 +77,9 @@ let <identifier> = <expression>
 let <identifier> : <type> = <expression>
 ```
 
-- When type is omitted, it defaults to `int`
+- When type is omitted, it is **inferred from the initializer expression**
 - Variables must be initialized at declaration
+- **No implicit type conversion**: `let x: double = 42` is an error (must write `42.0`)
 
 ### Variable Assignment
 
@@ -95,8 +97,9 @@ x = 10
 Functions are declared using `let` with parameter lists:
 
 ```
-let add (x : int) (y : int) : int = x + y
-let square (n : int) = n * n
+let add (x : int) (y : int) : int = x + y   ; explicit return type
+let square (n : int) = n * n                 ; return type inferred as int
+let half (x : double) = x / 2.0              ; return type inferred as double
 ```
 
 **Syntax:**
@@ -105,9 +108,10 @@ let <name> (<param> : <type>) ... : <return_type> = <expression>
 let <name> (<param> : <type>) ... = <expression>
 ```
 
-- Each parameter is enclosed in parentheses with its type
-- Return type can be omitted (defaults to `int`)
+- Each parameter is enclosed in parentheses with its type (required)
+- Return type can be omitted and will be **inferred from the body expression**
 - Function body is a single expression
+- **No implicit type conversion**: return type annotation must match body type exactly
 
 ### Function Calls
 

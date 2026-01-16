@@ -191,46 +191,100 @@ void TypeChecker::visit(const NExpressionStatement& node) {
 }
 
 void TypeChecker::visit(const NVariableDeclaration& node) {
-  const std::string decl_type = node.type.name;
+  // Cast away const to allow setting inferred type
+  NVariableDeclaration& mutable_node = const_cast<NVariableDeclaration&>(node);
 
-  // Check initializer if present
-  if (node.assignmentExpr != nullptr) {
-    node.assignmentExpr->accept(*this);
-    const std::string expr_type = inferred_type_;
-
-    if (expr_type != "unknown" && expr_type != decl_type) {
-      reportError("Variable '" + node.id.name + "' declared as " + decl_type +
-                  " but initialized with " + expr_type);
+  if (node.assignmentExpr == nullptr) {
+    // No initializer - must have type annotation
+    if (node.type == nullptr) {
+      reportError("Variable '" + node.id.name +
+                  "' must have type annotation or initializer");
+      inferred_type_ = "unknown";
+      return;
     }
+    local_types_[node.id.name] = node.type->name;
+    inferred_type_ = node.type->name;
+    return;
   }
 
-  // Store the variable type in scope
-  local_types_[node.id.name] = decl_type;
-  inferred_type_ = decl_type;
+  // Infer expression type
+  node.assignmentExpr->accept(*this);
+  const std::string expr_type = inferred_type_;
+
+  if (expr_type == "unknown") {
+    // Error already reported for expression
+    if (node.type != nullptr) {
+      local_types_[node.id.name] = node.type->name;
+      inferred_type_ = node.type->name;
+    }
+    return;
+  }
+
+  if (node.type == nullptr) {
+    // No type annotation - infer from expression
+    mutable_node.type = new NIdentifier(expr_type);
+    local_types_[node.id.name] = expr_type;
+    inferred_type_ = expr_type;
+  } else {
+    // Type annotation present - validate (no coercion!)
+    const std::string decl_type = node.type->name;
+
+    if (expr_type != decl_type) {
+      reportError("Variable '" + node.id.name + "' declared as " + decl_type +
+                  " but initialized with " + expr_type +
+                  " (no implicit conversion)");
+    }
+
+    local_types_[node.id.name] = decl_type;
+    inferred_type_ = decl_type;
+  }
 }
 
 void TypeChecker::visit(const NFunctionDeclaration& node) {
+  // Cast away const to allow setting inferred type
+  NFunctionDeclaration& mutable_node = const_cast<NFunctionDeclaration&>(node);
+
   // Save current scope
   const auto saved_locals = local_types_;
 
-  // Store function return type
-  function_return_types_[node.id.name] = node.type.name;
-
   // Add parameters to scope
   for (const auto* arg : node.arguments) {
-    local_types_[arg->id.name] = arg->type.name;
+    if (arg->type == nullptr) {
+      reportError("Function parameter '" + arg->id.name +
+                  "' must have type annotation");
+      continue;
+    }
+    local_types_[arg->id.name] = arg->type->name;
   }
 
   // Check function body
   node.block.accept(*this);
+  const std::string body_type = inferred_type_;
 
-  // Check return type matches body expression type
-  if (inferred_type_ != "unknown" && inferred_type_ != node.type.name) {
-    reportError("Function '" + node.id.name + "' returns " + node.type.name +
-                " but body has type " + inferred_type_);
+  if (node.type == nullptr) {
+    // Return type not annotated - infer from body
+    if (body_type != "unknown") {
+      mutable_node.type = new NIdentifier(body_type);
+      function_return_types_[node.id.name] = body_type;
+    } else {
+      // Default to int if we can't infer
+      mutable_node.type = new NIdentifier("int");
+      function_return_types_[node.id.name] = "int";
+    }
+  } else {
+    // Return type annotated - validate
+    const std::string decl_return_type = node.type->name;
+
+    if (body_type != "unknown" && body_type != decl_return_type) {
+      reportError("Function '" + node.id.name + "' declared to return " +
+                  decl_return_type + " but body has type " + body_type +
+                  " (no implicit conversion)");
+    }
+
+    function_return_types_[node.id.name] = decl_return_type;
   }
 
   // Restore previous scope
   local_types_ = saved_locals;
-  inferred_type_ = node.type.name;
+  inferred_type_ = node.type ? node.type->name : body_type;
 }

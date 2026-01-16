@@ -10,7 +10,7 @@ TEST(ParserTest, SimpleVariableDeclaration) {
   auto* varDecl = getFirstStatement<NVariableDeclaration>(block);
   ASSERT_NE(varDecl, nullptr);
   EXPECT_EQ(varDecl->id.name, "x");
-  EXPECT_EQ(varDecl->type.name, "int"); // default type
+  EXPECT_EQ(varDecl->type, nullptr); // type inferred, not yet set
 
   // Check assignment expression is an integer
   auto* intExpr = dynamic_cast<NInteger*>(varDecl->assignmentExpr);
@@ -26,7 +26,8 @@ TEST(ParserTest, TypedVariableDeclaration) {
   auto* varDecl = getFirstStatement<NVariableDeclaration>(block);
   ASSERT_NE(varDecl, nullptr);
   EXPECT_EQ(varDecl->id.name, "pi");
-  EXPECT_EQ(varDecl->type.name, "double");
+  ASSERT_NE(varDecl->type, nullptr);
+  EXPECT_EQ(varDecl->type->name, "double");
 
   auto* doubleExpr = dynamic_cast<NDouble*>(varDecl->assignmentExpr);
   ASSERT_NE(doubleExpr, nullptr);
@@ -57,10 +58,12 @@ TEST(ParserTest, SimpleFunctionDeclaration) {
   auto* funcDecl = getFirstStatement<NFunctionDeclaration>(block);
   ASSERT_NE(funcDecl, nullptr);
   EXPECT_EQ(funcDecl->id.name, "square");
-  EXPECT_EQ(funcDecl->type.name, "int");
+  ASSERT_NE(funcDecl->type, nullptr);
+  EXPECT_EQ(funcDecl->type->name, "int");
   ASSERT_EQ(funcDecl->arguments.size(), 1);
   EXPECT_EQ(funcDecl->arguments[0]->id.name, "n");
-  EXPECT_EQ(funcDecl->arguments[0]->type.name, "int");
+  ASSERT_NE(funcDecl->arguments[0]->type, nullptr);
+  EXPECT_EQ(funcDecl->arguments[0]->type->name, "int");
 }
 
 TEST(ParserTest, FunctionWithMultipleArgs) {
@@ -71,7 +74,8 @@ TEST(ParserTest, FunctionWithMultipleArgs) {
   auto* funcDecl = getFirstStatement<NFunctionDeclaration>(block);
   ASSERT_NE(funcDecl, nullptr);
   EXPECT_EQ(funcDecl->id.name, "add");
-  EXPECT_EQ(funcDecl->type.name, "int");
+  ASSERT_NE(funcDecl->type, nullptr);
+  EXPECT_EQ(funcDecl->type->name, "int");
   ASSERT_EQ(funcDecl->arguments.size(), 2);
   EXPECT_EQ(funcDecl->arguments[0]->id.name, "x");
   EXPECT_EQ(funcDecl->arguments[1]->id.name, "y");
@@ -85,5 +89,5 @@ TEST(ParserTest, FunctionWithInferredReturnType) {
   auto* funcDecl = getFirstStatement<NFunctionDeclaration>(block);
   ASSERT_NE(funcDecl, nullptr);
   EXPECT_EQ(funcDecl->id.name, "double");
-  EXPECT_EQ(funcDecl->type.name, "int"); // inferred
+  EXPECT_EQ(funcDecl->type, nullptr); // return type inferred, not yet set
 }

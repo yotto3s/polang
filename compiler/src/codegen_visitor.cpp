@@ -17,12 +17,16 @@ Value* CodeGenVisitor::generate(const Node& node) {
 }
 
 /* Returns an LLVM type based on the identifier */
-static Type* typeOf(const NIdentifier& type, LLVMContext& ctx) noexcept {
-  if (type.name.compare("int") == 0) {
+static Type* typeOf(const NIdentifier* type, LLVMContext& ctx) noexcept {
+  if (type == nullptr) {
+    std::cerr << "Internal error: type is null in codegen" << std::endl;
+    return Type::getVoidTy(ctx);
+  }
+  if (type->name.compare("int") == 0) {
     return Type::getInt64Ty(ctx);
-  } else if (type.name.compare("double") == 0) {
+  } else if (type->name.compare("double") == 0) {
     return Type::getDoubleTy(ctx);
-  } else if (type.name.compare("bool") == 0) {
+  } else if (type->name.compare("bool") == 0) {
     return Type::getInt1Ty(ctx);
   }
   return Type::getVoidTy(ctx);
@@ -213,6 +217,12 @@ void CodeGenVisitor::visit(const NExpressionStatement& node) {
 }
 
 void CodeGenVisitor::visit(const NVariableDeclaration& node) {
+  if (node.type == nullptr) {
+    std::cerr << "Internal error: variable type not resolved for "
+              << node.id.name << std::endl;
+    result_ = nullptr;
+    return;
+  }
   AllocaInst* alloc =
       new AllocaInst(typeOf(node.type, context_.context), 0,
                      node.id.name.c_str(), context_.currentBlock());
@@ -226,8 +236,19 @@ void CodeGenVisitor::visit(const NVariableDeclaration& node) {
 }
 
 void CodeGenVisitor::visit(const NFunctionDeclaration& node) {
+  if (node.type == nullptr) {
+    std::cerr << "Internal error: function return type not resolved for "
+              << node.id.name << std::endl;
+    result_ = nullptr;
+    return;
+  }
   std::vector<Type*> argTypes;
   for (const auto* arg : node.arguments) {
+    if (arg->type == nullptr) {
+      std::cerr << "Internal error: parameter type not resolved" << std::endl;
+      result_ = nullptr;
+      return;
+    }
     argTypes.push_back(typeOf(arg->type, context_.context));
   }
   FunctionType* ftype =
@@ -306,10 +327,9 @@ void CodeGenVisitor::visit(const NIfExpression& node) {
   // Save the block that else ends in
   BasicBlock* elseEndBB = context_.currentBlock();
 
-  // Emit merge block with PHI node
+  // Emit merge block with PHI node - use actual type from then value
   context_.setCurrentBlock(mergeBB);
-  PHINode* phi =
-      PHINode::Create(Type::getInt64Ty(context_.context), 2, "iftmp", mergeBB);
+  PHINode* phi = PHINode::Create(thenValue->getType(), 2, "iftmp", mergeBB);
   phi->addIncoming(thenValue, thenEndBB);
   phi->addIncoming(elseValue, elseEndBB);
 
@@ -322,6 +342,12 @@ void CodeGenVisitor::visit(const NLetExpression& node) {
 
   // Generate code for each binding
   for (const auto* binding : node.bindings) {
+    if (binding->type == nullptr) {
+      std::cerr << "Internal error: let binding type not resolved for "
+                << binding->id.name << std::endl;
+      result_ = nullptr;
+      return;
+    }
     AllocaInst* alloc =
         new AllocaInst(typeOf(binding->type, context_.context), 0,
                        binding->id.name.c_str(), context_.currentBlock());
