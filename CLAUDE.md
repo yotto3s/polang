@@ -125,7 +125,19 @@ polang/
 │   │   ├── main.cpp            # REPL entry point
 │   │   └── repl_session.cpp    # REPL session management
 │   └── include/repl/
-│       └── repl_session.hpp    # REPL session header
+│       ├── repl_session.hpp    # REPL session header
+│       └── input_checker.hpp   # Multi-line input detection
+├── tests/                      # Test suite (organized by component)
+│   ├── CMakeLists.txt          # Root test config (fetches GTest)
+│   ├── common/
+│   │   └── process_helper.hpp  # Shared test utilities
+│   ├── parser/                 # Parser unit tests
+│   │   └── *_test.cpp          # Lexer, parser, type checker tests
+│   ├── compiler/               # Compiler tests
+│   │   └── compiler_test.cpp   # LLVM IR generation tests
+│   └── repl/                   # REPL tests
+│       ├── repl_test.cpp       # REPL execution tests
+│       └── repl_unit_test.cpp  # InputChecker unit tests
 ├── example/                    # Example programs
 │   ├── hello.po
 │   ├── variables.po

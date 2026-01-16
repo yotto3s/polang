@@ -62,6 +62,19 @@ The compiler reads Polang source code and outputs LLVM IR:
 echo "let x = 42" | ./build/bin/PolangCompiler
 ```
 
+## Testing
+
+Run the test suite:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+Tests are organized by component:
+- `tests/parser/` - Lexer, parser, and type checker unit tests
+- `tests/compiler/` - LLVM IR generation tests
+- `tests/repl/` - REPL execution and input handling tests
+
 ## Documentation
 
 - [Language Syntax](doc/syntax.md) - Complete syntax reference

@@ -1,5 +1,5 @@
-#ifndef POLANG_INTEGRATION_TEST_HELPER_HPP
-#define POLANG_INTEGRATION_TEST_HELPER_HPP
+#ifndef POLANG_TEST_PROCESS_HELPER_HPP
+#define POLANG_TEST_PROCESS_HELPER_HPP
 
 #include <array>
 #include <cstdlib>
@@ -98,4 +98,4 @@ inline ProcessResult runRepl(const std::string& source) {
   return runProcess(POLANG_REPL_PATH, source);
 }
 
-#endif // POLANG_INTEGRATION_TEST_HELPER_HPP
+#endif // POLANG_TEST_PROCESS_HELPER_HPP

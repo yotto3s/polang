@@ -1,7 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "integration_test_helper.hpp"
+#include "process_helper.hpp"
 
 using ::testing::HasSubstr;
 
@@ -126,4 +126,99 @@ TEST(ReplIntegration, LetExpressionMixedBindingsCallBody) {
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("20"));
   EXPECT_THAT(result.stdout_output, HasSubstr("int"));
+}
+
+// ============== State Persistence Tests ==============
+// These tests verify that variables and functions persist across evaluations
+
+TEST(ReplIntegration, VariablePersistsAcrossEvaluations) {
+  // Declare variable, then use it in next evaluation
+  const auto result = runRepl("let x = 42\nx + 1");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("43 : int"));
+}
+
+TEST(ReplIntegration, FunctionPersistsAcrossEvaluations) {
+  // Declare function, then call it in next evaluation
+  const auto result = runRepl("let double(n: int): int = n * 2\ndouble(21)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("42 : int"));
+}
+
+TEST(ReplIntegration, MultipleVariablesPersist) {
+  // Multiple variables across multiple lines
+  const auto result = runRepl("let a = 10\nlet b = 20\nlet c = 30\na + b + c");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("60 : int"));
+}
+
+TEST(ReplIntegration, FunctionCalledWithPersistedVariable) {
+  // Variable declared, then passed to function call
+  const auto result = runRepl("let multiplier = 3\nlet scale(x: int, y: int): "
+                              "int = x * y\nscale(10, multiplier)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("30 : int"));
+}
+
+TEST(ReplIntegration, MultipleFunctionsPersist) {
+  // Multiple functions, each can call the other
+  const auto result = runRepl("let add1(x: int): int = x + 1\n"
+                              "let add2(x: int): int = add1(add1(x))\n"
+                              "add2(10)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("12 : int"));
+}
+
+TEST(ReplIntegration, VariableReassignmentPersists) {
+  // Reassign variable and verify new value persists
+  const auto result = runRepl("let x = 1\nx = 100\nx");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("100 : int"));
+}
+
+// ============== Multi-line Input Tests ==============
+// These tests verify the isInputIncomplete detection works correctly
+
+TEST(ReplIntegration, MultiLineIfExpression) {
+  // If expression split across lines (if without else is incomplete)
+  const auto result = runRepl("if true then 1\nelse 2");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("1 : int"));
+}
+
+TEST(ReplIntegration, MultiLineLetExpression) {
+  // Let expression split across lines (let without in body)
+  const auto result = runRepl("let x = 5 in\nx + 1");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("6 : int"));
+}
+
+TEST(ReplIntegration, MultiLineWithParentheses) {
+  // Expression with unbalanced parentheses continues
+  const auto result = runRepl("(1 +\n2) * 3");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("9 : int"));
+}
+
+TEST(ReplIntegration, MultiLineFunction) {
+  // Function declaration and call split across lines
+  const auto result = runRepl("let f(x: int): int =\nx * 2\nf(5)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("10 : int"));
+}
+
+TEST(ReplIntegration, MultiLineWithAndKeyword) {
+  // Let with 'and' keyword continues to next line
+  const auto result = runRepl("let x = 1 and\ny = 2 in x + y");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("3 : int"));
+}
+
+TEST(ReplIntegration, ComplexMultiLineExpression) {
+  // Complex expression across multiple lines
+  const auto result = runRepl("let sum(a: int, b: int): int = a + b\n"
+                              "let x = 10\n"
+                              "sum(x, 20)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("30 : int"));
 }
