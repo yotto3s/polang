@@ -1,5 +1,6 @@
 #include <llvm/AsmParser/Parser.h>
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Support/SourceMgr.h>
@@ -142,6 +143,46 @@ static std::string runCompiler(const std::string& source,
   return ir;
 }
 
+// Determine the original type of the return value by inspecting the IR
+// Returns: "int", "double", "bool", or "void"
+static std::string detectResultType(Module& module) {
+  Function* mainFn = module.getFunction("main");
+  if (mainFn == nullptr) {
+    return "void";
+  }
+
+  // Find return instruction and check the source operand type
+  for (auto& BB : *mainFn) {
+    for (auto& I : BB) {
+      if (auto* ret = dyn_cast<ReturnInst>(&I)) {
+        Value* retVal = ret->getReturnValue();
+        if (retVal == nullptr) {
+          return "void";
+        }
+
+        // Check for bitcast from double (indicates double type)
+        if (auto* bc = dyn_cast<BitCastInst>(retVal)) {
+          if (bc->getSrcTy()->isDoubleTy()) {
+            return "double";
+          }
+        }
+        // Check for zext from i1 (indicates bool type)
+        else if (auto* ze = dyn_cast<ZExtInst>(retVal)) {
+          if (ze->getSrcTy()->isIntegerTy(1)) {
+            return "bool";
+          }
+        }
+        // Otherwise assume int
+        else if (retVal->getType()->isIntegerTy(64)) {
+          return "int";
+        }
+      }
+    }
+  }
+
+  return "void";
+}
+
 // Parse IR string and execute with JIT
 static int executeIR(const std::string& ir) {
   InitializeNativeTarget();
@@ -156,6 +197,9 @@ static int executeIR(const std::string& ir) {
     err.print("PolangRepl", errs());
     return 1;
   }
+
+  // Detect the result type before JIT compilation
+  const std::string resultType = detectResultType(*module);
 
   // Create JIT
   auto JTMB = orc::JITTargetMachineBuilder::detectHost();
@@ -198,8 +242,21 @@ static int executeIR(const std::string& ir) {
     return 1;
   }
 
-  auto* MainFn = MainSym->toPtr<void (*)()>();
-  MainFn();
+  // Execute and capture result (main now returns i64)
+  auto* MainFn = MainSym->toPtr<int64_t (*)()>();
+  const int64_t result = MainFn();
+
+  // Print result with type
+  if (resultType == "double") {
+    double d = 0;
+    std::memcpy(&d, &result, sizeof(double));
+    std::cout << d << " : double\n";
+  } else if (resultType == "bool") {
+    std::cout << (result != 0 ? "true" : "false") << " : bool\n";
+  } else if (resultType == "int") {
+    std::cout << result << " : int\n";
+  }
+  // For "void" or unknown, don't print anything
 
   return 0;
 }

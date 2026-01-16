@@ -6,8 +6,9 @@
 void CodeGenContext::generateCode(NBlock& root) {
   /* Create the top level interpreter function to call as entry */
   std::vector<Type*> argTypes;
+  // Return i64 to allow REPL to capture and print result
   FunctionType* ftype =
-      FunctionType::get(Type::getVoidTy(context), argTypes, false);
+      FunctionType::get(Type::getInt64Ty(context), argTypes, false);
   mainFunction =
       Function::Create(ftype, GlobalValue::ExternalLinkage, "main", module);
   BasicBlock* bblock = BasicBlock::Create(context, "entry", mainFunction, 0);
@@ -16,7 +17,35 @@ void CodeGenContext::generateCode(NBlock& root) {
   pushBlock(bblock);
   CodeGenVisitor visitor(*this);
   root.accept(visitor); /* emit bytecode for the toplevel block */
-  ReturnInst::Create(context, currentBlock());
+
+  // Get the last expression value and return it as i64
+  Value* lastValue = visitor.getResult();
+  Value* retVal = nullptr;
+
+  if (lastValue != nullptr) {
+    Type* valType = lastValue->getType();
+
+    if (valType->isDoubleTy()) {
+      // Bitcast double to i64
+      retVal = new BitCastInst(lastValue, Type::getInt64Ty(context), "",
+                               currentBlock());
+    } else if (valType->isIntegerTy(1)) {
+      // Zero-extend bool (i1) to i64
+      retVal = new ZExtInst(lastValue, Type::getInt64Ty(context), "",
+                            currentBlock());
+    } else if (valType->isIntegerTy(64)) {
+      // Already i64
+      retVal = lastValue;
+    } else {
+      // Unknown type, return 0
+      retVal = ConstantInt::get(Type::getInt64Ty(context), 0);
+    }
+  } else {
+    // No expression, return 0
+    retVal = ConstantInt::get(Type::getInt64Ty(context), 0);
+  }
+
+  ReturnInst::Create(context, retVal, currentBlock());
   popBlock();
 }
 

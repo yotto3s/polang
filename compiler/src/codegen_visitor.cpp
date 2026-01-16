@@ -69,63 +69,124 @@ void CodeGenVisitor::visit(const NMethodCall& node) {
 }
 
 void CodeGenVisitor::visit(const NBinaryOperator& node) {
-  Instruction::BinaryOps instr;
+  Value* lhs = generate(node.lhs);
+  Value* rhs = generate(node.rhs);
+  const bool isDouble = lhs->getType()->isDoubleTy();
+
   switch (node.op) {
   case TPLUS:
-    instr = Instruction::Add;
-    goto math;
   case TMINUS:
-    instr = Instruction::Sub;
-    goto math;
   case TMUL:
-    instr = Instruction::Mul;
-    goto math;
-  case TDIV:
-    instr = Instruction::SDiv;
-    goto math;
+  case TDIV: {
+    Instruction::BinaryOps instr;
+    if (isDouble) {
+      switch (node.op) {
+      case TPLUS:
+        instr = Instruction::FAdd;
+        break;
+      case TMINUS:
+        instr = Instruction::FSub;
+        break;
+      case TMUL:
+        instr = Instruction::FMul;
+        break;
+      case TDIV:
+        instr = Instruction::FDiv;
+        break;
+      default:
+        result_ = nullptr;
+        return;
+      }
+    } else {
+      switch (node.op) {
+      case TPLUS:
+        instr = Instruction::Add;
+        break;
+      case TMINUS:
+        instr = Instruction::Sub;
+        break;
+      case TMUL:
+        instr = Instruction::Mul;
+        break;
+      case TDIV:
+        instr = Instruction::SDiv;
+        break;
+      default:
+        result_ = nullptr;
+        return;
+      }
+    }
+    result_ =
+        BinaryOperator::Create(instr, lhs, rhs, "", context_.currentBlock());
+    return;
+  }
   case TCEQ:
   case TCNE:
   case TCLT:
   case TCLE:
   case TCGT:
   case TCGE: {
-    CmpInst::Predicate pred;
-    switch (node.op) {
-    case TCEQ:
-      pred = CmpInst::ICMP_EQ;
-      break;
-    case TCNE:
-      pred = CmpInst::ICMP_NE;
-      break;
-    case TCLT:
-      pred = CmpInst::ICMP_SLT;
-      break;
-    case TCLE:
-      pred = CmpInst::ICMP_SLE;
-      break;
-    case TCGT:
-      pred = CmpInst::ICMP_SGT;
-      break;
-    case TCGE:
-      pred = CmpInst::ICMP_SGE;
-      break;
-    default:
-      result_ = nullptr;
-      return;
+    if (isDouble) {
+      CmpInst::Predicate pred;
+      switch (node.op) {
+      case TCEQ:
+        pred = CmpInst::FCMP_OEQ;
+        break;
+      case TCNE:
+        pred = CmpInst::FCMP_ONE;
+        break;
+      case TCLT:
+        pred = CmpInst::FCMP_OLT;
+        break;
+      case TCLE:
+        pred = CmpInst::FCMP_OLE;
+        break;
+      case TCGT:
+        pred = CmpInst::FCMP_OGT;
+        break;
+      case TCGE:
+        pred = CmpInst::FCMP_OGE;
+        break;
+      default:
+        result_ = nullptr;
+        return;
+      }
+      result_ = CmpInst::Create(Instruction::FCmp, pred, lhs, rhs, "",
+                                context_.currentBlock());
+    } else {
+      CmpInst::Predicate pred;
+      switch (node.op) {
+      case TCEQ:
+        pred = CmpInst::ICMP_EQ;
+        break;
+      case TCNE:
+        pred = CmpInst::ICMP_NE;
+        break;
+      case TCLT:
+        pred = CmpInst::ICMP_SLT;
+        break;
+      case TCLE:
+        pred = CmpInst::ICMP_SLE;
+        break;
+      case TCGT:
+        pred = CmpInst::ICMP_SGT;
+        break;
+      case TCGE:
+        pred = CmpInst::ICMP_SGE;
+        break;
+      default:
+        result_ = nullptr;
+        return;
+      }
+      result_ = CmpInst::Create(Instruction::ICmp, pred, lhs, rhs, "",
+                                context_.currentBlock());
     }
-    // Comparison returns i1 (bool)
-    result_ = CmpInst::Create(Instruction::ICmp, pred, generate(node.lhs),
-                              generate(node.rhs), "", context_.currentBlock());
     return;
   }
+  default:
+    result_ = nullptr;
+    return;
   }
-
-  result_ = nullptr;
-  return;
-math:
-  result_ =
-      BinaryOperator::Create(instr, generate(node.lhs), generate(node.rhs), "",
-                             context_.currentBlock());
 }
 
 void CodeGenVisitor::visit(const NAssignment& node) {
