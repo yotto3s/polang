@@ -1,6 +1,14 @@
+#ifndef POLANG_NODE_HPP
+#define POLANG_NODE_HPP
+
 #include <iostream>
-#include <llvm/IR/Value.h>
+#include <string>
 #include <vector>
+
+// Forward declare LLVM types to avoid header conflicts
+namespace llvm {
+class Value;
+}
 
 class CodeGenContext;
 class NStatement;
@@ -11,6 +19,7 @@ typedef std::vector<NStatement *> StatementList;
 typedef std::vector<NExpression *> ExpressionList;
 typedef std::vector<NVariableDeclaration *> VariableList;
 
+// clang-format off
 class Node {
 public:
   virtual ~Node() {}
@@ -25,21 +34,21 @@ class NInteger : public NExpression {
 public:
   long long value;
   NInteger(long long value) : value(value) {}
-  virtual llvm::Value *codeGen(CodeGenContext &context);
+  llvm::Value *codeGen(CodeGenContext &context) override;
 };
 
 class NDouble : public NExpression {
 public:
   double value;
   NDouble(double value) : value(value) {}
-  virtual llvm::Value *codeGen(CodeGenContext &context);
+  llvm::Value *codeGen(CodeGenContext &context) override;
 };
 
 class NIdentifier : public NExpression {
 public:
   std::string name;
   NIdentifier(const std::string &name) : name(name) {}
-  virtual llvm::Value *codeGen(CodeGenContext &context);
+  llvm::Value *codeGen(CodeGenContext &context) override;
 };
 
 class NMethodCall : public NExpression {
@@ -49,7 +58,7 @@ public:
   NMethodCall(const NIdentifier &id, ExpressionList &arguments)
       : id(id), arguments(arguments) {}
   NMethodCall(const NIdentifier &id) : id(id) {}
-  virtual llvm::Value *codeGen(CodeGenContext &context);
+  llvm::Value *codeGen(CodeGenContext &context) override;
 };
 
 class NBinaryOperator : public NExpression {
@@ -59,7 +68,7 @@ public:
   NExpression &rhs;
   NBinaryOperator(NExpression &lhs, int op, NExpression &rhs)
       : op(op), lhs(lhs), rhs(rhs) {}
-  virtual llvm::Value *codeGen(CodeGenContext &context);
+  llvm::Value *codeGen(CodeGenContext &context) override;
 };
 
 class NAssignment : public NExpression {
@@ -67,14 +76,14 @@ public:
   NIdentifier &lhs;
   NExpression &rhs;
   NAssignment(NIdentifier &lhs, NExpression &rhs) : lhs(lhs), rhs(rhs) {}
-  virtual llvm::Value *codeGen(CodeGenContext &context);
+  llvm::Value *codeGen(CodeGenContext &context) override;
 };
 
 class NBlock : public NExpression {
 public:
   StatementList statements;
   NBlock() {}
-  virtual llvm::Value *codeGen(CodeGenContext &context);
+  llvm::Value *codeGen(CodeGenContext &context) override;
 };
 
 class NIfExpression : public NExpression {
@@ -85,14 +94,14 @@ public:
   NIfExpression(NExpression &condition, NExpression &thenExpr,
                 NExpression &elseExpr)
       : condition(condition), thenExpr(thenExpr), elseExpr(elseExpr) {}
-  virtual llvm::Value *codeGen(CodeGenContext &context);
+  llvm::Value *codeGen(CodeGenContext &context) override;
 };
 
 class NExpressionStatement : public NStatement {
 public:
   NExpression &expression;
   NExpressionStatement(NExpression &expression) : expression(expression) {}
-  virtual llvm::Value *codeGen(CodeGenContext &context);
+  llvm::Value *codeGen(CodeGenContext &context) override;
 };
 
 class NVariableDeclaration : public NStatement {
@@ -105,7 +114,7 @@ public:
   NVariableDeclaration(const NIdentifier &type, NIdentifier &id,
                        NExpression *assignmentExpr)
       : type(type), id(id), assignmentExpr(assignmentExpr) {}
-  virtual llvm::Value *codeGen(CodeGenContext &context);
+  llvm::Value *codeGen(CodeGenContext &context) override;
 };
 
 class NFunctionDeclaration : public NStatement {
@@ -117,5 +126,8 @@ public:
   NFunctionDeclaration(const NIdentifier &type, const NIdentifier &id,
                        const VariableList &arguments, NBlock &block)
       : type(type), id(id), arguments(arguments), block(block) {}
-  virtual llvm::Value *codeGen(CodeGenContext &context);
+  llvm::Value *codeGen(CodeGenContext &context) override;
 };
+// clang-format on
+
+#endif // POLANG_NODE_HPP

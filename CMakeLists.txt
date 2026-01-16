@@ -17,3 +17,7 @@ separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
 add_subdirectory(parser)
 add_subdirectory(compiler)
 add_subdirectory(repl)
+
+# Enable testing
+enable_testing()
+add_subdirectory(tests)

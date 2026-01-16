@@ -40,7 +40,7 @@ clang-format -i <path/to/edited-file>
 
 ```bash
 # Configure (inside docker container)
-cmake -S. -Bbuild
+cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 # Build (inside docker container)
 cmake --build build -j$(nproc)

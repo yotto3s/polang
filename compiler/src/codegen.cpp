@@ -1,6 +1,8 @@
 #include "compiler/codegen.hpp"
+// clang-format off
 #include "parser/node.hpp"
 #include "parser.hpp" // Must be after node.hpp for bison union types
+// clang-format on
 
 /* Compile the AST into a module */
 void CodeGenContext::generateCode(NBlock &root) {
