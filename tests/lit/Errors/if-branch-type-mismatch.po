@@ -1,0 +1,5 @@
+; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+
+; Test if branch type mismatch (then and else have different types)
+; CHECK: {{.*}}If branches have different types: int and double{{.*}}
+if true then 1 else 2.0

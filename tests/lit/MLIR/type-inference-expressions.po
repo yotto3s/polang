@@ -1,0 +1,19 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test type inference from expressions
+
+; Arithmetic on int produces int
+; CHECK: {{.*}}polang.add %{{[0-9]+}}, %{{[0-9]+}} : !polang.int{{.*}}
+let a = 1 + 2
+
+; Arithmetic on double produces double
+; CHECK: {{.*}}polang.mul %{{[0-9]+}}, %{{[0-9]+}} : !polang.double{{.*}}
+let b = 1.5 * 2.0
+
+; Comparison produces bool
+; CHECK: {{.*}}polang.cmp lt, %{{[0-9]+}}, %{{[0-9]+}} : !polang.int{{.*}}
+let c = 1 < 2
+
+; Double comparison produces bool
+; CHECK: {{.*}}polang.cmp ge, %{{[0-9]+}}, %{{[0-9]+}} : !polang.double{{.*}}
+let d = 3.14 >= 2.71

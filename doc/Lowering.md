@@ -32,6 +32,21 @@ The Polang dialect is a custom MLIR dialect that closely mirrors the language se
 
 **Immutable Variable SSA Optimization**: Immutable variables (`let`) are represented as SSA values directly, avoiding unnecessary memory allocation. This enables LLVM to perform constant folding and other optimizations more effectively.
 
+### MLIR Verification
+
+The Polang dialect leverages MLIR's built-in verification infrastructure to catch type errors during compilation:
+
+| Operation | Verification |
+|-----------|--------------|
+| `polang.add`, `polang.sub`, `polang.mul`, `polang.div` | `SameOperandsAndResultType` trait ensures operands and result have matching types |
+| `polang.cmp` | Verifies operands have the same type |
+| `polang.if` | Verifies condition is `!polang.bool`, both branches yield same type |
+| `polang.return` | Verifies return value matches function signature |
+| `polang.call` | Verifies function exists, arity matches, and argument types match |
+| `polang.store` | Verifies target variable is mutable |
+
+Type inference is performed at the AST level before MLIR generation, ensuring all operations have explicit types in the generated MLIR.
+
 ### Types
 
 | Polang Type | MLIR Type | Lowers To |
@@ -306,6 +321,7 @@ mlir/
 │   │   ├── PolangDialect.td    # Dialect definition
 │   │   ├── PolangOps.td        # Operation definitions
 │   │   ├── PolangTypes.td      # Type definitions
+│   │   ├── Passes.h            # Dialect pass declarations
 │   │   └── *.h                 # Generated headers
 │   ├── Conversion/
 │   │   └── Passes.h            # Lowering pass declarations
@@ -313,8 +329,9 @@ mlir/
 └── lib/
     ├── Dialect/
     │   ├── PolangDialect.cpp   # Dialect implementation
-    │   ├── PolangOps.cpp       # Operation implementations
-    │   └── PolangTypes.cpp     # Type implementations
+    │   ├── PolangOps.cpp       # Operation implementations (includes verifiers)
+    │   ├── PolangTypes.cpp     # Type implementations
+    │   └── PolangTypeInference.cpp # Type inference pass
     ├── Conversion/
     │   └── PolangToStandard.cpp # Lowering pass
     └── MLIRGen/

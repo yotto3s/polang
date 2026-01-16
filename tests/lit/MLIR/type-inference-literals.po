@@ -1,0 +1,18 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test type inference from literal values
+
+; Integer literal infers int type
+; CHECK: {{.*}}polang.constant.int 42 : !polang.int{{.*}}
+let a = 42
+
+; Double literal infers double type
+; CHECK: {{.*}}polang.constant.double 3.140000e+00 : !polang.double{{.*}}
+let b = 3.14
+
+; Boolean literal infers bool type
+; CHECK: {{.*}}polang.constant.bool true : !polang.bool{{.*}}
+let c = true
+
+; CHECK: {{.*}}polang.constant.bool false : !polang.bool{{.*}}
+let d = false

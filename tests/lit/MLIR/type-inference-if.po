@@ -1,0 +1,15 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test if expression type inference
+
+; If expression with int branches infers int
+; CHECK: {{.*}}polang.if %{{[0-9]+}} -> !polang.int{{.*}}
+let a = if true then 1 else 2
+
+; If expression with double branches infers double
+; CHECK: {{.*}}polang.if %{{[0-9]+}} -> !polang.double{{.*}}
+let b = if false then 1.0 else 2.0
+
+; If expression with bool branches infers bool
+; CHECK: {{.*}}polang.if %{{[0-9]+}} -> !polang.bool{{.*}}
+let c = if true then true else false

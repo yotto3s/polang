@@ -1,0 +1,19 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test function return type inference
+
+; Function returning int (inferred from body)
+; CHECK: {{.*}}polang.func @double_it(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+let double_it(x: int) = x * 2
+
+; Function returning double (inferred from body)
+; CHECK: {{.*}}polang.func @half(%{{.*}}: !polang.double) -> !polang.double{{.*}}
+let half(x: double) = x / 2.0
+
+; Function returning bool (inferred from comparison)
+; CHECK: {{.*}}polang.func @is_positive(%{{.*}}: !polang.int) -> !polang.bool{{.*}}
+let is_positive(x: int) = x > 0
+
+; Explicit return type should match
+; CHECK: {{.*}}polang.func @identity(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+let identity(x: int): int = x

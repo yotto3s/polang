@@ -82,17 +82,17 @@ When adding new language features or modifying compiler output, consider adding 
 - `tests/lit/Execution/` - REPL execution tests
 - `tests/lit/Errors/` - Error handling tests
 
-### Lit Test Coverage (55 tests)
+### Lit Test Coverage (63 tests)
 
 **AST Tests (11 files):** literals, double-literals, bool-literals, variables, mutable-variables, assignment, functions, control-flow, comparisons, let-expressions, method-calls
 
-**MLIR Tests (10 files):** constants, arithmetic, double-arithmetic, functions, function-calls, control-flow, comparisons, types, mutable-variables, let-expressions
+**MLIR Tests (14 files):** constants, arithmetic, double-arithmetic, functions, function-calls, control-flow, comparisons, types, mutable-variables, let-expressions, type-inference-literals, type-inference-expressions, type-inference-functions, type-inference-if
 
 **LLVMIR Tests (13 files):** arithmetic, types, bool-type, functions, control-flow, comparisons, double-comparisons, mutable-variables, let-expressions, variable-shadowing, recursive-function, constant-folding, nested-if
 
 **Execution Tests (12 files):** hello, variables, mutability, functions, conditionals, closures, fibonacci, factorial, double-operations, bool-operations, let-expressions, comparison-operators
 
-**Error Tests (9 files):** syntax-errors, undefined-variable, type-mismatch, immutable-reassignment, undefined-function, function-arity, missing-else, syntax-error-paren, type-error-if-condition
+**Error Tests (13 files):** syntax-errors, undefined-variable, type-mismatch, immutable-reassignment, undefined-function, function-arity, missing-else, syntax-error-paren, type-error-if-condition, return-type-mismatch, if-branch-type-mismatch, argument-type-mismatch, assignment-type-mismatch
 
 ## Testing
 
@@ -231,14 +231,14 @@ polang/
 │   ├── repl/                   # REPL tests
 │   │   ├── repl_test.cpp       # REPL execution tests
 │   │   └── repl_unit_test.cpp  # InputChecker unit tests
-│   └── lit/                    # llvm-lit FileCheck tests (55 tests)
+│   └── lit/                    # llvm-lit FileCheck tests (63 tests)
 │       ├── lit.cfg.py          # Lit configuration
 │       ├── lit.site.cfg.py.in  # CMake-configured site settings
 │       ├── AST/                # AST dump tests (11 files)
-│       ├── MLIR/               # MLIR output tests (10 files)
+│       ├── MLIR/               # MLIR output tests (14 files)
 │       ├── LLVMIR/             # LLVM IR output tests (13 files)
 │       ├── Execution/          # REPL execution tests (12 files)
-│       └── Errors/             # Error handling tests (9 files)
+│       └── Errors/             # Error handling tests (13 files)
 ├── example/                    # Example programs
 │   ├── hello.po
 │   ├── variables.po
