@@ -5,6 +5,116 @@
 // clang-format on
 
 #include <iostream>
+#include <set>
+
+// Helper visitor class to collect free variables (identifiers not locally
+// defined)
+class FreeVariableCollector : public Visitor {
+public:
+  FreeVariableCollector(const std::set<std::string>& initial_locals)
+      : local_names_(initial_locals) {}
+
+  std::set<std::string> getReferencedNonLocals() const {
+    return referenced_non_locals_;
+  }
+
+  void visit(const NInteger& node) override {}
+  void visit(const NDouble& node) override {}
+  void visit(const NBoolean& node) override {}
+
+  void visit(const NIdentifier& node) override {
+    // If not locally defined, it's a free variable
+    if (local_names_.find(node.name) == local_names_.end()) {
+      referenced_non_locals_.insert(node.name);
+    }
+  }
+
+  void visit(const NMethodCall& node) override {
+    // Function name itself is not a capture (functions are global)
+    // Only process arguments
+    for (const auto* arg : node.arguments) {
+      arg->accept(*this);
+    }
+  }
+
+  void visit(const NBinaryOperator& node) override {
+    node.lhs.accept(*this);
+    node.rhs.accept(*this);
+  }
+
+  void visit(const NAssignment& node) override {
+    // LHS is an identifier being assigned - check if it's a free variable
+    if (local_names_.find(node.lhs.name) == local_names_.end()) {
+      referenced_non_locals_.insert(node.lhs.name);
+    }
+    node.rhs.accept(*this);
+  }
+
+  void visit(const NBlock& node) override {
+    for (const auto* stmt : node.statements) {
+      stmt->accept(*this);
+    }
+  }
+
+  void visit(const NIfExpression& node) override {
+    node.condition.accept(*this);
+    node.thenExpr.accept(*this);
+    node.elseExpr.accept(*this);
+  }
+
+  void visit(const NLetExpression& node) override {
+    // Save current local names
+    const auto saved_locals = local_names_;
+
+    // First, process initializers in current scope
+    for (const auto* binding : node.bindings) {
+      if (binding->isFunction) {
+        // Don't recurse into nested function bodies - they have their own
+        // captures
+      } else if (binding->var->assignmentExpr != nullptr) {
+        binding->var->assignmentExpr->accept(*this);
+      }
+    }
+
+    // Add bindings to local scope for the body
+    for (const auto* binding : node.bindings) {
+      if (binding->isFunction) {
+        local_names_.insert(binding->func->id.name);
+      } else {
+        local_names_.insert(binding->var->id.name);
+      }
+    }
+
+    // Process body with extended scope
+    node.body.accept(*this);
+
+    // Restore scope
+    local_names_ = saved_locals;
+  }
+
+  void visit(const NExpressionStatement& node) override {
+    node.expression.accept(*this);
+  }
+
+  void visit(const NVariableDeclaration& node) override {
+    // Process initializer
+    if (node.assignmentExpr != nullptr) {
+      node.assignmentExpr->accept(*this);
+    }
+    // Add to local scope (for subsequent statements in a block)
+    local_names_.insert(node.id.name);
+  }
+
+  void visit(const NFunctionDeclaration& node) override {
+    // Don't recurse into nested function bodies - they will have their own
+    // capture analysis Add function name to local scope
+    local_names_.insert(node.id.name);
+  }
+
+private:
+  std::set<std::string> local_names_;
+  std::set<std::string> referenced_non_locals_;
+};
 
 TypeChecker::TypeChecker() : inferred_type_("int") {}
 
@@ -211,7 +321,28 @@ void TypeChecker::visit(const NLetExpression& node) {
   const auto saved_func_returns = function_return_types_;
   const auto saved_func_params = function_param_types_;
 
-  // Pass 1: Type-check all binding initializers in the ORIGINAL scope
+  // Pass 1: First collect sibling variable binding types (for closure capture)
+  // This allows functions to capture sibling variables in let...and expressions
+  std::map<std::string, std::string> sibling_var_types;
+  std::map<std::string, bool> sibling_var_mutability;
+  for (const auto* binding : node.bindings) {
+    if (!binding->isFunction) {
+      const auto* var = binding->var;
+      if (var->type != nullptr) {
+        sibling_var_types[var->id.name] = var->type->name;
+        sibling_var_mutability[var->id.name] = var->isMutable;
+      } else if (var->assignmentExpr != nullptr) {
+        // Infer type from initializer (in original scope)
+        var->assignmentExpr->accept(*this);
+        if (inferred_type_ != "unknown") {
+          sibling_var_types[var->id.name] = inferred_type_;
+          sibling_var_mutability[var->id.name] = var->isMutable;
+        }
+      }
+    }
+  }
+
+  // Pass 2: Type-check all binding initializers in the ORIGINAL scope
   // (no new bindings visible yet - parallel/simultaneous binding semantics)
   std::vector<std::string> binding_types;
   std::vector<bool> binding_mutability;
@@ -221,14 +352,18 @@ void TypeChecker::visit(const NLetExpression& node) {
     if (binding->isFunction) {
       // For functions, process parameters and body but don't add to scope yet
       const auto* func = binding->func;
+      NFunctionDeclaration& mutable_func =
+          const_cast<NFunctionDeclaration&>(*func);
 
       // Save scope before processing function
       const auto func_saved_locals = local_types_;
       const auto func_saved_mutability = local_mutability_;
 
-      // Add parameters to scope for type-checking the function body
+      // Collect parameter names and add to scope for type-checking the body
+      std::set<std::string> param_names;
       std::vector<std::string> param_types;
       for (const auto* arg : func->arguments) {
+        param_names.insert(arg->id.name);
         if (arg->type == nullptr) {
           reportError("Function parameter '" + arg->id.name +
                       "' must have type annotation");
@@ -241,13 +376,52 @@ void TypeChecker::visit(const NLetExpression& node) {
       }
       func_param_types.push_back(param_types);
 
+      // Capture analysis: find free variables in the function body
+      const std::set<std::string> free_vars =
+          collectFreeVariables(func->block, param_names);
+
+      // Clear any existing captures and add new ones
+      mutable_func.captures.clear();
+      for (const auto& var_name : free_vars) {
+        // Check outer scope first, then sibling variables
+        std::string var_type;
+        bool is_mutable = false;
+        bool found = false;
+
+        if (saved_locals.find(var_name) != saved_locals.end()) {
+          // Found in outer scope
+          var_type = saved_locals.at(var_name);
+          is_mutable = saved_mutability.count(var_name) > 0 &&
+                       saved_mutability.at(var_name);
+          found = true;
+        } else if (sibling_var_types.find(var_name) !=
+                   sibling_var_types.end()) {
+          // Found in sibling bindings
+          var_type = sibling_var_types.at(var_name);
+          is_mutable = sibling_var_mutability.count(var_name) > 0 &&
+                       sibling_var_mutability.at(var_name);
+          found = true;
+        }
+
+        if (found) {
+          auto* capture_id = new NIdentifier(var_name);
+          auto* capture_type = new NIdentifier(var_type);
+          auto* capture = new NVariableDeclaration(capture_type, *capture_id,
+                                                   nullptr, is_mutable);
+          mutable_func.captures.push_back(capture);
+
+          // Add captured variable to local scope for body type checking
+          local_types_[var_name] = var_type;
+          local_mutability_[var_name] = is_mutable;
+        }
+        // If not found, it will be caught as "undeclared variable"
+      }
+
       // Type-check function body
       func->block.accept(*this);
       const std::string body_type = inferred_type_;
 
       // Handle return type inference
-      NFunctionDeclaration& mutable_func =
-          const_cast<NFunctionDeclaration&>(*func);
       if (func->type == nullptr) {
         if (body_type != "unknown") {
           mutable_func.type = new NIdentifier(body_type);
@@ -409,9 +583,11 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   const auto saved_locals = local_types_;
   const auto saved_mutability = local_mutability_;
 
-  // Add parameters to scope and collect parameter types
+  // Collect parameter names (these are local to the function)
+  std::set<std::string> param_names;
   std::vector<std::string> param_types;
   for (const auto* arg : node.arguments) {
+    param_names.insert(arg->id.name);
     if (arg->type == nullptr) {
       reportError("Function parameter '" + arg->id.name +
                   "' must have type annotation");
@@ -421,6 +597,32 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
     local_types_[arg->id.name] = arg->type->name;
     local_mutability_[arg->id.name] = arg->isMutable;
     param_types.push_back(arg->type->name);
+  }
+
+  // Capture analysis: find free variables in the function body
+  const std::set<std::string> free_vars =
+      collectFreeVariables(node.block, param_names);
+
+  // Clear any existing captures and add new ones
+  mutable_node.captures.clear();
+  for (const auto& var_name : free_vars) {
+    // Check if this free variable exists in the outer scope
+    const auto type_it = saved_locals.find(var_name);
+    if (type_it != saved_locals.end()) {
+      // Create a capture entry for this variable
+      auto* capture_id = new NIdentifier(var_name);
+      auto* capture_type = new NIdentifier(type_it->second);
+      const bool is_mutable =
+          saved_mutability.count(var_name) > 0 && saved_mutability.at(var_name);
+      auto* capture = new NVariableDeclaration(capture_type, *capture_id,
+                                               nullptr, is_mutable);
+      mutable_node.captures.push_back(capture);
+
+      // Add captured variable to local scope for body type checking
+      local_types_[var_name] = type_it->second;
+      local_mutability_[var_name] = is_mutable;
+    }
+    // If not in outer scope, it will be caught as "undeclared variable" later
   }
 
   // Store parameter types for this function
@@ -457,4 +659,11 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   local_types_ = saved_locals;
   local_mutability_ = saved_mutability;
   inferred_type_ = node.type ? node.type->name : body_type;
+}
+
+std::set<std::string> TypeChecker::collectFreeVariables(
+    const NBlock& block, const std::set<std::string>& local_names) const {
+  FreeVariableCollector collector(local_names);
+  block.accept(collector);
+  return collector.getReferencedNonLocals();
 }

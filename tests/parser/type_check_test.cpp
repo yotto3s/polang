@@ -360,3 +360,41 @@ TEST(TypeCheckTest, LetBindingParallelEvaluation) {
   // Both bindings evaluated in same scope - neither sees the other
   EXPECT_TRUE(hasTypeError("let x = y and y = 1 in x"));
 }
+
+// ============== Closure / Variable Capture Tests ==============
+
+TEST(TypeCheckTest, SimpleClosure) {
+  // Function can capture variable from outer scope
+  EXPECT_TRUE(hasNoTypeError("let x = 10\nlet f() = x + 1\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithParameter) {
+  // Function with parameter can also capture
+  EXPECT_TRUE(
+      hasNoTypeError("let multiplier = 3\nlet scale(n: int) = n * multiplier\nscale(5)"));
+}
+
+TEST(TypeCheckTest, MultipleCapturedVariables) {
+  // Function can capture multiple variables
+  EXPECT_TRUE(hasNoTypeError("let a = 1\nlet b = 2\nlet sum() = a + b\nsum()"));
+}
+
+TEST(TypeCheckTest, ClosureInLetExpression) {
+  // Function in let expression captures sibling variable
+  EXPECT_TRUE(hasNoTypeError("let x = 10 and f() = x + 1 in f()"));
+}
+
+TEST(TypeCheckTest, ClosureCapturesMutableVariable) {
+  // Function can capture mutable variable
+  EXPECT_TRUE(hasNoTypeError("let mut x = 10\nlet f() = x + 1\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureTypeMismatch) {
+  // Captured variable type must be compatible with usage
+  EXPECT_TRUE(hasTypeError("let x = 10\nlet f(): double = x + 1.0\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureUndeclaredCapture) {
+  // Cannot capture undeclared variable
+  EXPECT_TRUE(hasTypeError("let f() = y + 1\nf()"));
+}

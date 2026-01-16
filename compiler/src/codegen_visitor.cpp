@@ -65,9 +65,28 @@ void CodeGenVisitor::visit(const NMethodCall& node) {
     return;
   }
   std::vector<Value*> args;
+
+  // Regular arguments
   for (const auto* arg : node.arguments) {
     args.push_back(generate(*arg));
   }
+
+  // Pass captured variables as extra arguments
+  const auto& captures = context_.getFunctionCaptures(node.id.name);
+  for (const auto& capture_name : captures) {
+    if (context_.locals().find(capture_name) == context_.locals().end()) {
+      std::cerr << "captured variable " << capture_name
+                << " not in scope at call site\n";
+      result_ = nullptr;
+      return;
+    }
+    // Load the captured variable's value and pass it
+    Value* const captured_value = new LoadInst(
+        context_.locals()[capture_name]->getAllocatedType(),
+        context_.locals()[capture_name], "", false, context_.currentBlock());
+    args.push_back(captured_value);
+  }
+
   result_ = CallInst::Create(function->getFunctionType(), function, args, "",
                              context_.currentBlock());
 }
@@ -243,6 +262,8 @@ void CodeGenVisitor::visit(const NFunctionDeclaration& node) {
     result_ = nullptr;
     return;
   }
+
+  // Build argument types: regular params + captured variables
   std::vector<Type*> argTypes;
   for (const auto* arg : node.arguments) {
     if (arg->type == nullptr) {
@@ -252,10 +273,28 @@ void CodeGenVisitor::visit(const NFunctionDeclaration& node) {
     }
     argTypes.push_back(typeOf(arg->type, context_.context));
   }
+
+  // Add captured variable types
+  std::vector<std::string> capture_names;
+  for (const auto* capture : node.captures) {
+    if (capture->type == nullptr) {
+      std::cerr << "Internal error: captured variable type not resolved"
+                << "\n";
+      result_ = nullptr;
+      return;
+    }
+    argTypes.push_back(typeOf(capture->type, context_.context));
+    capture_names.push_back(capture->id.name);
+  }
+
+  // Store capture info for use when calling this function
+  context_.setFunctionCaptures(node.id.name, capture_names);
+
   FunctionType* const ftype =
       FunctionType::get(typeOf(node.type, context_.context), argTypes, false);
-  Function* const function = Function::Create(ftype, GlobalValue::InternalLinkage,
-                                              node.id.name.c_str(), context_.module);
+  Function* const function =
+      Function::Create(ftype, GlobalValue::InternalLinkage,
+                       node.id.name.c_str(), context_.module);
   BasicBlock* const bblock =
       BasicBlock::Create(context_.context, "entry", function, 0);
 
@@ -267,6 +306,15 @@ void CodeGenVisitor::visit(const NFunctionDeclaration& node) {
     arg->accept(*this); // Creates the alloca
     // Store the function argument value into the alloca
     new StoreInst(&*argValues, context_.locals()[arg->id.name], false, bblock);
+    ++argValues;
+  }
+
+  // Create allocas for captured variables and store their values
+  for (const auto* capture : node.captures) {
+    capture->accept(*this); // Creates the alloca
+    // Store the captured argument value into the alloca
+    new StoreInst(&*argValues, context_.locals()[capture->id.name], false,
+                  bblock);
     ++argValues;
   }
 
@@ -301,7 +349,8 @@ void CodeGenVisitor::visit(const NIfExpression& node) {
   // Create basic blocks for then, else, and merge
   BasicBlock* const thenBB = BasicBlock::Create(context_.context, "then", func);
   BasicBlock* const elseBB = BasicBlock::Create(context_.context, "else", func);
-  BasicBlock* const mergeBB = BasicBlock::Create(context_.context, "ifcont", func);
+  BasicBlock* const mergeBB =
+      BasicBlock::Create(context_.context, "ifcont", func);
 
   // Create conditional branch
   BranchInst::Create(thenBB, elseBB, condBool, context_.currentBlock());
@@ -330,7 +379,8 @@ void CodeGenVisitor::visit(const NIfExpression& node) {
 
   // Emit merge block with PHI node - use actual type from then value
   context_.setCurrentBlock(mergeBB);
-  PHINode* const phi = PHINode::Create(thenValue->getType(), 2, "iftmp", mergeBB);
+  PHINode* const phi =
+      PHINode::Create(thenValue->getType(), 2, "iftmp", mergeBB);
   phi->addIncoming(thenValue, thenEndBB);
   phi->addIncoming(elseValue, elseEndBB);
 

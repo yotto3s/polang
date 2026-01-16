@@ -32,6 +32,7 @@ public:
 class CodeGenContext {
   std::stack<CodeGenBlock*> blocks;
   Function* mainFunction;
+  std::map<std::string, std::vector<std::string>> function_captures_;
 
 public:
   LLVMContext context;
@@ -59,6 +60,16 @@ public:
     CodeGenBlock* top = blocks.top();
     blocks.pop();
     delete top;
+  }
+  void setFunctionCaptures(const std::string& name,
+                           const std::vector<std::string>& captures) noexcept {
+    function_captures_[name] = captures;
+  }
+  const std::vector<std::string>&
+  getFunctionCaptures(const std::string& name) const noexcept {
+    static const std::vector<std::string> empty;
+    const auto it = function_captures_.find(name);
+    return it != function_captures_.end() ? it->second : empty;
   }
 };
 

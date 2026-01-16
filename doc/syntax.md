@@ -249,7 +249,42 @@ let x = 10 and double(y: int): int = y * 2 in double(x)
 let inc(n: int) = n + 1 in inc(41)
 ```
 
-**Note:** Functions defined in let expressions cannot capture sibling variable bindings. They can only access their own parameters and call sibling functions.
+### Variable Capture (Closures)
+
+Functions can capture variables from their enclosing scope:
+
+```
+let x = 10
+let f() = x + 1   ; f captures x
+f()               ; returns 11
+```
+
+**Capture Semantics:**
+- Variables are captured **by value** at call time
+- Captured variables are passed as implicit extra parameters
+- Both mutable and immutable variables can be captured
+- Mutations to captured variables inside the function do not affect the outer variable
+
+**Examples:**
+
+```
+; Simple capture
+let multiplier = 3
+let scale(n: int) = n * multiplier
+scale(10)  ; returns 30
+
+; Capture in let expression
+let result =
+  let base = 100 and
+      add(x: int) = base + x
+  in add(5)  ; returns 105
+
+; Multiple captures
+let a = 1
+let b = 2
+let sum() = a + b
+sum()  ; returns 3
+```
 
 ## Expressions
 

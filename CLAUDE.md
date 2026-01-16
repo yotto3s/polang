@@ -80,15 +80,16 @@ for f in example/*.po; do echo "=== $(basename $f) ==="; ./build/bin/PolangRepl 
 ```
 
 Expected outputs:
-- `hello.po` → `7 : int`
-- `variables.po` → `30 : int`
-- `functions.po` → `25 : int`
+- `closures.po` → `21 : int`
 - `conditionals.po` → `10 : int`
-- `let_expressions.po` → `16 : int`
-- `types.po` → `84 : int`
-- `fibonacci.po` → `5 : int`
 - `factorial.po` → `120 : int`
+- `fibonacci.po` → `5 : int`
+- `functions.po` → `25 : int`
+- `hello.po` → `7 : int`
+- `let_expressions.po` → `16 : int`
 - `mutability.po` → `23 : int`
+- `types.po` → `84 : int`
+- `variables.po` → `30 : int`
 
 Also run the test suite:
 

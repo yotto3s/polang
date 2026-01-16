@@ -2,12 +2,14 @@
 #define POLANG_TYPE_CHECKER_HPP
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
 #include <parser/visitor.hpp>
 
 class Node;
+class NBlock;
 
 struct TypeCheckError {
   std::string message;
@@ -58,6 +60,11 @@ private:
 
   void reportError(const std::string& message);
   std::string inferType(const Node& node);
+
+  // Collect identifiers referenced in a block that are not locally defined
+  std::set<std::string>
+  collectFreeVariables(const NBlock& block,
+                       const std::set<std::string>& local_names) const;
 };
 
 #endif // POLANG_TYPE_CHECKER_HPP

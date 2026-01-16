@@ -153,6 +153,7 @@ public:
   const NIdentifier &id;
   VariableList arguments;
   NBlock &block;
+  VariableList captures;  // captured variables (filled by type checker)
   // Constructor for inferred return type
   NFunctionDeclaration(const NIdentifier &id, const VariableList &arguments,
                        NBlock &block)

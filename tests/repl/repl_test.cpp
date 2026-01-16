@@ -250,3 +250,43 @@ TEST(ReplIntegration, ComplexMultiLineExpression) {
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("30 : int"));
 }
+
+// ============== Closure / Variable Capture Tests ==============
+
+TEST(ReplIntegration, SimpleClosure) {
+  const auto result = runRepl("let x = 10\nlet f() = x + 1\nf()");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("11 : int"));
+}
+
+TEST(ReplIntegration, ClosureWithParameter) {
+  const auto result = runRepl("let multiplier = 3\nlet scale(n: int) = n * multiplier\nscale(10)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("30 : int"));
+}
+
+TEST(ReplIntegration, ClosureInLetExpression) {
+  const auto result = runRepl("let x = 10 and f() = x + 1 in f()");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("11 : int"));
+}
+
+TEST(ReplIntegration, MultipleCapturedVariables) {
+  const auto result = runRepl("let a = 1\nlet b = 2\nlet sum() = a + b\nsum()");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("3 : int"));
+}
+
+TEST(ReplIntegration, ClosureWithMutableCapture) {
+  const auto result = runRepl("let mut x = 10\nlet f() = x + 1\nf()");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("11 : int"));
+}
+
+TEST(ReplIntegration, ClosureCaptureByValue) {
+  // Capture is by value at call time, so mutation after function definition
+  // should be visible when calling
+  const auto result = runRepl("let mut x = 10\nlet f() = x + 1\nx <- 20\nf()");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("21 : int"));
+}
