@@ -54,8 +54,9 @@ cmake --build build -j$(nproc)
 
 Build outputs:
 - `build/bin/PolangCompiler` - Compiler executable (outputs LLVM IR to stdout)
-- `build/bin/PolangRepl` - REPL executable (executes code via JIT)
+- `build/bin/PolangRepl` - Interactive REPL executable (executes code via JIT)
 - `build/lib/libPolangParser.a` - Parser static library
+- `build/lib/libPolangCodegen.a` - Code generation static library
 
 ## Dependencies
 
@@ -94,8 +95,11 @@ polang/
 │       └── codegen.hpp         # Code generation header
 ├── repl/                       # REPL application
 │   ├── CMakeLists.txt
-│   └── src/
-│       └── main.cpp            # REPL entry point
+│   ├── src/
+│   │   ├── main.cpp            # REPL entry point
+│   │   └── repl_session.cpp    # REPL session management
+│   └── include/repl/
+│       └── repl_session.hpp    # REPL session header
 └── docker/                     # Docker build environment
 ```
 
@@ -116,12 +120,16 @@ Polang is a simple programming language compiler with LLVM backend.
    - Generates LLVM IR using `CodeGenContext`
    - Outputs IR to stdout
 
-3. **REPL** (`repl/`)
-   - Reads source from stdin
-   - Spawns `PolangCompiler` as subprocess
-   - Receives LLVM IR from compiler
-   - Parses IR and executes via LLVM JIT
-   - Note: Requires `PolangCompiler` in PATH
+3. **Codegen Library** (`compiler/`)
+   - `libPolangCodegen.a` - Code generation as static library
+   - Used by both compiler and REPL
+
+4. **REPL** (`repl/`)
+   - Interactive read-eval-print loop
+   - Links directly to parser and codegen libraries
+   - Supports multi-line input for incomplete expressions
+   - Persists variables and functions across evaluations
+   - Executes code via LLVM JIT
 
 ### Pipeline
 
@@ -148,7 +156,15 @@ Bison and Flex generate files in `build/parser/`:
 # Compile source to LLVM IR
 echo "let x = 5" | ./build/bin/PolangCompiler
 
-# Execute source via REPL (requires PolangCompiler in PATH)
-export PATH=$PATH:$(pwd)/build/bin
+# Execute source via REPL (pipe mode)
 echo "let x = 5" | ./build/bin/PolangRepl
+
+# Interactive REPL session
+./build/bin/PolangRepl
+# > 1 + 2
+# 3 : int
+# > let x = 5
+# > x * 2
+# 10 : int
+# > exit
 ```
