@@ -4,8 +4,10 @@
 NBlock *programBlock; /* the top level root node of our final AST */
 
 extern int yylex();
-void yyerror(const char *s) { printf("ERROR: %sn", s); }
+void yyerror(const char *s);
 %}
+
+%locations
 
 /* Represents the many different ways we can access our data */
 %union {
@@ -139,3 +141,8 @@ comparison : TCEQ | TCNE | TCLT | TCLE | TCGT | TCGE
            ;
 
 %%
+
+void yyerror(const char *s) {
+  fprintf(stderr, "ERROR: %s at line %d, column %d\n",
+          s, yylloc.first_line, yylloc.first_column);
+}

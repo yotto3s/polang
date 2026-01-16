@@ -4,13 +4,28 @@
 #include "parser.hpp"
 #define SAVE_TOKEN yylval.string = new std::string(yytext, yyleng)
 #define TOKEN(t) (yylval.token = t)
+
+static int yycolumn = 1;
+
+void polang_reset_lexer_location() {
+    yycolumn = 1;
+    yylineno = 1;
+}
+
+#define YY_USER_ACTION \
+    yylloc.first_line = yylloc.last_line = yylineno; \
+    yylloc.first_column = yycolumn; \
+    yylloc.last_column = yycolumn + yyleng - 1; \
+    yycolumn += yyleng;
 %}
 
 %option noyywrap
+%option yylineno
 
 %%
 
-[ \t\n]                 { /* skip whitespaces */ }
+[ \t]+                  { /* skip spaces and tabs */ }
+\n                      { yycolumn = 1; /* reset column on newline */ }
 "let"                   { return TOKEN(TLET); }
 "fun"                   { return TOKEN(TFUN); }
 "in"                    { return TOKEN(TIN); }
@@ -39,6 +54,6 @@
 "-"                     { return TOKEN(TMINUS); }
 "*"                     { return TOKEN(TMUL); }
 "/"                     { return TOKEN(TDIV); }
-.                       { printf("Unknown token!\n"); yyterminate(); }
+.                       { fprintf(stderr, "ERROR: unknown token '%s' at line %d, column %d\n", yytext, yylineno, yylloc.first_column); yyterminate(); }
 
 %%
