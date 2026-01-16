@@ -1,0 +1,7 @@
+let result = let x = 10 and y = 20 in x + y
+
+let compute (a: int) (b: int): int =
+  let sum = a + b and diff = a - b in
+  sum * diff
+
+compute(5, 3)

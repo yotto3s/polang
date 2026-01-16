@@ -1,0 +1,4 @@
+let x = 10
+let y: int = 20
+let sum = x + y
+sum

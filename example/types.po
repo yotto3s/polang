@@ -1,0 +1,8 @@
+let i: int = 42
+let d: double = 3.14159
+let b: bool = true
+
+let is_positive: bool = i > 0
+let is_large: bool = d > 3.0
+
+if is_positive then i * 2 else 0

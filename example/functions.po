@@ -1,0 +1,4 @@
+let square (n: int): int = n * n
+let add (a: int) (b: int): int = a + b
+let result = add(square(3), square(4))
+result
