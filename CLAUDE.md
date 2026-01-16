@@ -29,7 +29,7 @@ clangd --path-mappings=$(pwd)=/workspace/polang --enable-config
 
 ## clang-format Commands
 
-Always apply clang-format to files you edit.
+Always apply clang-format to files you edit (C/C++ files only, not .l or .y files).
 
 ```bash
 # Run clang-format (inside docker container)
@@ -46,25 +46,83 @@ cmake -S. -Bbuild
 cmake --build build -j$(nproc)
 ```
 
-The executable is built at `build/src/PolangRepl`.
+Build outputs:
+- `build/bin/PolangCompiler` - Compiler executable (outputs LLVM IR to stdout)
+- `build/bin/PolangRepl` - REPL executable (executes code via JIT)
+- `build/lib/libPolangParser.a` - Parser static library
 
 ## Dependencies
 
 - CMake 3.10+
-- LLVM (core, support, native components)
+- LLVM (core, support, native, OrcJIT, AsmParser components)
 - Bison (for parser generation)
 - Flex (for lexer generation)
+
+## Documentation
+
+When modifying the language syntax (lexer.l, parser.y, or node.hpp), always update:
+- `doc/syntax.md` - Language syntax reference
+
+## Project Structure
+
+```
+polang/
+├── CMakeLists.txt              # Root CMake configuration
+├── doc/                        # Documentation
+│   └── syntax.md               # Language syntax reference
+├── parser/                     # Parser library
+│   ├── CMakeLists.txt
+│   ├── src/
+│   │   ├── lexer.l             # Flex lexer
+│   │   ├── parser.y            # Bison grammar
+│   │   └── parser_api.cpp      # Parser API implementation
+│   └── include/parser/
+│       ├── node.hpp            # AST node definitions
+│       └── parser_api.hpp      # Parser API header
+├── compiler/                   # Compiler application
+│   ├── CMakeLists.txt
+│   ├── src/
+│   │   ├── main.cpp            # Compiler entry point
+│   │   └── codegen.cpp         # LLVM IR code generation
+│   └── include/compiler/
+│       └── codegen.hpp         # Code generation header
+├── repl/                       # REPL application
+│   ├── CMakeLists.txt
+│   └── src/
+│       └── main.cpp            # REPL entry point
+└── docker/                     # Docker build environment
+```
 
 ## Architecture
 
 Polang is a simple programming language compiler with LLVM backend.
 
+### Components
+
+1. **Parser Library** (`parser/`)
+   - Receives source code string via `polang_parse()` API
+   - Returns AST (`NBlock*`)
+   - Built as static library `libPolangParser.a`
+
+2. **Compiler** (`compiler/`)
+   - Reads source from stdin
+   - Uses parser library to build AST
+   - Generates LLVM IR using `CodeGenContext`
+   - Outputs IR to stdout
+
+3. **REPL** (`repl/`)
+   - Reads source from stdin
+   - Spawns `PolangCompiler` as subprocess
+   - Receives LLVM IR from compiler
+   - Parses IR and executes via LLVM JIT
+   - Note: Requires `PolangCompiler` in PATH
+
 ### Pipeline
 
-1. **Lexer** (`src/lexer.l`) - Flex-based tokenizer recognizing identifiers, integers, doubles, operators, and punctuation
-2. **Parser** (`src/parser.y`) - Bison grammar that builds an AST from tokens; outputs `programBlock` (NBlock*)
-3. **AST** (`src/node.hpp`) - Node class hierarchy: `NExpression`, `NStatement`, and concrete types like `NInteger`, `NIdentifier`, `NBinaryOperator`, `NFunctionDeclaration`, etc.
-4. **Code Generation** (`src/codegen.cpp`, `src/codegen.hpp`) - `CodeGenContext` traverses AST and emits LLVM IR via `codeGen()` virtual methods on each node type
+1. **Lexer** (`parser/src/lexer.l`) - Flex-based tokenizer recognizing identifiers, integers, doubles, operators, and punctuation
+2. **Parser** (`parser/src/parser.y`) - Bison grammar that builds an AST from tokens; outputs `programBlock` (NBlock*)
+3. **AST** (`parser/include/parser/node.hpp`) - Node class hierarchy: `NExpression`, `NStatement`, and concrete types like `NInteger`, `NIdentifier`, `NBinaryOperator`, `NFunctionDeclaration`, etc.
+4. **Code Generation** (`compiler/src/codegen.cpp`) - `CodeGenContext` traverses AST and emits LLVM IR via `codeGen()` virtual methods on each node type
 
 ### Key Types
 
@@ -74,6 +132,17 @@ Polang is a simple programming language compiler with LLVM backend.
 
 ### Generated Files
 
-Bison and Flex generate files in `build/src/`:
+Bison and Flex generate files in `build/parser/`:
 - `parser.cpp`, `parser.hpp` - Parser implementation and token definitions
 - `lexer.cpp` - Lexer implementation
+
+## Usage
+
+```bash
+# Compile source to LLVM IR
+echo "let x = 5" | ./build/bin/PolangCompiler
+
+# Execute source via REPL (requires PolangCompiler in PATH)
+export PATH=$PATH:$(pwd)/build/bin
+echo "let x = 5" | ./build/bin/PolangRepl
+```
