@@ -40,13 +40,13 @@ namespace {
 
 class MLIRGenVisitor : public Visitor {
 public:
-  MLIRGenVisitor(MLIRContext &context) : builder(&context) {
+  MLIRGenVisitor(MLIRContext& context) : builder(&context) {
     // Create a new module
     module = ModuleOp::create(builder.getUnknownLoc());
   }
 
   /// Generate MLIR for the given AST block
-  ModuleOp generate(const NBlock &block) {
+  ModuleOp generate(const NBlock& block) {
     // First, run type checker to get type information
     typeChecker.check(block);
 
@@ -63,46 +63,56 @@ public:
   }
 
   // Visitor interface implementations
-  void visit(const NInteger &node) override {
+  void visit(const NInteger& node) override {
     result = builder.create<ConstantIntOp>(loc(), node.value);
     resultType = "int";
   }
 
-  void visit(const NDouble &node) override {
+  void visit(const NDouble& node) override {
     result = builder.create<ConstantDoubleOp>(loc(), node.value);
     resultType = "double";
   }
 
-  void visit(const NBoolean &node) override {
+  void visit(const NBoolean& node) override {
     result = builder.create<ConstantBoolOp>(loc(), node.value);
     resultType = "bool";
   }
 
-  void visit(const NIdentifier &node) override {
-    // Look up the variable in the symbol table
+  void visit(const NIdentifier& node) override {
+    // Check immutable values first (SSA values, no load needed)
+    auto immIt = immutableValues.find(node.name);
+    if (immIt != immutableValues.end()) {
+      result = immIt->second;
+      resultType = typeTable[node.name];
+      return;
+    }
+
+    // Check mutable variables (allocas, need load)
     auto it = symbolTable.find(node.name);
     if (it != symbolTable.end()) {
-      // Load from the alloca
       Value allocaOp = it->second;
-      result = builder.create<LoadOp>(loc(), getTypeForName(node.name), allocaOp);
+      result =
+          builder.create<LoadOp>(loc(), getTypeForName(node.name), allocaOp);
       resultType = typeTable[node.name];
-    } else {
-      // Check function arguments
-      auto argIt = argValues.find(node.name);
-      if (argIt != argValues.end()) {
-        result = argIt->second;
-        resultType = typeTable[node.name];
-      } else {
-        llvm::errs() << "Unknown variable: " << node.name << "\n";
-        result = nullptr;
-      }
+      return;
     }
+
+    // Check function arguments
+    auto argIt = argValues.find(node.name);
+    if (argIt != argValues.end()) {
+      result = argIt->second;
+      resultType = typeTable[node.name];
+      return;
+    }
+
+    llvm::errs() << "Unknown variable: " << node.name << "\n";
+    result = nullptr;
   }
 
-  void visit(const NMethodCall &node) override {
+  void visit(const NMethodCall& node) override {
     // Collect arguments
     SmallVector<Value> args;
-    for (const auto *arg : node.arguments) {
+    for (const auto* arg : node.arguments) {
       arg->accept(*this);
       if (!result)
         return;
@@ -113,16 +123,24 @@ public:
     auto funcIt = functionCaptures.find(node.id.name);
     if (funcIt != functionCaptures.end()) {
       // Add captured variables as extra arguments
-      for (const auto &captureName : funcIt->second) {
-        auto it = symbolTable.find(captureName);
-        if (it != symbolTable.end()) {
-          Value loadedVal = builder.create<LoadOp>(
-              loc(), getTypeForName(captureName), it->second);
-          args.push_back(loadedVal);
+      for (const auto& captureName : funcIt->second) {
+        // Check immutable values first (SSA values)
+        auto immIt = immutableValues.find(captureName);
+        if (immIt != immutableValues.end()) {
+          args.push_back(immIt->second);
         } else {
-          auto argIt = argValues.find(captureName);
-          if (argIt != argValues.end()) {
-            args.push_back(argIt->second);
+          // Check mutable variables (allocas)
+          auto it = symbolTable.find(captureName);
+          if (it != symbolTable.end()) {
+            Value loadedVal = builder.create<LoadOp>(
+                loc(), getTypeForName(captureName), it->second);
+            args.push_back(loadedVal);
+          } else {
+            // Check function arguments
+            auto argIt = argValues.find(captureName);
+            if (argIt != argValues.end()) {
+              args.push_back(argIt->second);
+            }
           }
         }
       }
@@ -139,12 +157,12 @@ public:
       resultType = "int";
     }
 
-    auto callOp = builder.create<CallOp>(loc(), node.id.name,
-                                          TypeRange{resultTy}, args);
+    auto callOp =
+        builder.create<CallOp>(loc(), node.id.name, TypeRange{resultTy}, args);
     result = callOp.getResult();
   }
 
-  void visit(const NBinaryOperator &node) override {
+  void visit(const NBinaryOperator& node) override {
     node.lhs.accept(*this);
     if (!result)
       return;
@@ -195,7 +213,7 @@ public:
     }
   }
 
-  void visit(const NAssignment &node) override {
+  void visit(const NAssignment& node) override {
     // Evaluate RHS
     node.rhs.accept(*this);
     if (!result)
@@ -205,7 +223,8 @@ public:
     // Get the alloca for the variable
     auto it = symbolTable.find(node.lhs.name);
     if (it == symbolTable.end()) {
-      llvm::errs() << "Unknown variable in assignment: " << node.lhs.name << "\n";
+      llvm::errs() << "Unknown variable in assignment: " << node.lhs.name
+                   << "\n";
       result = nullptr;
       return;
     }
@@ -217,10 +236,10 @@ public:
     result = value;
   }
 
-  void visit(const NBlock &node) override {
+  void visit(const NBlock& node) override {
     Value lastValue = nullptr;
 
-    for (const auto *stmt : node.statements) {
+    for (const auto* stmt : node.statements) {
       stmt->accept(*this);
       if (result)
         lastValue = result;
@@ -229,7 +248,7 @@ public:
     result = lastValue;
   }
 
-  void visit(const NIfExpression &node) override {
+  void visit(const NIfExpression& node) override {
     // Evaluate condition
     node.condition.accept(*this);
     if (!result)
@@ -266,13 +285,14 @@ public:
     resultType = ifResultType;
   }
 
-  void visit(const NLetExpression &node) override {
+  void visit(const NLetExpression& node) override {
     // Save current symbol table state
     auto savedSymbolTable = symbolTable;
     auto savedTypeTable = typeTable;
+    auto savedImmutableValues = immutableValues;
 
     // Process bindings
-    for (const auto *binding : node.bindings) {
+    for (const auto* binding : node.bindings) {
       if (binding->isFunction) {
         binding->func->accept(*this);
       } else {
@@ -286,13 +306,14 @@ public:
     // Restore symbol table (let bindings are scoped)
     symbolTable = savedSymbolTable;
     typeTable = savedTypeTable;
+    immutableValues = savedImmutableValues;
   }
 
-  void visit(const NExpressionStatement &node) override {
+  void visit(const NExpressionStatement& node) override {
     node.expression.accept(*this);
   }
 
-  void visit(const NVariableDeclaration &node) override {
+  void visit(const NVariableDeclaration& node) override {
     // Determine the type
     std::string typeName = node.type ? node.type->name : "int";
     if (node.assignmentExpr) {
@@ -301,25 +322,29 @@ public:
       typeName = resultType;
     }
 
-    Type polangType = getPolangType(typeName);
-    Type llvmType = convertPolangType(polangType);
+    if (node.isMutable) {
+      // Mutable: use alloca/store pattern
+      Type polangType = getPolangType(typeName);
+      Type llvmType = convertPolangType(polangType);
 
-    // Create alloca using the correct builder signature
-    auto memRefType = MemRefType::get({}, llvmType);
-    auto alloca = builder.create<AllocaOp>(
-        loc(), memRefType, node.id.name, polangType, node.isMutable);
+      auto memRefType = MemRefType::get({}, llvmType);
+      auto alloca = builder.create<AllocaOp>(loc(), memRefType, node.id.name,
+                                             polangType, node.isMutable);
 
-    // Store initial value if present
-    if (node.assignmentExpr && result) {
-      builder.create<StoreOp>(loc(), result, alloca);
+      if (node.assignmentExpr && result) {
+        builder.create<StoreOp>(loc(), result, alloca);
+      }
+
+      symbolTable[node.id.name] = alloca;
+    } else {
+      // Immutable: store SSA value directly (no alloca needed)
+      immutableValues[node.id.name] = result;
     }
 
-    // Register in symbol table
-    symbolTable[node.id.name] = alloca;
     typeTable[node.id.name] = typeName;
   }
 
-  void visit(const NFunctionDeclaration &node) override {
+  void visit(const NFunctionDeclaration& node) override {
     // Save the current insertion point
     OpBuilder::InsertionGuard guard(builder);
 
@@ -327,7 +352,7 @@ public:
     SmallVector<Type> argTypes;
     std::vector<std::string> argNames;
 
-    for (const auto *arg : node.arguments) {
+    for (const auto* arg : node.arguments) {
       std::string typeName = arg->type ? arg->type->name : "int";
       argTypes.push_back(getPolangType(typeName));
       argNames.push_back(arg->id.name);
@@ -335,7 +360,7 @@ public:
 
     // Add captured variables as extra parameters
     std::vector<std::string> captureNames;
-    for (const auto *capture : node.captures) {
+    for (const auto* capture : node.captures) {
       std::string typeName = capture->type ? capture->type->name : "int";
       argTypes.push_back(getPolangType(typeName));
       captureNames.push_back(capture->id.name);
@@ -356,29 +381,31 @@ public:
 
     // Convert captureNames to ArrayRef<StringRef>
     SmallVector<StringRef> captureRefs;
-    for (const auto &name : captureNames) {
+    for (const auto& name : captureNames) {
       captureRefs.push_back(name);
     }
 
     auto funcOp = builder.create<FuncOp>(loc(), node.id.name, funcType,
-                                          ArrayRef<StringRef>(captureRefs));
+                                         ArrayRef<StringRef>(captureRefs));
 
     // Create entry block with arguments
-    Block *entryBlock = funcOp.addEntryBlock();
+    Block* entryBlock = funcOp.addEntryBlock();
     builder.setInsertionPointToStart(entryBlock);
 
     // Save current state
     auto savedSymbolTable = symbolTable;
     auto savedTypeTable = typeTable;
     auto savedArgValues = argValues;
+    auto savedImmutableValues = immutableValues;
 
     symbolTable.clear();
     typeTable.clear();
     argValues.clear();
+    immutableValues.clear();
 
     // Register function arguments
     size_t argIdx = 0;
-    for (const auto *arg : node.arguments) {
+    for (const auto* arg : node.arguments) {
       std::string typeName = arg->type ? arg->type->name : "int";
       argValues[arg->id.name] = entryBlock->getArgument(argIdx);
       typeTable[arg->id.name] = typeName;
@@ -386,7 +413,7 @@ public:
     }
 
     // Register captured variables as arguments
-    for (const auto *capture : node.captures) {
+    for (const auto* capture : node.captures) {
       std::string typeName = capture->type ? capture->type->name : "int";
       argValues[capture->id.name] = entryBlock->getArgument(argIdx);
       typeTable[capture->id.name] = typeName;
@@ -407,6 +434,7 @@ public:
     symbolTable = savedSymbolTable;
     typeTable = savedTypeTable;
     argValues = savedArgValues;
+    immutableValues = savedImmutableValues;
 
     result = nullptr; // Function declarations don't produce a value
   }
@@ -421,15 +449,16 @@ private:
   std::string resultType;
 
   // Symbol tables
-  std::map<std::string, Value> symbolTable;  // Variable allocas
-  std::map<std::string, Value> argValues;    // Function arguments
-  std::map<std::string, std::string> typeTable;  // Variable types
+  std::map<std::string, Value> symbolTable;     // Mutable variable allocas
+  std::map<std::string, Value> argValues;       // Function arguments
+  std::map<std::string, Value> immutableValues; // Immutable variable SSA values
+  std::map<std::string, std::string> typeTable; // Variable types
   std::map<std::string, std::vector<std::string>> functionCaptures;
   std::map<std::string, std::string> functionReturnTypes;
 
   Location loc() { return builder.getUnknownLoc(); }
 
-  Type getPolangType(const std::string &typeName) {
+  Type getPolangType(const std::string& typeName) {
     if (typeName == "int")
       return builder.getType<IntType>();
     if (typeName == "double")
@@ -440,7 +469,7 @@ private:
     return builder.getType<IntType>();
   }
 
-  Type getTypeForName(const std::string &name) {
+  Type getTypeForName(const std::string& name) {
     auto it = typeTable.find(name);
     if (it != typeTable.end()) {
       return getPolangType(it->second);
@@ -458,8 +487,9 @@ private:
     return builder.getI64Type();
   }
 
-  void generateMainFunction(const NBlock &block) {
-    // Get the inferred return type from the type checker (already ran in generate())
+  void generateMainFunction(const NBlock& block) {
+    // Get the inferred return type from the type checker (already ran in
+    // generate())
     std::string inferredType = typeChecker.getInferredType();
     Type returnType = getPolangType(inferredType);
 
@@ -470,7 +500,7 @@ private:
     auto entryFunc = builder.create<FuncOp>(loc(), "__polang_entry", funcType);
 
     // Create entry block
-    Block *entryBlock = entryFunc.addEntryBlock();
+    Block* entryBlock = entryFunc.addEntryBlock();
     builder.setInsertionPointToStart(entryBlock);
 
     // Generate code for the block
@@ -496,8 +526,8 @@ private:
 
 } // namespace
 
-mlir::OwningOpRef<mlir::ModuleOp> polang::mlirGen(mlir::MLIRContext &context,
-                                                   const NBlock &moduleAST) {
+mlir::OwningOpRef<mlir::ModuleOp> polang::mlirGen(mlir::MLIRContext& context,
+                                                  const NBlock& moduleAST) {
   // Register the Polang dialect
   context.getOrLoadDialect<PolangDialect>();
 

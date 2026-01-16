@@ -1,8 +1,8 @@
 ; RUN: %polang_compiler %s | %FileCheck %s
 
 ; Test variable shadowing in nested let expressions
-; The inner x shadows the outer x; only one alloca needed since outer is unused
-; CHECK: {{.*}}alloca{{.*}}
-; CHECK: {{.*}}store{{.*}}
-; CHECK: {{.*}}load{{.*}}
+; The inner x shadows the outer x; immutable variables are optimized to SSA values
+; CHECK: define i64 @__polang_entry() {
+; CHECK: {{.*}}ret i64 2
+; CHECK: }
 let x = 1 in let x = 2 in x

@@ -28,6 +28,10 @@ The Polang dialect is a custom MLIR dialect that closely mirrors the language se
 - **Optimization opportunities**: Custom passes can operate on high-level operations
 - **Debugging**: The Polang dialect MLIR is human-readable and maps directly to source constructs
 
+### Built-in Optimizations
+
+**Immutable Variable SSA Optimization**: Immutable variables (`let`) are represented as SSA values directly, avoiding unnecessary memory allocation. This enables LLVM to perform constant folding and other optimizations more effectively.
+
 ### Types
 
 | Polang Type | MLIR Type | Lowers To |
@@ -80,9 +84,11 @@ The Polang dialect is a custom MLIR dialect that closely mirrors the language se
 
 | Operation | Description | Example |
 |-----------|-------------|---------|
-| `polang.alloca` | Allocate variable | `%0 = polang.alloca "x" : !polang.int -> memref<i64>` |
-| `polang.load` | Load from variable | `%1 = polang.load %0 : memref<i64> -> !polang.int` |
-| `polang.store` | Store to variable | `polang.store %val, %0 : !polang.int, memref<i64>` |
+| `polang.alloca` | Allocate mutable variable | `%0 = polang.alloca "x", mutable : !polang.int -> memref<i64>` |
+| `polang.load` | Load from mutable variable | `%1 = polang.load %0 : memref<i64> -> !polang.int` |
+| `polang.store` | Store to mutable variable | `polang.store %val, %0 : !polang.int, memref<i64>` |
+
+**Note:** Immutable variables (declared with `let`) are optimized to use SSA values directly without memory allocation. Only mutable variables (declared with `let mut`) use the alloca/load/store pattern.
 
 ## Lowering Stages
 
@@ -93,8 +99,13 @@ The `MLIRGenVisitor` traverses the AST and generates Polang dialect operations. 
 - Creates `polang.func @__polang_entry` for the top-level code
 - Generates nested functions for `let` bindings with function declarations
 - Handles closure capture by adding captured variables as extra function parameters
+- **Optimizes immutable variables** to use SSA values directly (no memory allocation)
 
-**Example:**
+#### Immutable Variable Optimization
+
+Immutable variables (declared with `let`) are stored as SSA values and used directly without memory operations. This enables better optimization by LLVM (e.g., constant folding).
+
+**Example (immutable variables):**
 
 ```polang
 let x = 10
@@ -108,15 +119,37 @@ Generates:
 module {
   polang.func @__polang_entry() -> !polang.int {
     %0 = polang.constant.int 10 : !polang.int
-    %1 = polang.alloca "x" : !polang.int -> memref<i64>
+    %1 = polang.constant.int 20 : !polang.int
+    %2 = polang.add %0, %1 : !polang.int
+    polang.return %2 : !polang.int
+  }
+}
+```
+
+#### Mutable Variable Handling
+
+Mutable variables (declared with `let mut`) require memory allocation since their values can change:
+
+**Example (mutable variable):**
+
+```polang
+let mut x = 10
+x <- 20
+x
+```
+
+Generates:
+
+```mlir
+module {
+  polang.func @__polang_entry() -> !polang.int {
+    %0 = polang.constant.int 10 : !polang.int
+    %1 = polang.alloca "x", mutable : !polang.int -> memref<i64>
     polang.store %0, %1 : !polang.int, memref<i64>
     %2 = polang.constant.int 20 : !polang.int
-    %3 = polang.alloca "y" : !polang.int -> memref<i64>
-    polang.store %2, %3 : !polang.int, memref<i64>
-    %4 = polang.load %1 : memref<i64> -> !polang.int
-    %5 = polang.load %3 : memref<i64> -> !polang.int
-    %6 = polang.add %4, %5 : !polang.int
-    polang.return %6 : !polang.int
+    polang.store %2, %1 : !polang.int, memref<i64>
+    %3 = polang.load %1 : memref<i64> -> !polang.int
+    polang.return %3 : !polang.int
   }
 }
 ```
