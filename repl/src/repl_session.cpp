@@ -32,8 +32,8 @@ bool ReplSession::initialize() {
 
 bool ReplSession::isInputIncomplete(const std::string& input) {
   int parenDepth = 0;
-  int letWithoutIn = 0;
   int ifWithoutElse = 0;
+  std::string lastToken;
 
   // Simple tokenization - track keywords and brackets
   size_t i = 0;
@@ -47,16 +47,18 @@ bool ReplSession::isInputIncomplete(const std::string& input) {
     // Track parentheses
     if (input[i] == '(') {
       ++parenDepth;
+      lastToken = "(";
       ++i;
       continue;
     }
     if (input[i] == ')') {
       --parenDepth;
+      lastToken = ")";
       ++i;
       continue;
     }
 
-    // Check for keywords
+    // Check for keywords and identifiers
     if (std::isalpha(static_cast<unsigned char>(input[i])) || input[i] == '_') {
       const size_t start = i;
       while (i < input.size() &&
@@ -65,17 +67,9 @@ bool ReplSession::isInputIncomplete(const std::string& input) {
         ++i;
       }
       const std::string word = input.substr(start, i - start);
+      lastToken = word;
 
-      if (word == "let") {
-        // Check if this is followed by identifier then '(' (function) or '='
-        // (variable) For let-expressions, they need 'in'
-        // For simplicity, track potential let-expressions
-        ++letWithoutIn;
-      } else if (word == "in") {
-        if (letWithoutIn > 0) {
-          --letWithoutIn;
-        }
-      } else if (word == "if") {
+      if (word == "if") {
         ++ifWithoutElse;
       } else if (word == "else") {
         if (ifWithoutElse > 0) {
@@ -85,12 +79,21 @@ bool ReplSession::isInputIncomplete(const std::string& input) {
       continue;
     }
 
-    // Skip other characters
+    // Track operators and other tokens
+    lastToken = std::string(1, input[i]);
     ++i;
   }
 
-  // Input is incomplete if we have unbalanced structures
-  return parenDepth > 0 || letWithoutIn > 0 || ifWithoutElse > 0;
+  // Input is incomplete if:
+  // - Unbalanced parentheses
+  // - if without matching else
+  // - Ends with 'in' keyword (let expression needs body)
+  // - Ends with 'then' keyword (if expression needs else)
+  // - Ends with binary operator (expression continues)
+  return parenDepth > 0 || ifWithoutElse > 0 || lastToken == "in" ||
+         lastToken == "then" || lastToken == "+" || lastToken == "-" ||
+         lastToken == "*" || lastToken == "/" || lastToken == "=" ||
+         lastToken == "," || lastToken == "and";
 }
 
 EvalResult ReplSession::evaluate(const std::string& input) {
@@ -120,14 +123,25 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     return EvalResult::error(errMsg);
   }
 
+  // Check if the last statement is an expression (should print result)
+  // vs a declaration (shouldn't print result)
+  bool lastIsExpression = false;
+  std::string resultType = "void";
+  if (!ast->statements.empty()) {
+    const NStatement* lastStmt = ast->statements.back();
+    // NExpressionStatement wraps expressions as statements
+    if (dynamic_cast<const NExpressionStatement*>(lastStmt) != nullptr) {
+      lastIsExpression = true;
+      // Get the inferred type of the last expression
+      TypeChecker checker;
+      checker.check(*ast);
+      resultType = checker.getInferredType();
+    }
+  }
+
   // Generate code
   CodeGenContext codegenCtx;
   codegenCtx.generateCode(*ast);
-
-  // Get the inferred type of the last expression
-  TypeChecker checker;
-  checker.check(*ast);
-  const std::string resultType = checker.getInferredType();
 
   // Verify the module
   std::string errStr;
@@ -181,5 +195,9 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   // Update accumulated code on success
   accumulatedCode_ = fullCode + "\n";
 
-  return EvalResult::value(result, resultType);
+  // Only return a value if the last statement was an expression
+  if (lastIsExpression) {
+    return EvalResult::value(result, resultType);
+  }
+  return EvalResult::ok();
 }

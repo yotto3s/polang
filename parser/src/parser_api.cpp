@@ -20,9 +20,14 @@ extern NBlock* programBlock;
 
 NBlock* polang_parse(const std::string& source) {
   polang_reset_lexer_location();
+  programBlock = nullptr; // Reset before parsing
   YY_BUFFER_STATE buffer = yy_scan_string(source.c_str());
-  yyparse();
+  const int parseResult = yyparse();
   yy_delete_buffer(buffer);
+  // Return nullptr if parsing failed
+  if (parseResult != 0) {
+    return nullptr;
+  }
   return programBlock;
 }
 
