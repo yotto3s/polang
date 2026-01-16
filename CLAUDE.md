@@ -70,6 +70,32 @@ Build outputs:
 When modifying the language syntax (lexer.l, parser.y, or node.hpp), always update:
 - `doc/syntax.md` - Language syntax reference
 
+## Testing
+
+After modifying the application, always verify that example programs still work:
+
+```bash
+# Run all example programs (inside docker container)
+for f in example/*.po; do echo "=== $(basename $f) ==="; ./build/bin/PolangRepl "$f"; done
+```
+
+Expected outputs:
+- `hello.po` → `7 : int`
+- `variables.po` → `30 : int`
+- `functions.po` → `25 : int`
+- `conditionals.po` → `10 : int`
+- `let_expressions.po` → `16 : int`
+- `types.po` → `84 : int`
+- `fibonacci.po` → `5 : int`
+- `factorial.po` → `120 : int`
+
+Also run the test suite:
+
+```bash
+# Run all tests (inside docker container)
+ctest --test-dir build --output-on-failure
+```
+
 ## Project Structure
 
 ```
@@ -100,6 +126,15 @@ polang/
 │   │   └── repl_session.cpp    # REPL session management
 │   └── include/repl/
 │       └── repl_session.hpp    # REPL session header
+├── example/                    # Example programs
+│   ├── hello.po
+│   ├── variables.po
+│   ├── functions.po
+│   ├── conditionals.po
+│   ├── let_expressions.po
+│   ├── types.po
+│   ├── fibonacci.po
+│   └── factorial.po
 └── docker/                     # Docker build environment
 ```
 
@@ -155,6 +190,9 @@ Bison and Flex generate files in `build/parser/`:
 ```bash
 # Compile source to LLVM IR
 echo "let x = 5" | ./build/bin/PolangCompiler
+
+# Execute source file via REPL
+./build/bin/PolangRepl example/hello.po
 
 # Execute source via REPL (pipe mode)
 echo "let x = 5" | ./build/bin/PolangRepl
