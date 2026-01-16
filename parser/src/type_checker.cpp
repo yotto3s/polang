@@ -12,6 +12,7 @@ std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   errors_.clear();
   local_types_.clear();
   function_return_types_.clear();
+  function_param_types_.clear();
   ast.accept(*this);
   return errors_;
 }
@@ -42,9 +43,34 @@ void TypeChecker::visit(const NIdentifier& node) {
 }
 
 void TypeChecker::visit(const NMethodCall& node) {
-  // Check argument types (for now, just visit them)
+  // Collect argument types
+  std::vector<std::string> arg_types;
   for (const auto* arg : node.arguments) {
     arg->accept(*this);
+    arg_types.push_back(inferred_type_);
+  }
+
+  // Check if function is known
+  const auto param_it = function_param_types_.find(node.id.name);
+  if (param_it != function_param_types_.end()) {
+    const auto& param_types = param_it->second;
+
+    // Check argument count
+    if (arg_types.size() != param_types.size()) {
+      reportError("Function '" + node.id.name + "' expects " +
+                  std::to_string(param_types.size()) + " argument(s), got " +
+                  std::to_string(arg_types.size()));
+    } else {
+      // Check each argument type
+      for (size_t i = 0; i < arg_types.size(); ++i) {
+        if (arg_types[i] != "unknown" && param_types[i] != "unknown" &&
+            arg_types[i] != param_types[i]) {
+          reportError("Function '" + node.id.name + "' argument " +
+                      std::to_string(i + 1) + " expects " + param_types[i] +
+                      ", got " + arg_types[i]);
+        }
+      }
+    }
   }
 
   // Get return type from function
@@ -247,15 +273,21 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   // Save current scope
   const auto saved_locals = local_types_;
 
-  // Add parameters to scope
+  // Add parameters to scope and collect parameter types
+  std::vector<std::string> param_types;
   for (const auto* arg : node.arguments) {
     if (arg->type == nullptr) {
       reportError("Function parameter '" + arg->id.name +
                   "' must have type annotation");
+      param_types.push_back("unknown");
       continue;
     }
     local_types_[arg->id.name] = arg->type->name;
+    param_types.push_back(arg->type->name);
   }
+
+  // Store parameter types for this function
+  function_param_types_[node.id.name] = param_types;
 
   // Check function body
   node.block.accept(*this);

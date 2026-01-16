@@ -209,3 +209,40 @@ TEST(TypeCheckTest, InferredVariableUsedWithWrongType) {
   // let x = 42 followed by double operation should fail
   EXPECT_TRUE(hasTypeError("let x = 42\nlet y = x + 1.0"));
 }
+
+// ============== Function Call Type Checking Tests ==============
+
+TEST(TypeCheckTest, FunctionCallCorrectTypes) {
+  // Correct argument types should pass
+  EXPECT_TRUE(hasNoTypeError("let f (x: int) = x + 1\nf(5)"));
+  EXPECT_TRUE(hasNoTypeError("let f (x: double) = x + 1.0\nf(5.0)"));
+  EXPECT_TRUE(hasNoTypeError("let f (x: int) (y: int) = x + y\nf(1, 2)"));
+}
+
+TEST(TypeCheckTest, FunctionCallWrongArgType) {
+  // Passing double to int parameter should fail
+  EXPECT_TRUE(hasTypeError("let f (x: int) = x + 1\nf(3.5)"));
+  // Passing int to double parameter should fail
+  EXPECT_TRUE(hasTypeError("let f (x: double) = x + 1.0\nf(3)"));
+}
+
+TEST(TypeCheckTest, FunctionCallWrongArgCount) {
+  // Too few arguments
+  EXPECT_TRUE(hasTypeError("let f (x: int) (y: int) = x + y\nf(1)"));
+  // Too many arguments
+  EXPECT_TRUE(hasTypeError("let f (x: int) = x + 1\nf(1, 2)"));
+}
+
+TEST(TypeCheckTest, FunctionCallMultipleArgsTypeMismatch) {
+  // Second argument has wrong type
+  EXPECT_TRUE(hasTypeError("let f (x: int) (y: int) = x + y\nf(1, 2.0)"));
+  // First argument has wrong type
+  EXPECT_TRUE(hasTypeError("let f (x: int) (y: int) = x + y\nf(1.0, 2)"));
+}
+
+TEST(TypeCheckTest, FunctionCallErrorMessage) {
+  auto errors = checkTypes("let f (x: int) = x + 1\nf(3.5)");
+  ASSERT_FALSE(errors.empty());
+  EXPECT_TRUE(errors[0].message.find("int") != std::string::npos);
+  EXPECT_TRUE(errors[0].message.find("double") != std::string::npos);
+}

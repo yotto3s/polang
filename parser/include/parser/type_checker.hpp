@@ -52,6 +52,7 @@ private:
   std::string inferred_type_;
   std::map<std::string, std::string> local_types_;
   std::map<std::string, std::string> function_return_types_;
+  std::map<std::string, std::vector<std::string>> function_param_types_;
   std::vector<TypeCheckError> errors_;
 
   void reportError(const std::string& message);
