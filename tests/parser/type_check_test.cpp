@@ -123,7 +123,69 @@ TEST(TypeCheckTest, LetExpressionTypeMismatch) {
 }
 
 TEST(TypeCheckTest, AssignmentTypeMismatch) {
-  EXPECT_TRUE(hasTypeError("let x = 1\nx = 2.0"));
+  EXPECT_TRUE(hasTypeError("let mut x = 1\nx <- 2.0"));
+}
+
+// ============== Mutability Tests ==============
+
+TEST(TypeCheckTest, MutableVariableReassignment) {
+  // Mutable variable can be reassigned
+  EXPECT_TRUE(hasNoTypeError("let mut x = 1\nx <- 2\nx"));
+  EXPECT_TRUE(hasNoTypeError("let mut x: int = 1\nx <- 2\nx"));
+}
+
+TEST(TypeCheckTest, ImmutableVariableReassignment) {
+  // Immutable variable cannot be reassigned
+  EXPECT_TRUE(hasTypeError("let x = 1\nx <- 2"));
+  EXPECT_TRUE(hasTypeError("let x: int = 1\nx <- 2"));
+}
+
+TEST(TypeCheckTest, MutableInLetExpression) {
+  // Mutable binding in let expression
+  EXPECT_TRUE(hasNoTypeError("let mut x = 1 in x <- 2"));
+  EXPECT_TRUE(hasNoTypeError("let mut x = 1 and y = 2 in x <- 10"));
+}
+
+TEST(TypeCheckTest, ImmutableInLetExpression) {
+  // Immutable binding in let expression cannot be reassigned
+  EXPECT_TRUE(hasTypeError("let x = 1 in x <- 2"));
+  EXPECT_TRUE(hasTypeError("let x = 1 and mut y = 2 in x <- 10"));
+}
+
+TEST(TypeCheckTest, MultipleReassignments) {
+  // Multiple reassignments of the same mutable variable
+  EXPECT_TRUE(hasNoTypeError("let mut x = 1\nx <- 2\nx <- 3\nx"));
+}
+
+TEST(TypeCheckTest, MutableDoubleType) {
+  // Mutable double variable
+  EXPECT_TRUE(hasNoTypeError("let mut x: double = 1.0\nx <- 2.5\nx"));
+  EXPECT_TRUE(hasTypeError("let mut x: double = 1.0\nx <- 2")); // int to double
+}
+
+TEST(TypeCheckTest, MutableBoolType) {
+  // Mutable bool variable
+  EXPECT_TRUE(hasNoTypeError("let mut flag: bool = true\nflag <- false\nflag"));
+}
+
+TEST(TypeCheckTest, MixedMutabilityInLetExpression) {
+  // Mix of mutable and immutable bindings
+  EXPECT_TRUE(hasNoTypeError("let x = 1 and mut y = 2 in y <- 10"));
+  EXPECT_TRUE(hasNoTypeError("let mut a = 1 and b = 2 in a <- b"));
+}
+
+TEST(TypeCheckTest, NestedLetWithMutability) {
+  // Nested let expressions with mutable bindings
+  EXPECT_TRUE(hasNoTypeError("let mut x = 1 in let y = x in y"));
+  EXPECT_TRUE(hasNoTypeError("let x = 1 in let mut y = x in y <- 2"));
+}
+
+TEST(TypeCheckTest, ImmutableReassignmentErrorMessage) {
+  // Error message should contain the variable name
+  auto errors = checkTypes("let x = 1\nx <- 2");
+  ASSERT_FALSE(errors.empty());
+  EXPECT_TRUE(errors[0].message.find("x") != std::string::npos);
+  EXPECT_TRUE(errors[0].message.find("immutable") != std::string::npos);
 }
 
 // ============== Error Message Tests ==============

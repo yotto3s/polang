@@ -1,0 +1,20 @@
+; Mutability demonstration
+; Variables are immutable by default, use 'let mut' for mutable variables
+
+; Immutable variable (default)
+let x = 10
+
+; Mutable variable
+let mut counter = 0
+
+; Reassign mutable variable using <- operator
+counter <- counter + 1
+counter <- counter + 1
+counter <- counter + 1
+
+; Mutable variable with explicit type
+let mut total: int = 0
+total <- x + counter
+
+; Final result: total = 10 + 3 = 13
+total

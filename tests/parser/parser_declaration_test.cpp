@@ -48,6 +48,45 @@ TEST(ParserTest, VariableWithIdentifierExpression) {
   EXPECT_EQ(identExpr->name, "x");
 }
 
+// ============== Mutable Variable Declaration Tests ==============
+
+TEST(ParserTest, MutableVariableDeclaration) {
+  NBlock* block = parseOrFail("let mut x = 5");
+  ASSERT_NE(block, nullptr);
+  ASSERT_EQ(block->statements.size(), 1);
+
+  auto* varDecl = getFirstStatement<NVariableDeclaration>(block);
+  ASSERT_NE(varDecl, nullptr);
+  EXPECT_EQ(varDecl->id.name, "x");
+  EXPECT_TRUE(varDecl->isMutable);
+
+  auto* intExpr = dynamic_cast<NInteger*>(varDecl->assignmentExpr);
+  ASSERT_NE(intExpr, nullptr);
+  EXPECT_EQ(intExpr->value, 5);
+}
+
+TEST(ParserTest, MutableTypedVariableDeclaration) {
+  NBlock* block = parseOrFail("let mut counter : int = 0");
+  ASSERT_NE(block, nullptr);
+  ASSERT_EQ(block->statements.size(), 1);
+
+  auto* varDecl = getFirstStatement<NVariableDeclaration>(block);
+  ASSERT_NE(varDecl, nullptr);
+  EXPECT_EQ(varDecl->id.name, "counter");
+  EXPECT_TRUE(varDecl->isMutable);
+  ASSERT_NE(varDecl->type, nullptr);
+  EXPECT_EQ(varDecl->type->name, "int");
+}
+
+TEST(ParserTest, ImmutableVariableDeclaration) {
+  NBlock* block = parseOrFail("let x = 5");
+  ASSERT_NE(block, nullptr);
+
+  auto* varDecl = getFirstStatement<NVariableDeclaration>(block);
+  ASSERT_NE(varDecl, nullptr);
+  EXPECT_FALSE(varDecl->isMutable);
+}
+
 // ============== Function Declaration Tests ==============
 
 TEST(ParserTest, SimpleFunctionDeclaration) {

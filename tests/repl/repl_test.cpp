@@ -171,7 +171,7 @@ TEST(ReplIntegration, MultipleFunctionsPersist) {
 
 TEST(ReplIntegration, VariableReassignmentPersists) {
   // Reassign variable and verify new value persists
-  const auto result = runRepl("let x = 1\nx = 100\nx");
+  const auto result = runRepl("let mut x = 1\nx <- 100\nx");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("100 : int"));
 }

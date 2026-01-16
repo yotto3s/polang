@@ -62,13 +62,13 @@ false
 
 ### Variable Declaration
 
-Variables are declared using the `let` keyword:
+Variables are declared using the `let` keyword. By default, variables are **immutable**:
 
 ```
-let x = 5           ; type inferred as int from literal
-let y = 3.14        ; type inferred as double from literal
-let z = true        ; type inferred as bool from literal
-let w : int = 10    ; explicit type annotation
+let x = 5           ; immutable, type inferred as int
+let y = 3.14        ; immutable, type inferred as double
+let z = true        ; immutable, type inferred as bool
+let w : int = 10    ; immutable, explicit type annotation
 ```
 
 **Syntax:**
@@ -81,14 +81,34 @@ let <identifier> : <type> = <expression>
 - Variables must be initialized at declaration
 - **No implicit type conversion**: `let x: double = 42` is an error (must write `42.0`)
 
-### Variable Assignment
+### Mutable Variables
 
-Existing variables can be reassigned:
+To declare a mutable variable that can be reassigned, use `let mut`:
 
 ```
-let x = 5
-x = 10
+let mut x = 5       ; mutable, type inferred as int
+let mut y : int = 10  ; mutable, explicit type annotation
 ```
+
+**Syntax:**
+```
+let mut <identifier> = <expression>
+let mut <identifier> : <type> = <expression>
+```
+
+### Variable Reassignment
+
+Only mutable variables can be reassigned using the `<-` operator:
+
+```
+let mut x = 5
+x <- 10             ; OK: x is mutable
+
+let y = 5
+y <- 10             ; ERROR: cannot reassign immutable variable
+```
+
+**Note:** The `=` operator is used only for initial binding (declaration). The `<-` operator is used for reassignment (mutation).
 
 ## Functions
 
@@ -174,10 +194,12 @@ let x : int = 1 and y : double = 2.0 in x
 let <binding> (and <binding>)* in <expression>
 ```
 
-Where `<binding>` can be a variable binding:
+Where `<binding>` can be a variable binding (immutable by default):
 ```
 <identifier> = <expression>
 <identifier> : <type> = <expression>
+mut <identifier> = <expression>
+mut <identifier> : <type> = <expression>
 ```
 
 Or a function binding:
@@ -224,7 +246,7 @@ Expressions can be:
 - **Binary operations**: `a + b`, `x * y`
 - **Comparisons**: `a == b`, `x < y` (return bool)
 - **Function calls**: `add(1, 2)`
-- **Assignments**: `x = 5`
+- **Reassignments**: `x <- 5` (for mutable variables only)
 - **Parenthesized**: `(a + b) * c`
 - **If-expressions**: `if x > 0 then x else 0`
 - **Let-expressions**: `let x = 1 in x + 1`
@@ -251,11 +273,13 @@ Expressions can be:
 | `>`      | Greater than             | `a > b`   |
 | `>=`     | Greater than or equal    | `a >= b`  |
 
-### Assignment Operator
+### Reassignment Operator
 
-| Operator | Description | Example  |
-|----------|-------------|----------|
-| `=`      | Assignment  | `x = 5`  |
+| Operator | Description                           | Example   |
+|----------|---------------------------------------|-----------|
+| `<-`     | Reassignment (mutable variables only) | `x <- 5`  |
+
+**Note:** The `=` operator is used only for initial binding in declarations (`let x = 5`).
 
 ### Operator Precedence
 
@@ -264,7 +288,7 @@ From highest to lowest:
 1. `*`, `/` (multiplication, division)
 2. `+`, `-` (addition, subtraction)
 3. `==`, `!=`, `<`, `<=`, `>`, `>=` (comparisons)
-4. `=` (assignment, right-associative)
+4. `<-` (reassignment, right-associative)
 
 Parentheses can be used to override precedence:
 
@@ -295,6 +319,8 @@ statement   ::= var_decl
 
 var_decl    ::= "let" identifier "=" expression
               | "let" identifier ":" type "=" expression
+              | "let" "mut" identifier "=" expression
+              | "let" "mut" identifier ":" type "=" expression
 
 func_decl   ::= "let" identifier "(" param_list ")" ":" type "=" expression
               | "let" identifier "(" param_list ")" "=" expression
@@ -305,7 +331,7 @@ param_list  ::= param ("," param)*
 
 param       ::= identifier ":" type
 
-expression  ::= identifier "=" expression
+expression  ::= identifier "<-" expression
               | identifier "(" call_args ")"
               | identifier
               | numeric
@@ -322,6 +348,8 @@ let_bindings ::= let_binding ("and" let_binding)*
 
 let_binding ::= identifier "=" expression
               | identifier ":" type "=" expression
+              | "mut" identifier "=" expression
+              | "mut" identifier ":" type "=" expression
               | identifier "(" param_list ")" ":" type "=" expression
               | identifier "(" param_list ")" "=" expression
               | identifier "()" ":" type "=" expression

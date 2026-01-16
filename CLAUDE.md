@@ -88,6 +88,7 @@ Expected outputs:
 - `types.po` → `84 : int`
 - `fibonacci.po` → `5 : int`
 - `factorial.po` → `120 : int`
+- `mutability.po` → `13 : int`
 
 Also run the test suite:
 
@@ -146,7 +147,8 @@ polang/
 │   ├── let_expressions.po
 │   ├── types.po
 │   ├── fibonacci.po
-│   └── factorial.po
+│   ├── factorial.po
+│   └── mutability.po
 └── docker/                     # Docker build environment
 ```
 

@@ -216,7 +216,7 @@ TEST(ParserTest, FunctionCallMultipleArgs) {
 // ============== Assignment Tests ==============
 
 TEST(ParserTest, SimpleAssignment) {
-  NBlock* block = parseOrFail("x = 10");
+  NBlock* block = parseOrFail("x <- 10");
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
@@ -227,6 +227,35 @@ TEST(ParserTest, SimpleAssignment) {
   auto* rhs = dynamic_cast<const NInteger*>(&assign->rhs);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->value, 10);
+}
+
+TEST(ParserTest, AssignmentWithExpression) {
+  NBlock* block = parseOrFail("x <- 1 + 2");
+  ASSERT_NE(block, nullptr);
+
+  auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
+  auto* assign = dynamic_cast<const NAssignment*>(&exprStmt->expression);
+  ASSERT_NE(assign, nullptr);
+  EXPECT_EQ(assign->lhs.name, "x");
+
+  auto* binOp = dynamic_cast<const NBinaryOperator*>(&assign->rhs);
+  ASSERT_NE(binOp, nullptr);
+  EXPECT_EQ(binOp->op, TPLUS);
+}
+
+TEST(ParserTest, ChainedAssignment) {
+  // x <- y <- 5 should parse as x <- (y <- 5) due to right-associativity
+  NBlock* block = parseOrFail("x <- y <- 5");
+  ASSERT_NE(block, nullptr);
+
+  auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
+  auto* outerAssign = dynamic_cast<const NAssignment*>(&exprStmt->expression);
+  ASSERT_NE(outerAssign, nullptr);
+  EXPECT_EQ(outerAssign->lhs.name, "x");
+
+  auto* innerAssign = dynamic_cast<const NAssignment*>(&outerAssign->rhs);
+  ASSERT_NE(innerAssign, nullptr);
+  EXPECT_EQ(innerAssign->lhs.name, "y");
 }
 
 // ============== Complex Expression Tests ==============

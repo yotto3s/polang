@@ -11,6 +11,7 @@ TypeChecker::TypeChecker() : inferred_type_("int") {}
 std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   errors_.clear();
   local_types_.clear();
+  local_mutability_.clear();
   function_return_types_.clear();
   function_param_types_.clear();
   ast.accept(*this);
@@ -148,6 +149,13 @@ void TypeChecker::visit(const NAssignment& node) {
     return;
   }
 
+  // Check mutability
+  if (!local_mutability_[node.lhs.name]) {
+    reportError("Cannot reassign immutable variable: " + node.lhs.name);
+    inferred_type_ = "unknown";
+    return;
+  }
+
   const std::string var_type = local_types_[node.lhs.name];
 
   // Check RHS type
@@ -199,12 +207,14 @@ void TypeChecker::visit(const NIfExpression& node) {
 void TypeChecker::visit(const NLetExpression& node) {
   // Save current scopes
   const auto saved_locals = local_types_;
+  const auto saved_mutability = local_mutability_;
   const auto saved_func_returns = function_return_types_;
   const auto saved_func_params = function_param_types_;
 
   // Pass 1: Type-check all binding initializers in the ORIGINAL scope
   // (no new bindings visible yet - parallel/simultaneous binding semantics)
   std::vector<std::string> binding_types;
+  std::vector<bool> binding_mutability;
   std::vector<std::vector<std::string>> func_param_types;
 
   for (const auto* binding : node.bindings) {
@@ -214,6 +224,7 @@ void TypeChecker::visit(const NLetExpression& node) {
 
       // Save scope before processing function
       const auto func_saved_locals = local_types_;
+      const auto func_saved_mutability = local_mutability_;
 
       // Add parameters to scope for type-checking the function body
       std::vector<std::string> param_types;
@@ -225,6 +236,7 @@ void TypeChecker::visit(const NLetExpression& node) {
           continue;
         }
         local_types_[arg->id.name] = arg->type->name;
+        local_mutability_[arg->id.name] = arg->isMutable;
         param_types.push_back(arg->type->name);
       }
       func_param_types.push_back(param_types);
@@ -247,11 +259,13 @@ void TypeChecker::visit(const NLetExpression& node) {
                     func->type->name + " but body has type " + body_type);
       }
 
-      // Placeholder for function binding type
+      // Placeholder for function binding type and mutability
       binding_types.push_back("function");
+      binding_mutability.push_back(false);
 
       // Restore scope (remove parameters)
       local_types_ = func_saved_locals;
+      local_mutability_ = func_saved_mutability;
     } else {
       // Variable binding: type-check initializer without adding to scope
       const auto* var = binding->var;
@@ -263,8 +277,10 @@ void TypeChecker::visit(const NLetExpression& node) {
           reportError("Variable '" + var->id.name +
                       "' must have type annotation or initializer");
           binding_types.push_back("unknown");
+          binding_mutability.push_back(var->isMutable);
         } else {
           binding_types.push_back(var->type->name);
+          binding_mutability.push_back(var->isMutable);
         }
         continue;
       }
@@ -276,8 +292,10 @@ void TypeChecker::visit(const NLetExpression& node) {
       if (expr_type == "unknown") {
         if (var->type != nullptr) {
           binding_types.push_back(var->type->name);
+          binding_mutability.push_back(var->isMutable);
         } else {
           binding_types.push_back("unknown");
+          binding_mutability.push_back(var->isMutable);
         }
         continue;
       }
@@ -286,6 +304,7 @@ void TypeChecker::visit(const NLetExpression& node) {
         // Infer type from expression
         mutable_var.type = new NIdentifier(expr_type);
         binding_types.push_back(expr_type);
+        binding_mutability.push_back(var->isMutable);
       } else {
         // Validate type annotation
         if (expr_type != var->type->name) {
@@ -293,6 +312,7 @@ void TypeChecker::visit(const NLetExpression& node) {
                       var->type->name + " but initialized with " + expr_type);
         }
         binding_types.push_back(var->type->name);
+        binding_mutability.push_back(var->isMutable);
       }
     }
   }
@@ -308,6 +328,7 @@ void TypeChecker::visit(const NLetExpression& node) {
           func->type ? func->type->name : "int";
     } else {
       local_types_[binding->var->id.name] = binding_types[i];
+      local_mutability_[binding->var->id.name] = binding_mutability[i];
     }
     ++i;
   }
@@ -317,6 +338,7 @@ void TypeChecker::visit(const NLetExpression& node) {
 
   // Restore previous scopes
   local_types_ = saved_locals;
+  local_mutability_ = saved_mutability;
   function_return_types_ = saved_func_returns;
   function_param_types_ = saved_func_params;
 }
@@ -338,6 +360,7 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
       return;
     }
     local_types_[node.id.name] = node.type->name;
+    local_mutability_[node.id.name] = node.isMutable;
     inferred_type_ = node.type->name;
     return;
   }
@@ -350,6 +373,7 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
     // Error already reported for expression
     if (node.type != nullptr) {
       local_types_[node.id.name] = node.type->name;
+      local_mutability_[node.id.name] = node.isMutable;
       inferred_type_ = node.type->name;
     }
     return;
@@ -359,6 +383,7 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
     // No type annotation - infer from expression
     mutable_node.type = new NIdentifier(expr_type);
     local_types_[node.id.name] = expr_type;
+    local_mutability_[node.id.name] = node.isMutable;
     inferred_type_ = expr_type;
   } else {
     // Type annotation present - validate (no coercion!)
@@ -371,6 +396,7 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
     }
 
     local_types_[node.id.name] = decl_type;
+    local_mutability_[node.id.name] = node.isMutable;
     inferred_type_ = decl_type;
   }
 }
@@ -381,6 +407,7 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
 
   // Save current scope
   const auto saved_locals = local_types_;
+  const auto saved_mutability = local_mutability_;
 
   // Add parameters to scope and collect parameter types
   std::vector<std::string> param_types;
@@ -392,6 +419,7 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
       continue;
     }
     local_types_[arg->id.name] = arg->type->name;
+    local_mutability_[arg->id.name] = arg->isMutable;
     param_types.push_back(arg->type->name);
   }
 
@@ -427,5 +455,6 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
 
   // Restore previous scope
   local_types_ = saved_locals;
+  local_mutability_ = saved_mutability;
   inferred_type_ = node.type ? node.type->name : body_type;
 }

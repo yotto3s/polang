@@ -192,6 +192,52 @@ TEST(ParserTest, NestedLetExpression) {
   ASSERT_NE(bodyExpr, nullptr);
 }
 
+TEST(ParserTest, LetExpressionMutableBinding) {
+  NBlock* block = parseOrFail("let mut x = 1 in x");
+  ASSERT_NE(block, nullptr);
+
+  auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
+  ASSERT_NE(letExpr, nullptr);
+  ASSERT_EQ(letExpr->bindings.size(), 1);
+  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
+  EXPECT_EQ(letExpr->bindings[0]->var->id.name, "x");
+  EXPECT_TRUE(letExpr->bindings[0]->var->isMutable);
+}
+
+TEST(ParserTest, LetExpressionMixedMutability) {
+  NBlock* block = parseOrFail("let x = 1 and mut y = 2 in x + y");
+  ASSERT_NE(block, nullptr);
+
+  auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
+  ASSERT_NE(letExpr, nullptr);
+  ASSERT_EQ(letExpr->bindings.size(), 2);
+
+  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
+  EXPECT_EQ(letExpr->bindings[0]->var->id.name, "x");
+  EXPECT_FALSE(letExpr->bindings[0]->var->isMutable);
+
+  ASSERT_FALSE(letExpr->bindings[1]->isFunction);
+  EXPECT_EQ(letExpr->bindings[1]->var->id.name, "y");
+  EXPECT_TRUE(letExpr->bindings[1]->var->isMutable);
+}
+
+TEST(ParserTest, LetExpressionMutableWithTypeAnnotation) {
+  NBlock* block = parseOrFail("let mut counter : int = 0 in counter");
+  ASSERT_NE(block, nullptr);
+
+  auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
+  ASSERT_NE(letExpr, nullptr);
+  ASSERT_EQ(letExpr->bindings.size(), 1);
+  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
+  EXPECT_EQ(letExpr->bindings[0]->var->id.name, "counter");
+  EXPECT_TRUE(letExpr->bindings[0]->var->isMutable);
+  ASSERT_NE(letExpr->bindings[0]->var->type, nullptr);
+  EXPECT_EQ(letExpr->bindings[0]->var->type->name, "int");
+}
+
 TEST(ParserTest, LetExpressionInVariableDeclaration) {
   NBlock* block = parseOrFail("let a = let x = 5 in x + 1");
   ASSERT_NE(block, nullptr);

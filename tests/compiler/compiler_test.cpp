@@ -133,7 +133,7 @@ TEST(CompilerIntegration, TypeErrorInIfCondition) {
 // ============== Additional CodeGen Tests ==============
 
 TEST(CompilerIntegration, VariableReassignment) {
-  const auto result = runCompiler("let x = 5\nx = 10\nx");
+  const auto result = runCompiler("let mut x = 5\nx <- 10\nx");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("store"));
 }

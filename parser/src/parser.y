@@ -36,6 +36,7 @@ void yyerror(const char *s);
 %token <token> TLET TFUN TIN TCOLON TARROW TAND
 %token <token> TIF TTHEN TELSE
 %token <token> TTRUE TFALSE
+%token <token> TMUT TLARROW
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -55,7 +56,7 @@ void yyerror(const char *s);
 /* Operator precedence (lowest to highest) */
 %right TLET TIN TAND
 %right TIF TTHEN TELSE
-%right TEQUAL
+%right TEQUAL TLARROW
 %nonassoc COMPARISON TCEQ TCNE TCLT TCLE TCGT TCGE
 %left TPLUS TMINUS
 %left TMUL TDIV
@@ -79,12 +80,20 @@ stmt : var_decl | func_decl
      ;
 
 var_decl : TLET ident TEQUAL expr {
-             /* let x = expr (type to be inferred) */
-             $$ = new NVariableDeclaration(*$2, $4);
+             /* let x = expr (immutable, type to be inferred) */
+             $$ = new NVariableDeclaration(*$2, $4, false);
            }
          | TLET ident TCOLON ident TEQUAL expr {
-             /* let x : type = expr */
-             $$ = new NVariableDeclaration($4, *$2, $6);
+             /* let x : type = expr (immutable) */
+             $$ = new NVariableDeclaration($4, *$2, $6, false);
+           }
+         | TLET TMUT ident TEQUAL expr {
+             /* let mut x = expr (mutable, type to be inferred) */
+             $$ = new NVariableDeclaration(*$3, $5, true);
+           }
+         | TLET TMUT ident TCOLON ident TEQUAL expr {
+             /* let mut x : type = expr (mutable) */
+             $$ = new NVariableDeclaration($5, *$3, $7, true);
            }
          ;
         
@@ -137,7 +146,7 @@ boolean : TTRUE { $$ = new NBoolean(true); }
         | TFALSE { $$ = new NBoolean(false); }
         ;
 
-expr : ident TEQUAL expr { $$ = new NAssignment(*$<ident>1, *$3); }
+expr : ident TLARROW expr { $$ = new NAssignment(*$<ident>1, *$3); }
      | ident TLPAREN call_args TRPAREN { $$ = new NMethodCall(*$1, *$3); delete $3; }
      | ident { $<ident>$ = $1; }
      | numeric
@@ -168,12 +177,20 @@ let_bindings : let_binding {
              ;
 
 let_binding : ident TEQUAL expr {
-                /* x = expr (type to be inferred) */
-                $$ = new NLetBinding(new NVariableDeclaration(*$1, $3));
+                /* x = expr (immutable, type to be inferred) */
+                $$ = new NLetBinding(new NVariableDeclaration(*$1, $3, false));
               }
             | ident TCOLON ident TEQUAL expr {
-                /* x : type = expr */
-                $$ = new NLetBinding(new NVariableDeclaration($3, *$1, $5));
+                /* x : type = expr (immutable) */
+                $$ = new NLetBinding(new NVariableDeclaration($3, *$1, $5, false));
+              }
+            | TMUT ident TEQUAL expr {
+                /* mut x = expr (mutable, type to be inferred) */
+                $$ = new NLetBinding(new NVariableDeclaration(*$2, $4, true));
+              }
+            | TMUT ident TCOLON ident TEQUAL expr {
+                /* mut x : type = expr (mutable) */
+                $$ = new NLetBinding(new NVariableDeclaration($4, *$2, $6, true));
               }
             | ident func_decl_args TCOLON ident TEQUAL expr {
                 /* f(x: int): int = expr */

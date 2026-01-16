@@ -21,18 +21,18 @@ class StderrCapture {
 public:
   StderrCapture() {
     // Save original stderr
-    original_stderr_ = std::stderr;
+    original_stderr_ = stderr;
     // Create a temporary file to capture stderr
     captured_file_ = std::tmpfile();
     if (captured_file_) {
       // Redirect stderr to the temporary file
-      std::stderr = captured_file_;
+      stderr = captured_file_;
     }
   }
 
   ~StderrCapture() {
     // Restore original stderr
-    std::stderr = original_stderr_;
+    stderr = original_stderr_;
     if (captured_file_) {
       std::fclose(captured_file_);
     }

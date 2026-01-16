@@ -36,10 +36,12 @@ void polang_reset_lexer_location() {
 "else"                  { return TOKEN(TELSE); }
 "true"                  { return TOKEN(TTRUE); }
 "false"                 { return TOKEN(TFALSE); }
+"mut"                   { return TOKEN(TMUT); }
 [a-zA-Z_][a-zA-Z0-9_]*  { SAVE_TOKEN; return TIDENTIFIER; }
 [0-9]+\.[0-9]*          { SAVE_TOKEN; return TDOUBLE; }
 [0-9]+                  { SAVE_TOKEN; return TINTEGER; }
 "->"                    { return TOKEN(TARROW); }
+"<-"                    { return TOKEN(TLARROW); }
 "="                     { return TOKEN(TEQUAL); }
 "=="                    { return TOKEN(TCEQ); }
 "!="                    { return TOKEN(TCNE); }

@@ -133,13 +133,17 @@ public:
   NIdentifier *type;  // nullptr when type should be inferred
   NIdentifier &id;
   NExpression *assignmentExpr;
+  bool isMutable;  // true for 'let mut', false for 'let'
   // Constructor for inferred type (no annotation)
-  NVariableDeclaration(NIdentifier &id, NExpression *assignmentExpr)
-      : type(nullptr), id(id), assignmentExpr(assignmentExpr) {}
+  NVariableDeclaration(NIdentifier &id, NExpression *assignmentExpr,
+                       bool isMutable = false)
+      : type(nullptr), id(id), assignmentExpr(assignmentExpr),
+        isMutable(isMutable) {}
   // Constructor for explicit type annotation
   NVariableDeclaration(NIdentifier *type, NIdentifier &id,
-                       NExpression *assignmentExpr)
-      : type(type), id(id), assignmentExpr(assignmentExpr) {}
+                       NExpression *assignmentExpr, bool isMutable = false)
+      : type(type), id(id), assignmentExpr(assignmentExpr),
+        isMutable(isMutable) {}
   void accept(Visitor &visitor) const override;
 };
 
