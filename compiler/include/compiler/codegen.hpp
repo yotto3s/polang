@@ -36,6 +36,7 @@ public:
   CodeGenContext() { module = new Module("main", context); }
 
   void generateCode(NBlock &root);
+  void printIR(raw_ostream &os);
   GenericValue runCode();
   std::map<std::string, AllocaInst *> &locals() { return blocks.top()->locals; }
   BasicBlock *currentBlock() { return blocks.top()->block; }
