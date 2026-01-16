@@ -247,7 +247,15 @@ Parentheses can be used to override precedence:
 
 ## Comments
 
-Currently, Polang does not support comments. All non-whitespace characters must be valid tokens.
+Polang supports single-line comments using the semicolon (`;`), following Lisp-style syntax:
+
+```
+; This is a comment
+let x = 5  ; inline comment after code
+; Comments extend to the end of the line
+```
+
+Comments are ignored by the parser and do not affect program execution. A file containing only comments is valid (produces an empty program).
 
 ## Grammar Summary
 
@@ -298,6 +306,8 @@ double      ::= [0-9]+ "." [0-9]*
 boolean     ::= "true" | "false"
 
 type        ::= "int" | "double" | "bool"
+
+comment     ::= ";" [^\n]*
 ```
 
 ## Examples

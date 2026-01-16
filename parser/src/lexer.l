@@ -26,6 +26,7 @@ void polang_reset_lexer_location() {
 
 [ \t]+                  { /* skip spaces and tabs */ }
 \n                      { yycolumn = 1; /* reset column on newline */ }
+;[^\n]*                 { /* skip single-line comments */ }
 "let"                   { return TOKEN(TLET); }
 "fun"                   { return TOKEN(TFUN); }
 "in"                    { return TOKEN(TIN); }
