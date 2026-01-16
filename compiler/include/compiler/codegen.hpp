@@ -36,10 +36,13 @@ public:
   CodeGenContext() { module = new Module("main", context); }
 
   void generateCode(NBlock& root);
-  void printIR(raw_ostream& os);
+  void printIR(raw_ostream& os) const;
   GenericValue runCode();
   std::map<std::string, AllocaInst*>& locals() { return blocks.top()->locals; }
-  BasicBlock* currentBlock() { return blocks.top()->block; }
+  const std::map<std::string, AllocaInst*>& locals() const {
+    return blocks.top()->locals;
+  }
+  BasicBlock* currentBlock() const { return blocks.top()->block; }
   void setCurrentBlock(BasicBlock* block) { blocks.top()->block = block; }
   void pushBlock(BasicBlock* block) {
     blocks.push(new CodeGenBlock());

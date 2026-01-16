@@ -19,19 +19,19 @@ public:
   virtual ~Visitor() = default;
 
   // Expression visitors
-  virtual void visit(NInteger& node) = 0;
-  virtual void visit(NDouble& node) = 0;
-  virtual void visit(NIdentifier& node) = 0;
-  virtual void visit(NMethodCall& node) = 0;
-  virtual void visit(NBinaryOperator& node) = 0;
-  virtual void visit(NAssignment& node) = 0;
-  virtual void visit(NBlock& node) = 0;
-  virtual void visit(NIfExpression& node) = 0;
+  virtual void visit(const NInteger& node) = 0;
+  virtual void visit(const NDouble& node) = 0;
+  virtual void visit(const NIdentifier& node) = 0;
+  virtual void visit(const NMethodCall& node) = 0;
+  virtual void visit(const NBinaryOperator& node) = 0;
+  virtual void visit(const NAssignment& node) = 0;
+  virtual void visit(const NBlock& node) = 0;
+  virtual void visit(const NIfExpression& node) = 0;
 
   // Statement visitors
-  virtual void visit(NExpressionStatement& node) = 0;
-  virtual void visit(NVariableDeclaration& node) = 0;
-  virtual void visit(NFunctionDeclaration& node) = 0;
+  virtual void visit(const NExpressionStatement& node) = 0;
+  virtual void visit(const NVariableDeclaration& node) = 0;
+  virtual void visit(const NFunctionDeclaration& node) = 0;
 };
 
 #endif // POLANG_VISITOR_HPP

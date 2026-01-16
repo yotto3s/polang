@@ -27,6 +27,12 @@ docker/run_docker_command.sh <command> [options]
 clangd --path-mappings=$(pwd)=/workspace/polang --enable-config
 ```
 
+## Code Style
+
+- Make variables and functions `const` whenever possible
+- Mark functions `noexcept` when they don't throw exceptions
+- Prefer `const` references for function parameters that aren't modified
+
 ## clang-format Commands
 
 Always apply clang-format to files you edit (C/C++ files only, not .l or .y files).

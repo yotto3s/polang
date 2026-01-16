@@ -11,13 +11,13 @@ using namespace llvm;
 
 CodeGenVisitor::CodeGenVisitor(CodeGenContext& context) : context_(context) {}
 
-Value* CodeGenVisitor::generate(Node& node) {
+Value* CodeGenVisitor::generate(const Node& node) {
   node.accept(*this);
   return result_;
 }
 
 /* Returns an LLVM type based on the identifier */
-static Type* typeOf(const NIdentifier& type, LLVMContext& ctx) {
+static Type* typeOf(const NIdentifier& type, LLVMContext& ctx) noexcept {
   if (type.name.compare("int") == 0) {
     return Type::getInt64Ty(ctx);
   } else if (type.name.compare("double") == 0) {
@@ -26,16 +26,16 @@ static Type* typeOf(const NIdentifier& type, LLVMContext& ctx) {
   return Type::getVoidTy(ctx);
 }
 
-void CodeGenVisitor::visit(NInteger& node) {
+void CodeGenVisitor::visit(const NInteger& node) {
   result_ =
       ConstantInt::get(Type::getInt64Ty(context_.context), node.value, true);
 }
 
-void CodeGenVisitor::visit(NDouble& node) {
+void CodeGenVisitor::visit(const NDouble& node) {
   result_ = ConstantFP::get(Type::getDoubleTy(context_.context), node.value);
 }
 
-void CodeGenVisitor::visit(NIdentifier& node) {
+void CodeGenVisitor::visit(const NIdentifier& node) {
   if (context_.locals().find(node.name) == context_.locals().end()) {
     std::cerr << "undeclared variable " << node.name << std::endl;
     result_ = nullptr;
@@ -46,7 +46,7 @@ void CodeGenVisitor::visit(NIdentifier& node) {
                          context_.currentBlock());
 }
 
-void CodeGenVisitor::visit(NMethodCall& node) {
+void CodeGenVisitor::visit(const NMethodCall& node) {
   Function* function = context_.module->getFunction(node.id.name.c_str());
   if (function == nullptr) {
     std::cerr << "no such function " << node.id.name << std::endl;
@@ -54,15 +54,14 @@ void CodeGenVisitor::visit(NMethodCall& node) {
     return;
   }
   std::vector<Value*> args;
-  ExpressionList::const_iterator it;
-  for (it = node.arguments.begin(); it != node.arguments.end(); it++) {
-    args.push_back(generate(**it));
+  for (const auto* arg : node.arguments) {
+    args.push_back(generate(*arg));
   }
   result_ = CallInst::Create(function->getFunctionType(), function, args, "",
                              context_.currentBlock());
 }
 
-void CodeGenVisitor::visit(NBinaryOperator& node) {
+void CodeGenVisitor::visit(const NBinaryOperator& node) {
   Instruction::BinaryOps instr;
   switch (node.op) {
   case TPLUS:
@@ -125,7 +124,7 @@ math:
                              context_.currentBlock());
 }
 
-void CodeGenVisitor::visit(NAssignment& node) {
+void CodeGenVisitor::visit(const NAssignment& node) {
   if (context_.locals().find(node.lhs.name) == context_.locals().end()) {
     std::cerr << "undeclared variable " << node.lhs.name << std::endl;
     result_ = nullptr;
@@ -136,36 +135,35 @@ void CodeGenVisitor::visit(NAssignment& node) {
                           context_.currentBlock());
 }
 
-void CodeGenVisitor::visit(NBlock& node) {
-  StatementList::const_iterator it;
+void CodeGenVisitor::visit(const NBlock& node) {
   Value* last = nullptr;
-  for (it = node.statements.begin(); it != node.statements.end(); it++) {
-    last = generate(**it);
+  for (const auto* stmt : node.statements) {
+    last = generate(*stmt);
   }
   result_ = last;
 }
 
-void CodeGenVisitor::visit(NExpressionStatement& node) {
+void CodeGenVisitor::visit(const NExpressionStatement& node) {
   result_ = generate(node.expression);
 }
 
-void CodeGenVisitor::visit(NVariableDeclaration& node) {
+void CodeGenVisitor::visit(const NVariableDeclaration& node) {
   AllocaInst* alloc =
       new AllocaInst(typeOf(node.type, context_.context), 0,
                      node.id.name.c_str(), context_.currentBlock());
   context_.locals()[node.id.name] = alloc;
   if (node.assignmentExpr != nullptr) {
-    NAssignment assn(node.id, *node.assignmentExpr);
-    assn.accept(*this);
+    // Inline assignment logic instead of creating temporary NAssignment
+    Value* value = generate(*node.assignmentExpr);
+    new StoreInst(value, alloc, false, context_.currentBlock());
   }
   result_ = alloc;
 }
 
-void CodeGenVisitor::visit(NFunctionDeclaration& node) {
+void CodeGenVisitor::visit(const NFunctionDeclaration& node) {
   std::vector<Type*> argTypes;
-  VariableList::const_iterator it;
-  for (it = node.arguments.begin(); it != node.arguments.end(); it++) {
-    argTypes.push_back(typeOf((**it).type, context_.context));
+  for (const auto* arg : node.arguments) {
+    argTypes.push_back(typeOf(arg->type, context_.context));
   }
   FunctionType* ftype =
       FunctionType::get(typeOf(node.type, context_.context), argTypes, false);
@@ -178,12 +176,11 @@ void CodeGenVisitor::visit(NFunctionDeclaration& node) {
 
   // Create allocas for arguments and store the incoming argument values
   Function::arg_iterator argValues = function->arg_begin();
-  for (it = node.arguments.begin(); it != node.arguments.end();
-       it++, argValues++) {
-    (**it).accept(*this); // Creates the alloca
+  for (const auto* arg : node.arguments) {
+    arg->accept(*this); // Creates the alloca
     // Store the function argument value into the alloca
-    new StoreInst(&*argValues, context_.locals()[(**it).id.name], false,
-                  bblock);
+    new StoreInst(&*argValues, context_.locals()[arg->id.name], false, bblock);
+    ++argValues;
   }
 
   // Generate code for the function body and return its value
@@ -194,7 +191,7 @@ void CodeGenVisitor::visit(NFunctionDeclaration& node) {
   result_ = function;
 }
 
-void CodeGenVisitor::visit(NIfExpression& node) {
+void CodeGenVisitor::visit(const NIfExpression& node) {
   // Generate code for the condition
   Value* condValue = generate(node.condition);
   if (!condValue) {

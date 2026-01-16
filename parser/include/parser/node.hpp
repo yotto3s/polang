@@ -18,7 +18,7 @@ typedef std::vector<NVariableDeclaration*> VariableList;
 class Node {
 public:
   virtual ~Node() {}
-  virtual void accept(Visitor &visitor) = 0;
+  virtual void accept(Visitor &visitor) const = 0;
 };
 
 class NExpression : public Node {};
@@ -29,21 +29,21 @@ class NInteger : public NExpression {
 public:
   long long value;
   NInteger(long long value) : value(value) {}
-  void accept(Visitor &visitor) override;
+  void accept(Visitor &visitor) const override;
 };
 
 class NDouble : public NExpression {
 public:
   double value;
   NDouble(double value) : value(value) {}
-  void accept(Visitor &visitor) override;
+  void accept(Visitor &visitor) const override;
 };
 
 class NIdentifier : public NExpression {
 public:
   std::string name;
   NIdentifier(const std::string &name) : name(name) {}
-  void accept(Visitor &visitor) override;
+  void accept(Visitor &visitor) const override;
 };
 
 class NMethodCall : public NExpression {
@@ -53,7 +53,7 @@ public:
   NMethodCall(const NIdentifier &id, ExpressionList &arguments)
       : id(id), arguments(arguments) {}
   NMethodCall(const NIdentifier &id) : id(id) {}
-  void accept(Visitor &visitor) override;
+  void accept(Visitor &visitor) const override;
 };
 
 class NBinaryOperator : public NExpression {
@@ -63,7 +63,7 @@ public:
   NExpression &rhs;
   NBinaryOperator(NExpression &lhs, int op, NExpression &rhs)
       : op(op), lhs(lhs), rhs(rhs) {}
-  void accept(Visitor &visitor) override;
+  void accept(Visitor &visitor) const override;
 };
 
 class NAssignment : public NExpression {
@@ -71,14 +71,14 @@ public:
   NIdentifier &lhs;
   NExpression &rhs;
   NAssignment(NIdentifier &lhs, NExpression &rhs) : lhs(lhs), rhs(rhs) {}
-  void accept(Visitor &visitor) override;
+  void accept(Visitor &visitor) const override;
 };
 
 class NBlock : public NExpression {
 public:
   StatementList statements;
   NBlock() {}
-  void accept(Visitor &visitor) override;
+  void accept(Visitor &visitor) const override;
 };
 
 class NIfExpression : public NExpression {
@@ -89,14 +89,14 @@ public:
   NIfExpression(NExpression &condition, NExpression &thenExpr,
                 NExpression &elseExpr)
       : condition(condition), thenExpr(thenExpr), elseExpr(elseExpr) {}
-  void accept(Visitor &visitor) override;
+  void accept(Visitor &visitor) const override;
 };
 
 class NExpressionStatement : public NStatement {
 public:
   NExpression &expression;
   NExpressionStatement(NExpression &expression) : expression(expression) {}
-  void accept(Visitor &visitor) override;
+  void accept(Visitor &visitor) const override;
 };
 
 class NVariableDeclaration : public NStatement {
@@ -109,7 +109,7 @@ public:
   NVariableDeclaration(const NIdentifier &type, NIdentifier &id,
                        NExpression *assignmentExpr)
       : type(type), id(id), assignmentExpr(assignmentExpr) {}
-  void accept(Visitor &visitor) override;
+  void accept(Visitor &visitor) const override;
 };
 
 class NFunctionDeclaration : public NStatement {
@@ -121,7 +121,7 @@ public:
   NFunctionDeclaration(const NIdentifier &type, const NIdentifier &id,
                        const VariableList &arguments, NBlock &block)
       : type(type), id(id), arguments(arguments), block(block) {}
-  void accept(Visitor &visitor) override;
+  void accept(Visitor &visitor) const override;
 };
 // clang-format on
 

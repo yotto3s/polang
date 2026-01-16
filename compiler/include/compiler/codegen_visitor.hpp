@@ -15,26 +15,26 @@ public:
   llvm::Value* getResult() const { return result_; }
 
   // Expression visitors
-  void visit(NInteger& node) override;
-  void visit(NDouble& node) override;
-  void visit(NIdentifier& node) override;
-  void visit(NMethodCall& node) override;
-  void visit(NBinaryOperator& node) override;
-  void visit(NAssignment& node) override;
-  void visit(NBlock& node) override;
-  void visit(NIfExpression& node) override;
+  void visit(const NInteger& node) override;
+  void visit(const NDouble& node) override;
+  void visit(const NIdentifier& node) override;
+  void visit(const NMethodCall& node) override;
+  void visit(const NBinaryOperator& node) override;
+  void visit(const NAssignment& node) override;
+  void visit(const NBlock& node) override;
+  void visit(const NIfExpression& node) override;
 
   // Statement visitors
-  void visit(NExpressionStatement& node) override;
-  void visit(NVariableDeclaration& node) override;
-  void visit(NFunctionDeclaration& node) override;
+  void visit(const NExpressionStatement& node) override;
+  void visit(const NVariableDeclaration& node) override;
+  void visit(const NFunctionDeclaration& node) override;
 
 private:
   CodeGenContext& context_;
   llvm::Value* result_ = nullptr;
 
   // Helper to visit a node and return its result
-  llvm::Value* generate(Node& node);
+  llvm::Value* generate(const Node& node);
 };
 
 #endif // POLANG_CODEGEN_VISITOR_HPP

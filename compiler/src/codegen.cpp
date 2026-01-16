@@ -21,7 +21,9 @@ void CodeGenContext::generateCode(NBlock& root) {
 }
 
 /* Print the LLVM IR to the given output stream */
-void CodeGenContext::printIR(raw_ostream& os) { module->print(os, nullptr); }
+void CodeGenContext::printIR(raw_ostream& os) const {
+  module->print(os, nullptr);
+}
 
 /* Executes the AST by running the main function */
 GenericValue CodeGenContext::runCode() {
