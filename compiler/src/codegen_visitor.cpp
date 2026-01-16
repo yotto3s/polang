@@ -200,8 +200,9 @@ void CodeGenVisitor::visit(const NAssignment& node) {
     return;
   }
   Value* const value = generate(node.rhs);
-  result_ = new StoreInst(value, context_.locals()[node.lhs.name], false,
-                          context_.currentBlock());
+  new StoreInst(value, context_.locals()[node.lhs.name], false,
+                context_.currentBlock());
+  result_ = value;
 }
 
 void CodeGenVisitor::visit(const NBlock& node) {

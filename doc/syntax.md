@@ -108,6 +108,20 @@ let y = 5
 y <- 10             ; ERROR: cannot reassign immutable variable
 ```
 
+**Assignment as Expression:**
+
+The assignment operator `<-` returns the assigned value, making it an expression:
+
+```
+let mut x = 0
+x <- 10             ; evaluates to 10
+
+; Chained assignment (right-associative)
+let mut a = 0
+let mut b = 0
+a <- b <- 5         ; assigns 5 to both a and b, evaluates to 5
+```
+
 **Note:** The `=` operator is used only for initial binding (declaration). The `<-` operator is used for reassignment (mutation).
 
 ## Functions
@@ -275,9 +289,11 @@ Expressions can be:
 
 ### Reassignment Operator
 
-| Operator | Description                           | Example   |
-|----------|---------------------------------------|-----------|
-| `<-`     | Reassignment (mutable variables only) | `x <- 5`  |
+| Operator | Description                           | Example   | Returns        |
+|----------|---------------------------------------|-----------|----------------|
+| `<-`     | Reassignment (mutable variables only) | `x <- 5`  | Assigned value |
+
+The reassignment operator returns the assigned value, allowing chained assignments like `a <- b <- 5`.
 
 **Note:** The `=` operator is used only for initial binding in declarations (`let x = 5`).
 
@@ -416,4 +432,20 @@ let answer = compute(1, 2, 3)
 ```
 let max(a: int, b: int): int = if a > b then a else b
 let larger = max(10, 20)
+```
+
+### Mutable Variables
+
+```
+let mut counter = 0
+counter <- counter + 1
+counter <- counter + 1
+counter <- counter + 1
+; counter is now 3
+
+; Chained assignment
+let mut x = 0
+let mut y = 0
+x <- y <- 10
+; both x and y are 10
 ```

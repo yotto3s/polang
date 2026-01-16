@@ -176,6 +176,34 @@ TEST(ReplIntegration, VariableReassignmentPersists) {
   EXPECT_THAT(result.stdout_output, HasSubstr("100 : int"));
 }
 
+TEST(ReplIntegration, AssignmentReturnsIntValue) {
+  // Assignment expression returns the assigned value
+  const auto result = runRepl("let mut x = 0\nx <- 42");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("42 : int"));
+}
+
+TEST(ReplIntegration, AssignmentReturnsDoubleValue) {
+  // Assignment expression returns double value
+  const auto result = runRepl("let mut x: double = 0.0\nx <- 3.14");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("3.14 : double"));
+}
+
+TEST(ReplIntegration, AssignmentReturnsBoolValue) {
+  // Assignment expression returns bool value
+  const auto result = runRepl("let mut flag: bool = false\nflag <- true");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("true : bool"));
+}
+
+TEST(ReplIntegration, ChainedAssignment) {
+  // Chained assignment: x <- y <- 5 assigns 5 to both
+  const auto result = runRepl("let mut x = 0\nlet mut y = 0\nx <- y <- 5\nx + y");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("10 : int"));
+}
+
 // ============== Multi-line Input Tests ==============
 // These tests verify the isInputIncomplete detection works correctly
 

@@ -88,7 +88,7 @@ Expected outputs:
 - `types.po` → `84 : int`
 - `fibonacci.po` → `5 : int`
 - `factorial.po` → `120 : int`
-- `mutability.po` → `13 : int`
+- `mutability.po` → `23 : int`
 
 Also run the test suite:
 
