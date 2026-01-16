@@ -161,7 +161,7 @@ let sign(n: int): int = if n > 0 then 1 else if n < 0 then 0 - 1 else 0
 
 ### Let Expression
 
-Let-expressions introduce local variable bindings that are only visible within the body expression:
+Let-expressions introduce local bindings (variables or functions) that are only visible within the body expression:
 
 ```
 let x = 1 in x + 1
@@ -174,24 +174,46 @@ let x : int = 1 and y : double = 2.0 in x
 let <binding> (and <binding>)* in <expression>
 ```
 
-Where `<binding>` is:
+Where `<binding>` can be a variable binding:
 ```
 <identifier> = <expression>
 <identifier> : <type> = <expression>
 ```
 
+Or a function binding:
+```
+<identifier>(<param>: <type>, ...): <return_type> = <expression>
+<identifier>(<param>: <type>, ...) = <expression>
+```
+
 - Bindings are only visible within the body expression
 - Multiple bindings are separated by `and`
-- Each binding can optionally have a type annotation (defaults to `int`)
+- Bindings can be variables or functions mixed together
+- Each variable binding can optionally have a type annotation
+- Each function binding can optionally have a return type annotation (inferred if omitted)
 - The entire let-expression evaluates to the value of the body expression
 
 **Examples:**
 
 ```
+; Simple variable bindings
 let a = 10 and b = 20 in a + b
 let x = 5 in let y = x + 1 in y * 2
-let sum(a: int, b: int): int = let result = a + b in result
+
+; Function binding in let expression
+let f(x: int): int = x + 1 in f(5)
+
+; Multiple function bindings
+let square(n: int): int = n * n and cube(n: int): int = n * n * n in square(3) + cube(2)
+
+; Mixed variable and function bindings
+let x = 10 and double(y: int): int = y * 2 in double(x)
+
+; Function with inferred return type
+let inc(n: int) = n + 1 in inc(41)
 ```
+
+**Note:** Functions defined in let expressions cannot capture sibling variable bindings. They can only access their own parameters and call sibling functions.
 
 ## Expressions
 
@@ -296,10 +318,14 @@ expression  ::= identifier "=" expression
 call_args   ::= ε
               | expression ("," expression)*
 
-let_bindings ::= binding ("and" binding)*
+let_bindings ::= let_binding ("and" let_binding)*
 
-binding     ::= identifier "=" expression
+let_binding ::= identifier "=" expression
               | identifier ":" type "=" expression
+              | identifier "(" param_list ")" ":" type "=" expression
+              | identifier "(" param_list ")" "=" expression
+              | identifier "()" ":" type "=" expression
+              | identifier "()" "=" expression
 
 binop       ::= "+" | "-" | "*" | "/"
               | "==" | "!=" | "<" | "<=" | ">" | ">="

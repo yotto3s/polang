@@ -197,19 +197,27 @@ void TypeChecker::visit(const NIfExpression& node) {
 }
 
 void TypeChecker::visit(const NLetExpression& node) {
-  // Save current scope
+  // Save current scopes
   const auto saved_locals = local_types_;
+  const auto saved_func_returns = function_return_types_;
+  const auto saved_func_params = function_param_types_;
 
-  // Process bindings
+  // Process bindings (can be variables or functions)
   for (const auto* binding : node.bindings) {
-    binding->accept(*this);
+    if (binding->isFunction) {
+      binding->func->accept(*this);
+    } else {
+      binding->var->accept(*this);
+    }
   }
 
-  // Process body with new variables in scope
+  // Process body with new bindings in scope
   node.body.accept(*this);
 
-  // Restore previous scope
+  // Restore previous scopes
   local_types_ = saved_locals;
+  function_return_types_ = saved_func_returns;
+  function_param_types_ = saved_func_params;
 }
 
 void TypeChecker::visit(const NExpressionStatement& node) {

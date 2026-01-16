@@ -340,22 +340,29 @@ void CodeGenVisitor::visit(const NLetExpression& node) {
   // Save current locals to restore later (scoping)
   const auto savedLocals = context_.locals();
 
-  // Generate code for each binding
+  // Generate code for each binding (can be variables or functions)
   for (const auto* binding : node.bindings) {
-    if (binding->type == nullptr) {
-      std::cerr << "Internal error: let binding type not resolved for "
-                << binding->id.name << std::endl;
-      result_ = nullptr;
-      return;
-    }
-    AllocaInst* alloc =
-        new AllocaInst(typeOf(binding->type, context_.context), 0,
-                       binding->id.name.c_str(), context_.currentBlock());
-    context_.locals()[binding->id.name] = alloc;
+    if (binding->isFunction) {
+      // Generate the function (will be added to module)
+      binding->func->accept(*this);
+    } else {
+      // Handle variable binding
+      const auto* var = binding->var;
+      if (var->type == nullptr) {
+        std::cerr << "Internal error: let binding type not resolved for "
+                  << var->id.name << std::endl;
+        result_ = nullptr;
+        return;
+      }
+      AllocaInst* alloc =
+          new AllocaInst(typeOf(var->type, context_.context), 0,
+                         var->id.name.c_str(), context_.currentBlock());
+      context_.locals()[var->id.name] = alloc;
 
-    if (binding->assignmentExpr != nullptr) {
-      Value* value = generate(*binding->assignmentExpr);
-      new StoreInst(value, alloc, false, context_.currentBlock());
+      if (var->assignmentExpr != nullptr) {
+        Value* value = generate(*var->assignmentExpr);
+        new StoreInst(value, alloc, false, context_.currentBlock());
+      }
     }
   }
 

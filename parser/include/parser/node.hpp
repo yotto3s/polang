@@ -9,10 +9,22 @@ class Visitor;
 class NStatement;
 class NExpression;
 class NVariableDeclaration;
+class NFunctionDeclaration;
 
 typedef std::vector<NStatement*> StatementList;
 typedef std::vector<NExpression*> ExpressionList;
 typedef std::vector<NVariableDeclaration*> VariableList;
+
+// Union type for let bindings (can be variable or function)
+struct NLetBinding {
+  bool isFunction;
+  NVariableDeclaration* var;
+  NFunctionDeclaration* func;
+  NLetBinding(NVariableDeclaration* v) : isFunction(false), var(v), func(nullptr) {}
+  NLetBinding(NFunctionDeclaration* f) : isFunction(true), var(nullptr), func(f) {}
+};
+
+typedef std::vector<NLetBinding*> LetBindingList;
 
 // clang-format off
 class Node {
@@ -101,9 +113,9 @@ public:
 
 class NLetExpression : public NExpression {
 public:
-  VariableList bindings;
+  LetBindingList bindings;
   NExpression &body;
-  NLetExpression(VariableList &bindings, NExpression &body)
+  NLetExpression(LetBindingList &bindings, NExpression &body)
       : bindings(bindings), body(body) {}
   void accept(Visitor &visitor) const override;
 };

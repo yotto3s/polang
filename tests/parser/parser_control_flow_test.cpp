@@ -98,11 +98,13 @@ TEST(ParserTest, SimpleLetExpression) {
   auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 1);
-  EXPECT_EQ(letExpr->bindings[0]->id.name, "x");
-  EXPECT_EQ(letExpr->bindings[0]->type, nullptr); // type inferred, not yet set
+  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
+  EXPECT_EQ(letExpr->bindings[0]->var->id.name, "x");
+  EXPECT_EQ(letExpr->bindings[0]->var->type,
+            nullptr); // type inferred, not yet set
 
   auto* initExpr =
-      dynamic_cast<NInteger*>(letExpr->bindings[0]->assignmentExpr);
+      dynamic_cast<NInteger*>(letExpr->bindings[0]->var->assignmentExpr);
   ASSERT_NE(initExpr, nullptr);
   EXPECT_EQ(initExpr->value, 1);
 
@@ -121,13 +123,17 @@ TEST(ParserTest, LetExpressionMultipleBindings) {
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 2);
 
-  EXPECT_EQ(letExpr->bindings[0]->id.name, "x");
-  auto* initX = dynamic_cast<NInteger*>(letExpr->bindings[0]->assignmentExpr);
+  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
+  EXPECT_EQ(letExpr->bindings[0]->var->id.name, "x");
+  auto* initX =
+      dynamic_cast<NInteger*>(letExpr->bindings[0]->var->assignmentExpr);
   ASSERT_NE(initX, nullptr);
   EXPECT_EQ(initX->value, 1);
 
-  EXPECT_EQ(letExpr->bindings[1]->id.name, "y");
-  auto* initY = dynamic_cast<NInteger*>(letExpr->bindings[1]->assignmentExpr);
+  ASSERT_FALSE(letExpr->bindings[1]->isFunction);
+  EXPECT_EQ(letExpr->bindings[1]->var->id.name, "y");
+  auto* initY =
+      dynamic_cast<NInteger*>(letExpr->bindings[1]->var->assignmentExpr);
   ASSERT_NE(initY, nullptr);
   EXPECT_EQ(initY->value, 2);
 }
@@ -140,9 +146,10 @@ TEST(ParserTest, LetExpressionWithTypeAnnotation) {
   auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 1);
-  EXPECT_EQ(letExpr->bindings[0]->id.name, "x");
-  ASSERT_NE(letExpr->bindings[0]->type, nullptr);
-  EXPECT_EQ(letExpr->bindings[0]->type->name, "int");
+  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
+  EXPECT_EQ(letExpr->bindings[0]->var->id.name, "x");
+  ASSERT_NE(letExpr->bindings[0]->var->type, nullptr);
+  EXPECT_EQ(letExpr->bindings[0]->var->type->name, "int");
 }
 
 TEST(ParserTest, LetExpressionMixedTypeAnnotations) {
@@ -155,11 +162,15 @@ TEST(ParserTest, LetExpressionMixedTypeAnnotations) {
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 3);
 
-  ASSERT_NE(letExpr->bindings[0]->type, nullptr);
-  EXPECT_EQ(letExpr->bindings[0]->type->name, "int");
-  EXPECT_EQ(letExpr->bindings[1]->type, nullptr); // type inferred, not yet set
-  ASSERT_NE(letExpr->bindings[2]->type, nullptr);
-  EXPECT_EQ(letExpr->bindings[2]->type->name, "double");
+  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
+  ASSERT_NE(letExpr->bindings[0]->var->type, nullptr);
+  EXPECT_EQ(letExpr->bindings[0]->var->type->name, "int");
+  ASSERT_FALSE(letExpr->bindings[1]->isFunction);
+  EXPECT_EQ(letExpr->bindings[1]->var->type,
+            nullptr); // type inferred, not yet set
+  ASSERT_FALSE(letExpr->bindings[2]->isFunction);
+  ASSERT_NE(letExpr->bindings[2]->var->type, nullptr);
+  EXPECT_EQ(letExpr->bindings[2]->var->type->name, "double");
 }
 
 TEST(ParserTest, NestedLetExpression) {
@@ -169,11 +180,13 @@ TEST(ParserTest, NestedLetExpression) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
   auto* outerLet = dynamic_cast<NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(outerLet, nullptr);
-  EXPECT_EQ(outerLet->bindings[0]->id.name, "x");
+  ASSERT_FALSE(outerLet->bindings[0]->isFunction);
+  EXPECT_EQ(outerLet->bindings[0]->var->id.name, "x");
 
   auto* innerLet = dynamic_cast<NLetExpression*>(&outerLet->body);
   ASSERT_NE(innerLet, nullptr);
-  EXPECT_EQ(innerLet->bindings[0]->id.name, "y");
+  ASSERT_FALSE(innerLet->bindings[0]->isFunction);
+  EXPECT_EQ(innerLet->bindings[0]->var->id.name, "y");
 
   auto* bodyExpr = dynamic_cast<NBinaryOperator*>(&innerLet->body);
   ASSERT_NE(bodyExpr, nullptr);
@@ -189,7 +202,8 @@ TEST(ParserTest, LetExpressionInVariableDeclaration) {
 
   auto* letExpr = dynamic_cast<NLetExpression*>(varDecl->assignmentExpr);
   ASSERT_NE(letExpr, nullptr);
-  EXPECT_EQ(letExpr->bindings[0]->id.name, "x");
+  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
+  EXPECT_EQ(letExpr->bindings[0]->var->id.name, "x");
 }
 
 TEST(ParserTest, LetExpressionInFunctionBody) {
@@ -207,7 +221,8 @@ TEST(ParserTest, LetExpressionInFunctionBody) {
 
   auto* letExpr = dynamic_cast<NLetExpression*>(&bodyStmt->expression);
   ASSERT_NE(letExpr, nullptr);
-  EXPECT_EQ(letExpr->bindings[0]->id.name, "b");
+  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
+  EXPECT_EQ(letExpr->bindings[0]->var->id.name, "b");
 }
 
 TEST(ParserTest, LetExpressionWithIfBody) {
@@ -231,8 +246,9 @@ TEST(ParserTest, LetExpressionWithComplexInitializer) {
   ASSERT_NE(letExpr, nullptr);
 
   // Initializer should be 1 + (2 * 3) due to precedence
+  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
   auto* addOp =
-      dynamic_cast<NBinaryOperator*>(letExpr->bindings[0]->assignmentExpr);
+      dynamic_cast<NBinaryOperator*>(letExpr->bindings[0]->var->assignmentExpr);
   ASSERT_NE(addOp, nullptr);
   EXPECT_EQ(addOp->op, TPLUS);
 }
@@ -245,7 +261,93 @@ TEST(ParserTest, LetExpressionThreeBindings) {
   auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 3);
-  EXPECT_EQ(letExpr->bindings[0]->id.name, "a");
-  EXPECT_EQ(letExpr->bindings[1]->id.name, "b");
-  EXPECT_EQ(letExpr->bindings[2]->id.name, "c");
+  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
+  EXPECT_EQ(letExpr->bindings[0]->var->id.name, "a");
+  ASSERT_FALSE(letExpr->bindings[1]->isFunction);
+  EXPECT_EQ(letExpr->bindings[1]->var->id.name, "b");
+  ASSERT_FALSE(letExpr->bindings[2]->isFunction);
+  EXPECT_EQ(letExpr->bindings[2]->var->id.name, "c");
+}
+
+// ============== Function in Let Expression Tests ==============
+
+TEST(ParserTest, LetExpressionWithFunction) {
+  NBlock* block = parseOrFail("let f(x: int): int = x + 1 in f(5)");
+  ASSERT_NE(block, nullptr);
+
+  auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
+  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  ASSERT_NE(letExpr, nullptr);
+  ASSERT_EQ(letExpr->bindings.size(), 1);
+
+  // Check that the binding is a function
+  ASSERT_TRUE(letExpr->bindings[0]->isFunction);
+  auto* func = letExpr->bindings[0]->func;
+  ASSERT_NE(func, nullptr);
+  EXPECT_EQ(func->id.name, "f");
+  ASSERT_NE(func->type, nullptr);
+  EXPECT_EQ(func->type->name, "int");
+  ASSERT_EQ(func->arguments.size(), 1);
+  EXPECT_EQ(func->arguments[0]->id.name, "x");
+
+  // Check that the body is a function call
+  auto* call = dynamic_cast<NMethodCall*>(&letExpr->body);
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(call->id.name, "f");
+}
+
+TEST(ParserTest, LetExpressionWithFunctionInferredReturnType) {
+  NBlock* block = parseOrFail("let double(n: int) = n * 2 in double(5)");
+  ASSERT_NE(block, nullptr);
+
+  auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
+  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  ASSERT_NE(letExpr, nullptr);
+  ASSERT_EQ(letExpr->bindings.size(), 1);
+
+  // Check that the binding is a function with inferred return type
+  ASSERT_TRUE(letExpr->bindings[0]->isFunction);
+  auto* func = letExpr->bindings[0]->func;
+  ASSERT_NE(func, nullptr);
+  EXPECT_EQ(func->id.name, "double");
+  EXPECT_EQ(func->type,
+            nullptr); // Return type not yet inferred (set by type checker)
+}
+
+TEST(ParserTest, LetExpressionMultipleFunctions) {
+  NBlock* block = parseOrFail(
+      "let square(n: int): int = n * n and cube(n: int): int = n * n * n in "
+      "square(2) + cube(2)");
+  ASSERT_NE(block, nullptr);
+
+  auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
+  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  ASSERT_NE(letExpr, nullptr);
+  ASSERT_EQ(letExpr->bindings.size(), 2);
+
+  // First binding: square
+  ASSERT_TRUE(letExpr->bindings[0]->isFunction);
+  EXPECT_EQ(letExpr->bindings[0]->func->id.name, "square");
+
+  // Second binding: cube
+  ASSERT_TRUE(letExpr->bindings[1]->isFunction);
+  EXPECT_EQ(letExpr->bindings[1]->func->id.name, "cube");
+}
+
+TEST(ParserTest, LetExpressionMixedVariablesAndFunctions) {
+  NBlock* block = parseOrFail("let x = 10 and f(y: int): int = y * 2 in f(x)");
+  ASSERT_NE(block, nullptr);
+
+  auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
+  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  ASSERT_NE(letExpr, nullptr);
+  ASSERT_EQ(letExpr->bindings.size(), 2);
+
+  // First binding: variable x
+  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
+  EXPECT_EQ(letExpr->bindings[0]->var->id.name, "x");
+
+  // Second binding: function f
+  ASSERT_TRUE(letExpr->bindings[1]->isFunction);
+  EXPECT_EQ(letExpr->bindings[1]->func->id.name, "f");
 }

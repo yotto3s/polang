@@ -19,6 +19,8 @@ void yyerror(const char *s);
     NVariableDeclaration *var_decl;
     std::vector<NVariableDeclaration*> *varvec;
     std::vector<NExpression*> *exprvec;
+    NLetBinding *letbind;
+    std::vector<NLetBinding*> *letbindvec;
     std::string *string;
     int token;
 }
@@ -42,7 +44,9 @@ void yyerror(const char *s);
  */
 %type <ident> ident
 %type <expr> numeric expr boolean
-%type <varvec> func_decl_args func_param_list let_bindings
+%type <varvec> func_decl_args func_param_list
+%type <letbind> let_binding
+%type <letbindvec> let_bindings
 %type <exprvec> call_args
 %type <block> program stmts
 %type <stmt> stmt var_decl func_decl
@@ -153,27 +157,39 @@ call_args : /*blank*/  { $$ = new ExpressionList(); }
           | call_args TCOMMA expr  { $1->push_back($3); }
           ;
 
-let_bindings : ident TEQUAL expr {
-                 /* x = expr (type to be inferred) */
-                 $$ = new VariableList();
-                 $$->push_back(new NVariableDeclaration(*$1, $3));
+let_bindings : let_binding {
+                 $$ = new LetBindingList();
+                 $$->push_back($1);
                }
-             | ident TCOLON ident TEQUAL expr {
-                 /* x : type = expr */
-                 $$ = new VariableList();
-                 $$->push_back(new NVariableDeclaration($3, *$1, $5));
-               }
-             | let_bindings TAND ident TEQUAL expr {
-                 /* and x = expr (type to be inferred) */
-                 $1->push_back(new NVariableDeclaration(*$3, $5));
-                 $$ = $1;
-               }
-             | let_bindings TAND ident TCOLON ident TEQUAL expr {
-                 /* and x : type = expr */
-                 $1->push_back(new NVariableDeclaration($5, *$3, $7));
+             | let_bindings TAND let_binding {
+                 $1->push_back($3);
                  $$ = $1;
                }
              ;
+
+let_binding : ident TEQUAL expr {
+                /* x = expr (type to be inferred) */
+                $$ = new NLetBinding(new NVariableDeclaration(*$1, $3));
+              }
+            | ident TCOLON ident TEQUAL expr {
+                /* x : type = expr */
+                $$ = new NLetBinding(new NVariableDeclaration($3, *$1, $5));
+              }
+            | ident func_decl_args TCOLON ident TEQUAL expr {
+                /* f(x: int): int = expr */
+                NBlock *body = new NBlock();
+                body->statements.push_back(new NExpressionStatement(*$6));
+                $$ = new NLetBinding(new NFunctionDeclaration($4, *$1, *$2, *body));
+                delete $2;
+              }
+            | ident func_decl_args TEQUAL expr {
+                /* f(x: int) = expr (return type inferred) */
+                NBlock *body = new NBlock();
+                body->statements.push_back(new NExpressionStatement(*$4));
+                $$ = new NLetBinding(new NFunctionDeclaration(*$1, *$2, *body));
+                delete $2;
+              }
+            ;
 
 comparison : TCEQ | TCNE | TCLT | TCLE | TCGT | TCGE
            ;

@@ -101,3 +101,29 @@ TEST(ReplIntegration, TypeErrorIfCondition) {
   const auto result = runRepl("if 1 then 2 else 3");
   EXPECT_EQ(result.exit_code, 1);
 }
+
+// ============== Function in Let Expression Tests ==============
+
+TEST(ReplIntegration, LetExpressionWithFunction) {
+  const auto result = runRepl("let f(x: int): int = x + 1 in f(5)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("6"));
+  EXPECT_THAT(result.stdout_output, HasSubstr("int"));
+}
+
+TEST(ReplIntegration, LetExpressionMultipleFunctions) {
+  const auto result = runRepl(
+      "let square(n: int): int = n * n and cube(n: int): int = n * n * n in "
+      "square(3) + cube(2)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("17")); // 9 + 8
+  EXPECT_THAT(result.stdout_output, HasSubstr("int"));
+}
+
+TEST(ReplIntegration, LetExpressionMixedBindingsCallBody) {
+  // Variable and function in let, function is called with variable
+  const auto result = runRepl("let x = 10 and f(y: int): int = y * 2 in f(x)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("20"));
+  EXPECT_THAT(result.stdout_output, HasSubstr("int"));
+}

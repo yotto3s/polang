@@ -53,8 +53,7 @@ TEST(TypeCheckTest, VariableUsage) {
 
 TEST(TypeCheckTest, FunctionDeclaration) {
   EXPECT_TRUE(hasNoTypeError("let add(x: int, y: int): int = x + y"));
-  EXPECT_TRUE(
-      hasNoTypeError("let mul(a: double, b: double): double = a * b"));
+  EXPECT_TRUE(hasNoTypeError("let mul(a: double, b: double): double = a * b"));
 }
 
 TEST(TypeCheckTest, LetExpression) {
@@ -245,4 +244,39 @@ TEST(TypeCheckTest, FunctionCallErrorMessage) {
   ASSERT_FALSE(errors.empty());
   EXPECT_TRUE(errors[0].message.find("int") != std::string::npos);
   EXPECT_TRUE(errors[0].message.find("double") != std::string::npos);
+}
+
+// ============== Function in Let Expression Type Checking Tests ==============
+
+TEST(TypeCheckTest, LetExpressionWithFunction) {
+  // Function declared in let expression should be type-checked
+  EXPECT_TRUE(hasNoTypeError("let f(x: int): int = x + 1 in f(5)"));
+  EXPECT_TRUE(hasNoTypeError("let f(x: double): double = x + 1.0 in f(5.0)"));
+}
+
+TEST(TypeCheckTest, LetExpressionWithFunctionInferredReturnType) {
+  // Return type should be inferred from function body
+  EXPECT_TRUE(hasNoTypeError("let f(x: int) = x * 2 in f(5)"));
+}
+
+TEST(TypeCheckTest, LetExpressionWithFunctionWrongArgType) {
+  // Passing wrong type to function in let expression should fail
+  EXPECT_TRUE(hasTypeError("let f(x: int): int = x + 1 in f(5.0)"));
+}
+
+TEST(TypeCheckTest, LetExpressionWithFunctionReturnTypeMismatch) {
+  // Function return type doesn't match body
+  EXPECT_TRUE(hasTypeError("let f(x: int): double = x + 1 in f(5)"));
+}
+
+TEST(TypeCheckTest, LetExpressionMultipleFunctions) {
+  // Multiple functions in let expression
+  EXPECT_TRUE(hasNoTypeError(
+      "let square(n: int): int = n * n and cube(n: int): int = n * n * n in "
+      "square(2) + cube(2)"));
+}
+
+TEST(TypeCheckTest, LetExpressionMixedBindingsTypes) {
+  // Variable and function in same let expression
+  EXPECT_TRUE(hasNoTypeError("let x = 10 and f(y: int): int = y * 2 in f(x)"));
 }
