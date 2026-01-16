@@ -39,7 +39,18 @@ target_link_libraries(error_test
 )
 target_compile_options(error_test PRIVATE -Wno-error)
 
+# Type check tests
+add_executable(type_check_test
+    type_check_test.cpp
+)
+target_link_libraries(type_check_test
+    PRIVATE PolangParser
+    PRIVATE GTest::gtest_main
+)
+target_compile_options(type_check_test PRIVATE -Wno-error)
+
 include(GoogleTest)
 gtest_discover_tests(lexer_test)
 gtest_discover_tests(parser_test)
 gtest_discover_tests(error_test)
+gtest_discover_tests(type_check_test)

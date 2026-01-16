@@ -22,6 +22,8 @@ static Type* typeOf(const NIdentifier& type, LLVMContext& ctx) noexcept {
     return Type::getInt64Ty(ctx);
   } else if (type.name.compare("double") == 0) {
     return Type::getDoubleTy(ctx);
+  } else if (type.name.compare("bool") == 0) {
+    return Type::getInt1Ty(ctx);
   }
   return Type::getVoidTy(ctx);
 }
@@ -33,6 +35,11 @@ void CodeGenVisitor::visit(const NInteger& node) {
 
 void CodeGenVisitor::visit(const NDouble& node) {
   result_ = ConstantFP::get(Type::getDoubleTy(context_.context), node.value);
+}
+
+void CodeGenVisitor::visit(const NBoolean& node) {
+  result_ =
+      ConstantInt::get(Type::getInt1Ty(context_.context), node.value ? 1 : 0);
 }
 
 void CodeGenVisitor::visit(const NIdentifier& node) {
@@ -106,12 +113,9 @@ void CodeGenVisitor::visit(const NBinaryOperator& node) {
       result_ = nullptr;
       return;
     }
-    Value* cmp =
-        CmpInst::Create(Instruction::ICmp, pred, generate(node.lhs),
-                        generate(node.rhs), "", context_.currentBlock());
-    // Convert i1 to i64 for consistency with other integer operations
-    result_ = new ZExtInst(cmp, Type::getInt64Ty(context_.context), "",
-                           context_.currentBlock());
+    // Comparison returns i1 (bool)
+    result_ = CmpInst::Create(Instruction::ICmp, pred, generate(node.lhs),
+                              generate(node.rhs), "", context_.currentBlock());
     return;
   }
   }
@@ -199,11 +203,14 @@ void CodeGenVisitor::visit(const NIfExpression& node) {
     return;
   }
 
-  // Convert condition to boolean (compare with 0)
-  Value* condBool =
-      CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_NE, condValue,
-                      ConstantInt::get(Type::getInt64Ty(context_.context), 0),
-                      "ifcond", context_.currentBlock());
+  // Condition should be i1 (bool). If it's i64 (legacy int), convert it.
+  Value* condBool = condValue;
+  if (condValue->getType()->isIntegerTy(64)) {
+    condBool =
+        CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_NE, condValue,
+                        ConstantInt::get(Type::getInt64Ty(context_.context), 0),
+                        "ifcond", context_.currentBlock());
+  }
 
   // Get the current function
   Function* func = context_.currentBlock()->getParent();

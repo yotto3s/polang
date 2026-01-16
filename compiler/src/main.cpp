@@ -1,6 +1,7 @@
 #include "compiler/codegen.hpp"
 #include "parser/node.hpp"
 #include "parser/parser_api.hpp"
+#include "parser/type_checker.hpp"
 #include <iostream>
 #include <sstream>
 
@@ -19,6 +20,12 @@ int main(int argc, char** argv) {
   }
 
   if (!ast) {
+    return 1;
+  }
+
+  // Type checking
+  const auto type_errors = polang_check_types(*ast);
+  if (!type_errors.empty()) {
     return 1;
   }
 

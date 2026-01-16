@@ -16,12 +16,13 @@ Polang is a simple programming language with ML-inspired syntax and LLVM backend
 
 ## Types
 
-Polang supports two primitive types:
+Polang supports three primitive types:
 
 | Type     | Description                | Size    |
 |----------|----------------------------|---------|
 | `int`    | Signed integer             | 64-bit  |
 | `double` | Floating-point number      | 64-bit  |
+| `bool`   | Boolean value              | 1-bit   |
 
 ## Literals
 
@@ -47,6 +48,15 @@ Double literals are digits with a literal decimal point:
 ```
 
 Note: The decimal point is required. `3.` is valid (trailing digits are optional), but `3` without a decimal point is an integer.
+
+### Boolean Literals
+
+Boolean literals are `true` and `false`:
+
+```
+true
+false
+```
 
 ## Variables
 
@@ -131,7 +141,7 @@ if a == b then a + 1 else b + 1
 if <condition> then <then_expr> else <else_expr>
 ```
 
-- The condition is evaluated and compared to 0 (non-zero is truthy)
+- The condition must be a boolean expression (comparison or boolean literal)
 - Both `then` and `else` branches are required
 - If-expressions return a value and can be used anywhere an expression is expected
 - If-expressions can be nested
@@ -182,10 +192,10 @@ let sum (a : int) (b : int) : int = let result = a + b in result
 
 Expressions can be:
 
-- **Literals**: `42`, `3.14`
+- **Literals**: `42`, `3.14`, `true`, `false`
 - **Identifiers**: `x`, `myVar`
 - **Binary operations**: `a + b`, `x * y`
-- **Comparisons**: `a == b`, `x < y`
+- **Comparisons**: `a == b`, `x < y` (return bool)
 - **Function calls**: `add(1, 2)`
 - **Assignments**: `x = 5`
 - **Parenthesized**: `(a + b) * c`
@@ -260,6 +270,7 @@ expression  ::= identifier "=" expression
               | identifier "(" call_args ")"
               | identifier
               | numeric
+              | boolean
               | expression binop expression
               | "(" expression ")"
               | "if" expression "then" expression "else" expression
@@ -284,7 +295,9 @@ integer     ::= [0-9]+
 
 double      ::= [0-9]+ "." [0-9]*
 
-type        ::= "int" | "double"
+boolean     ::= "true" | "false"
+
+type        ::= "int" | "double" | "bool"
 ```
 
 ## Examples
@@ -315,7 +328,7 @@ let result = multiply(6, 7)
 ```
 let a = 5
 let b = 10
-let is_less = a < b
+let is_less : bool = a < b
 ```
 
 ### Complex Expression

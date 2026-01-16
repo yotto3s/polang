@@ -33,6 +33,7 @@ void yyerror(const char *s);
 %token <token> TPLUS TMINUS TMUL TDIV
 %token <token> TLET TFUN TIN TCOLON TARROW TAND
 %token <token> TIF TTHEN TELSE
+%token <token> TTRUE TFALSE
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -40,7 +41,7 @@ void yyerror(const char *s);
    calling an (NIdentifier*). It makes the compiler happy.
  */
 %type <ident> ident
-%type <expr> numeric expr
+%type <expr> numeric expr boolean
 %type <varvec> func_decl_args let_bindings
 %type <exprvec> call_args
 %type <block> program stmts
@@ -119,11 +120,16 @@ ident : TIDENTIFIER { $$ = new NIdentifier(*$1); delete $1; }
 numeric : TINTEGER { $$ = new NInteger(atol($1->c_str())); delete $1; }
         | TDOUBLE { $$ = new NDouble(atof($1->c_str())); delete $1; }
         ;
-    
+
+boolean : TTRUE { $$ = new NBoolean(true); }
+        | TFALSE { $$ = new NBoolean(false); }
+        ;
+
 expr : ident TEQUAL expr { $$ = new NAssignment(*$<ident>1, *$3); }
      | ident TLPAREN call_args TRPAREN { $$ = new NMethodCall(*$1, *$3); delete $3; }
      | ident { $<ident>$ = $1; }
      | numeric
+     | boolean
      | expr comparison expr %prec COMPARISON { $$ = new NBinaryOperator(*$1, $2, *$3); }
      | expr TPLUS expr { $$ = new NBinaryOperator(*$1, TPLUS, *$3); }
      | expr TMINUS expr { $$ = new NBinaryOperator(*$1, TMINUS, *$3); }

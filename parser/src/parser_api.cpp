@@ -1,5 +1,6 @@
 #include "parser/parser_api.hpp"
 #include "parser/node.hpp"
+#include "parser/type_checker.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -34,4 +35,9 @@ NBlock* polang_parse_file(const char* filename) {
   std::stringstream buffer;
   buffer << file.rdbuf();
   return polang_parse(buffer.str());
+}
+
+std::vector<TypeCheckError> polang_check_types(const NBlock& ast) {
+  TypeChecker checker;
+  return checker.check(ast);
 }

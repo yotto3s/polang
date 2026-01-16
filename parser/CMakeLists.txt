@@ -10,6 +10,7 @@ add_library(PolangParser STATIC
     ${FLEX_PolangFlex_OUTPUTS}
     src/parser_api.cpp
     src/node.cpp
+    src/type_checker.cpp
 )
 
 target_include_directories(PolangParser PUBLIC

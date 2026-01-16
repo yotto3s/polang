@@ -5,6 +5,8 @@ void NInteger::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NDouble::accept(Visitor& visitor) const { visitor.visit(*this); }
 
+void NBoolean::accept(Visitor& visitor) const { visitor.visit(*this); }
+
 void NIdentifier::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NMethodCall::accept(Visitor& visitor) const { visitor.visit(*this); }

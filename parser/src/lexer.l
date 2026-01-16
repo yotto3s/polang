@@ -33,6 +33,8 @@ void polang_reset_lexer_location() {
 "if"                    { return TOKEN(TIF); }
 "then"                  { return TOKEN(TTHEN); }
 "else"                  { return TOKEN(TELSE); }
+"true"                  { return TOKEN(TTRUE); }
+"false"                 { return TOKEN(TFALSE); }
 [a-zA-Z_][a-zA-Z0-9_]*  { SAVE_TOKEN; return TIDENTIFIER; }
 [0-9]+\.[0-9]*          { SAVE_TOKEN; return TDOUBLE; }
 [0-9]+                  { SAVE_TOKEN; return TINTEGER; }

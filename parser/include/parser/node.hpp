@@ -39,6 +39,13 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
+class NBoolean : public NExpression {
+public:
+  bool value;
+  NBoolean(bool value) : value(value) {}
+  void accept(Visitor &visitor) const override;
+};
+
 class NIdentifier : public NExpression {
 public:
   std::string name;

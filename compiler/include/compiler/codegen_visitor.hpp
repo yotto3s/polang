@@ -17,6 +17,7 @@ public:
   // Expression visitors
   void visit(const NInteger& node) override;
   void visit(const NDouble& node) override;
+  void visit(const NBoolean& node) override;
   void visit(const NIdentifier& node) override;
   void visit(const NMethodCall& node) override;
   void visit(const NBinaryOperator& node) override;

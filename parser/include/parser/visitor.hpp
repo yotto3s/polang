@@ -4,6 +4,7 @@
 // Forward declarations of all node types
 class NInteger;
 class NDouble;
+class NBoolean;
 class NIdentifier;
 class NMethodCall;
 class NBinaryOperator;
@@ -22,6 +23,7 @@ public:
   // Expression visitors
   virtual void visit(const NInteger& node) = 0;
   virtual void visit(const NDouble& node) = 0;
+  virtual void visit(const NBoolean& node) = 0;
   virtual void visit(const NIdentifier& node) = 0;
   virtual void visit(const NMethodCall& node) = 0;
   virtual void visit(const NBinaryOperator& node) = 0;
