@@ -1,7 +1,9 @@
 #include "repl/repl_session.hpp"
 
 #include <cstring>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <unistd.h>
 
@@ -64,6 +66,22 @@ int main(int argc, char** argv) {
   if (!session.initialize()) {
     std::cerr << "Failed to initialize REPL session\n";
     return 1;
+  }
+
+  // File mode: read file, evaluate, and exit
+  if (argc > 1) {
+    std::ifstream file(argv[1]);
+    if (!file.is_open()) {
+      std::cerr << "Error: Cannot open file: " << argv[1] << "\n";
+      return 1;
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    const std::string content = buffer.str();
+
+    const EvalResult result = session.evaluate(content);
+    printResult(result);
+    return result.success ? 0 : 1;
   }
 
   // Determine if running interactively (stdin is a terminal)
