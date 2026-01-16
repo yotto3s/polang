@@ -46,7 +46,7 @@ clang-format -i <path/to/edited-file>
 
 ```bash
 # Configure (inside docker container)
-cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
 
 # Build (inside docker container)
 cmake --build build -j$(nproc)
@@ -56,12 +56,15 @@ Build outputs:
 - `build/bin/PolangCompiler` - Compiler executable (outputs LLVM IR to stdout)
 - `build/bin/PolangRepl` - Interactive REPL executable (executes code via JIT)
 - `build/lib/libPolangParser.a` - Parser static library
-- `build/lib/libPolangCodegen.a` - Code generation static library
+- `build/lib/libPolangCodegen.a` - Legacy LLVM IR code generation library
+- `build/lib/libPolangMLIRCodegen.a` - MLIR-based code generation library
+- `build/lib/libPolangDialect.a` - Polang MLIR dialect library
 
 ## Dependencies
 
-- CMake 3.10+
-- LLVM (core, support, native, OrcJIT, AsmParser components)
+- CMake 3.20+
+- LLVM 20+ (core, support, native, OrcJIT components)
+- MLIR (included with LLVM 20+)
 - Bison (for parser generation)
 - Flex (for lexer generation)
 
@@ -69,6 +72,9 @@ Build outputs:
 
 When modifying the language syntax (lexer.l, parser.y, or node.hpp), always update:
 - `doc/syntax.md` - Language syntax reference
+
+When modifying the MLIR code generation pipeline, update:
+- `doc/Lowering.md` - MLIR lowering process documentation
 
 ## Testing
 
@@ -104,7 +110,18 @@ ctest --test-dir build --output-on-failure
 polang/
 ├── CMakeLists.txt              # Root CMake configuration
 ├── doc/                        # Documentation
-│   └── syntax.md               # Language syntax reference
+│   ├── syntax.md               # Language syntax reference
+│   └── Lowering.md             # MLIR lowering process
+├── mlir/                       # MLIR dialect and code generation
+│   ├── CMakeLists.txt
+│   ├── include/polang/
+│   │   ├── Dialect/            # Polang dialect definitions (.td files)
+│   │   ├── Conversion/         # Lowering pass headers
+│   │   └── MLIRGen.h           # AST to MLIR interface
+│   └── lib/
+│       ├── Dialect/            # Dialect implementation
+│       ├── Conversion/         # PolangToStandard lowering pass
+│       └── MLIRGen/            # AST to MLIR visitor
 ├── parser/                     # Parser library
 │   ├── CMakeLists.txt
 │   ├── src/
@@ -118,9 +135,11 @@ polang/
 │   ├── CMakeLists.txt
 │   ├── src/
 │   │   ├── main.cpp            # Compiler entry point
-│   │   └── codegen.cpp         # LLVM IR code generation
+│   │   ├── codegen.cpp         # Legacy LLVM IR code generation
+│   │   └── mlir_codegen.cpp    # MLIR-based code generation
 │   └── include/compiler/
-│       └── codegen.hpp         # Code generation header
+│       ├── codegen.hpp         # Legacy code generation header
+│       └── mlir_codegen.hpp    # MLIR code generation header
 ├── repl/                       # REPL application
 │   ├── CMakeLists.txt
 │   ├── src/
@@ -149,13 +168,14 @@ polang/
 │   ├── types.po
 │   ├── fibonacci.po
 │   ├── factorial.po
-│   └── mutability.po
+│   ├── mutability.po
+│   └── closures.po
 └── docker/                     # Docker build environment
 ```
 
 ## Architecture
 
-Polang is a simple programming language compiler with LLVM backend.
+Polang is a simple programming language compiler with an MLIR-based backend.
 
 ### Components
 
@@ -164,15 +184,17 @@ Polang is a simple programming language compiler with LLVM backend.
    - Returns AST (`NBlock*`)
    - Built as static library `libPolangParser.a`
 
-2. **Compiler** (`compiler/`)
-   - Reads source from stdin
-   - Uses parser library to build AST
-   - Generates LLVM IR using `CodeGenContext`
-   - Outputs IR to stdout
+2. **MLIR Dialect** (`mlir/`)
+   - Custom Polang dialect with types (`!polang.int`, `!polang.double`, `!polang.bool`)
+   - High-level operations that mirror language semantics
+   - Lowering pass to standard MLIR dialects (arith, func, scf, memref)
 
-3. **Codegen Library** (`compiler/`)
-   - `libPolangCodegen.a` - Code generation as static library
-   - Used by both compiler and REPL
+3. **Compiler** (`compiler/`)
+   - Reads source from stdin or file
+   - Uses parser library to build AST
+   - Default: MLIR backend generates Polang dialect, lowers to LLVM IR
+   - Legacy: Direct LLVM IR generation (with `--legacy` flag)
+   - Outputs IR to stdout
 
 4. **REPL** (`repl/`)
    - Interactive read-eval-print loop
@@ -181,18 +203,22 @@ Polang is a simple programming language compiler with LLVM backend.
    - Persists variables and functions across evaluations
    - Executes code via LLVM JIT
 
-### Pipeline
+### Pipeline (MLIR Backend - Default)
 
-1. **Lexer** (`parser/src/lexer.l`) - Flex-based tokenizer recognizing identifiers, integers, doubles, operators, and punctuation
-2. **Parser** (`parser/src/parser.y`) - Bison grammar that builds an AST from tokens; outputs `programBlock` (NBlock*)
-3. **AST** (`parser/include/parser/node.hpp`) - Node class hierarchy: `NExpression`, `NStatement`, and concrete types like `NInteger`, `NIdentifier`, `NBinaryOperator`, `NFunctionDeclaration`, etc.
-4. **Code Generation** (`compiler/src/codegen.cpp`) - `CodeGenContext` traverses AST and emits LLVM IR via `codeGen()` virtual methods on each node type
+1. **Lexer** (`parser/src/lexer.l`) - Flex-based tokenizer
+2. **Parser** (`parser/src/parser.y`) - Bison grammar that builds AST
+3. **AST** (`parser/include/parser/node.hpp`) - Node class hierarchy
+4. **MLIR Generation** (`mlir/lib/MLIRGen/`) - Generates Polang dialect MLIR from AST
+5. **Lowering** (`mlir/lib/Conversion/`) - Lowers Polang dialect to standard dialects, then to LLVM dialect
+6. **LLVM IR** - Translates LLVM dialect to LLVM IR
+
+See `doc/Lowering.md` for detailed documentation of the MLIR lowering process.
 
 ### Key Types
 
 - `NBlock` - Contains a `StatementList`; serves as the root AST node
-- `CodeGenContext` - Manages LLVM module, block stack, and local variable scopes
-- `CodeGenBlock` - Holds a `BasicBlock*` and local variable map for scope tracking
+- `MLIRCodeGenContext` - MLIR-based code generation context (default backend)
+- `CodeGenContext` - Legacy LLVM IR code generation context (with `--legacy`)
 
 ### Generated Files
 
@@ -203,8 +229,14 @@ Bison and Flex generate files in `build/parser/`:
 ## Usage
 
 ```bash
-# Compile source to LLVM IR
+# Compile source to LLVM IR (using MLIR backend)
 echo "let x = 5" | ./build/bin/PolangCompiler
+
+# Compile with legacy LLVM IR backend
+echo "let x = 5" | ./build/bin/PolangCompiler --legacy
+
+# Output Polang dialect MLIR (for debugging)
+echo "let x = 5" | ./build/bin/PolangCompiler --emit-mlir
 
 # Execute source file via REPL
 ./build/bin/PolangRepl example/hello.po
@@ -221,3 +253,12 @@ echo "let x = 5" | ./build/bin/PolangRepl
 # 10 : int
 # > exit
 ```
+
+### Compiler Flags
+
+| Flag | Description |
+|------|-------------|
+| (default) | Use MLIR backend, output LLVM IR |
+| `--emit-mlir` | Output Polang dialect MLIR instead of LLVM IR |
+| `--legacy` | Use legacy direct LLVM IR backend |
+| `--help` | Show help message |

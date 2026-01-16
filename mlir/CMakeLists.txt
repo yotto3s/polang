@@ -2,6 +2,13 @@
 # Ensure output directory exists before running TableGen
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include/polang/Dialect)
 
+# Add MLIR include directories for TableGen
+# The tablegen() function uses get_directory_property(INCLUDE_DIRECTORIES)
+# to find .td files, so we must add includes here
+# This does NOT affect GoogleTest since it's in a separate directory
+include_directories(${POLANG_MLIR_INCLUDE_DIRS})
+include_directories(${POLANG_LLVM_INCLUDE_DIRS})
+
 set(LLVM_TARGET_DEFINITIONS include/polang/Dialect/PolangOps.td)
 mlir_tablegen(include/polang/Dialect/PolangOps.h.inc -gen-op-decls)
 mlir_tablegen(include/polang/Dialect/PolangOps.cpp.inc -gen-op-defs)

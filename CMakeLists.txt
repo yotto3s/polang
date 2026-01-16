@@ -24,8 +24,13 @@ include(AddLLVM)
 include(AddMLIR)
 include(HandleLLVMOptions)
 
-include_directories(${LLVM_INCLUDE_DIRS})
-include_directories(${MLIR_INCLUDE_DIRS})
+# Store LLVM/MLIR include directories for use by targets that need them
+# We DON'T add these globally to avoid LLVM's cxxabi.h conflicting with
+# system headers when building GoogleTest
+set(POLANG_LLVM_INCLUDE_DIRS ${LLVM_INCLUDE_DIRS})
+set(POLANG_MLIR_INCLUDE_DIRS ${MLIR_INCLUDE_DIRS})
+
+# These project directories can be added globally (no conflicts)
 include_directories(${PROJECT_SOURCE_DIR}/mlir/include)
 include_directories(${PROJECT_BINARY_DIR}/mlir/include)
 
