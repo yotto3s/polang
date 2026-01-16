@@ -266,7 +266,7 @@ TEST(ErrorTest, LocationResetBetweenParses) {
 
 TEST(ErrorTest, ErrorInFunctionDeclaration) {
   StderrCapture capture;
-  NBlock* block = polang_parse("let add (x: int) (y: int) = @");
+  NBlock* block = polang_parse("let add(x: int, y: int) = @");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)

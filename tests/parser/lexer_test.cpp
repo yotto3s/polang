@@ -343,15 +343,15 @@ TEST(LexerTest, TypedVariableDeclaration) {
 }
 
 TEST(LexerTest, FunctionDeclaration) {
-  auto tokens = tokenize("let add (x : int) (y : int) : int = x + y");
-  ASSERT_EQ(tokens.size(), 18);
+  auto tokens = tokenize("let add(x: int, y: int): int = x + y");
+  ASSERT_EQ(tokens.size(), 17);
   EXPECT_EQ(tokens[0], TLET);
   EXPECT_EQ(tokens[1], TIDENTIFIER); // add
   EXPECT_EQ(tokens[2], TLPAREN);
   EXPECT_EQ(tokens[3], TIDENTIFIER); // x
   EXPECT_EQ(tokens[4], TCOLON);
   EXPECT_EQ(tokens[5], TIDENTIFIER); // int
-  EXPECT_EQ(tokens[6], TRPAREN);
+  EXPECT_EQ(tokens[6], TCOMMA);
 }
 
 TEST(LexerTest, FunctionCall) {

@@ -62,7 +62,7 @@ TEST(ReplIntegration, VariableDeclaration) {
 }
 
 TEST(ReplIntegration, FunctionDeclarationAndCall) {
-  const auto result = runRepl("let double (x: int): int = x * 2\ndouble(5)");
+  const auto result = runRepl("let double(x: int): int = x * 2\ndouble(5)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("10 : int"));
 }

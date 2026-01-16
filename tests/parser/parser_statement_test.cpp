@@ -20,7 +20,7 @@ TEST(ParserTest, MultipleStatements) {
 }
 
 TEST(ParserTest, FunctionAndCall) {
-  NBlock* block = parseOrFail("let inc (x : int) : int = x + 1\ninc(5)");
+  NBlock* block = parseOrFail("let inc(x: int): int = x + 1\ninc(5)");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 2);
 

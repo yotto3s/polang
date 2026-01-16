@@ -97,18 +97,19 @@ x = 10
 Functions are declared using `let` with parameter lists:
 
 ```
-let add (x : int) (y : int) : int = x + y   ; explicit return type
-let square (n : int) = n * n                 ; return type inferred as int
-let half (x : double) = x / 2.0              ; return type inferred as double
+let add(x: int, y: int): int = x + y   ; explicit return type
+let square(n: int) = n * n              ; return type inferred as int
+let half(x: double) = x / 2.0           ; return type inferred as double
 ```
 
 **Syntax:**
 ```
-let <name> (<param> : <type>) ... : <return_type> = <expression>
-let <name> (<param> : <type>) ... = <expression>
+let <name>(<param>: <type>, ...): <return_type> = <expression>
+let <name>(<param>: <type>, ...) = <expression>
 ```
 
-- Each parameter is enclosed in parentheses with its type (required)
+- Parameters are comma-separated within parentheses
+- Each parameter requires a type annotation
 - Return type can be omitted and will be **inferred from the body expression**
 - Function body is a single expression
 - **No implicit type conversion**: return type annotation must match body type exactly
@@ -153,9 +154,9 @@ if <condition> then <then_expr> else <else_expr>
 **Examples:**
 
 ```
-let max (a : int) (b : int) : int = if a > b then a else b
-let abs (x : int) : int = if x < 0 then 0 - x else x
-let sign (n : int) : int = if n > 0 then 1 else if n < 0 then 0 - 1 else 0
+let max(a: int, b: int): int = if a > b then a else b
+let abs(x: int): int = if x < 0 then 0 - x else x
+let sign(n: int): int = if n > 0 then 1 else if n < 0 then 0 - 1 else 0
 ```
 
 ### Let Expression
@@ -189,7 +190,7 @@ Where `<binding>` is:
 ```
 let a = 10 and b = 20 in a + b
 let x = 5 in let y = x + 1 in y * 2
-let sum (a : int) (b : int) : int = let result = a + b in result
+let sum(a: int, b: int): int = let result = a + b in result
 ```
 
 ## Expressions
@@ -273,10 +274,14 @@ statement   ::= var_decl
 var_decl    ::= "let" identifier "=" expression
               | "let" identifier ":" type "=" expression
 
-func_decl   ::= "let" identifier param+ ":" type "=" expression
-              | "let" identifier param+ "=" expression
+func_decl   ::= "let" identifier "(" param_list ")" ":" type "=" expression
+              | "let" identifier "(" param_list ")" "=" expression
+              | "let" identifier "()" ":" type "=" expression
+              | "let" identifier "()" "=" expression
 
-param       ::= "(" identifier ":" type ")"
+param_list  ::= param ("," param)*
+
+param       ::= identifier ":" type
 
 expression  ::= identifier "=" expression
               | identifier "(" call_args ")"
@@ -333,7 +338,7 @@ let sum = a + b
 ### Function Definition and Call
 
 ```
-let multiply (x : int) (y : int) : int = x * y
+let multiply(x: int, y: int): int = x * y
 let result = multiply(6, 7)
 ```
 
@@ -348,13 +353,13 @@ let is_less : bool = a < b
 ### Complex Expression
 
 ```
-let compute (a : int) (b : int) (c : int) : int = (a + b) * c
+let compute(a: int, b: int, c: int): int = (a + b) * c
 let answer = compute(1, 2, 3)
 ```
 
 ### If Expression
 
 ```
-let max (a : int) (b : int) : int = if a > b then a else b
+let max(a: int, b: int): int = if a > b then a else b
 let larger = max(10, 20)
 ```

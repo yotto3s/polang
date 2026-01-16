@@ -52,9 +52,9 @@ TEST(TypeCheckTest, VariableUsage) {
 }
 
 TEST(TypeCheckTest, FunctionDeclaration) {
-  EXPECT_TRUE(hasNoTypeError("let add (x : int) (y : int) : int = x + y"));
+  EXPECT_TRUE(hasNoTypeError("let add(x: int, y: int): int = x + y"));
   EXPECT_TRUE(
-      hasNoTypeError("let mul (a : double) (b : double) : double = a * b"));
+      hasNoTypeError("let mul(a: double, b: double): double = a * b"));
 }
 
 TEST(TypeCheckTest, LetExpression) {
@@ -99,8 +99,8 @@ TEST(TypeCheckTest, VariableTypeMismatch) {
 }
 
 TEST(TypeCheckTest, FunctionReturnTypeMismatch) {
-  EXPECT_TRUE(hasTypeError("let f (x : int) : double = x"));
-  EXPECT_TRUE(hasTypeError("let f (x : double) : int = x"));
+  EXPECT_TRUE(hasTypeError("let f(x: int): double = x"));
+  EXPECT_TRUE(hasTypeError("let f(x: double): int = x"));
 }
 
 TEST(TypeCheckTest, IfBranchTypeMismatch) {
@@ -170,14 +170,14 @@ TEST(TypeCheckTest, InferFromComparison) {
 }
 
 TEST(TypeCheckTest, InferFunctionReturnType) {
-  // let f (x: int) = x + 1 should infer int return type
-  EXPECT_TRUE(hasNoTypeError("let f (x: int) = x + 1\nlet y: int = f(5)"));
+  // let f(x: int) = x + 1 should infer int return type
+  EXPECT_TRUE(hasNoTypeError("let f(x: int) = x + 1\nlet y: int = f(5)"));
 }
 
 TEST(TypeCheckTest, InferFunctionReturnTypeDouble) {
-  // let f (x: double) = x + 1.0 should infer double return type
+  // let f(x: double) = x + 1.0 should infer double return type
   EXPECT_TRUE(
-      hasNoTypeError("let f (x: double) = x + 1.0\nlet y: double = f(5.0)"));
+      hasNoTypeError("let f(x: double) = x + 1.0\nlet y: double = f(5.0)"));
 }
 
 TEST(TypeCheckTest, NoImplicitConversionIntToDouble) {
@@ -214,34 +214,34 @@ TEST(TypeCheckTest, InferredVariableUsedWithWrongType) {
 
 TEST(TypeCheckTest, FunctionCallCorrectTypes) {
   // Correct argument types should pass
-  EXPECT_TRUE(hasNoTypeError("let f (x: int) = x + 1\nf(5)"));
-  EXPECT_TRUE(hasNoTypeError("let f (x: double) = x + 1.0\nf(5.0)"));
-  EXPECT_TRUE(hasNoTypeError("let f (x: int) (y: int) = x + y\nf(1, 2)"));
+  EXPECT_TRUE(hasNoTypeError("let f(x: int) = x + 1\nf(5)"));
+  EXPECT_TRUE(hasNoTypeError("let f(x: double) = x + 1.0\nf(5.0)"));
+  EXPECT_TRUE(hasNoTypeError("let f(x: int, y: int) = x + y\nf(1, 2)"));
 }
 
 TEST(TypeCheckTest, FunctionCallWrongArgType) {
   // Passing double to int parameter should fail
-  EXPECT_TRUE(hasTypeError("let f (x: int) = x + 1\nf(3.5)"));
+  EXPECT_TRUE(hasTypeError("let f(x: int) = x + 1\nf(3.5)"));
   // Passing int to double parameter should fail
-  EXPECT_TRUE(hasTypeError("let f (x: double) = x + 1.0\nf(3)"));
+  EXPECT_TRUE(hasTypeError("let f(x: double) = x + 1.0\nf(3)"));
 }
 
 TEST(TypeCheckTest, FunctionCallWrongArgCount) {
   // Too few arguments
-  EXPECT_TRUE(hasTypeError("let f (x: int) (y: int) = x + y\nf(1)"));
+  EXPECT_TRUE(hasTypeError("let f(x: int, y: int) = x + y\nf(1)"));
   // Too many arguments
-  EXPECT_TRUE(hasTypeError("let f (x: int) = x + 1\nf(1, 2)"));
+  EXPECT_TRUE(hasTypeError("let f(x: int) = x + 1\nf(1, 2)"));
 }
 
 TEST(TypeCheckTest, FunctionCallMultipleArgsTypeMismatch) {
   // Second argument has wrong type
-  EXPECT_TRUE(hasTypeError("let f (x: int) (y: int) = x + y\nf(1, 2.0)"));
+  EXPECT_TRUE(hasTypeError("let f(x: int, y: int) = x + y\nf(1, 2.0)"));
   // First argument has wrong type
-  EXPECT_TRUE(hasTypeError("let f (x: int) (y: int) = x + y\nf(1.0, 2)"));
+  EXPECT_TRUE(hasTypeError("let f(x: int, y: int) = x + y\nf(1.0, 2)"));
 }
 
 TEST(TypeCheckTest, FunctionCallErrorMessage) {
-  auto errors = checkTypes("let f (x: int) = x + 1\nf(3.5)");
+  auto errors = checkTypes("let f(x: int) = x + 1\nf(3.5)");
   ASSERT_FALSE(errors.empty());
   EXPECT_TRUE(errors[0].message.find("int") != std::string::npos);
   EXPECT_TRUE(errors[0].message.find("double") != std::string::npos);

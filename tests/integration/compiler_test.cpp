@@ -65,7 +65,7 @@ TEST(CompilerIntegration, Comparison) {
 }
 
 TEST(CompilerIntegration, FunctionDeclaration) {
-  const auto result = runCompiler("let add (a: int) (b: int): int = a + b");
+  const auto result = runCompiler("let add(a: int, b: int): int = a + b");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("define"));
   EXPECT_THAT(result.stdout_output, HasSubstr("@add"));
@@ -91,7 +91,7 @@ TEST(CompilerIntegration, LetExpressionMultipleBindings) {
 
 TEST(CompilerIntegration, FunctionDeclarationAndCall) {
   const auto result =
-      runCompiler("let double (x: int): int = x * 2\nlet y: int = double(5)");
+      runCompiler("let double(x: int): int = x * 2\nlet y: int = double(5)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("call"));
 }

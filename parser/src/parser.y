@@ -42,7 +42,7 @@ void yyerror(const char *s);
  */
 %type <ident> ident
 %type <expr> numeric expr boolean
-%type <varvec> func_decl_args let_bindings
+%type <varvec> func_decl_args func_param_list let_bindings
 %type <exprvec> call_args
 %type <block> program stmts
 %type <stmt> stmt var_decl func_decl
@@ -100,17 +100,27 @@ func_decl : TLET ident func_decl_args TCOLON ident TEQUAL expr {
             }
           ;
 
-func_decl_args : TLPAREN ident TCOLON ident TRPAREN {
-              /* First argument: (x : type) */
-              $$ = new VariableList();
-              $$->push_back(new NVariableDeclaration($4, *$2, nullptr));
+func_decl_args : TLPAREN func_param_list TRPAREN {
+              /* (x: type, y: type, ...) */
+              $$ = $2;
             }
-          | func_decl_args TLPAREN ident TCOLON ident TRPAREN {
-              /* Additional arguments: (x : type) */
-              $1->push_back(new NVariableDeclaration($5, *$3, nullptr));
-              $$ = $1;
+          | TLPAREN TRPAREN {
+              /* Empty parameter list: () */
+              $$ = new VariableList();
             }
           ;
+
+func_param_list : ident TCOLON ident {
+                /* First parameter: x : type */
+                $$ = new VariableList();
+                $$->push_back(new NVariableDeclaration($3, *$1, nullptr));
+              }
+            | func_param_list TCOMMA ident TCOLON ident {
+                /* Additional parameters: , x : type */
+                $1->push_back(new NVariableDeclaration($5, *$3, nullptr));
+                $$ = $1;
+              }
+            ;
 
 ident : TIDENTIFIER { $$ = new NIdentifier(*$1); delete $1; }
       ;

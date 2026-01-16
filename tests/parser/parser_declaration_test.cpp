@@ -51,7 +51,7 @@ TEST(ParserTest, VariableWithIdentifierExpression) {
 // ============== Function Declaration Tests ==============
 
 TEST(ParserTest, SimpleFunctionDeclaration) {
-  NBlock* block = parseOrFail("let square (n : int) : int = n * n");
+  NBlock* block = parseOrFail("let square(n: int): int = n * n");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 
@@ -67,7 +67,7 @@ TEST(ParserTest, SimpleFunctionDeclaration) {
 }
 
 TEST(ParserTest, FunctionWithMultipleArgs) {
-  NBlock* block = parseOrFail("let add (x : int) (y : int) : int = x + y");
+  NBlock* block = parseOrFail("let add(x: int, y: int): int = x + y");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 
@@ -82,7 +82,7 @@ TEST(ParserTest, FunctionWithMultipleArgs) {
 }
 
 TEST(ParserTest, FunctionWithInferredReturnType) {
-  NBlock* block = parseOrFail("let double (x : int) = x + x");
+  NBlock* block = parseOrFail("let double(x: int) = x + x");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 

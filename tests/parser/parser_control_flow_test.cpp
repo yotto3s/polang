@@ -68,7 +68,7 @@ TEST(ParserTest, IfExpressionInVariableDeclaration) {
 
 TEST(ParserTest, IfExpressionInFunctionBody) {
   NBlock* block =
-      parseOrFail("let max (a : int) (b : int) : int = if a > b then a else b");
+      parseOrFail("let max(a: int, b: int): int = if a > b then a else b");
   ASSERT_NE(block, nullptr);
 
   auto* funcDecl = getFirstStatement<NFunctionDeclaration>(block);
@@ -193,7 +193,7 @@ TEST(ParserTest, LetExpressionInVariableDeclaration) {
 }
 
 TEST(ParserTest, LetExpressionInFunctionBody) {
-  NBlock* block = parseOrFail("let f (a : int) : int = let b = 2 in a * b");
+  NBlock* block = parseOrFail("let f(a: int): int = let b = 2 in a * b");
   ASSERT_NE(block, nullptr);
 
   auto* funcDecl = getFirstStatement<NFunctionDeclaration>(block);
