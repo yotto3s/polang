@@ -29,6 +29,17 @@ target_link_libraries(parser_test
 )
 target_compile_options(parser_test PRIVATE -Wno-error)
 
+# Error reporting tests
+add_executable(error_test
+    error_test.cpp
+)
+target_link_libraries(error_test
+    PRIVATE PolangParser
+    PRIVATE GTest::gtest_main
+)
+target_compile_options(error_test PRIVATE -Wno-error)
+
 include(GoogleTest)
 gtest_discover_tests(lexer_test)
 gtest_discover_tests(parser_test)
+gtest_discover_tests(error_test)
