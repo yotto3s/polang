@@ -98,7 +98,11 @@ def Polang_ConstantBoolOp : Polang_Op<"constant.bool", [Pure]> {
 // Arithmetic operations
 //===----------------------------------------------------------------------===//
 
-class Polang_ArithOp<string mnemonic> : Polang_Op<mnemonic, [Pure, SameOperandsAndResultType]> {
+class Polang_ArithOp<string mnemonic> : Polang_Op<mnemonic, [
+    Pure,
+    SameOperandsAndResultType,
+    DeclareOpInterfaceMethods<InferTypeOpInterface>
+  ]> {
   let arguments = (ins Polang_AnyNumericType:$lhs, Polang_AnyNumericType:$rhs);
   let results = (outs Polang_AnyNumericType:$result);
   let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($result)";
@@ -171,7 +175,11 @@ def Polang_CmpPredicate : I64EnumAttr<
   let cppNamespace = "::polang";
 }
 
-def Polang_CmpOp : Polang_Op<"cmp", [Pure, SameTypeOperands]> {
+def Polang_CmpOp : Polang_Op<"cmp", [
+    Pure,
+    SameTypeOperands,
+    DeclareOpInterfaceMethods<InferTypeOpInterface>
+  ]> {
   let summary = "Comparison operation";
   let description = [{
     Compares two numeric values and returns a boolean result.
@@ -250,7 +258,8 @@ def Polang_FuncOp : Polang_Op<"func", [
 }
 
 def Polang_CallOp : Polang_Op<"call", [
-    DeclareOpInterfaceMethods<CallOpInterface>
+    DeclareOpInterfaceMethods<CallOpInterface>,
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>
   ]> {
   let summary = "Function call";
   let description = [{
@@ -277,6 +286,8 @@ def Polang_CallOp : Polang_Op<"call", [
   let extraClassDeclaration = [{
     mlir::FunctionType getCalleeType();
   }];
+
+  let hasVerifier = 1;
 }
 
 def Polang_ReturnOp : Polang_Op<"return", [
@@ -308,6 +319,8 @@ def Polang_ReturnOp : Polang_Op<"return", [
         $_state.addOperands(value);
     }]>
   ];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -346,6 +359,8 @@ def Polang_IfOp : Polang_Op<"if", [
   let builders = [
     OpBuilder<(ins "mlir::Type":$resultType, "mlir::Value":$condition)>
   ];
+
+  let hasVerifier = 1;
 }
 
 def Polang_YieldOp : Polang_Op<"yield", [
@@ -424,6 +439,8 @@ def Polang_StoreOp : Polang_Op<"store"> {
   let arguments = (ins Polang_AnyType:$value, AnyType:$ref);
 
   let assemblyFormat = "$value `,` $ref `:` type($value) `,` type($ref) attr-dict";
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//

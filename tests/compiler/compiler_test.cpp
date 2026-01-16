@@ -33,21 +33,21 @@ TEST(CompilerIntegration, IfExpressionInFunction) {
 }
 
 TEST(CompilerIntegration, ConstantFoldedExpression) {
-  // Note: MLIR backend uses allocas for let bindings, so no constant folding
+  // MLIR backend performs constant folding for immutable bindings
+  // Result: 1 + 2 = 3 is computed at compile time
   const auto result = runCompiler("let y: int = let x = 1 in x + 2");
   EXPECT_EQ(result.exit_code, 0);
-  // Check for alloca and add operations
-  EXPECT_THAT(result.stdout_output, HasSubstr("alloca"));
-  EXPECT_THAT(result.stdout_output, HasSubstr("add i64"));
+  // Check for constant-folded result (ret i64 3)
+  EXPECT_THAT(result.stdout_output, HasSubstr("ret i64 3"));
 }
 
 TEST(CompilerIntegration, LetExpressionMultipleBindings) {
-  // Note: MLIR backend uses allocas for let bindings, so no constant folding
+  // MLIR backend performs constant folding for immutable bindings
+  // Result: 1 + 2 = 3 is computed at compile time
   const auto result = runCompiler("let z: int = let x = 1 and y = 2 in x + y");
   EXPECT_EQ(result.exit_code, 0);
-  // Check for multiple allocas and add operation
-  EXPECT_THAT(result.stdout_output, HasSubstr("alloca"));
-  EXPECT_THAT(result.stdout_output, HasSubstr("add i64"));
+  // Check for constant-folded result (ret i64 3)
+  EXPECT_THAT(result.stdout_output, HasSubstr("ret i64 3"));
 }
 
 TEST(CompilerIntegration, FunctionDeclarationAndCall) {
@@ -85,13 +85,12 @@ TEST(CompilerIntegration, VariableReassignment) {
 // VariableShadowingInLet test moved to lit/LLVMIR/variable-shadowing.po
 
 TEST(CompilerIntegration, NestedLetExpression) {
-  // Note: MLIR backend uses allocas for let bindings, so no constant folding
+  // MLIR backend performs constant folding for immutable bindings
+  // Result: x=1, y=x+1=2, y*2=4 is computed at compile time
   const auto result = runCompiler("let x = 1 in let y = x + 1 in y * 2");
   EXPECT_EQ(result.exit_code, 0);
-  // Check for allocas and arithmetic operations
-  EXPECT_THAT(result.stdout_output, HasSubstr("alloca"));
-  EXPECT_THAT(result.stdout_output, HasSubstr("add i64"));
-  EXPECT_THAT(result.stdout_output, HasSubstr("mul i64"));
+  // Check for constant-folded result (ret i64 4)
+  EXPECT_THAT(result.stdout_output, HasSubstr("ret i64 4"));
 }
 
 // RecursiveFunction test moved to lit/LLVMIR/recursive-function.po
