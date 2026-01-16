@@ -2,10 +2,10 @@
 
 ; Test let-expression lowering
 ; CHECK: define i64 @__polang_entry() {
-; CHECK:   %{{[0-9]+}} = alloca i64
-; CHECK:   store i64 1
-; CHECK:   %{{[0-9]+}} = load i64
-; CHECK:   %{{[0-9]+}} = add i64 %{{[0-9]+}}, 1
-; CHECK:   ret i64 %{{[0-9]+}}
+; CHECK: {{.*}}alloca i64{{.*}}
+; CHECK: {{.*}}store i64 1{{.*}}
+; CHECK: {{.*}}load i64{{.*}}
+; CHECK: {{.*}}add i64 %{{[0-9]+}}, 1
+; CHECK: {{.*}}ret i64 %{{[0-9]+}}
 ; CHECK: }
 let x = 1 in x + 1

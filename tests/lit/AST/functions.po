@@ -1,11 +1,11 @@
 ; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
 
 ; Test function declaration
-; CHECK: NBlock
-; CHECK: `-NFunctionDeclaration 'add' (a: int, b: int) -> int
-; CHECK:   `-NBlock
-; CHECK:     `-NExpressionStatement
-; CHECK:       `-NBinaryOperator '+'
-; CHECK:         |-NIdentifier 'a'
-; CHECK:         `-NIdentifier 'b'
+; CHECK:      NBlock
+; CHECK-NEXT: `-NFunctionDeclaration 'add' (a: int, b: int) -> int
+; CHECK-NEXT:   `-NBlock
+; CHECK-NEXT:     `-NExpressionStatement
+; CHECK-NEXT:       `-NBinaryOperator '+'
+; CHECK-NEXT:         |-NIdentifier 'a'
+; CHECK-NEXT:         `-NIdentifier 'b'
 let add(a: int, b: int): int = a + b

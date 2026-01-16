@@ -1,11 +1,11 @@
 ; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
 
 ; Test method call
-; CHECK: NBlock
-; CHECK: |-NFunctionDeclaration 'add' (a: int, b: int) -> int
-; CHECK: `-NExpressionStatement
-; CHECK:   `-NMethodCall 'add'
-; CHECK:     |-NInteger 1
-; CHECK:     `-NInteger 2
+; CHECK:      NBlock
+; CHECK-NEXT: |-NFunctionDeclaration 'add' (a: int, b: int) -> int
+; CHECK:      {{^}}`-NExpressionStatement
+; CHECK-NEXT:  `-NMethodCall 'add'
+; CHECK-NEXT:    |-NInteger 1
+; CHECK-NEXT:    `-NInteger 2
 let add(a: int, b: int): int = a + b
 add(1, 2)

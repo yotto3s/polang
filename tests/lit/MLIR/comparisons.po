@@ -1,43 +1,43 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
 ; Test less-than comparison
-; CHECK: polang.func @cmp_lt(%arg0: !polang.int, %arg1: !polang.int) -> !polang.bool {
-; CHECK:   %{{[0-9]+}} = polang.cmp lt, %arg0, %arg1 : !polang.int
-; CHECK:   polang.return %{{[0-9]+}} : !polang.bool
-; CHECK: }
+; CHECK:      polang.func @cmp_lt(%arg0: !polang.int, %arg1: !polang.int) -> !polang.bool {
+; CHECK-NEXT:   %{{[0-9]+}} = polang.cmp lt, %arg0, %arg1 : !polang.int
+; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+; CHECK-NEXT: }
 let cmp_lt(a: int, b: int): bool = a < b
 
 ; Test less-or-equal comparison
-; CHECK: polang.func @cmp_le(%arg0: !polang.int, %arg1: !polang.int) -> !polang.bool {
-; CHECK:   %{{[0-9]+}} = polang.cmp le, %arg0, %arg1 : !polang.int
-; CHECK:   polang.return %{{[0-9]+}} : !polang.bool
-; CHECK: }
+; CHECK:      polang.func @cmp_le(%arg0: !polang.int, %arg1: !polang.int) -> !polang.bool {
+; CHECK-NEXT:   %{{[0-9]+}} = polang.cmp le, %arg0, %arg1 : !polang.int
+; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+; CHECK-NEXT: }
 let cmp_le(a: int, b: int): bool = a <= b
 
 ; Test greater-than comparison
-; CHECK: polang.func @cmp_gt(%arg0: !polang.int, %arg1: !polang.int) -> !polang.bool {
-; CHECK:   %{{[0-9]+}} = polang.cmp gt, %arg0, %arg1 : !polang.int
-; CHECK:   polang.return %{{[0-9]+}} : !polang.bool
-; CHECK: }
+; CHECK:      polang.func @cmp_gt(%arg0: !polang.int, %arg1: !polang.int) -> !polang.bool {
+; CHECK-NEXT:   %{{[0-9]+}} = polang.cmp gt, %arg0, %arg1 : !polang.int
+; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+; CHECK-NEXT: }
 let cmp_gt(a: int, b: int): bool = a > b
 
 ; Test greater-or-equal comparison
-; CHECK: polang.func @cmp_ge(%arg0: !polang.int, %arg1: !polang.int) -> !polang.bool {
-; CHECK:   %{{[0-9]+}} = polang.cmp ge, %arg0, %arg1 : !polang.int
-; CHECK:   polang.return %{{[0-9]+}} : !polang.bool
-; CHECK: }
+; CHECK:      polang.func @cmp_ge(%arg0: !polang.int, %arg1: !polang.int) -> !polang.bool {
+; CHECK-NEXT:   %{{[0-9]+}} = polang.cmp ge, %arg0, %arg1 : !polang.int
+; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+; CHECK-NEXT: }
 let cmp_ge(a: int, b: int): bool = a >= b
 
 ; Test equality comparison
-; CHECK: polang.func @cmp_eq(%arg0: !polang.int, %arg1: !polang.int) -> !polang.bool {
-; CHECK:   %{{[0-9]+}} = polang.cmp eq, %arg0, %arg1 : !polang.int
-; CHECK:   polang.return %{{[0-9]+}} : !polang.bool
-; CHECK: }
+; CHECK:      polang.func @cmp_eq(%arg0: !polang.int, %arg1: !polang.int) -> !polang.bool {
+; CHECK-NEXT:   %{{[0-9]+}} = polang.cmp eq, %arg0, %arg1 : !polang.int
+; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+; CHECK-NEXT: }
 let cmp_eq(a: int, b: int): bool = a == b
 
 ; Test not-equal comparison
-; CHECK: polang.func @cmp_ne(%arg0: !polang.int, %arg1: !polang.int) -> !polang.bool {
-; CHECK:   %{{[0-9]+}} = polang.cmp ne, %arg0, %arg1 : !polang.int
-; CHECK:   polang.return %{{[0-9]+}} : !polang.bool
-; CHECK: }
+; CHECK:      polang.func @cmp_ne(%arg0: !polang.int, %arg1: !polang.int) -> !polang.bool {
+; CHECK-NEXT:   %{{[0-9]+}} = polang.cmp ne, %arg0, %arg1 : !polang.int
+; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+; CHECK-NEXT: }
 let cmp_ne(a: int, b: int): bool = a != b

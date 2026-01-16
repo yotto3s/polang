@@ -24,7 +24,7 @@ config.test_exec_root = config.polang_obj_root
 # Tool substitutions - these are replaced in RUN: lines
 config.substitutions.append(("%polang_compiler", config.polang_compiler_path))
 config.substitutions.append(("%polang_repl", config.polang_repl_path))
-config.substitutions.append(("%FileCheck", config.filecheck_path))
+config.substitutions.append(("%FileCheck", config.filecheck_path + " --match-full-lines"))
 config.substitutions.append(("%not", config.not_path))
 
 # Features for conditional tests

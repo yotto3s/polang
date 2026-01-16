@@ -1,13 +1,13 @@
 ; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
 
 ; Test let-expression
-; CHECK: NBlock
-; CHECK: `-NExpressionStatement
-; CHECK:   `-NLetExpression
-; CHECK:     |-NVariableDeclaration 'x'
-; CHECK:     | `-NInteger 1
-; CHECK:     `-body:
-; CHECK:       `-NBinaryOperator '+'
-; CHECK:         |-NIdentifier 'x'
-; CHECK:         `-NInteger 1
+; CHECK:      NBlock
+; CHECK-NEXT: `-NExpressionStatement
+; CHECK-NEXT:   `-NLetExpression
+; CHECK-NEXT:     |-NVariableDeclaration 'x'
+; CHECK-NEXT:     | `-NInteger 1
+; CHECK-NEXT:     `-body:
+; CHECK-NEXT:       `-NBinaryOperator '+'
+; CHECK-NEXT:         |-NIdentifier 'x'
+; CHECK-NEXT:         `-NInteger 1
 let x = 1 in x + 1

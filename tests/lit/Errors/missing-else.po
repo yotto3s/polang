@@ -1,5 +1,5 @@
 ; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
 
 ; Test error when if-expression missing else branch
-; CHECK: ERROR: syntax error
+; CHECK: {{.*}}ERROR: syntax error{{.*}}
 if 1 > 0 then 1

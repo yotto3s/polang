@@ -1,0 +1,5 @@
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; Test complex expression is constant folded
+; CHECK: ret i64 21
+(1 + 2) * (3 + 4)

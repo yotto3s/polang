@@ -1,0 +1,5 @@
+; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+
+; Test error when parenthesis is malformed
+; CHECK: {{.*}}error{{.*}}
+let foo (: int = 1

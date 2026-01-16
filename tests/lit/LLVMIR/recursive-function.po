@@ -1,0 +1,6 @@
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; Test recursive function generates correct call pattern
+; CHECK: {{.*}}@factorial{{.*}}
+; CHECK: {{.*}}call{{.*}}@factorial{{.*}}
+let factorial(n: int): int = if n <= 1 then 1 else n * factorial(n - 1)

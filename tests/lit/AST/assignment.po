@@ -1,12 +1,12 @@
 ; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
 
 ; Test assignment expression
-; CHECK: NBlock
-; CHECK: |-NVariableDeclaration 'x' mut
-; CHECK: | `-NInteger 10
-; CHECK: `-NExpressionStatement
-; CHECK:   `-NAssignment
-; CHECK:     |-NIdentifier 'x'
-; CHECK:     `-NInteger 20
+; CHECK:      NBlock
+; CHECK-NEXT: |-NVariableDeclaration 'x' mut
+; CHECK-NEXT: | `-NInteger 10
+; CHECK-NEXT: `-NExpressionStatement
+; CHECK-NEXT:   `-NAssignment
+; CHECK-NEXT:     |-NIdentifier 'x'
+; CHECK-NEXT:     `-NInteger 20
 let mut x = 10
 x <- 20

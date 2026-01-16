@@ -82,17 +82,17 @@ When adding new language features or modifying compiler output, consider adding 
 - `tests/lit/Execution/` - REPL execution tests
 - `tests/lit/Errors/` - Error handling tests
 
-### Lit Test Coverage (49 tests)
+### Lit Test Coverage (55 tests)
 
 **AST Tests (11 files):** literals, double-literals, bool-literals, variables, mutable-variables, assignment, functions, control-flow, comparisons, let-expressions, method-calls
 
 **MLIR Tests (10 files):** constants, arithmetic, double-arithmetic, functions, function-calls, control-flow, comparisons, types, mutable-variables, let-expressions
 
-**LLVMIR Tests (9 files):** arithmetic, types, bool-type, functions, control-flow, comparisons, double-comparisons, mutable-variables, let-expressions
+**LLVMIR Tests (13 files):** arithmetic, types, bool-type, functions, control-flow, comparisons, double-comparisons, mutable-variables, let-expressions, variable-shadowing, recursive-function, constant-folding, nested-if
 
 **Execution Tests (12 files):** hello, variables, mutability, functions, conditionals, closures, fibonacci, factorial, double-operations, bool-operations, let-expressions, comparison-operators
 
-**Error Tests (7 files):** syntax-errors, undefined-variable, type-mismatch, immutable-reassignment, undefined-function, function-arity, missing-else
+**Error Tests (9 files):** syntax-errors, undefined-variable, type-mismatch, immutable-reassignment, undefined-function, function-arity, missing-else, syntax-error-paren, type-error-if-condition
 
 ## Testing
 
@@ -138,10 +138,20 @@ Lit tests use FileCheck to verify compiler output. Example test format:
 ```
 ; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
 
-; CHECK: NBlock
-; CHECK: `-NExpressionStatement
-; CHECK:   `-NInteger 42
+; Test integer literal AST
+; CHECK:      NBlock
+; CHECK-NEXT: `-NExpressionStatement
+; CHECK-NEXT:   `-NInteger 42
 42
+```
+
+For LLVM IR tests where only part of the line needs to match:
+```
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; CHECK: {{.*}}alloca i64{{.*}}
+; CHECK: {{.*}}store i64 1{{.*}}
+let x = 1
 ```
 
 Available substitutions:
@@ -152,9 +162,19 @@ Available substitutions:
 - `%s` - Current test file path
 
 FileCheck patterns:
-- `; CHECK:` - Match exact string
+- `; CHECK:` - Match full line (can skip lines)
+- `; CHECK-NEXT:` - Match on the immediately following line (preferred for consecutive output)
 - `%{{[0-9]+}}` - Match SSA values like `%0`, `%1`
+- `{{.*}}` - Match any characters (use at start/end for partial line matching)
+- `{{^}}` - Match start of line (useful to disambiguate nested vs top-level patterns)
 - Use `%not` for tests that should fail (e.g., syntax errors)
+
+**Note:** FileCheck is configured with `--match-full-lines`, so patterns must match the entire line. Use `{{.*}}` at the start or end of patterns when only checking for a substring.
+
+**Best practices:**
+- Prefer `CHECK-NEXT` over `CHECK` when testing consecutive lines
+- Use exact full-line patterns when possible for maximum precision
+- Use `{{.*}}pattern{{.*}}` for partial matching when full line content varies
 
 ## Project Structure
 
@@ -211,14 +231,14 @@ polang/
 │   ├── repl/                   # REPL tests
 │   │   ├── repl_test.cpp       # REPL execution tests
 │   │   └── repl_unit_test.cpp  # InputChecker unit tests
-│   └── lit/                    # llvm-lit FileCheck tests (49 tests)
+│   └── lit/                    # llvm-lit FileCheck tests (55 tests)
 │       ├── lit.cfg.py          # Lit configuration
 │       ├── lit.site.cfg.py.in  # CMake-configured site settings
 │       ├── AST/                # AST dump tests (11 files)
 │       ├── MLIR/               # MLIR output tests (10 files)
-│       ├── LLVMIR/             # LLVM IR output tests (9 files)
+│       ├── LLVMIR/             # LLVM IR output tests (13 files)
 │       ├── Execution/          # REPL execution tests (12 files)
-│       └── Errors/             # Error handling tests (7 files)
+│       └── Errors/             # Error handling tests (9 files)
 ├── example/                    # Example programs
 │   ├── hello.po
 │   ├── variables.po
