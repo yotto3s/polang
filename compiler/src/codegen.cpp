@@ -188,12 +188,17 @@ Value *NFunctionDeclaration::codeGen(CodeGenContext &context) {
 
   context.pushBlock(bblock);
 
-  for (it = arguments.begin(); it != arguments.end(); it++) {
-    (**it).codeGen(context);
+  // Create allocas for arguments and store the incoming argument values
+  Function::arg_iterator argValues = function->arg_begin();
+  for (it = arguments.begin(); it != arguments.end(); it++, argValues++) {
+    (**it).codeGen(context); // Creates the alloca
+    // Store the function argument value into the alloca
+    new StoreInst(&*argValues, context.locals()[(**it).id.name], false, bblock);
   }
 
-  block.codeGen(context);
-  ReturnInst::Create(context.context, bblock);
+  // Generate code for the function body and return its value
+  Value *retVal = block.codeGen(context);
+  ReturnInst::Create(context.context, retVal, bblock);
 
   context.popBlock();
   return function;

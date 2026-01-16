@@ -15,7 +15,7 @@
 "fun"                   { return TOKEN(TFUN); }
 "in"                    { return TOKEN(TIN); }
 [a-zA-Z_][a-zA-Z0-9_]*  { SAVE_TOKEN; return TIDENTIFIER; }
-[0-9]+.[0-9]*           { SAVE_TOKEN; return TDOUBLE; }
+[0-9]+\.[0-9]*          { SAVE_TOKEN; return TDOUBLE; }
 [0-9]+                  { SAVE_TOKEN; return TINTEGER; }
 "->"                    { return TOKEN(TARROW); }
 "="                     { return TOKEN(TEQUAL); }

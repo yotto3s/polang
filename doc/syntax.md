@@ -36,15 +36,16 @@ Integer literals are sequences of digits:
 
 ### Double Literals
 
-Double literals are digits with a decimal point:
+Double literals are digits with a literal decimal point:
 
 ```
 3.14
 0.5
 123.456
+3.
 ```
 
-Note: The decimal point must be followed by at least one digit pattern (e.g., `3.` is parsed as `3.0`).
+Note: The decimal point is required. `3.` is valid (trailing digits are optional), but `3` without a decimal point is an integer.
 
 ## Variables
 
