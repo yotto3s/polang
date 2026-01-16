@@ -1,0 +1,6 @@
+; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+
+; Cannot infer type - parameter not used with known type
+; CHECK: {{.*}}Cannot infer type of parameter{{.*}}
+let unused(x) = 42
+unused(1)

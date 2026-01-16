@@ -1,0 +1,20 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Infer parameter type from int literal
+; CHECK: {{.*}}polang.func @double_it(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+let double_it(x) = x * 2
+
+; Infer parameter type from double literal
+; CHECK: {{.*}}polang.func @half(%{{.*}}: !polang.double) -> !polang.double{{.*}}
+let half(x) = x / 2.0
+
+; Infer parameter type from comparison with int
+; CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.int) -> !polang.bool{{.*}}
+let is_zero(x) = x == 0
+
+; Infer one param from another typed param
+; CHECK: {{.*}}polang.func @add(%{{.*}}: !polang.int, %{{.*}}: !polang.int) -> !polang.int{{.*}}
+let add(x: int, y) = x + y
+
+; Entry point (required for valid program)
+0

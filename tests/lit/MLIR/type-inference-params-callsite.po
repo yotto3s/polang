@@ -1,0 +1,5 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Infer parameter type from call site in let-expression
+; CHECK: {{.*}}polang.func @identity(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+let identity(x) = x in identity(42)

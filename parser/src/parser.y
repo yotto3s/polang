@@ -46,6 +46,7 @@ void yyerror(const char *s);
 %type <ident> ident
 %type <expr> numeric expr boolean
 %type <varvec> func_decl_args func_param_list
+%type <var_decl> func_param
 %type <letbind> let_binding
 %type <letbindvec> let_bindings
 %type <exprvec> call_args
@@ -123,17 +124,27 @@ func_decl_args : TLPAREN func_param_list TRPAREN {
             }
           ;
 
-func_param_list : ident TCOLON ident {
-                /* First parameter: x : type */
+func_param_list : func_param {
+                /* First parameter */
                 $$ = new VariableList();
-                $$->push_back(new NVariableDeclaration($3, *$1, nullptr));
+                $$->push_back($1);
               }
-            | func_param_list TCOMMA ident TCOLON ident {
-                /* Additional parameters: , x : type */
-                $1->push_back(new NVariableDeclaration($5, *$3, nullptr));
+            | func_param_list TCOMMA func_param {
+                /* Additional parameters */
+                $1->push_back($3);
                 $$ = $1;
               }
             ;
+
+func_param : ident TCOLON ident {
+               /* x : type (explicit type annotation) */
+               $$ = new NVariableDeclaration($3, *$1, nullptr);
+             }
+           | ident {
+               /* x (type to be inferred) */
+               $$ = new NVariableDeclaration(*$1, nullptr, false);
+             }
+           ;
 
 ident : TIDENTIFIER { $$ = new NIdentifier(*$1); delete $1; }
       ;

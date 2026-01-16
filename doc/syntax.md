@@ -131,22 +131,52 @@ a <- b <- 5         ; assigns 5 to both a and b, evaluates to 5
 Functions are declared using `let` with parameter lists:
 
 ```
-let add(x: int, y: int): int = x + y   ; explicit return type
+let add(x: int, y: int): int = x + y   ; explicit types
 let square(n: int) = n * n              ; return type inferred as int
-let half(x: double) = x / 2.0           ; return type inferred as double
+let double(x) = x * 2                   ; parameter type inferred from body
+let half(x) = x / 2.0                   ; parameter type inferred as double
 ```
 
 **Syntax:**
 ```
 let <name>(<param>: <type>, ...): <return_type> = <expression>
 let <name>(<param>: <type>, ...) = <expression>
+let <name>(<param>, ...) = <expression>    ; types inferred
 ```
 
 - Parameters are comma-separated within parentheses
-- Each parameter requires a type annotation
+- Parameter type annotations are optional; when omitted, types are **inferred from usage**
 - Return type can be omitted and will be **inferred from the body expression**
 - Function body is a single expression
-- **No implicit type conversion**: return type annotation must match body type exactly
+- **No implicit type conversion**: explicit type annotations must match inferred types exactly
+
+### Parameter Type Inference
+
+When a parameter type is omitted, Polang infers it from how the parameter is used in the function body:
+
+```
+let double(x) = x * 2       ; x inferred as int (from * 2)
+let half(x) = x / 2.0       ; x inferred as double (from / 2.0)
+let is_zero(x) = x == 0     ; x inferred as int (from == 0)
+let add(x: int, y) = x + y  ; y inferred as int (from + x)
+```
+
+**Inference rules (top-level functions):**
+- `x + 1` or `x * 2` (integer literal) → x is `int`
+- `x + 1.0` or `x / 2.0` (double literal) → x is `double`
+- `x == true` or `x != false` → x is `bool`
+- `x + y` where y has known type → x has same type
+- `f(x)` where f expects a type → x has that type
+
+**Let-expression functions** also support call-site inference:
+```
+let identity(x) = x in identity(42)  ; x inferred as int from call site
+```
+
+If a parameter's type cannot be inferred, a compile-time error is raised:
+```
+let unused(x) = 42   ; ERROR: Cannot infer type of parameter 'x'
+```
 
 ### Function Calls
 
@@ -381,6 +411,7 @@ func_decl   ::= "let" identifier "(" param_list ")" ":" type "=" expression
 param_list  ::= param ("," param)*
 
 param       ::= identifier ":" type
+              | identifier
 
 expression  ::= identifier "<-" expression
               | identifier "(" call_args ")"
