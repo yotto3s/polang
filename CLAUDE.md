@@ -126,10 +126,12 @@ polang/
 │   ├── src/
 │   │   ├── lexer.l             # Flex lexer
 │   │   ├── parser.y            # Bison grammar
-│   │   └── parser_api.cpp      # Parser API implementation
+│   │   ├── parser_api.cpp      # Parser API implementation
+│   │   └── ast_printer.cpp     # AST printer implementation
 │   └── include/parser/
 │       ├── node.hpp            # AST node definitions
-│       └── parser_api.hpp      # Parser API header
+│       ├── parser_api.hpp      # Parser API header
+│       └── ast_printer.hpp     # AST printer header
 ├── compiler/                   # Compiler application
 │   ├── CMakeLists.txt
 │   ├── src/
@@ -227,6 +229,9 @@ Bison and Flex generate files in `build/parser/`:
 # Compile source to LLVM IR
 echo "let x = 5" | ./build/bin/PolangCompiler
 
+# Dump AST (for debugging)
+echo "let x = 5" | ./build/bin/PolangCompiler --dump-ast
+
 # Output Polang dialect MLIR (for debugging)
 echo "let x = 5" | ./build/bin/PolangCompiler --emit-mlir
 
@@ -251,5 +256,6 @@ echo "let x = 5" | ./build/bin/PolangRepl
 | Flag | Description |
 |------|-------------|
 | (default) | Output LLVM IR |
+| `--dump-ast` | Dump AST and exit (no code generation) |
 | `--emit-mlir` | Output Polang dialect MLIR instead of LLVM IR |
 | `--help` | Show help message |

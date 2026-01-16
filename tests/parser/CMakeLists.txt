@@ -7,6 +7,7 @@ set(PARSER_TESTS
     parser_statement
     error
     type_check
+    ast_printer
 )
 
 foreach(test_name ${PARSER_TESTS})

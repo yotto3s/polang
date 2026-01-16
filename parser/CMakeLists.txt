@@ -11,6 +11,7 @@ add_library(PolangParser STATIC
     src/parser_api.cpp
     src/node.cpp
     src/type_checker.cpp
+    src/ast_printer.cpp
 )
 
 target_include_directories(PolangParser PUBLIC
