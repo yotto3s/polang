@@ -5,11 +5,19 @@
 #include <sstream>
 
 int main(int argc, char** argv) {
-  std::stringstream buffer;
-  buffer << std::cin.rdbuf();
-  std::string source = buffer.str();
+  NBlock* ast = nullptr;
 
-  NBlock* ast = polang_parse(source);
+  if (argc > 1) {
+    // File input mode
+    ast = polang_parse_file(argv[1]);
+  } else {
+    // Stdin mode
+    std::stringstream buffer;
+    buffer << std::cin.rdbuf();
+    const std::string source = buffer.str();
+    ast = polang_parse(source);
+  }
+
   if (!ast) {
     return 1;
   }

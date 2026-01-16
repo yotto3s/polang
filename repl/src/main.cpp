@@ -14,8 +14,10 @@
 
 using namespace llvm;
 
-// Run PolangCompiler as subprocess, pass source via stdin, get IR from stdout
-static std::string runCompiler(const std::string& source) {
+// Run PolangCompiler as subprocess
+// If filename is provided, pass it as argument; otherwise pipe source via stdin
+static std::string runCompiler(const std::string& source,
+                               const char* filename = nullptr) {
   int pipeIn[2];  // Parent writes, child reads (child's stdin)
   int pipeOut[2]; // Child writes, parent reads (child's stdout)
 
@@ -24,7 +26,7 @@ static std::string runCompiler(const std::string& source) {
     return "";
   }
 
-  pid_t pid = fork();
+  const pid_t pid = fork();
   if (pid < 0) {
     std::cerr << "Failed to fork\n";
     return "";
@@ -42,7 +44,13 @@ static std::string runCompiler(const std::string& source) {
     close(pipeOut[1]);
 
     // Execute PolangCompiler (assumes it's in PATH or same directory)
-    execlp("PolangCompiler", "PolangCompiler", nullptr);
+    if (filename != nullptr) {
+      // File mode: pass filename as argument
+      execlp("PolangCompiler", "PolangCompiler", filename, nullptr);
+    } else {
+      // Stdin mode: no arguments
+      execlp("PolangCompiler", "PolangCompiler", nullptr);
+    }
 
     // If exec fails, exit
     std::cerr << "Failed to exec PolangCompiler\n";
@@ -53,8 +61,10 @@ static std::string runCompiler(const std::string& source) {
   close(pipeIn[0]);  // Close read end of input pipe
   close(pipeOut[1]); // Close write end of output pipe
 
-  // Write source to compiler's stdin
-  write(pipeIn[1], source.c_str(), source.size());
+  // Write source to compiler's stdin only in stdin mode
+  if (filename == nullptr) {
+    write(pipeIn[1], source.c_str(), source.size());
+  }
   close(pipeIn[1]); // Signal EOF
 
   // Read IR from compiler's stdout
@@ -141,13 +151,19 @@ static int executeIR(const std::string& ir) {
 }
 
 int main(int argc, char** argv) {
-  // Read source from stdin
-  std::stringstream buffer;
-  buffer << std::cin.rdbuf();
-  std::string source = buffer.str();
+  std::string ir;
 
-  // Run compiler to get IR
-  std::string ir = runCompiler(source);
+  if (argc > 1) {
+    // File input mode - pass filename to compiler
+    ir = runCompiler("", argv[1]);
+  } else {
+    // Stdin mode
+    std::stringstream buffer;
+    buffer << std::cin.rdbuf();
+    const std::string source = buffer.str();
+    ir = runCompiler(source, nullptr);
+  }
+
   if (ir.empty()) {
     return 1;
   }
