@@ -90,7 +90,7 @@ The Polang dialect is a custom MLIR dialect that closely mirrors the language se
 
 The `MLIRGenVisitor` traverses the AST and generates Polang dialect operations. This stage:
 
-- Creates `polang.func @main` for the top-level code
+- Creates `polang.func @__polang_entry` for the top-level code
 - Generates nested functions for `let` bindings with function declarations
 - Handles closure capture by adding captured variables as extra function parameters
 
@@ -106,7 +106,7 @@ Generates:
 
 ```mlir
 module {
-  polang.func @main() -> !polang.int {
+  polang.func @__polang_entry() -> !polang.int {
     %0 = polang.constant.int 10 : !polang.int
     %1 = polang.alloca "x" : !polang.int -> memref<i64>
     polang.store %0, %1 : !polang.int, memref<i64>
@@ -186,7 +186,7 @@ if 5 > 3 then 10 else 20
 **Polang Dialect:**
 ```mlir
 module {
-  polang.func @main() -> !polang.int {
+  polang.func @__polang_entry() -> !polang.int {
     %0 = polang.constant.int 5 : !polang.int
     %1 = polang.constant.int 3 : !polang.int
     %2 = polang.cmp gt, %0, %1 : !polang.int
@@ -205,7 +205,7 @@ module {
 **After Standard Lowering:**
 ```mlir
 module {
-  func.func @main() -> i64 {
+  func.func @__polang_entry() -> i64 {
     %c5 = arith.constant 5 : i64
     %c3 = arith.constant 3 : i64
     %cmp = arith.cmpi sgt, %c5, %c3 : i64
@@ -223,7 +223,7 @@ module {
 
 **LLVM IR:**
 ```llvm
-define i64 @main() {
+define i64 @__polang_entry() {
   %1 = icmp sgt i64 5, 3
   %2 = select i1 %1, i64 10, i64 20
   ret i64 %2

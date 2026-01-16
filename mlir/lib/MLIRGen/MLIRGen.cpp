@@ -459,26 +459,37 @@ private:
   }
 
   void generateMainFunction(const NBlock &block) {
-    // Create main function type: () -> i64
-    auto funcType = builder.getFunctionType({}, {builder.getType<IntType>()});
+    // Get the inferred return type from the type checker (already ran in generate())
+    std::string inferredType = typeChecker.getInferredType();
+    Type returnType = getPolangType(inferredType);
 
-    // Create main function
+    // Create entry function with dynamic return type
+    auto funcType = builder.getFunctionType({}, {returnType});
+
     builder.setInsertionPointToEnd(module.getBody());
-    auto mainFunc = builder.create<FuncOp>(loc(), "main", funcType);
+    auto entryFunc = builder.create<FuncOp>(loc(), "__polang_entry", funcType);
 
     // Create entry block
-    Block *entryBlock = mainFunc.addEntryBlock();
+    Block *entryBlock = entryFunc.addEntryBlock();
     builder.setInsertionPointToStart(entryBlock);
 
     // Generate code for the block
     block.accept(*this);
 
-    // Return the last expression value, or 0 if none
+    // Return the last expression value, or default value of correct type
     if (result) {
       builder.create<ReturnOp>(loc(), result);
     } else {
-      Value zero = builder.create<ConstantIntOp>(loc(), 0);
-      builder.create<ReturnOp>(loc(), zero);
+      // Create default value matching the return type
+      Value defaultVal;
+      if (inferredType == "double") {
+        defaultVal = builder.create<ConstantDoubleOp>(loc(), 0.0);
+      } else if (inferredType == "bool") {
+        defaultVal = builder.create<ConstantBoolOp>(loc(), false);
+      } else {
+        defaultVal = builder.create<ConstantIntOp>(loc(), 0);
+      }
+      builder.create<ReturnOp>(loc(), defaultVal);
     }
   }
 };

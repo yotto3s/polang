@@ -111,7 +111,7 @@ TEST(CompilerIntegration, ModuleDefinition) {
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("ModuleID"));
   EXPECT_THAT(result.stdout_output, HasSubstr("define"));
-  EXPECT_THAT(result.stdout_output, HasSubstr("@main"));
+  EXPECT_THAT(result.stdout_output, HasSubstr("@__polang_entry"));
 }
 
 // Test error handling - verify exit code 1 and error message

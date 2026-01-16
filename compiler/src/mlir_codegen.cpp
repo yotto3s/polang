@@ -192,7 +192,7 @@ bool MLIRCodeGenContext::runCode(int64_t& result) {
   llvm::SmallVector<void*> args;
   args.push_back(&resultVal);
 
-  auto invocationResult = engine->invokePacked("main", args);
+  auto invocationResult = engine->invokePacked("__polang_entry", args);
   if (invocationResult) {
     error_ = "Execution failed: " + llvm::toString(std::move(invocationResult));
     return false;
