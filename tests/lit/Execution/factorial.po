@@ -1,0 +1,13 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test factorial calculation with let expressions
+; CHECK: 120 : int
+let fact5 =
+  let n1 = 1 in
+  let n2 = n1 * 2 in
+  let n3 = n2 * 3 in
+  let n4 = n3 * 4 in
+  let n5 = n4 * 5 in
+  n5
+
+fact5

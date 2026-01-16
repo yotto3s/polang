@@ -1,0 +1,6 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test function declarations and calls
+; CHECK: 25 : int
+let square(x: int): int = x * x
+square(5)

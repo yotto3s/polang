@@ -1,0 +1,26 @@
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; Test arithmetic operations in LLVM IR
+; CHECK: define i64 @add(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = add i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i64 %{{[0-9]+}}
+; CHECK: }
+let add(a: int, b: int): int = a + b
+
+; CHECK: define i64 @sub(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = sub i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i64 %{{[0-9]+}}
+; CHECK: }
+let sub(a: int, b: int): int = a - b
+
+; CHECK: define i64 @mul(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = mul i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i64 %{{[0-9]+}}
+; CHECK: }
+let mul(a: int, b: int): int = a * b
+
+; CHECK: define i64 @div(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = sdiv i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i64 %{{[0-9]+}}
+; CHECK: }
+let div(a: int, b: int): int = a / b

@@ -1,0 +1,16 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test function call
+; CHECK: polang.func @__polang_entry() -> !polang.int {
+; CHECK:   %{{[0-9]+}} = polang.constant.int 1 : !polang.int
+; CHECK:   %{{[0-9]+}} = polang.constant.int 2 : !polang.int
+; CHECK:   %{{[0-9]+}} = polang.call @add(%{{[0-9]+}}, %{{[0-9]+}}) : (!polang.int, !polang.int) -> !polang.int
+; CHECK:   polang.return %{{[0-9]+}} : !polang.int
+; CHECK: }
+
+; CHECK: polang.func @add(%arg0: !polang.int, %arg1: !polang.int) -> !polang.int {
+; CHECK:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.int
+; CHECK:   polang.return %{{[0-9]+}} : !polang.int
+; CHECK: }
+let add(a: int, b: int): int = a + b
+add(1, 2)

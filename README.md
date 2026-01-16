@@ -6,7 +6,7 @@ A simple programming language with ML-inspired syntax and LLVM backend.
 
 ```bash
 # Configure
-cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
 
 # Build
 cmake --build build -j$(nproc)

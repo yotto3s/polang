@@ -1,0 +1,10 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test boolean literals
+; CHECK: NBlock
+; CHECK: |-NExpressionStatement
+; CHECK:   `-NBoolean true
+; CHECK: `-NExpressionStatement
+; CHECK:   `-NBoolean false
+true
+false

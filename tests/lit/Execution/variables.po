@@ -1,0 +1,7 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test variable declaration and usage
+; CHECK: 30 : int
+let x = 10
+let y = 20
+x + y

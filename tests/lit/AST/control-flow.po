@@ -1,0 +1,17 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test if expression
+; CHECK: NBlock
+; CHECK: `-NFunctionDeclaration 'max' (a: int, b: int) -> int
+; CHECK:   `-NBlock
+; CHECK:     `-NExpressionStatement
+; CHECK:       `-NIfExpression
+; CHECK:         |-condition:
+; CHECK:         | `-NBinaryOperator '>'
+; CHECK:         |   |-NIdentifier 'a'
+; CHECK:         |   `-NIdentifier 'b'
+; CHECK:         |-then:
+; CHECK:         | `-NIdentifier 'a'
+; CHECK:         `-else:
+; CHECK:           `-NIdentifier 'b'
+let max(a: int, b: int): int = if a > b then a else b

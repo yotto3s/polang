@@ -1,0 +1,6 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test if-then-else expression
+; CHECK: 10 : int
+let max(a: int, b: int): int = if a > b then a else b
+max(10, 5)

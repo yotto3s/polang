@@ -1,0 +1,7 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test mutable variable declaration
+; CHECK: NBlock
+; CHECK: `-NVariableDeclaration 'x' mut
+; CHECK:   `-NInteger 10
+let mut x = 10

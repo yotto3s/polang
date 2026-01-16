@@ -1,0 +1,13 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test if-expression in MLIR
+; CHECK: polang.func @max(%arg0: !polang.int, %arg1: !polang.int) -> !polang.int {
+; CHECK:   %{{[0-9]+}} = polang.cmp gt, %arg0, %arg1 : !polang.int
+; CHECK:   %{{[0-9]+}} = polang.if %{{[0-9]+}} -> !polang.int {
+; CHECK:     polang.yield %arg0 : !polang.int
+; CHECK:   } else {
+; CHECK:     polang.yield %arg1 : !polang.int
+; CHECK:   }
+; CHECK:   polang.return %{{[0-9]+}} : !polang.int
+; CHECK: }
+let max(a: int, b: int): int = if a > b then a else b

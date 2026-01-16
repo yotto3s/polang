@@ -1,0 +1,28 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test all comparison operators
+let lt(a: int, b: int): bool = a < b
+let le(a: int, b: int): bool = a <= b
+let gt(a: int, b: int): bool = a > b
+let ge(a: int, b: int): bool = a >= b
+let eq(a: int, b: int): bool = a == b
+let ne(a: int, b: int): bool = a != b
+
+; Test less-than: 1 < 2 = true, 2 < 1 = false
+; First we need a way to combine results
+; Use integer encoding: true=1, false=0
+let btoi(b: bool): int = if b then 1 else 0
+
+; Sum all expected true comparisons
+let result =
+  btoi(lt(1, 2)) +
+  btoi(le(1, 2)) +
+  btoi(le(2, 2)) +
+  btoi(gt(2, 1)) +
+  btoi(ge(2, 1)) +
+  btoi(ge(2, 2)) +
+  btoi(eq(2, 2)) +
+  btoi(ne(1, 2))
+
+; CHECK: 8 : int
+result

@@ -1,0 +1,43 @@
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; Test less-than comparison
+; CHECK: define i1 @cmp_lt(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = icmp slt i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i1 %{{[0-9]+}}
+; CHECK: }
+let cmp_lt(a: int, b: int): bool = a < b
+
+; Test less-or-equal comparison
+; CHECK: define i1 @cmp_le(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = icmp sle i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i1 %{{[0-9]+}}
+; CHECK: }
+let cmp_le(a: int, b: int): bool = a <= b
+
+; Test greater-than comparison
+; CHECK: define i1 @cmp_gt(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = icmp sgt i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i1 %{{[0-9]+}}
+; CHECK: }
+let cmp_gt(a: int, b: int): bool = a > b
+
+; Test greater-or-equal comparison
+; CHECK: define i1 @cmp_ge(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = icmp sge i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i1 %{{[0-9]+}}
+; CHECK: }
+let cmp_ge(a: int, b: int): bool = a >= b
+
+; Test equality comparison
+; CHECK: define i1 @cmp_eq(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = icmp eq i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i1 %{{[0-9]+}}
+; CHECK: }
+let cmp_eq(a: int, b: int): bool = a == b
+
+; Test not-equal comparison
+; CHECK: define i1 @cmp_ne(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = icmp ne i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i1 %{{[0-9]+}}
+; CHECK: }
+let cmp_ne(a: int, b: int): bool = a != b

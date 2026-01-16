@@ -1,0 +1,15 @@
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; Test double type operations
+; CHECK: define double @fadd(double %{{[0-9]+}}, double %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = fadd double %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret double %{{[0-9]+}}
+; CHECK: }
+let fadd(a: double, b: double): double = a + b
+
+; Test integer comparison returning bool
+; CHECK: define i1 @lt(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = icmp slt i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i1 %{{[0-9]+}}
+; CHECK: }
+let lt(a: int, b: int): bool = a < b

@@ -1,0 +1,15 @@
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; Test entry point function with function call
+; CHECK: define i64 @__polang_entry() {
+; CHECK:   %{{[0-9]+}} = call i64 @square(i64 5)
+; CHECK:   ret i64 %{{[0-9]+}}
+; CHECK: }
+let square(x: int): int = x * x
+square(5)
+
+; Test function definition
+; CHECK: define i64 @square(i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = mul i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i64 %{{[0-9]+}}
+; CHECK: }

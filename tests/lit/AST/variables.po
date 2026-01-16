@@ -1,0 +1,7 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test variable declaration
+; CHECK: NBlock
+; CHECK: `-NVariableDeclaration 'x'
+; CHECK:   `-NInteger 42
+let x = 42

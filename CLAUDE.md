@@ -75,6 +75,25 @@ When modifying the language syntax (lexer.l, parser.y, or node.hpp), always upda
 When modifying the MLIR code generation pipeline, update:
 - `doc/Lowering.md` - MLIR lowering process documentation
 
+When adding new language features or modifying compiler output, consider adding lit tests:
+- `tests/lit/AST/` - AST dump tests using `--dump-ast`
+- `tests/lit/MLIR/` - MLIR output tests using `--emit-mlir`
+- `tests/lit/LLVMIR/` - LLVM IR output tests
+- `tests/lit/Execution/` - REPL execution tests
+- `tests/lit/Errors/` - Error handling tests
+
+### Lit Test Coverage (49 tests)
+
+**AST Tests (11 files):** literals, double-literals, bool-literals, variables, mutable-variables, assignment, functions, control-flow, comparisons, let-expressions, method-calls
+
+**MLIR Tests (10 files):** constants, arithmetic, double-arithmetic, functions, function-calls, control-flow, comparisons, types, mutable-variables, let-expressions
+
+**LLVMIR Tests (9 files):** arithmetic, types, bool-type, functions, control-flow, comparisons, double-comparisons, mutable-variables, let-expressions
+
+**Execution Tests (12 files):** hello, variables, mutability, functions, conditionals, closures, fibonacci, factorial, double-operations, bool-operations, let-expressions, comparison-operators
+
+**Error Tests (7 files):** syntax-errors, undefined-variable, type-mismatch, immutable-reassignment, undefined-function, function-arity, missing-else
+
 ## Testing
 
 After modifying the application, always verify that example programs still work:
@@ -101,7 +120,41 @@ Also run the test suite:
 ```bash
 # Run all tests (inside docker container)
 ctest --test-dir build --output-on-failure
+
+# Run only lit tests (inside docker container)
+python3 /usr/lib/llvm-20/build/utils/lit/lit.py -v build/tests/lit
+
+# Run lit tests via CMake target (inside docker container)
+cmake --build build --target check-polang-lit
+
+# Run specific lit test category (inside docker container)
+python3 /usr/lib/llvm-20/build/utils/lit/lit.py -v build/tests/lit/MLIR
 ```
+
+### Writing Lit Tests
+
+Lit tests use FileCheck to verify compiler output. Example test format:
+
+```
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; CHECK: NBlock
+; CHECK: `-NExpressionStatement
+; CHECK:   `-NInteger 42
+42
+```
+
+Available substitutions:
+- `%polang_compiler` - Path to PolangCompiler
+- `%polang_repl` - Path to PolangRepl
+- `%FileCheck` - Path to FileCheck
+- `%not` - Inverts exit code (for error tests)
+- `%s` - Current test file path
+
+FileCheck patterns:
+- `; CHECK:` - Match exact string
+- `%{{[0-9]+}}` - Match SSA values like `%0`, `%1`
+- Use `%not` for tests that should fail (e.g., syntax errors)
 
 ## Project Structure
 
@@ -155,9 +208,17 @@ polang/
 │   │   └── *_test.cpp          # Lexer, parser, type checker tests
 │   ├── compiler/               # Compiler tests
 │   │   └── compiler_test.cpp   # LLVM IR generation tests
-│   └── repl/                   # REPL tests
-│       ├── repl_test.cpp       # REPL execution tests
-│       └── repl_unit_test.cpp  # InputChecker unit tests
+│   ├── repl/                   # REPL tests
+│   │   ├── repl_test.cpp       # REPL execution tests
+│   │   └── repl_unit_test.cpp  # InputChecker unit tests
+│   └── lit/                    # llvm-lit FileCheck tests (49 tests)
+│       ├── lit.cfg.py          # Lit configuration
+│       ├── lit.site.cfg.py.in  # CMake-configured site settings
+│       ├── AST/                # AST dump tests (11 files)
+│       ├── MLIR/               # MLIR output tests (10 files)
+│       ├── LLVMIR/             # LLVM IR output tests (9 files)
+│       ├── Execution/          # REPL execution tests (12 files)
+│       └── Errors/             # Error handling tests (7 files)
 ├── example/                    # Example programs
 │   ├── hello.po
 │   ├── variables.po

@@ -1,0 +1,15 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test closure variable capture
+; CHECK: 21 : int
+let base = 10
+let add_base(x: int): int = x + base
+let result1 = add_base(5)
+
+let a = 1
+let b = 2
+let c = 3
+let sum_all(): int = a + b + c
+let result2 = sum_all()
+
+result1 + result2

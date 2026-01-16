@@ -1,0 +1,29 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test double addition
+; CHECK: polang.func @dadd(%arg0: !polang.double, %arg1: !polang.double) -> !polang.double {
+; CHECK:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.double
+; CHECK:   polang.return %{{[0-9]+}} : !polang.double
+; CHECK: }
+let dadd(a: double, b: double): double = a + b
+
+; Test double subtraction
+; CHECK: polang.func @dsub(%arg0: !polang.double, %arg1: !polang.double) -> !polang.double {
+; CHECK:   %{{[0-9]+}} = polang.sub %arg0, %arg1 : !polang.double
+; CHECK:   polang.return %{{[0-9]+}} : !polang.double
+; CHECK: }
+let dsub(a: double, b: double): double = a - b
+
+; Test double multiplication
+; CHECK: polang.func @dmul(%arg0: !polang.double, %arg1: !polang.double) -> !polang.double {
+; CHECK:   %{{[0-9]+}} = polang.mul %arg0, %arg1 : !polang.double
+; CHECK:   polang.return %{{[0-9]+}} : !polang.double
+; CHECK: }
+let dmul(a: double, b: double): double = a * b
+
+; Test double division
+; CHECK: polang.func @ddiv(%arg0: !polang.double, %arg1: !polang.double) -> !polang.double {
+; CHECK:   %{{[0-9]+}} = polang.div %arg0, %arg1 : !polang.double
+; CHECK:   polang.return %{{[0-9]+}} : !polang.double
+; CHECK: }
+let ddiv(a: double, b: double): double = a / b

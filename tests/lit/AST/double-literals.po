@@ -1,0 +1,7 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test double literal
+; CHECK: NBlock
+; CHECK: `-NExpressionStatement
+; CHECK:   `-NDouble 3.14
+3.14

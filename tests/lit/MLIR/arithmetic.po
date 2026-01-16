@@ -1,0 +1,11 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test arithmetic operations
+; CHECK: polang.func @__polang_entry() -> !polang.int {
+; CHECK:   polang.constant.int 1
+; CHECK:   polang.constant.int 2
+; CHECK:   polang.constant.int 3
+; CHECK:   polang.mul %{{[0-9]+}}, %{{[0-9]+}} : !polang.int
+; CHECK:   polang.add %{{[0-9]+}}, %{{[0-9]+}} : !polang.int
+; CHECK:   polang.return
+1 + 2 * 3

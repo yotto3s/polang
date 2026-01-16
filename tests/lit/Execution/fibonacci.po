@@ -1,0 +1,13 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test fibonacci sequence with let expressions
+; CHECK: 5 : int
+let fib5 =
+  let f0 = 0 and f1 = 1 in
+  let f2 = f0 + f1 in
+  let f3 = f1 + f2 in
+  let f4 = f2 + f3 in
+  let f5 = f3 + f4 in
+  f5
+
+fib5

@@ -1,0 +1,10 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test constant generation
+; CHECK: module {
+; CHECK:   polang.func @__polang_entry() -> !polang.int {
+; CHECK:     %{{[0-9]+}} = polang.constant.int 42 : !polang.int
+; CHECK:     polang.return %{{[0-9]+}} : !polang.int
+; CHECK:   }
+; CHECK: }
+42

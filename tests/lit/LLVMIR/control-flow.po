@@ -1,0 +1,9 @@
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; Test if-expression lowering to select
+; CHECK: define i64 @max(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = icmp sgt i64 %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   %{{[0-9]+}} = select i1 %{{[0-9]+}}, i64 %{{[0-9]+}}, i64 %{{[0-9]+}}
+; CHECK:   ret i64 %{{[0-9]+}}
+; CHECK: }
+let max(a: int, b: int): int = if a > b then a else b

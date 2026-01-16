@@ -1,0 +1,12 @@
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; Test bool type with i1
+; CHECK: define i1 @bool_true() {
+; CHECK:   ret i1 true
+; CHECK: }
+let bool_true(): bool = true
+
+; CHECK: define i1 @bool_false() {
+; CHECK:   ret i1 false
+; CHECK: }
+let bool_false(): bool = false

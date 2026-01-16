@@ -1,0 +1,22 @@
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; Test double less-than comparison
+; CHECK: define i1 @dcmp_lt(double %{{[0-9]+}}, double %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = fcmp olt double %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i1 %{{[0-9]+}}
+; CHECK: }
+let dcmp_lt(a: double, b: double): bool = a < b
+
+; Test double greater-than comparison
+; CHECK: define i1 @dcmp_gt(double %{{[0-9]+}}, double %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = fcmp ogt double %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i1 %{{[0-9]+}}
+; CHECK: }
+let dcmp_gt(a: double, b: double): bool = a > b
+
+; Test double equality comparison
+; CHECK: define i1 @dcmp_eq(double %{{[0-9]+}}, double %{{[0-9]+}}) {
+; CHECK:   %{{[0-9]+}} = fcmp oeq double %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK:   ret i1 %{{[0-9]+}}
+; CHECK: }
+let dcmp_eq(a: double, b: double): bool = a == b

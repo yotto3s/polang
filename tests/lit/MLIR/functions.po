@@ -1,0 +1,8 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test function generation
+; CHECK: polang.func @add(%arg0: !polang.int, %arg1: !polang.int) -> !polang.int {
+; CHECK:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.int
+; CHECK:   polang.return %{{[0-9]+}} : !polang.int
+; CHECK: }
+let add(a: int, b: int): int = a + b

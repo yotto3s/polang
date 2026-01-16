@@ -17,3 +17,6 @@ set(POLANG_TEST_COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/common)
 add_subdirectory(parser)
 add_subdirectory(compiler)
 add_subdirectory(repl)
+
+# Include lit tests
+add_subdirectory(lit)
