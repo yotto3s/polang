@@ -2,6 +2,8 @@
 #include "compiler/codegen_visitor.hpp"
 #include "parser/node.hpp"
 
+#include <iostream>
+
 /* Compile the AST into a module */
 void CodeGenContext::generateCode(NBlock& root) {
   /* Create the top level interpreter function to call as entry */
@@ -11,7 +13,7 @@ void CodeGenContext::generateCode(NBlock& root) {
       FunctionType::get(Type::getInt64Ty(context), argTypes, false);
   mainFunction =
       Function::Create(ftype, GlobalValue::ExternalLinkage, "main", module);
-  BasicBlock* bblock = BasicBlock::Create(context, "entry", mainFunction, 0);
+  BasicBlock* const bblock = BasicBlock::Create(context, "entry", mainFunction, 0);
 
   /* Push a new variable/block context */
   pushBlock(bblock);
@@ -19,11 +21,11 @@ void CodeGenContext::generateCode(NBlock& root) {
   root.accept(visitor); /* emit bytecode for the toplevel block */
 
   // Get the last expression value and return it as i64
-  Value* lastValue = visitor.getResult();
+  Value* const lastValue = visitor.getResult();
   Value* retVal = nullptr;
 
   if (lastValue != nullptr) {
-    Type* valType = lastValue->getType();
+    Type* const valType = lastValue->getType();
 
     if (valType->isDoubleTy()) {
       // Bitcast double to i64

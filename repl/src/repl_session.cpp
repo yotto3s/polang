@@ -12,13 +12,12 @@
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/TargetSelect.h>
 
-#include <cstring>
 #include <iostream>
 
 using namespace llvm;
 
-ReplSession::ReplSession() = default;
-ReplSession::~ReplSession() = default;
+ReplSession::ReplSession() noexcept = default;
+ReplSession::~ReplSession() noexcept = default;
 
 bool ReplSession::initialize() {
   if (initialized_) {
@@ -32,7 +31,7 @@ bool ReplSession::initialize() {
   return true;
 }
 
-bool ReplSession::isInputIncomplete(const std::string& input) {
+bool ReplSession::isInputIncomplete(const std::string& input) noexcept {
   return InputChecker::isInputIncomplete(input);
 }
 

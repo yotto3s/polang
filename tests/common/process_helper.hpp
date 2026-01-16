@@ -67,14 +67,14 @@ inline ProcessResult runProcess(const std::string& executable,
   ssize_t bytes_read = 0;
   while ((bytes_read = read(stdout_pipe[0], buffer.data(), buffer.size())) >
          0) {
-    result.stdout_output.append(buffer.data(), static_cast<size_t>(bytes_read));
+    result.stdout_output.append(buffer.data(), static_cast<std::size_t>(bytes_read));
   }
   close(stdout_pipe[0]);
 
   // Read stderr
   while ((bytes_read = read(stderr_pipe[0], buffer.data(), buffer.size())) >
          0) {
-    result.stderr_output.append(buffer.data(), static_cast<size_t>(bytes_read));
+    result.stderr_output.append(buffer.data(), static_cast<std::size_t>(bytes_read));
   }
   close(stderr_pipe[0]);
 

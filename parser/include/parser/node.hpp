@@ -1,7 +1,6 @@
 #ifndef POLANG_NODE_HPP
 #define POLANG_NODE_HPP
 
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -20,8 +19,10 @@ struct NLetBinding {
   bool isFunction;
   NVariableDeclaration* var;
   NFunctionDeclaration* func;
-  NLetBinding(NVariableDeclaration* v) : isFunction(false), var(v), func(nullptr) {}
-  NLetBinding(NFunctionDeclaration* f) : isFunction(true), var(nullptr), func(f) {}
+  NLetBinding(NVariableDeclaration* v)
+      : isFunction(false), var(v), func(nullptr) {}
+  NLetBinding(NFunctionDeclaration* f)
+      : isFunction(true), var(nullptr), func(f) {}
 };
 
 typedef std::vector<NLetBinding*> LetBindingList;
@@ -29,7 +30,7 @@ typedef std::vector<NLetBinding*> LetBindingList;
 // clang-format off
 class Node {
 public:
-  virtual ~Node() {}
+  virtual ~Node() noexcept {}
   virtual void accept(Visitor &visitor) const = 0;
 };
 
@@ -69,7 +70,7 @@ class NMethodCall : public NExpression {
 public:
   const NIdentifier &id;
   ExpressionList arguments;
-  NMethodCall(const NIdentifier &id, ExpressionList &arguments)
+  NMethodCall(const NIdentifier &id, const ExpressionList &arguments)
       : id(id), arguments(arguments) {}
   NMethodCall(const NIdentifier &id) : id(id) {}
   void accept(Visitor &visitor) const override;
@@ -78,18 +79,18 @@ public:
 class NBinaryOperator : public NExpression {
 public:
   int op;
-  NExpression &lhs;
-  NExpression &rhs;
-  NBinaryOperator(NExpression &lhs, int op, NExpression &rhs)
+  const NExpression &lhs;
+  const NExpression &rhs;
+  NBinaryOperator(const NExpression &lhs, int op, const NExpression &rhs)
       : op(op), lhs(lhs), rhs(rhs) {}
   void accept(Visitor &visitor) const override;
 };
 
 class NAssignment : public NExpression {
 public:
-  NIdentifier &lhs;
-  NExpression &rhs;
-  NAssignment(NIdentifier &lhs, NExpression &rhs) : lhs(lhs), rhs(rhs) {}
+  const NIdentifier &lhs;
+  const NExpression &rhs;
+  NAssignment(const NIdentifier &lhs, const NExpression &rhs) : lhs(lhs), rhs(rhs) {}
   void accept(Visitor &visitor) const override;
 };
 
@@ -102,11 +103,11 @@ public:
 
 class NIfExpression : public NExpression {
 public:
-  NExpression &condition;
-  NExpression &thenExpr;
-  NExpression &elseExpr;
-  NIfExpression(NExpression &condition, NExpression &thenExpr,
-                NExpression &elseExpr)
+  const NExpression &condition;
+  const NExpression &thenExpr;
+  const NExpression &elseExpr;
+  NIfExpression(const NExpression &condition, const NExpression &thenExpr,
+                const NExpression &elseExpr)
       : condition(condition), thenExpr(thenExpr), elseExpr(elseExpr) {}
   void accept(Visitor &visitor) const override;
 };
@@ -114,16 +115,16 @@ public:
 class NLetExpression : public NExpression {
 public:
   LetBindingList bindings;
-  NExpression &body;
-  NLetExpression(LetBindingList &bindings, NExpression &body)
+  const NExpression &body;
+  NLetExpression(const LetBindingList &bindings, const NExpression &body)
       : bindings(bindings), body(body) {}
   void accept(Visitor &visitor) const override;
 };
 
 class NExpressionStatement : public NStatement {
 public:
-  NExpression &expression;
-  NExpressionStatement(NExpression &expression) : expression(expression) {}
+  const NExpression &expression;
+  NExpressionStatement(const NExpression &expression) : expression(expression) {}
   void accept(Visitor &visitor) const override;
 };
 

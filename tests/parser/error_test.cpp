@@ -15,24 +15,26 @@
 // clang-format on
 
 // Helper class to capture stderr output
+// Note: Uses C++ standard library <cstdio> because bison outputs errors via
+// fprintf(stderr, ...) which cannot be captured with std::cerr redirection.
 class StderrCapture {
 public:
   StderrCapture() {
     // Save original stderr
-    original_stderr_ = stderr;
+    original_stderr_ = std::stderr;
     // Create a temporary file to capture stderr
-    captured_file_ = tmpfile();
+    captured_file_ = std::tmpfile();
     if (captured_file_) {
       // Redirect stderr to the temporary file
-      stderr = captured_file_;
+      std::stderr = captured_file_;
     }
   }
 
   ~StderrCapture() {
     // Restore original stderr
-    stderr = original_stderr_;
+    std::stderr = original_stderr_;
     if (captured_file_) {
-      fclose(captured_file_);
+      std::fclose(captured_file_);
     }
   }
 
@@ -41,20 +43,20 @@ public:
       return "";
     }
     // Flush any pending output
-    fflush(captured_file_);
+    std::fflush(captured_file_);
     // Read from the beginning of the temp file
-    rewind(captured_file_);
+    std::rewind(captured_file_);
     std::string result;
     char buffer[256];
-    while (fgets(buffer, sizeof(buffer), captured_file_)) {
+    while (std::fgets(buffer, sizeof(buffer), captured_file_)) {
       result += buffer;
     }
     return result;
   }
 
 private:
-  FILE* original_stderr_;
-  FILE* captured_file_;
+  std::FILE* original_stderr_;
+  std::FILE* captured_file_;
 };
 
 // ============== Syntax Error Location Tests ==============

@@ -19,7 +19,7 @@ Value* CodeGenVisitor::generate(const Node& node) {
 /* Returns an LLVM type based on the identifier */
 static Type* typeOf(const NIdentifier* type, LLVMContext& ctx) noexcept {
   if (type == nullptr) {
-    std::cerr << "Internal error: type is null in codegen" << std::endl;
+    std::cerr << "Internal error: type is null in codegen" << "\n";
     return Type::getVoidTy(ctx);
   }
   if (type->name.compare("int") == 0) {
@@ -48,7 +48,7 @@ void CodeGenVisitor::visit(const NBoolean& node) {
 
 void CodeGenVisitor::visit(const NIdentifier& node) {
   if (context_.locals().find(node.name) == context_.locals().end()) {
-    std::cerr << "undeclared variable " << node.name << std::endl;
+    std::cerr << "undeclared variable " << node.name << "\n";
     result_ = nullptr;
     return;
   }
@@ -58,9 +58,9 @@ void CodeGenVisitor::visit(const NIdentifier& node) {
 }
 
 void CodeGenVisitor::visit(const NMethodCall& node) {
-  Function* function = context_.module->getFunction(node.id.name.c_str());
+  Function* const function = context_.module->getFunction(node.id.name.c_str());
   if (function == nullptr) {
-    std::cerr << "no such function " << node.id.name << std::endl;
+    std::cerr << "no such function " << node.id.name << "\n";
     result_ = nullptr;
     return;
   }
@@ -73,8 +73,8 @@ void CodeGenVisitor::visit(const NMethodCall& node) {
 }
 
 void CodeGenVisitor::visit(const NBinaryOperator& node) {
-  Value* lhs = generate(node.lhs);
-  Value* rhs = generate(node.rhs);
+  Value* const lhs = generate(node.lhs);
+  Value* const rhs = generate(node.rhs);
   const bool isDouble = lhs->getType()->isDoubleTy();
 
   switch (node.op) {
@@ -195,11 +195,11 @@ void CodeGenVisitor::visit(const NBinaryOperator& node) {
 
 void CodeGenVisitor::visit(const NAssignment& node) {
   if (context_.locals().find(node.lhs.name) == context_.locals().end()) {
-    std::cerr << "undeclared variable " << node.lhs.name << std::endl;
+    std::cerr << "undeclared variable " << node.lhs.name << "\n";
     result_ = nullptr;
     return;
   }
-  Value* value = generate(node.rhs);
+  Value* const value = generate(node.rhs);
   result_ = new StoreInst(value, context_.locals()[node.lhs.name], false,
                           context_.currentBlock());
 }
@@ -219,17 +219,17 @@ void CodeGenVisitor::visit(const NExpressionStatement& node) {
 void CodeGenVisitor::visit(const NVariableDeclaration& node) {
   if (node.type == nullptr) {
     std::cerr << "Internal error: variable type not resolved for "
-              << node.id.name << std::endl;
+              << node.id.name << "\n";
     result_ = nullptr;
     return;
   }
-  AllocaInst* alloc =
+  AllocaInst* const alloc =
       new AllocaInst(typeOf(node.type, context_.context), 0,
                      node.id.name.c_str(), context_.currentBlock());
   context_.locals()[node.id.name] = alloc;
   if (node.assignmentExpr != nullptr) {
     // Inline assignment logic instead of creating temporary NAssignment
-    Value* value = generate(*node.assignmentExpr);
+    Value* const value = generate(*node.assignmentExpr);
     new StoreInst(value, alloc, false, context_.currentBlock());
   }
   result_ = alloc;
@@ -238,24 +238,24 @@ void CodeGenVisitor::visit(const NVariableDeclaration& node) {
 void CodeGenVisitor::visit(const NFunctionDeclaration& node) {
   if (node.type == nullptr) {
     std::cerr << "Internal error: function return type not resolved for "
-              << node.id.name << std::endl;
+              << node.id.name << "\n";
     result_ = nullptr;
     return;
   }
   std::vector<Type*> argTypes;
   for (const auto* arg : node.arguments) {
     if (arg->type == nullptr) {
-      std::cerr << "Internal error: parameter type not resolved" << std::endl;
+      std::cerr << "Internal error: parameter type not resolved" << "\n";
       result_ = nullptr;
       return;
     }
     argTypes.push_back(typeOf(arg->type, context_.context));
   }
-  FunctionType* ftype =
+  FunctionType* const ftype =
       FunctionType::get(typeOf(node.type, context_.context), argTypes, false);
-  Function* function = Function::Create(ftype, GlobalValue::InternalLinkage,
-                                        node.id.name.c_str(), context_.module);
-  BasicBlock* bblock =
+  Function* const function = Function::Create(ftype, GlobalValue::InternalLinkage,
+                                              node.id.name.c_str(), context_.module);
+  BasicBlock* const bblock =
       BasicBlock::Create(context_.context, "entry", function, 0);
 
   context_.pushBlock(bblock);
@@ -270,7 +270,7 @@ void CodeGenVisitor::visit(const NFunctionDeclaration& node) {
   }
 
   // Generate code for the function body and return its value
-  Value* retVal = generate(node.block);
+  Value* const retVal = generate(node.block);
   ReturnInst::Create(context_.context, retVal, context_.currentBlock());
 
   context_.popBlock();
@@ -279,7 +279,7 @@ void CodeGenVisitor::visit(const NFunctionDeclaration& node) {
 
 void CodeGenVisitor::visit(const NIfExpression& node) {
   // Generate code for the condition
-  Value* condValue = generate(node.condition);
+  Value* const condValue = generate(node.condition);
   if (!condValue) {
     result_ = nullptr;
     return;
@@ -295,41 +295,41 @@ void CodeGenVisitor::visit(const NIfExpression& node) {
   }
 
   // Get the current function
-  Function* func = context_.currentBlock()->getParent();
+  Function* const func = context_.currentBlock()->getParent();
 
   // Create basic blocks for then, else, and merge
-  BasicBlock* thenBB = BasicBlock::Create(context_.context, "then", func);
-  BasicBlock* elseBB = BasicBlock::Create(context_.context, "else", func);
-  BasicBlock* mergeBB = BasicBlock::Create(context_.context, "ifcont", func);
+  BasicBlock* const thenBB = BasicBlock::Create(context_.context, "then", func);
+  BasicBlock* const elseBB = BasicBlock::Create(context_.context, "else", func);
+  BasicBlock* const mergeBB = BasicBlock::Create(context_.context, "ifcont", func);
 
   // Create conditional branch
   BranchInst::Create(thenBB, elseBB, condBool, context_.currentBlock());
 
   // Emit then block
   context_.setCurrentBlock(thenBB);
-  Value* thenValue = generate(node.thenExpr);
+  Value* const thenValue = generate(node.thenExpr);
   if (!thenValue) {
     result_ = nullptr;
     return;
   }
   BranchInst::Create(mergeBB, context_.currentBlock());
   // Save the block that then ends in (might be different due to nested ifs)
-  BasicBlock* thenEndBB = context_.currentBlock();
+  BasicBlock* const thenEndBB = context_.currentBlock();
 
   // Emit else block
   context_.setCurrentBlock(elseBB);
-  Value* elseValue = generate(node.elseExpr);
+  Value* const elseValue = generate(node.elseExpr);
   if (!elseValue) {
     result_ = nullptr;
     return;
   }
   BranchInst::Create(mergeBB, context_.currentBlock());
   // Save the block that else ends in
-  BasicBlock* elseEndBB = context_.currentBlock();
+  BasicBlock* const elseEndBB = context_.currentBlock();
 
   // Emit merge block with PHI node - use actual type from then value
   context_.setCurrentBlock(mergeBB);
-  PHINode* phi = PHINode::Create(thenValue->getType(), 2, "iftmp", mergeBB);
+  PHINode* const phi = PHINode::Create(thenValue->getType(), 2, "iftmp", mergeBB);
   phi->addIncoming(thenValue, thenEndBB);
   phi->addIncoming(elseValue, elseEndBB);
 
@@ -350,24 +350,24 @@ void CodeGenVisitor::visit(const NLetExpression& node) {
       const auto* var = binding->var;
       if (var->type == nullptr) {
         std::cerr << "Internal error: let binding type not resolved for "
-                  << var->id.name << std::endl;
+                  << var->id.name << "\n";
         result_ = nullptr;
         return;
       }
-      AllocaInst* alloc =
+      AllocaInst* const alloc =
           new AllocaInst(typeOf(var->type, context_.context), 0,
                          var->id.name.c_str(), context_.currentBlock());
       context_.locals()[var->id.name] = alloc;
 
       if (var->assignmentExpr != nullptr) {
-        Value* value = generate(*var->assignmentExpr);
+        Value* const value = generate(*var->assignmentExpr);
         new StoreInst(value, alloc, false, context_.currentBlock());
       }
     }
   }
 
   // Generate the body expression
-  Value* bodyValue = generate(node.body);
+  Value* const bodyValue = generate(node.body);
 
   // Restore the original locals (remove bindings from scope)
   context_.locals() = savedLocals;

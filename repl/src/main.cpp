@@ -5,7 +5,15 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+
+// Cross-platform terminal detection
+#ifdef _WIN32
+#include <io.h>
+#define isatty _isatty
+#define fileno _fileno
+#else
 #include <unistd.h>
+#endif
 
 // Print the result of an evaluation
 static void printResult(const EvalResult& result) {

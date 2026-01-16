@@ -7,18 +7,18 @@ TEST(ParserTest, SimpleIfExpression) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* ifExpr = dynamic_cast<NIfExpression*>(&exprStmt->expression);
+  auto* ifExpr = dynamic_cast<const NIfExpression*>(&exprStmt->expression);
   ASSERT_NE(ifExpr, nullptr);
 
-  auto* cond = dynamic_cast<NInteger*>(&ifExpr->condition);
+  auto* cond = dynamic_cast<const NInteger*>(&ifExpr->condition);
   ASSERT_NE(cond, nullptr);
   EXPECT_EQ(cond->value, 1);
 
-  auto* thenExpr = dynamic_cast<NInteger*>(&ifExpr->thenExpr);
+  auto* thenExpr = dynamic_cast<const NInteger*>(&ifExpr->thenExpr);
   ASSERT_NE(thenExpr, nullptr);
   EXPECT_EQ(thenExpr->value, 2);
 
-  auto* elseExpr = dynamic_cast<NInteger*>(&ifExpr->elseExpr);
+  auto* elseExpr = dynamic_cast<const NInteger*>(&ifExpr->elseExpr);
   ASSERT_NE(elseExpr, nullptr);
   EXPECT_EQ(elseExpr->value, 3);
 }
@@ -28,10 +28,10 @@ TEST(ParserTest, IfExpressionWithComparison) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* ifExpr = dynamic_cast<NIfExpression*>(&exprStmt->expression);
+  auto* ifExpr = dynamic_cast<const NIfExpression*>(&exprStmt->expression);
   ASSERT_NE(ifExpr, nullptr);
 
-  auto* cond = dynamic_cast<NBinaryOperator*>(&ifExpr->condition);
+  auto* cond = dynamic_cast<const NBinaryOperator*>(&ifExpr->condition);
   ASSERT_NE(cond, nullptr);
   EXPECT_EQ(cond->op, TCGT);
 }
@@ -41,15 +41,15 @@ TEST(ParserTest, NestedIfExpression) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* outerIf = dynamic_cast<NIfExpression*>(&exprStmt->expression);
+  auto* outerIf = dynamic_cast<const NIfExpression*>(&exprStmt->expression);
   ASSERT_NE(outerIf, nullptr);
 
   // The then branch should be another if expression
-  auto* innerIf = dynamic_cast<NIfExpression*>(&outerIf->thenExpr);
+  auto* innerIf = dynamic_cast<const NIfExpression*>(&outerIf->thenExpr);
   ASSERT_NE(innerIf, nullptr);
 
   // The outer else should be 3
-  auto* elseExpr = dynamic_cast<NInteger*>(&outerIf->elseExpr);
+  auto* elseExpr = dynamic_cast<const NInteger*>(&outerIf->elseExpr);
   ASSERT_NE(elseExpr, nullptr);
   EXPECT_EQ(elseExpr->value, 3);
 }
@@ -81,7 +81,7 @@ TEST(ParserTest, IfExpressionInFunctionBody) {
       dynamic_cast<NExpressionStatement*>(funcDecl->block.statements[0]);
   ASSERT_NE(bodyStmt, nullptr);
 
-  auto* ifExpr = dynamic_cast<NIfExpression*>(&bodyStmt->expression);
+  auto* ifExpr = dynamic_cast<const NIfExpression*>(&bodyStmt->expression);
   ASSERT_NE(ifExpr, nullptr);
 }
 
@@ -95,7 +95,7 @@ TEST(ParserTest, SimpleLetExpression) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
   ASSERT_NE(exprStmt, nullptr);
 
-  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 1);
   ASSERT_FALSE(letExpr->bindings[0]->isFunction);
@@ -108,7 +108,7 @@ TEST(ParserTest, SimpleLetExpression) {
   ASSERT_NE(initExpr, nullptr);
   EXPECT_EQ(initExpr->value, 1);
 
-  auto* bodyExpr = dynamic_cast<NBinaryOperator*>(&letExpr->body);
+  auto* bodyExpr = dynamic_cast<const NBinaryOperator*>(&letExpr->body);
   ASSERT_NE(bodyExpr, nullptr);
   EXPECT_EQ(bodyExpr->op, TPLUS);
 }
@@ -119,7 +119,7 @@ TEST(ParserTest, LetExpressionMultipleBindings) {
   ASSERT_EQ(block->statements.size(), 1);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 2);
 
@@ -143,7 +143,7 @@ TEST(ParserTest, LetExpressionWithTypeAnnotation) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 1);
   ASSERT_FALSE(letExpr->bindings[0]->isFunction);
@@ -158,7 +158,7 @@ TEST(ParserTest, LetExpressionMixedTypeAnnotations) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 3);
 
@@ -178,17 +178,17 @@ TEST(ParserTest, NestedLetExpression) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* outerLet = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  auto* outerLet = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(outerLet, nullptr);
   ASSERT_FALSE(outerLet->bindings[0]->isFunction);
   EXPECT_EQ(outerLet->bindings[0]->var->id.name, "x");
 
-  auto* innerLet = dynamic_cast<NLetExpression*>(&outerLet->body);
+  auto* innerLet = dynamic_cast<const NLetExpression*>(&outerLet->body);
   ASSERT_NE(innerLet, nullptr);
   ASSERT_FALSE(innerLet->bindings[0]->isFunction);
   EXPECT_EQ(innerLet->bindings[0]->var->id.name, "y");
 
-  auto* bodyExpr = dynamic_cast<NBinaryOperator*>(&innerLet->body);
+  auto* bodyExpr = dynamic_cast<const NBinaryOperator*>(&innerLet->body);
   ASSERT_NE(bodyExpr, nullptr);
 }
 
@@ -219,7 +219,7 @@ TEST(ParserTest, LetExpressionInFunctionBody) {
       dynamic_cast<NExpressionStatement*>(funcDecl->block.statements[0]);
   ASSERT_NE(bodyStmt, nullptr);
 
-  auto* letExpr = dynamic_cast<NLetExpression*>(&bodyStmt->expression);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&bodyStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_FALSE(letExpr->bindings[0]->isFunction);
   EXPECT_EQ(letExpr->bindings[0]->var->id.name, "b");
@@ -230,10 +230,10 @@ TEST(ParserTest, LetExpressionWithIfBody) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
 
-  auto* ifExpr = dynamic_cast<NIfExpression*>(&letExpr->body);
+  auto* ifExpr = dynamic_cast<const NIfExpression*>(&letExpr->body);
   ASSERT_NE(ifExpr, nullptr);
 }
 
@@ -242,7 +242,7 @@ TEST(ParserTest, LetExpressionWithComplexInitializer) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
 
   // Initializer should be 1 + (2 * 3) due to precedence
@@ -258,7 +258,7 @@ TEST(ParserTest, LetExpressionThreeBindings) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 3);
   ASSERT_FALSE(letExpr->bindings[0]->isFunction);
@@ -276,7 +276,7 @@ TEST(ParserTest, LetExpressionWithFunction) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 1);
 
@@ -291,7 +291,7 @@ TEST(ParserTest, LetExpressionWithFunction) {
   EXPECT_EQ(func->arguments[0]->id.name, "x");
 
   // Check that the body is a function call
-  auto* call = dynamic_cast<NMethodCall*>(&letExpr->body);
+  auto* call = dynamic_cast<const NMethodCall*>(&letExpr->body);
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(call->id.name, "f");
 }
@@ -301,7 +301,7 @@ TEST(ParserTest, LetExpressionWithFunctionInferredReturnType) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 1);
 
@@ -321,7 +321,7 @@ TEST(ParserTest, LetExpressionMultipleFunctions) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 2);
 
@@ -339,7 +339,7 @@ TEST(ParserTest, LetExpressionMixedVariablesAndFunctions) {
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block);
-  auto* letExpr = dynamic_cast<NLetExpression*>(&exprStmt->expression);
+  auto* letExpr = dynamic_cast<const NLetExpression*>(&exprStmt->expression);
   ASSERT_NE(letExpr, nullptr);
   ASSERT_EQ(letExpr->bindings.size(), 2);
 
