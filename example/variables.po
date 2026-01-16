@@ -1,4 +1,5 @@
-let x = 10
-let y: int = 20
-let sum = x + y
-sum
+; Variable declarations and usage
+let x = 10          ; type inferred as int
+let y: int = 20     ; explicit type annotation
+let sum = x + y     ; use variables in expressions
+sum                 ; result: 30

@@ -1,9 +1,11 @@
+; Factorial using nested let expressions
+; fact(n) = n * (n-1) * ... * 2 * 1
 let fact5 =
-  let n1 = 1 in
-  let n2 = n1 * 2 in
-  let n3 = n2 * 3 in
-  let n4 = n3 * 4 in
-  let n5 = n4 * 5 in
+  let n1 = 1 in       ; 1! = 1
+  let n2 = n1 * 2 in  ; 2! = 2
+  let n3 = n2 * 3 in  ; 3! = 6
+  let n4 = n3 * 4 in  ; 4! = 24
+  let n5 = n4 * 5 in  ; 5! = 120
   n5
 
-fact5
+fact5  ; result: 120

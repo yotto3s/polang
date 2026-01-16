@@ -1,4 +1,5 @@
-let square (n: int): int = n * n
-let add (a: int) (b: int): int = a + b
-let result = add(square(3), square(4))
-result
+; Function declarations and calls
+let square (n: int): int = n * n              ; single parameter function
+let add (a: int) (b: int): int = a + b        ; multi-parameter function
+let result = add(square(3), square(4))        ; nested function calls: 9 + 16
+result                                         ; result: 25

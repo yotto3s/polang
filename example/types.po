@@ -1,8 +1,10 @@
-let i: int = 42
-let d: double = 3.14159
-let b: bool = true
+; Type system demonstration
+let i: int = 42           ; integer type
+let d: double = 3.14159   ; double type
+let b: bool = true        ; boolean type
 
+; Comparisons return bool
 let is_positive: bool = i > 0
 let is_large: bool = d > 3.0
 
-if is_positive then i * 2 else 0
+if is_positive then i * 2 else 0  ; result: 84
