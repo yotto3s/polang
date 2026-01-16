@@ -280,3 +280,21 @@ TEST(TypeCheckTest, LetExpressionMixedBindingsTypes) {
   // Variable and function in same let expression
   EXPECT_TRUE(hasNoTypeError("let x = 10 and f(y: int): int = y * 2 in f(x)"));
 }
+
+// ============== Let Expression Parallel Binding Tests ==============
+
+TEST(TypeCheckTest, LetBindingCannotReferToSibling) {
+  // Bindings in let...and cannot refer to each other
+  EXPECT_TRUE(hasTypeError("let x = 10 and y = x in y"));
+  EXPECT_TRUE(hasTypeError("let a = 1 and b = a + 1 in b"));
+}
+
+TEST(TypeCheckTest, LetBindingCanReferToOuterScope) {
+  // Nested let can see outer binding
+  EXPECT_TRUE(hasNoTypeError("let x = 10 in let y = x in y"));
+}
+
+TEST(TypeCheckTest, LetBindingParallelEvaluation) {
+  // Both bindings evaluated in same scope - neither sees the other
+  EXPECT_TRUE(hasTypeError("let x = y and y = 1 in x"));
+}

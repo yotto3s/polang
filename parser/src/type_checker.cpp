@@ -202,16 +202,117 @@ void TypeChecker::visit(const NLetExpression& node) {
   const auto saved_func_returns = function_return_types_;
   const auto saved_func_params = function_param_types_;
 
-  // Process bindings (can be variables or functions)
+  // Pass 1: Type-check all binding initializers in the ORIGINAL scope
+  // (no new bindings visible yet - parallel/simultaneous binding semantics)
+  std::vector<std::string> binding_types;
+  std::vector<std::vector<std::string>> func_param_types;
+
   for (const auto* binding : node.bindings) {
     if (binding->isFunction) {
-      binding->func->accept(*this);
+      // For functions, process parameters and body but don't add to scope yet
+      const auto* func = binding->func;
+
+      // Save scope before processing function
+      const auto func_saved_locals = local_types_;
+
+      // Add parameters to scope for type-checking the function body
+      std::vector<std::string> param_types;
+      for (const auto* arg : func->arguments) {
+        if (arg->type == nullptr) {
+          reportError("Function parameter '" + arg->id.name +
+                      "' must have type annotation");
+          param_types.push_back("unknown");
+          continue;
+        }
+        local_types_[arg->id.name] = arg->type->name;
+        param_types.push_back(arg->type->name);
+      }
+      func_param_types.push_back(param_types);
+
+      // Type-check function body
+      func->block.accept(*this);
+      const std::string body_type = inferred_type_;
+
+      // Handle return type inference
+      NFunctionDeclaration& mutable_func =
+          const_cast<NFunctionDeclaration&>(*func);
+      if (func->type == nullptr) {
+        if (body_type != "unknown") {
+          mutable_func.type = new NIdentifier(body_type);
+        } else {
+          mutable_func.type = new NIdentifier("int");
+        }
+      } else if (body_type != "unknown" && body_type != func->type->name) {
+        reportError("Function '" + func->id.name + "' declared to return " +
+                    func->type->name + " but body has type " + body_type);
+      }
+
+      // Placeholder for function binding type
+      binding_types.push_back("function");
+
+      // Restore scope (remove parameters)
+      local_types_ = func_saved_locals;
     } else {
-      binding->var->accept(*this);
+      // Variable binding: type-check initializer without adding to scope
+      const auto* var = binding->var;
+      NVariableDeclaration& mutable_var =
+          const_cast<NVariableDeclaration&>(*var);
+
+      if (var->assignmentExpr == nullptr) {
+        if (var->type == nullptr) {
+          reportError("Variable '" + var->id.name +
+                      "' must have type annotation or initializer");
+          binding_types.push_back("unknown");
+        } else {
+          binding_types.push_back(var->type->name);
+        }
+        continue;
+      }
+
+      // Type-check initializer in current scope (no new bindings visible)
+      var->assignmentExpr->accept(*this);
+      const std::string expr_type = inferred_type_;
+
+      if (expr_type == "unknown") {
+        if (var->type != nullptr) {
+          binding_types.push_back(var->type->name);
+        } else {
+          binding_types.push_back("unknown");
+        }
+        continue;
+      }
+
+      if (var->type == nullptr) {
+        // Infer type from expression
+        mutable_var.type = new NIdentifier(expr_type);
+        binding_types.push_back(expr_type);
+      } else {
+        // Validate type annotation
+        if (expr_type != var->type->name) {
+          reportError("Variable '" + var->id.name + "' declared as " +
+                      var->type->name + " but initialized with " + expr_type);
+        }
+        binding_types.push_back(var->type->name);
+      }
     }
   }
 
-  // Process body with new bindings in scope
+  // Pass 2: Add all bindings to scope
+  size_t i = 0;
+  size_t func_idx = 0;
+  for (const auto* binding : node.bindings) {
+    if (binding->isFunction) {
+      const auto* func = binding->func;
+      function_param_types_[func->id.name] = func_param_types[func_idx++];
+      function_return_types_[func->id.name] =
+          func->type ? func->type->name : "int";
+    } else {
+      local_types_[binding->var->id.name] = binding_types[i];
+    }
+    ++i;
+  }
+
+  // Process body with all bindings in scope
   node.body.accept(*this);
 
   // Restore previous scopes
