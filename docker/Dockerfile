@@ -32,6 +32,12 @@ RUN wget https://apt.llvm.org/llvm.sh && \
     sudo ./llvm.sh 20 all && \
     rm llvm.sh
 
+# Install MLIR development packages
+RUN apt-get update && apt-get install -y \
+    libmlir-20-dev \
+    mlir-20-tools \
+    && apt-get clean
+
 # Register clang
 RUN sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100 \
     --slave /usr/bin/clang++ clang++ /usr/bin/clang++-20 \

@@ -1,16 +1,54 @@
 #include "compiler/codegen.hpp"
+#include "compiler/mlir_codegen.hpp"
 #include "parser/node.hpp"
 #include "parser/parser_api.hpp"
 #include "parser/type_checker.hpp"
+#include <cstring>
 #include <iostream>
 #include <sstream>
 
+static void printUsage(const char* progName) {
+  std::cerr << "Usage: " << progName << " [options] [file]\n";
+  std::cerr << "Options:\n";
+  std::cerr << "  --emit-mlir  Emit Polang dialect MLIR instead of LLVM IR\n";
+  std::cerr << "  --legacy     Use legacy LLVM IR backend (default: MLIR)\n";
+  std::cerr << "  --help       Show this help message\n";
+}
+
 int main(int argc, char** argv) {
+  bool useLegacy = false;
+  bool emitMlir = false;
+  const char* inputFile = nullptr;
+
+  // Parse command-line arguments
+  for (int i = 1; i < argc; ++i) {
+    if (std::strcmp(argv[i], "--legacy") == 0) {
+      useLegacy = true;
+    } else if (std::strcmp(argv[i], "--emit-mlir") == 0) {
+      emitMlir = true;
+    } else if (std::strcmp(argv[i], "--help") == 0 ||
+               std::strcmp(argv[i], "-h") == 0) {
+      printUsage(argv[0]);
+      return 0;
+    } else if (argv[i][0] == '-') {
+      std::cerr << "Unknown option: " << argv[i] << "\n";
+      printUsage(argv[0]);
+      return 1;
+    } else {
+      inputFile = argv[i];
+    }
+  }
+
+  if (emitMlir && useLegacy) {
+    std::cerr << "Error: --emit-mlir cannot be used with --legacy\n";
+    return 1;
+  }
+
   NBlock* ast = nullptr;
 
-  if (argc > 1) {
+  if (inputFile != nullptr) {
     // File input mode
-    ast = polang_parse_file(argv[1]);
+    ast = polang_parse_file(inputFile);
   } else {
     // Stdin mode
     std::stringstream buffer;
@@ -19,7 +57,7 @@ int main(int argc, char** argv) {
     ast = polang_parse(source);
   }
 
-  if (!ast) {
+  if (ast == nullptr) {
     return 1;
   }
 
@@ -29,9 +67,45 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  CodeGenContext context;
-  context.generateCode(*ast);
-  context.printIR(llvm::outs());
+  if (useLegacy) {
+    // Legacy LLVM IR backend
+    CodeGenContext context;
+    context.generateCode(*ast);
+    context.printIR(llvm::outs());
+  } else {
+    // MLIR backend (default)
+    polang::MLIRCodeGenContext context;
+
+    if (!context.generateCode(*ast)) {
+      std::cerr << "MLIR generation failed: " << context.getError() << "\n";
+      return 1;
+    }
+
+    if (emitMlir) {
+      // Just print the Polang dialect MLIR
+      context.printMLIR(llvm::outs());
+      return 0;
+    }
+
+    // Lower to standard dialects
+    if (!context.lowerToStandard()) {
+      std::cerr << "Lowering to standard failed: " << context.getError()
+                << "\n";
+      return 1;
+    }
+
+    // Lower to LLVM dialect
+    if (!context.lowerToLLVM()) {
+      std::cerr << "Lowering to LLVM failed: " << context.getError() << "\n";
+      return 1;
+    }
+
+    // Print LLVM IR
+    if (!context.printLLVMIR(llvm::outs())) {
+      std::cerr << "LLVM IR generation failed: " << context.getError() << "\n";
+      return 1;
+    }
+  }
 
   return 0;
 }
