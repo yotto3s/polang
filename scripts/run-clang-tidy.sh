@@ -1,24 +1,12 @@
 #!/bin/bash
 # Run clang-tidy on the Polang codebase
-# Usage: ./scripts/run-clang-tidy.sh [--fix] [files...]
+# Usage: ./scripts/run-clang-tidy.sh [build_dir] [--fix] [files...]
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_DIR="$PROJECT_DIR/build"
-
-# Check if build directory exists
-if [[ ! -d "$BUILD_DIR" ]]; then
-    echo "Error: Build directory not found. Run cmake first."
-    exit 1
-fi
-
-# Check if compile_commands.json exists
-if [[ ! -f "$BUILD_DIR/compile_commands.json" ]]; then
-    echo "Error: compile_commands.json not found. Configure with -DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
-    exit 1
-fi
 
 # Parse arguments
 FIX_FLAG=""
@@ -30,11 +18,28 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         *)
-            FILES+=("$1")
+            # First non-flag argument that is a directory is the build dir
+            if [[ -d "$1" ]] && [[ ${#FILES[@]} -eq 0 ]] && [[ "$BUILD_DIR" == "$PROJECT_DIR/build" ]]; then
+                BUILD_DIR="$1"
+            else
+                FILES+=("$1")
+            fi
             shift
             ;;
     esac
 done
+
+# Check if build directory exists
+if [[ ! -d "$BUILD_DIR" ]]; then
+    echo "Error: Build directory '$BUILD_DIR' not found. Run cmake first."
+    exit 1
+fi
+
+# Check if compile_commands.json exists
+if [[ ! -f "$BUILD_DIR/compile_commands.json" ]]; then
+    echo "Error: compile_commands.json not found in '$BUILD_DIR'. Configure with -DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+    exit 1
+fi
 
 # Create filtered compile_commands.json (remove GCC-specific flags)
 FILTERED_COMPILE_COMMANDS=$(mktemp)
