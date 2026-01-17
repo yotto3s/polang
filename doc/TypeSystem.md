@@ -86,13 +86,13 @@ The type checker uses the `FreeVariableCollector` class for capture analysis:
 
 ```cpp
 class FreeVariableCollector : public Visitor {
-  std::set<std::string> local_names_;
-  std::set<std::string> referenced_non_locals_;
+  std::set<std::string> localNames;
+  std::set<std::string> referencedNonLocals;
 
   void visit(const NIdentifier& node) override {
     // If not locally defined, it's a free variable (capture)
-    if (local_names_.find(node.name) == local_names_.end()) {
-      referenced_non_locals_.insert(node.name);
+    if (localNames.find(node.name) == localNames.end()) {
+      referencedNonLocals.insert(node.name);
     }
   }
 };
@@ -195,10 +195,10 @@ The `MLIRGenVisitor` generates fresh type variables for untyped parameters:
 
 ```cpp
 class MLIRGenVisitor : public Visitor {
-  uint64_t nextTypeVarId_ = 0;
+  uint64_t nextTypeVarId = 0;
 
   Type freshTypeVar() {
-    return builder.getType<TypeVarType>(nextTypeVarId_++);
+    return builder.getType<TypeVarType>(nextTypeVarId++);
   }
 
   Type getTypeOrFresh(const NIdentifier* typeAnnotation) {
@@ -220,11 +220,11 @@ A substitution maps type variable IDs to types:
 
 ```cpp
 class Substitution {
-  llvm::DenseMap<uint64_t, Type> bindings_;
+  llvm::DenseMap<uint64_t, Type> bindings;
 public:
   void bind(uint64_t var, Type type);
-  Type apply(Type type) const;      // Recursively resolve type vars
-  Substitution compose(const Substitution& other) const;
+  [[nodiscard]] Type apply(Type type) const;      // Recursively resolve type vars
+  [[nodiscard]] Substitution compose(const Substitution& other) const;
 };
 ```
 

@@ -7,11 +7,12 @@
 #ifndef POLANG_DIALECT_POLANGOPS_H
 #define POLANG_DIALECT_POLANGOPS_H
 
-// Suppress Clang warnings from MLIR headers (OperationSupport.h)
-#if defined(__clang__)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdangling-assignment-gsl"
+// Suppress warnings from MLIR headers
+#pragma GCC diagnostic push
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wdangling-assignment-gsl"
 #endif
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -23,10 +24,6 @@
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-#if defined(__clang__)
-#pragma clang diagnostic pop
-#endif
-
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangTypes.h"
 
@@ -35,5 +32,7 @@
 
 #define GET_OP_CLASSES
 #include "polang/Dialect/PolangOps.h.inc"
+
+#pragma GCC diagnostic pop
 
 #endif // POLANG_DIALECT_POLANGOPS_H

@@ -4,6 +4,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Suppress warnings from MLIR/LLVM headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "polang/Dialect/PolangTypes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -15,6 +19,8 @@ using namespace polang;
 
 #define GET_TYPEDEF_CLASSES
 #include "polang/Dialect/PolangTypes.cpp.inc"
+
+#pragma GCC diagnostic pop
 
 void PolangDialect::registerTypes() {
   addTypes<

@@ -1,3 +1,7 @@
+// Suppress warnings from LLVM headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "compiler/mlir_codegen.hpp"
 #include "parser/ast_printer.hpp"
 #include "parser/node.hpp"
@@ -8,6 +12,8 @@
 #include <sstream>
 
 #include <llvm/Support/raw_ostream.h>
+
+#pragma GCC diagnostic pop
 
 static void printUsage(const char* progName) {
   std::cerr << "Usage: " << progName << " [options] [file]\n";

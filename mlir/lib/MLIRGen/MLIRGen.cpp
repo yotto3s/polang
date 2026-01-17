@@ -4,6 +4,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Suppress warnings from MLIR/LLVM headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "polang/MLIRGen.h"
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangOps.h"
@@ -28,6 +32,8 @@ using polang::TypeNames;
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
+#pragma GCC diagnostic pop
+
 #include <map>
 #include <optional>
 #include <string>
@@ -51,7 +57,7 @@ public:
   }
 
   /// Generate a fresh type variable
-  Type freshTypeVar() { return builder.getType<TypeVarType>(nextTypeVarId_++); }
+  Type freshTypeVar() { return builder.getType<TypeVarType>(nextTypeVarId++); }
 
   /// Get a Polang type from annotation, or a fresh type variable if none
   Type getTypeOrFresh(const NIdentifier* typeAnnotation) {
@@ -475,7 +481,7 @@ public:
 
   void visit(const NModuleDeclaration& node) override {
     // Push module name onto path for name mangling
-    currentModulePath_.push_back(node.name.name);
+    currentModulePath.push_back(node.name.name);
 
     // Generate module members with mangled names
     for (const auto* member : node.members) {
@@ -483,7 +489,7 @@ public:
     }
 
     // Pop module name from path
-    currentModulePath_.pop_back();
+    currentModulePath.pop_back();
     result = nullptr; // Module declarations don't produce a value
   }
 
@@ -572,22 +578,22 @@ private:
   TypeChecker typeChecker;
 
   // Type variable counter for generating fresh type variables
-  uint64_t nextTypeVarId_ = 0;
+  uint64_t nextTypeVarId = 0;
 
   // Current result value and type
   Value result;
   std::string resultType;
 
   // Module path for name mangling (e.g., ["Math", "Internal"])
-  std::vector<std::string> currentModulePath_;
+  std::vector<std::string> currentModulePath;
 
   // Get mangled name for a symbol within current module context
   [[nodiscard]] std::string mangledName(const std::string& name) const {
-    if (currentModulePath_.empty()) {
+    if (currentModulePath.empty()) {
       return name;
     }
     std::string result;
-    for (const auto& part : currentModulePath_) {
+    for (const auto& part : currentModulePath) {
       result += part + "$$";
     }
     result += name;
@@ -614,35 +620,35 @@ private:
   class SymbolTableScope {
   public:
     SymbolTableScope(MLIRGenVisitor& visitor, bool clearAllTables = false)
-        : visitor_(visitor), savedSymbolTable_(visitor.symbolTable),
-          savedTypeTable_(visitor.typeTable),
-          savedTypeVarTable_(visitor.typeVarTable),
-          savedArgValues_(visitor.argValues),
-          savedImmutableValues_(visitor.immutableValues) {
+        : visitor(visitor), savedSymbolTable(visitor.symbolTable),
+          savedTypeTable(visitor.typeTable),
+          savedTypeVarTable(visitor.typeVarTable),
+          savedArgValues(visitor.argValues),
+          savedImmutableValues(visitor.immutableValues) {
       if (clearAllTables) {
-        visitor_.symbolTable.clear();
-        visitor_.typeTable.clear();
-        visitor_.typeVarTable.clear();
-        visitor_.argValues.clear();
-        visitor_.immutableValues.clear();
+        visitor.symbolTable.clear();
+        visitor.typeTable.clear();
+        visitor.typeVarTable.clear();
+        visitor.argValues.clear();
+        visitor.immutableValues.clear();
       }
     }
 
     ~SymbolTableScope() {
-      visitor_.symbolTable = savedSymbolTable_;
-      visitor_.typeTable = savedTypeTable_;
-      visitor_.typeVarTable = savedTypeVarTable_;
-      visitor_.argValues = savedArgValues_;
-      visitor_.immutableValues = savedImmutableValues_;
+      visitor.symbolTable = savedSymbolTable;
+      visitor.typeTable = savedTypeTable;
+      visitor.typeVarTable = savedTypeVarTable;
+      visitor.argValues = savedArgValues;
+      visitor.immutableValues = savedImmutableValues;
     }
 
   private:
-    MLIRGenVisitor& visitor_;
-    std::map<std::string, Value> savedSymbolTable_;
-    std::map<std::string, std::string> savedTypeTable_;
-    std::map<std::string, Type> savedTypeVarTable_;
-    std::map<std::string, Value> savedArgValues_;
-    std::map<std::string, Value> savedImmutableValues_;
+    MLIRGenVisitor& visitor;
+    std::map<std::string, Value> savedSymbolTable;
+    std::map<std::string, std::string> savedTypeTable;
+    std::map<std::string, Type> savedTypeVarTable;
+    std::map<std::string, Value> savedArgValues;
+    std::map<std::string, Value> savedImmutableValues;
   };
 
   Location loc() { return builder.getUnknownLoc(); }

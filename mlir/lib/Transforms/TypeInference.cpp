@@ -4,6 +4,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Suppress warnings from MLIR/LLVM headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangOps.h"
 #include "polang/Dialect/PolangTypes.h"
@@ -19,6 +23,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/raw_ostream.h"
+
+#pragma GCC diagnostic pop
 
 #include <optional>
 #include <set>
@@ -39,19 +45,17 @@ bool containsTypeVar(Type type) { return isa<TypeVarType>(type); }
 /// The entry function (__polang_entry) is never considered polymorphic.
 bool isPolymorphicFunction(FuncOp func) {
   // The entry function is never polymorphic - it should always be resolved
-  if (func.getSymName() == "__polang_entry")
+  if (func.getSymName() == "__polang_entry") {
     return false;
+  }
 
   FunctionType funcType = func.getFunctionType();
-  for (Type input : funcType.getInputs()) {
-    if (containsTypeVar(input))
-      return true;
+  if (llvm::any_of(funcType.getInputs(),
+                   [](Type input) { return containsTypeVar(input); })) {
+    return true;
   }
-  for (Type result : funcType.getResults()) {
-    if (containsTypeVar(result))
-      return true;
-  }
-  return false;
+  return llvm::any_of(funcType.getResults(),
+                      [](Type result) { return containsTypeVar(result); });
 }
 
 //===----------------------------------------------------------------------===//
@@ -60,17 +64,19 @@ bool isPolymorphicFunction(FuncOp func) {
 
 class Substitution {
 public:
-  void bind(uint64_t var, Type type) { bindings_[var] = type; }
+  void bind(uint64_t var, Type type) { bindings[var] = type; }
 
-  Type lookup(uint64_t var) const {
-    auto it = bindings_.find(var);
-    return it != bindings_.end() ? it->second : Type();
+  [[nodiscard]] Type lookup(uint64_t var) const {
+    auto it = bindings.find(var);
+    return it != bindings.end() ? it->second : Type();
   }
 
-  bool contains(uint64_t var) const { return bindings_.count(var) > 0; }
+  [[nodiscard]] bool contains(uint64_t var) const {
+    return bindings.contains(var);
+  }
 
   /// Apply substitution to a type, recursively resolving type variables
-  Type apply(Type type) const {
+  [[nodiscard]] Type apply(Type type) const {
     if (auto typeVar = dyn_cast<TypeVarType>(type)) {
       Type bound = lookup(typeVar.getId());
       if (bound) {
@@ -85,29 +91,29 @@ public:
   }
 
   /// Compose two substitutions: (this . other)(t) = this(other(t))
-  Substitution compose(const Substitution& other) const {
+  [[nodiscard]] Substitution compose(const Substitution& other) const {
     Substitution result;
     // Apply this substitution to all types in other
-    for (const auto& [var, type] : other.bindings_) {
-      result.bindings_[var] = apply(type);
+    for (const auto& [var, type] : other.bindings) {
+      result.bindings[var] = apply(type);
     }
     // Add bindings from this that aren't in other
-    for (const auto& [var, type] : bindings_) {
+    for (const auto& [var, type] : bindings) {
       if (!result.contains(var)) {
-        result.bindings_[var] = type;
+        result.bindings[var] = type;
       }
     }
     return result;
   }
 
   void dump() const {
-    for (const auto& [var, type] : bindings_) {
+    for (const auto& [var, type] : bindings) {
       llvm::errs() << "  typevar<" << var << "> = " << type << "\n";
     }
   }
 
 private:
-  llvm::DenseMap<uint64_t, Type> bindings_;
+  llvm::DenseMap<uint64_t, Type> bindings;
 };
 
 //===----------------------------------------------------------------------===//
@@ -123,8 +129,9 @@ public:
     Type s2 = subst.apply(t2);
 
     // Same type - trivially unifiable
-    if (s1 == s2)
+    if (s1 == s2) {
       return true;
+    }
 
     // Left is type variable
     if (auto var1 = dyn_cast<TypeVarType>(s1)) {
@@ -142,7 +149,7 @@ public:
 
 private:
   /// Check if type variable occurs in type (prevents infinite types)
-  bool occursIn(uint64_t var, Type type) const {
+  [[nodiscard]] bool occursIn(uint64_t var, Type type) const {
     if (auto typeVar = dyn_cast<TypeVarType>(type)) {
       return typeVar.getId() == var;
     }
@@ -169,8 +176,10 @@ struct TypeInferencePass
     : public PassWrapper<TypeInferencePass, OperationPass<ModuleOp>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TypeInferencePass)
 
-  StringRef getArgument() const override { return "polang-type-inference"; }
-  StringRef getDescription() const override {
+  [[nodiscard]] StringRef getArgument() const override {
+    return "polang-type-inference";
+  }
+  [[nodiscard]] StringRef getDescription() const override {
     return "Infer types for type variables using Hindley-Milner algorithm";
   }
 
@@ -214,8 +223,9 @@ private:
     // For each return operation, unify return value type with function
     // return type
     FunctionType funcType = func.getFunctionType();
-    if (funcType.getNumResults() == 0)
+    if (funcType.getNumResults() == 0) {
       return;
+    }
 
     Type expectedReturnType = funcType.getResult(0);
 
@@ -266,8 +276,9 @@ private:
                               Unifier& unifier, bool& hadError) {
     // Find the callee function
     auto callee = module.lookupSymbol<FuncOp>(call.getCallee());
-    if (!callee)
+    if (!callee) {
       return;
+    }
 
     // Skip polymorphic function calls - they can be called with different types
     // at different call sites (e.g., identity(42) and identity(true)).
@@ -322,8 +333,9 @@ private:
       if (polymorphicFuncs.contains(call.getCallee())) {
         // Get the callee function
         auto callee = module.lookupSymbol<FuncOp>(call.getCallee());
-        if (!callee)
+        if (!callee) {
           return;
+        }
 
         FunctionType calleeType = callee.getFunctionType();
 
@@ -412,8 +424,9 @@ private:
     // Skip operations inside polymorphic functions
     module.walk([&](Operation* op) {
       // Skip function ops (handled above)
-      if (isa<FuncOp>(op))
+      if (isa<FuncOp>(op)) {
         return;
+      }
 
       // Skip operations inside polymorphic functions
       if (auto parentFunc = op->getParentOfType<FuncOp>()) {
@@ -424,8 +437,7 @@ private:
 
       bool needsUpdate = false;
       for (Type type : op->getResultTypes()) {
-        if (isa<TypeVarType>(subst.apply(type)) == false &&
-            isa<TypeVarType>(type)) {
+        if (!isa<TypeVarType>(subst.apply(type)) && isa<TypeVarType>(type)) {
           needsUpdate = true;
           break;
         }
@@ -435,8 +447,9 @@ private:
         }
       }
 
-      if (!needsUpdate)
+      if (!needsUpdate) {
         return;
+      }
 
       // Update result types by creating new operation
       OpBuilder builder(op);

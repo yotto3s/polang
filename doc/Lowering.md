@@ -399,7 +399,7 @@ mlir/
     │   └── PolangToStandard.cpp # Lowering pass
     ├── Transforms/
     │   ├── TypeInference.cpp   # Type inference pass (unification algorithm)
-    │   └── Monomorphization.cpp # Monomorphization pass (placeholder)
+    │   └── Monomorphization.cpp # Monomorphization pass (function specialization)
     └── MLIRGen/
         └── MLIRGen.cpp         # AST to MLIR visitor
 ```

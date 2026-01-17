@@ -3,7 +3,7 @@ project(Polang LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-add_compile_options(-Wall -Werror)
+add_compile_options(-Wall -Wextra -Werror)
 
 # Code coverage option
 option(POLANG_ENABLE_COVERAGE "Enable code coverage with gcov" OFF)

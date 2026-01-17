@@ -5,6 +5,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Suppress warnings from MLIR/LLVM headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "polang/Conversion/Passes.h"
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangOps.h"
@@ -17,6 +21,8 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
+
+#pragma GCC diagnostic pop
 
 using namespace mlir;
 using namespace polang;
@@ -50,6 +56,7 @@ struct ConstantIntOpLowering : public OpConversionPattern<ConstantIntOp> {
   LogicalResult
   matchAndRewrite(ConstantIntOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
+    (void)adaptor; // Unused, but required by MLIR interface
     auto i64Type = rewriter.getI64Type();
     auto value = rewriter.create<arith::ConstantIntOp>(op.getLoc(),
                                                        op.getValue(), i64Type);
@@ -64,6 +71,7 @@ struct ConstantDoubleOpLowering : public OpConversionPattern<ConstantDoubleOp> {
   LogicalResult
   matchAndRewrite(ConstantDoubleOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
+    (void)adaptor; // Unused, but required by MLIR interface
     auto f64Type = rewriter.getF64Type();
     auto value = rewriter.create<arith::ConstantFloatOp>(
         op.getLoc(), op.getValue(), f64Type);
@@ -78,6 +86,7 @@ struct ConstantBoolOpLowering : public OpConversionPattern<ConstantBoolOp> {
   LogicalResult
   matchAndRewrite(ConstantBoolOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
+    (void)adaptor; // Unused, but required by MLIR interface
     auto i1Type = rewriter.getI1Type();
     auto value = rewriter.create<arith::ConstantIntOp>(
         op.getLoc(), op.getValue() ? 1 : 0, i1Type);
@@ -236,6 +245,7 @@ struct FuncOpLowering : public OpConversionPattern<FuncOp> {
   LogicalResult
   matchAndRewrite(FuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
+    (void)adaptor; // Unused, but required by MLIR interface
     // Skip polymorphic functions - they are templates that should not be
     // lowered. Only their specialized (monomorphized) versions are lowered.
     if (op->hasAttr("polang.polymorphic")) {
@@ -366,6 +376,7 @@ struct AllocaOpLowering : public OpConversionPattern<AllocaOp> {
   LogicalResult
   matchAndRewrite(AllocaOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
+    (void)adaptor; // Unused, but required by MLIR interface
     auto elementType = getTypeConverter()->convertType(op.getElementType());
     if (!elementType) {
       return failure();
@@ -410,6 +421,7 @@ struct PrintOpLowering : public OpConversionPattern<PrintOp> {
   LogicalResult
   matchAndRewrite(PrintOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
+    (void)adaptor; // Unused, but required by MLIR interface
     // For now, just erase the print operation
     // In a full implementation, this would lower to a runtime call
     rewriter.eraseOp(op);
@@ -425,8 +437,10 @@ struct PolangToStandardPass
     : public PassWrapper<PolangToStandardPass, OperationPass<ModuleOp>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PolangToStandardPass)
 
-  StringRef getArgument() const final { return "convert-polang-to-standard"; }
-  StringRef getDescription() const final {
+  [[nodiscard]] StringRef getArgument() const final {
+    return "convert-polang-to-standard";
+  }
+  [[nodiscard]] StringRef getDescription() const final {
     return "Lower Polang dialect to standard dialects";
   }
 

@@ -1,3 +1,7 @@
+// Suppress warnings from LLVM headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "repl/repl_session.hpp"
 #include "repl/input_checker.hpp"
 
@@ -7,6 +11,8 @@
 #include "parser/type_checker.hpp"
 
 #include <llvm/Support/TargetSelect.h>
+
+#pragma GCC diagnostic pop
 
 #include <iostream>
 

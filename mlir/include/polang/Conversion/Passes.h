@@ -7,7 +7,14 @@
 #ifndef POLANG_CONVERSION_PASSES_H
 #define POLANG_CONVERSION_PASSES_H
 
+// Suppress warnings from MLIR headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "mlir/Pass/Pass.h"
+
+#pragma GCC diagnostic pop
+
 #include <memory>
 
 namespace polang {

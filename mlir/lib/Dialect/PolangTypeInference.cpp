@@ -4,6 +4,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Suppress warnings from MLIR/LLVM headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "polang/Dialect/Passes.h"
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangOps.h"
@@ -11,6 +15,8 @@
 
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
+
+#pragma GCC diagnostic pop
 
 using namespace mlir;
 using namespace polang;
@@ -21,8 +27,10 @@ struct PolangTypeInferencePass
     : public PassWrapper<PolangTypeInferencePass, OperationPass<ModuleOp>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PolangTypeInferencePass)
 
-  StringRef getArgument() const final { return "polang-type-inference"; }
-  StringRef getDescription() const final {
+  [[nodiscard]] StringRef getArgument() const final {
+    return "polang-type-inference";
+  }
+  [[nodiscard]] StringRef getDescription() const final {
     return "Perform Polang-specific type inference";
   }
 
@@ -35,8 +43,9 @@ struct PolangTypeInferencePass
         // Find return ops and infer type from returned value
         Type inferredType;
         funcOp.walk([&](ReturnOp returnOp) {
-          if (returnOp.getValue())
+          if (returnOp.getValue()) {
             inferredType = returnOp.getValue().getType();
+          }
         });
 
         if (inferredType) {

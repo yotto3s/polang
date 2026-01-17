@@ -4,6 +4,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Suppress warnings from MLIR/LLVM headers and generated code
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "polang/Dialect/PolangOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -35,6 +39,8 @@ bool typesAreCompatible(Type t1, Type t2) {
 
 #define GET_OP_CLASSES
 #include "polang/Dialect/PolangOps.cpp.inc"
+
+#pragma GCC diagnostic pop
 
 //===----------------------------------------------------------------------===//
 // FuncOp
@@ -113,6 +119,7 @@ FunctionType CallOp::getCalleeType() {
 
 void IfOp::build(OpBuilder& builder, OperationState& state, Type resultType,
                  Value condition) {
+  (void)builder; // Unused, but required by MLIR interface
   state.addOperands(condition);
   state.addTypes(resultType);
 

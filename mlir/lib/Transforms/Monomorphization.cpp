@@ -6,6 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Suppress warnings from MLIR/LLVM headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangOps.h"
 #include "polang/Dialect/PolangTypes.h"
@@ -18,6 +22,8 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+
+#pragma GCC diagnostic pop
 
 using namespace mlir;
 using namespace polang;
@@ -35,19 +41,17 @@ bool isTypeVar(Type type) { return isa<TypeVarType>(type); }
 /// The entry function (__polang_entry) is never considered polymorphic.
 bool isPolymorphicFunction(FuncOp func) {
   // The entry function is never polymorphic - it should always be resolved
-  if (func.getSymName() == "__polang_entry")
+  if (func.getSymName() == "__polang_entry") {
     return false;
+  }
 
   FunctionType funcType = func.getFunctionType();
-  for (Type input : funcType.getInputs()) {
-    if (isTypeVar(input))
-      return true;
+  if (llvm::any_of(funcType.getInputs(),
+                   [](Type input) { return isTypeVar(input); })) {
+    return true;
   }
-  for (Type result : funcType.getResults()) {
-    if (isTypeVar(result))
-      return true;
-  }
-  return false;
+  return llvm::any_of(funcType.getResults(),
+                      [](Type result) { return isTypeVar(result); });
 }
 
 /// Generate a mangled name for a specialized function
@@ -55,16 +59,18 @@ bool isPolymorphicFunction(FuncOp func) {
 std::string getMangledName(StringRef baseName, ArrayRef<Type> argTypes) {
   std::string result = baseName.str() + "$";
   for (size_t i = 0; i < argTypes.size(); ++i) {
-    if (i > 0)
+    if (i > 0) {
       result += "_";
-    if (isa<IntType>(argTypes[i]))
+    }
+    if (isa<IntType>(argTypes[i])) {
       result += "int";
-    else if (isa<DoubleType>(argTypes[i]))
+    } else if (isa<DoubleType>(argTypes[i])) {
       result += "double";
-    else if (isa<BoolType>(argTypes[i]))
+    } else if (isa<BoolType>(argTypes[i])) {
       result += "bool";
-    else
+    } else {
       result += "unknown";
+    }
   }
   return result;
 }
@@ -73,24 +79,26 @@ std::string getMangledName(StringRef baseName, ArrayRef<Type> argTypes) {
 std::string getSignatureKey(ArrayRef<Type> argTypes, Type returnType) {
   std::string key;
   for (Type t : argTypes) {
-    if (isa<IntType>(t))
+    if (isa<IntType>(t)) {
       key += "i";
-    else if (isa<DoubleType>(t))
+    } else if (isa<DoubleType>(t)) {
       key += "d";
-    else if (isa<BoolType>(t))
+    } else if (isa<BoolType>(t)) {
       key += "b";
-    else
+    } else {
       key += "?";
+    }
   }
   key += "->";
-  if (isa<IntType>(returnType))
+  if (isa<IntType>(returnType)) {
     key += "i";
-  else if (isa<DoubleType>(returnType))
+  } else if (isa<DoubleType>(returnType)) {
     key += "d";
-  else if (isa<BoolType>(returnType))
+  } else if (isa<BoolType>(returnType)) {
     key += "b";
-  else
+  } else {
     key += "?";
+  }
   return key;
 }
 
@@ -123,8 +131,9 @@ Type applyTypeMapping(Type type,
                       const llvm::DenseMap<uint64_t, Type>& mapping) {
   if (auto typeVar = dyn_cast<TypeVarType>(type)) {
     auto it = mapping.find(typeVar.getId());
-    if (it != mapping.end())
+    if (it != mapping.end()) {
       return it->second;
+    }
   }
   return type;
 }
@@ -137,8 +146,10 @@ struct MonomorphizationPass
     : public PassWrapper<MonomorphizationPass, OperationPass<ModuleOp>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MonomorphizationPass)
 
-  StringRef getArgument() const override { return "polang-monomorphize"; }
-  StringRef getDescription() const override {
+  [[nodiscard]] StringRef getArgument() const override {
+    return "polang-monomorphize";
+  }
+  [[nodiscard]] StringRef getDescription() const override {
     return "Monomorphize polymorphic functions";
   }
 
@@ -157,8 +168,9 @@ struct MonomorphizationPass
       }
     });
 
-    if (polymorphicFuncs.empty())
+    if (polymorphicFuncs.empty()) {
       return; // Nothing to monomorphize
+    }
 
     // Step 2: Collect all unique call signatures for each polymorphic function
     // Map: function name -> (signature key -> (argTypes, returnType))
@@ -169,8 +181,9 @@ struct MonomorphizationPass
     llvm::StringMap<llvm::StringMap<CallSignature>> callSignatures;
 
     module.walk([&](CallOp call) {
-      if (!polymorphicFuncs.contains(call.getCallee()))
+      if (!polymorphicFuncs.contains(call.getCallee())) {
         return;
+      }
 
       // Get resolved types from attributes (set by type inference)
       auto resolvedArgTypesAttr =
@@ -178,8 +191,9 @@ struct MonomorphizationPass
       auto resolvedReturnTypeAttr =
           call->getAttrOfType<TypeAttr>("polang.resolved_return_type");
 
-      if (!resolvedArgTypesAttr || !resolvedReturnTypeAttr)
+      if (!resolvedArgTypesAttr || !resolvedReturnTypeAttr) {
         return;
+      }
 
       SmallVector<Type> argTypes;
       for (Attribute attr : resolvedArgTypesAttr) {
@@ -217,16 +231,18 @@ struct MonomorphizationPass
 
     // Step 4: Update all CallOps to use specialized functions
     module.walk([&](CallOp call) {
-      if (!polymorphicFuncs.contains(call.getCallee()))
+      if (!polymorphicFuncs.contains(call.getCallee())) {
         return;
+      }
 
       auto resolvedArgTypesAttr =
           call->getAttrOfType<ArrayAttr>("polang.resolved_arg_types");
       auto resolvedReturnTypeAttr =
           call->getAttrOfType<TypeAttr>("polang.resolved_return_type");
 
-      if (!resolvedArgTypesAttr || !resolvedReturnTypeAttr)
+      if (!resolvedArgTypesAttr || !resolvedReturnTypeAttr) {
         return;
+      }
 
       SmallVector<Type> argTypes;
       for (Attribute attr : resolvedArgTypesAttr) {
@@ -238,12 +254,14 @@ struct MonomorphizationPass
 
       // Find the specialized function name
       auto funcIt = specializedNames.find(call.getCallee());
-      if (funcIt == specializedNames.end())
+      if (funcIt == specializedNames.end()) {
         return;
+      }
 
       auto sigIt = funcIt->second.find(sigKey);
-      if (sigIt == funcIt->second.end())
+      if (sigIt == funcIt->second.end()) {
         return;
+      }
 
       // Update the call to use the specialized function
       call.setCalleeFromCallable(
@@ -268,16 +286,19 @@ struct MonomorphizationPass
     // After monomorphization, the return statement may return a value with
     // a concrete type, but the function signature might still have a type var.
     module.walk([&](FuncOp func) {
-      if (func.getSymName() != "__polang_entry")
+      if (func.getSymName() != "__polang_entry") {
         return;
+      }
 
       FunctionType funcType = func.getFunctionType();
-      if (funcType.getNumResults() == 0)
+      if (funcType.getNumResults() == 0) {
         return;
+      }
 
       Type returnType = funcType.getResult(0);
-      if (!isTypeVar(returnType))
+      if (!isTypeVar(returnType)) {
         return; // Already concrete
+      }
 
       // Find the return statement and get its actual value type
       Type actualReturnType;
@@ -287,8 +308,9 @@ struct MonomorphizationPass
         }
       });
 
-      if (!actualReturnType || isTypeVar(actualReturnType))
+      if (!actualReturnType || isTypeVar(actualReturnType)) {
         return; // Couldn't determine concrete type
+      }
 
       // Update the function signature
       FunctionType newFuncType = FunctionType::get(
@@ -346,8 +368,9 @@ private:
     // Collect operations that need type updates (we can't modify while walking)
     SmallVector<Operation*> opsToUpdate;
     func.walk([&](Operation* op) {
-      if (isa<FuncOp>(op))
+      if (isa<FuncOp>(op)) {
         return;
+      }
 
       bool needsUpdate = false;
       for (Type type : op->getResultTypes()) {
@@ -356,8 +379,9 @@ private:
           break;
         }
       }
-      if (needsUpdate)
+      if (needsUpdate) {
         opsToUpdate.push_back(op);
+      }
     });
 
     // Update operations

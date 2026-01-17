@@ -4,6 +4,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Suppress warnings from MLIR/LLVM headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "compiler/mlir_codegen.hpp"
 
 #include "polang/Conversion/Passes.h"
@@ -36,6 +40,8 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
+
+#pragma GCC diagnostic pop
 
 #include <mutex>
 
