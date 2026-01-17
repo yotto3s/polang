@@ -88,12 +88,23 @@ Run clang-tidy to check for issues:
 ## Build Commands
 
 ```bash
-# Configure (inside docker container)
-cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+# Configure Debug build (default, inside docker container)
+cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+
+# Configure Release build (inside docker container)
+cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
 
 # Build (inside docker container)
 cmake --build build -j$(nproc)
 ```
+
+### Build Types
+
+| Type | Optimization | Debug Symbols | Assertions | Use Case |
+|------|-------------|---------------|------------|----------|
+| `Debug` | `-O0` | Yes (`-g`) | Enabled | Development, debugging |
+| `Release` | `-O3` | No | Disabled (`NDEBUG`) | Production, benchmarking |
+| `RelWithDebInfo` | `-O2` | Yes (`-g`) | Disabled | Performance profiling |
 
 Build outputs:
 - `build/bin/PolangCompiler` - Compiler executable (outputs LLVM IR to stdout)

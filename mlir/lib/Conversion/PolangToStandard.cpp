@@ -185,7 +185,7 @@ struct CmpOpLowering : public OpConversionPattern<CmpOp> {
     auto rhs = adaptor.getRhs();
 
     if (isa<IntegerType>(lhs.getType())) {
-      arith::CmpIPredicate pred;
+      arith::CmpIPredicate pred = arith::CmpIPredicate::eq;
       switch (op.getPredicate()) {
       case CmpPredicate::eq:
         pred = arith::CmpIPredicate::eq;
@@ -208,7 +208,7 @@ struct CmpOpLowering : public OpConversionPattern<CmpOp> {
       }
       rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, pred, lhs, rhs);
     } else {
-      arith::CmpFPredicate pred;
+      arith::CmpFPredicate pred = arith::CmpFPredicate::OEQ;
       switch (op.getPredicate()) {
       case CmpPredicate::eq:
         pred = arith::CmpFPredicate::OEQ;

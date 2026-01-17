@@ -80,6 +80,14 @@ Main build and test matrix with 4 configurations:
 | Clang 20 | Debug |
 | Clang 20 | Release |
 
+**Build Types:**
+
+| Type | Optimization | Debug Symbols | Assertions | Use Case |
+|------|-------------|---------------|------------|----------|
+| `Debug` | `-O0` | Yes (`-g`) | Enabled | Development, debugging |
+| `Release` | `-O3` | No | Disabled (`NDEBUG`) | Production, benchmarking |
+| `RelWithDebInfo` | `-O2` | Yes (`-g`) | Disabled | Performance profiling |
+
 Each configuration:
 1. Configures CMake with appropriate compiler and build type
 2. Builds the project
@@ -156,14 +164,20 @@ docker/run_docker_command.sh ./scripts/run-clang-format.sh --check
 # Run clang-tidy
 docker/run_docker_command.sh bash -c "cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 && ./scripts/run-clang-tidy.sh"
 
-# Build and test (Debug, GCC)
-docker/run_docker_command.sh bash -c "cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Debug && cmake --build build -j\$(nproc) && ctest --test-dir build --output-on-failure"
+# Build and test (Debug, GCC - default)
+docker/run_docker_command.sh bash -c "cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 && cmake --build build -j\$(nproc) && ctest --test-dir build --output-on-failure"
+
+# Build and test (Release, GCC)
+docker/run_docker_command.sh bash -c "cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 && cmake --build build -j\$(nproc) && ctest --test-dir build --output-on-failure"
+
+# Build and test (Debug, Clang)
+docker/run_docker_command.sh bash -c "cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 && cmake --build build -j\$(nproc) && ctest --test-dir build --output-on-failure"
 
 # Run with AddressSanitizer
-docker/run_docker_command.sh bash -c "cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_CXX_FLAGS='-fsanitize=address -fno-omit-frame-pointer -g' -DCMAKE_C_FLAGS='-fsanitize=address -fno-omit-frame-pointer -g' -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=address' && cmake --build build -j\$(nproc) && ctest --test-dir build --output-on-failure"
+docker/run_docker_command.sh bash -c "cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 -DCMAKE_CXX_FLAGS='-fsanitize=address -fno-omit-frame-pointer -g' -DCMAKE_C_FLAGS='-fsanitize=address -fno-omit-frame-pointer -g' -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=address' && cmake --build build -j\$(nproc) && ctest --test-dir build --output-on-failure"
 
 # Generate coverage report
-docker/run_docker_command.sh bash -c "cmake -S. -Bbuild -DPOLANG_ENABLE_COVERAGE=ON && cmake --build build -j\$(nproc) && ctest --test-dir build --output-on-failure && cmake --build build --target coverage"
+docker/run_docker_command.sh bash -c "cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 -DPOLANG_ENABLE_COVERAGE=ON && cmake --build build -j\$(nproc) && ctest --test-dir build --output-on-failure && cmake --build build --target coverage"
 ```
 
 ## Troubleshooting

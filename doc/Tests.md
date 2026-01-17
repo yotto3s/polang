@@ -88,8 +88,8 @@ FileCheck-based tests organized by output type:
 ### Measuring Coverage
 
 ```bash
-# Configure with coverage enabled
-cmake -S. -Bbuild -DPOLANG_ENABLE_COVERAGE=ON \
+# Configure with coverage enabled (Debug build required for accurate coverage)
+cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Debug -DPOLANG_ENABLE_COVERAGE=ON \
   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
 
 # Build and run tests
