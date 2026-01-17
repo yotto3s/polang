@@ -78,4 +78,9 @@ def Polang_AnyTypeOrVar : AnyTypeOf<[
     Polang_IntType, Polang_DoubleType, Polang_BoolType, Polang_TypeVarType
 ], "any Polang type or type variable">;
 
+// Bool or type variable (for if conditions before type inference)
+def Polang_BoolOrTypeVar : AnyTypeOf<[
+    Polang_BoolType, Polang_TypeVarType
+], "bool or type variable">;
+
 #endif // POLANG_TYPES_TD

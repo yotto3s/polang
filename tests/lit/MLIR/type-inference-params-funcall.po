@@ -4,16 +4,16 @@
 ; CHECK: {{.*}}polang.func @double_int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
 let double_int(x: int): int = x * 2
 
-; Infer parameter type from passing to known function
-; CHECK: {{.*}}polang.func @wrapper(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+; Wrapper functions remain polymorphic until called
+; CHECK: {{.*}}polang.func @wrapper(%{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
 let wrapper(y) = double_int(y)
 
 ; Known function for double type
 ; CHECK: {{.*}}polang.func @half_double(%{{.*}}: !polang.double) -> !polang.double{{.*}}
 let half_double(x: double): double = x / 2.0
 
-; Infer double parameter type from passing to known function
-; CHECK: {{.*}}polang.func @wrapper_double(%{{.*}}: !polang.double) -> !polang.double{{.*}}
+; Wrapper function remains polymorphic until called
+; CHECK: {{.*}}polang.func @wrapper_double(%{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
 let wrapper_double(y) = half_double(y)
 
 ; Entry point

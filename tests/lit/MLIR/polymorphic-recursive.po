@@ -1,14 +1,15 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
-; Test recursive function with type inference.
-; Type is inferred from literals in body (0, 1), so NOT polymorphic.
-; The function is directly monomorphic with int type.
+; Test recursive function with type inference via monomorphization.
 
-; Function with inferred int type (not polymorphic because 0 and 1 are int literals)
-; CHECK: {{.*}}polang.func @countdown(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+; Polymorphic template function
+; CHECK: {{.*}}polang.func @countdown(%{{.*}}: !polang.typevar{{.*}}) -> !polang.int{{.*}}
 
-; Verify recursive call exists
-; CHECK: {{.*}}polang.call @countdown{{.*}}
+; Monomorphized version for int parameter
+; CHECK: {{.*}}polang.func @countdown$int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+
+; Verify recursive call in monomorphized version
+; CHECK: {{.*}}polang.call @countdown$int{{.*}}
 
 let countdown(n) = if n == 0 then 0 else countdown(n - 1)
 countdown(5)

@@ -1,14 +1,16 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
 ; Test function with type inference from comparison.
-; Parameter type is inferred from comparison with literal 0 (int).
-; This is NOT polymorphic - type is fully resolved at AST level.
+; Parameter type is inferred via monomorphization at call site.
 
-; Function with inferred int parameter (not polymorphic)
-; CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.int) -> !polang.bool{{.*}}
+; Polymorphic template function
+; CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.typevar{{.*}}) -> !polang.bool{{.*}}
 
-; Verify comparison operation exists
-; CHECK: {{.*}}polang.cmp eq{{.*}}
+; Monomorphized version for int parameter
+; CHECK: {{.*}}polang.func @is_zero$int(%{{.*}}: !polang.int) -> !polang.bool{{.*}}
+
+; Verify comparison operation exists in monomorphized version
+; CHECK: {{.*}}polang.cmp eq{{.*}}!polang.int, !polang.int{{.*}}
 
 let is_zero(x) = x == 0
 is_zero(5)

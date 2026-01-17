@@ -250,6 +250,16 @@ private:
         }
       }
     });
+
+    // For if operations, condition must be bool
+    func.walk([&](IfOp ifOp) {
+      Type condType = ifOp.getCondition().getType();
+      Type boolType = BoolType::get(ifOp.getContext());
+      if (!unifier.unify(condType, boolType, subst)) {
+        ifOp.emitError() << "if condition must be bool, got " << condType;
+        hadError = true;
+      }
+    });
   }
 
   void collectCallConstraints(CallOp call, ModuleOp module, Substitution& subst,

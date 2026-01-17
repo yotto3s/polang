@@ -3,7 +3,7 @@
 ; Test if-expression in MLIR
 ; CHECK:      polang.func @max(%arg0: !polang.int, %arg1: !polang.int) -> !polang.int {
 ; CHECK-NEXT:   %{{[0-9]+}} = polang.cmp gt, %arg0, %arg1 : !polang.int, !polang.int
-; CHECK-NEXT:   %{{[0-9]+}} = polang.if %{{[0-9]+}} -> !polang.int {
+; CHECK-NEXT:   %{{[0-9]+}} = polang.if %{{[0-9]+}} : !polang.bool -> !polang.int {
 ; CHECK-NEXT:     polang.yield %arg0 : !polang.int
 ; CHECK-NEXT:   } else {
 ; CHECK-NEXT:     polang.yield %arg1 : !polang.int

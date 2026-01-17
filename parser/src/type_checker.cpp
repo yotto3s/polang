@@ -179,388 +179,6 @@ private:
   std::set<std::string> referenced_non_locals_;
 };
 
-/// ParameterTypeInferrer - A visitor that infers types of untyped function
-/// parameters by analyzing how they are used in the function body.
-///
-/// ## Algorithm
-///
-/// 1. Track a set of parameters whose types need to be inferred
-/// 2. Traverse the function body and collect type constraints:
-///    - Binary operations: if `param + literal`, infer param type from literal
-///    - Binary operations: if `param + var`, infer param type from var's type
-///    - Function calls: if `f(param)`, infer param type from f's parameter type
-///    - If condition: if `if param then ...`, infer param is bool
-/// 3. Return the collected type constraints
-class ParameterTypeInferrer : public Visitor {
-public:
-  ParameterTypeInferrer(
-      const std::set<std::string>& untyped_params,
-      const std::map<std::string, std::string>& known_types,
-      const std::map<std::string, std::vector<std::string>>& func_param_types,
-      const std::map<std::string, std::string>& func_return_types)
-      : untyped_params_(untyped_params), known_types_(known_types),
-        func_param_types_(func_param_types),
-        func_return_types_(func_return_types) {}
-
-  std::map<std::string, std::string> getInferredTypes() const {
-    return inferred_types_;
-  }
-
-  void visit(const NInteger& node) override { current_type_ = TypeNames::INT; }
-
-  void visit(const NDouble& node) override {
-    current_type_ = TypeNames::DOUBLE;
-  }
-
-  void visit(const NBoolean& node) override { current_type_ = TypeNames::BOOL; }
-
-  void visit(const NIdentifier& node) override {
-    // Check if this is an untyped parameter
-    if (untyped_params_.count(node.name)) {
-      // If we already inferred a type, use it
-      if (inferred_types_.count(node.name)) {
-        current_type_ = inferred_types_[node.name];
-      } else {
-        current_type_ = TypeNames::UNKNOWN;
-      }
-    } else if (known_types_.count(node.name)) {
-      current_type_ = known_types_.at(node.name);
-    } else {
-      current_type_ = TypeNames::UNKNOWN;
-    }
-  }
-
-  void visit(const NQualifiedName& node) override {
-    // Qualified names reference module members
-    // For now, treat as unknown type (full module resolution in Phase 2+)
-    current_type_ = TypeNames::UNKNOWN;
-  }
-
-  void visit(const NBinaryOperator& node) override {
-    // Get types of both operands
-    node.lhs.accept(*this);
-    const std::string lhs_type = current_type_;
-    const std::string lhs_name = getIdentifierName(node.lhs);
-
-    node.rhs.accept(*this);
-    const std::string rhs_type = current_type_;
-    const std::string rhs_name = getIdentifierName(node.rhs);
-
-    // If one side is an untyped param and the other has a known type,
-    // infer the param's type
-    if (!lhs_name.empty() && untyped_params_.count(lhs_name) &&
-        rhs_type != TypeNames::UNKNOWN) {
-      addConstraint(lhs_name, rhs_type);
-    }
-    if (!rhs_name.empty() && untyped_params_.count(rhs_name) &&
-        lhs_type != TypeNames::UNKNOWN) {
-      addConstraint(rhs_name, lhs_type);
-    }
-
-    // If both sides are untyped params used together, they must have same type
-    // but we can't infer what type yet
-
-    // Determine result type
-    if (isComparisonOperator(node.op)) {
-      current_type_ = TypeNames::BOOL;
-    } else if (lhs_type != TypeNames::UNKNOWN) {
-      current_type_ = lhs_type;
-    } else if (rhs_type != TypeNames::UNKNOWN) {
-      current_type_ = rhs_type;
-    } else {
-      current_type_ = TypeNames::UNKNOWN;
-    }
-  }
-
-  void visit(const NMethodCall& node) override {
-    // Check if we know the function's parameter types
-    auto func_it = func_param_types_.find(node.id.name);
-    if (func_it != func_param_types_.end()) {
-      const auto& param_types = func_it->second;
-      for (size_t i = 0; i < node.arguments.size() && i < param_types.size();
-           ++i) {
-        const std::string param_name = getIdentifierName(*node.arguments[i]);
-        if (!param_name.empty() && untyped_params_.count(param_name) &&
-            param_types[i] != TypeNames::UNKNOWN) {
-          addConstraint(param_name, param_types[i]);
-        }
-        // Also recurse into arguments
-        node.arguments[i]->accept(*this);
-      }
-    } else {
-      // Unknown function - just recurse
-      for (const auto* arg : node.arguments) {
-        arg->accept(*this);
-      }
-    }
-
-    // Set return type
-    auto ret_it = func_return_types_.find(node.id.name);
-    if (ret_it != func_return_types_.end()) {
-      current_type_ = ret_it->second;
-    } else {
-      current_type_ = TypeNames::UNKNOWN;
-    }
-  }
-
-  void visit(const NAssignment& node) override {
-    // Visit RHS
-    node.rhs.accept(*this);
-    const std::string rhs_type = current_type_;
-
-    // If LHS is an untyped parameter and RHS has known type
-    if (untyped_params_.count(node.lhs.name) &&
-        rhs_type != TypeNames::UNKNOWN) {
-      addConstraint(node.lhs.name, rhs_type);
-    }
-
-    current_type_ = rhs_type;
-  }
-
-  void visit(const NBlock& node) override {
-    for (const auto* stmt : node.statements) {
-      stmt->accept(*this);
-    }
-  }
-
-  void visit(const NIfExpression& node) override {
-    // If condition is an untyped param, it must be bool
-    const std::string cond_name = getIdentifierName(node.condition);
-    if (!cond_name.empty() && untyped_params_.count(cond_name)) {
-      addConstraint(cond_name, TypeNames::BOOL);
-    }
-
-    // Recurse into condition
-    node.condition.accept(*this);
-
-    // Recurse into branches
-    node.thenExpr.accept(*this);
-    const std::string then_type = current_type_;
-    node.elseExpr.accept(*this);
-
-    current_type_ = then_type;
-  }
-
-  void visit(const NLetExpression& node) override {
-    // Save and extend known types with let bindings
-    auto saved_known_types = known_types_;
-
-    // First pass: process initializers
-    for (const auto* binding : node.bindings) {
-      if (!binding->isFunction && binding->var->assignmentExpr != nullptr) {
-        binding->var->assignmentExpr->accept(*this);
-        if (current_type_ != TypeNames::UNKNOWN) {
-          known_types_[binding->var->id.name] = current_type_;
-        }
-      }
-    }
-
-    // Add function bindings to scope (for recursive calls)
-    for (const auto* binding : node.bindings) {
-      if (binding->isFunction) {
-        // Note: we don't recurse into nested function bodies
-        known_types_[binding->func->id.name] = TypeNames::FUNCTION;
-      }
-    }
-
-    // Process body
-    node.body.accept(*this);
-
-    // Restore
-    known_types_ = saved_known_types;
-  }
-
-  void visit(const NExpressionStatement& node) override {
-    node.expression.accept(*this);
-  }
-
-  void visit(const NVariableDeclaration& node) override {
-    if (node.assignmentExpr != nullptr) {
-      node.assignmentExpr->accept(*this);
-    }
-    // Add to known types for subsequent traversal
-    if (node.type != nullptr) {
-      known_types_[node.id.name] = node.type->name;
-    } else if (current_type_ != TypeNames::UNKNOWN) {
-      known_types_[node.id.name] = current_type_;
-    }
-  }
-
-  void visit(const NFunctionDeclaration& node) override {
-    // Don't recurse into nested function bodies
-    known_types_[node.id.name] = TypeNames::FUNCTION;
-  }
-
-  void visit(const NModuleDeclaration& node) override {
-    // Don't recurse into modules for parameter type inference
-  }
-
-  void visit(const NImportStatement& node) override {
-    // Import statements don't affect parameter type inference
-  }
-
-private:
-  std::set<std::string> untyped_params_;
-  std::map<std::string, std::string> known_types_;
-  std::map<std::string, std::vector<std::string>> func_param_types_;
-  std::map<std::string, std::string> func_return_types_;
-  std::map<std::string, std::string> inferred_types_;
-  std::string current_type_;
-
-  void addConstraint(const std::string& param, const std::string& type) {
-    if (inferred_types_.count(param) == 0) {
-      inferred_types_[param] = type;
-    }
-    // If already has a type, could check for conflict, but for now just keep
-    // first
-  }
-
-  /// Get the identifier name if the expression is a simple identifier
-  std::string getIdentifierName(const NExpression& expr) const {
-    // Try to cast to NIdentifier
-    const auto* ident = dynamic_cast<const NIdentifier*>(&expr);
-    if (ident != nullptr) {
-      return ident->name;
-    }
-    return "";
-  }
-};
-
-/// CallSiteCollector - A visitor that collects call sites to specific functions
-/// and their argument types. Used for call-site type inference in
-/// let-expressions.
-class CallSiteCollector : public Visitor {
-public:
-  CallSiteCollector(const std::set<std::string>& tracked_functions,
-                    const std::map<std::string, std::string>& known_types)
-      : tracked_functions_(tracked_functions), known_types_(known_types) {}
-
-  /// Get collected call sites: function name -> list of (arg_position -> type)
-  const std::map<std::string, std::vector<std::vector<std::string>>>&
-  getCallSites() const {
-    return call_sites_;
-  }
-
-  void visit(const NInteger& node) override { current_type_ = TypeNames::INT; }
-
-  void visit(const NDouble& node) override {
-    current_type_ = TypeNames::DOUBLE;
-  }
-
-  void visit(const NBoolean& node) override { current_type_ = TypeNames::BOOL; }
-
-  void visit(const NIdentifier& node) override {
-    if (known_types_.count(node.name)) {
-      current_type_ = known_types_.at(node.name);
-    } else {
-      current_type_ = TypeNames::UNKNOWN;
-    }
-  }
-
-  void visit(const NQualifiedName& node) override {
-    // Qualified names reference module members
-    current_type_ = TypeNames::UNKNOWN;
-  }
-
-  void visit(const NMethodCall& node) override {
-    // Collect argument types
-    std::vector<std::string> arg_types;
-    for (const auto* arg : node.arguments) {
-      arg->accept(*this);
-      arg_types.push_back(current_type_);
-    }
-
-    // If this is a tracked function (use effective name for qualified calls)
-    const std::string func_name = node.effectiveName();
-    if (tracked_functions_.count(func_name)) {
-      call_sites_[func_name].push_back(arg_types);
-    }
-
-    current_type_ = TypeNames::UNKNOWN; // Don't know return type yet
-  }
-
-  void visit(const NBinaryOperator& node) override {
-    node.lhs.accept(*this);
-    const std::string lhs_type = current_type_;
-    node.rhs.accept(*this);
-    const std::string rhs_type = current_type_;
-
-    if (isComparisonOperator(node.op)) {
-      current_type_ = TypeNames::BOOL;
-    } else if (lhs_type != TypeNames::UNKNOWN) {
-      current_type_ = lhs_type;
-    } else {
-      current_type_ = rhs_type;
-    }
-  }
-
-  void visit(const NAssignment& node) override { node.rhs.accept(*this); }
-
-  void visit(const NBlock& node) override {
-    for (const auto* stmt : node.statements) {
-      stmt->accept(*this);
-    }
-  }
-
-  void visit(const NIfExpression& node) override {
-    node.condition.accept(*this);
-    node.thenExpr.accept(*this);
-    const std::string then_type = current_type_;
-    node.elseExpr.accept(*this);
-    current_type_ = then_type;
-  }
-
-  void visit(const NLetExpression& node) override {
-    // Extend known types with let bindings
-    auto saved_known_types = known_types_;
-
-    for (const auto* binding : node.bindings) {
-      if (!binding->isFunction && binding->var->assignmentExpr != nullptr) {
-        binding->var->assignmentExpr->accept(*this);
-        if (binding->var->type != nullptr) {
-          known_types_[binding->var->id.name] = binding->var->type->name;
-        } else if (current_type_ != TypeNames::UNKNOWN) {
-          known_types_[binding->var->id.name] = current_type_;
-        }
-      }
-    }
-
-    node.body.accept(*this);
-    known_types_ = saved_known_types;
-  }
-
-  void visit(const NExpressionStatement& node) override {
-    node.expression.accept(*this);
-  }
-
-  void visit(const NVariableDeclaration& node) override {
-    if (node.assignmentExpr != nullptr) {
-      node.assignmentExpr->accept(*this);
-    }
-    if (node.type != nullptr) {
-      known_types_[node.id.name] = node.type->name;
-    }
-  }
-
-  void visit(const NFunctionDeclaration& node) override {
-    // Don't recurse into nested function bodies
-  }
-
-  void visit(const NModuleDeclaration& node) override {
-    // Don't recurse into modules for call site collection
-  }
-
-  void visit(const NImportStatement& node) override {
-    // Import statements don't affect call site collection
-  }
-
-private:
-  std::set<std::string> tracked_functions_;
-  std::map<std::string, std::string> known_types_;
-  std::map<std::string, std::vector<std::vector<std::string>>> call_sites_;
-  std::string current_type_;
-};
-
 TypeChecker::TypeChecker() : inferred_type_(TypeNames::INT) {}
 
 std::string TypeChecker::mangledName(const std::string& name) const {
@@ -676,8 +294,7 @@ void TypeChecker::visit(const NMethodCall& node) {
   }
 
   // Get return type from function
-  if (function_return_types_.find(func_name) !=
-      function_return_types_.end()) {
+  if (function_return_types_.find(func_name) != function_return_types_.end()) {
     inferred_type_ = function_return_types_[func_name];
   } else {
     // Unknown function, assume int
@@ -700,16 +317,25 @@ void TypeChecker::visit(const NBinaryOperator& node) {
     return;
   }
 
+  // Allow typevar to match any type (MLIR will resolve later)
+  const bool lhs_is_typevar = lhs_type == TypeNames::TYPEVAR;
+  const bool rhs_is_typevar = rhs_type == TypeNames::TYPEVAR;
+
   if (isArithmeticOperator(node.op)) {
-    // Both operands must be the same type for arithmetic
-    if (lhs_type != rhs_type) {
+    // Both operands must be the same type for arithmetic (unless typevar)
+    if (!lhs_is_typevar && !rhs_is_typevar && lhs_type != rhs_type) {
       reportError("Type mismatch in '" + operatorToString(node.op) +
                   "': " + lhs_type + " and " + rhs_type);
     }
-    inferred_type_ = lhs_type; // Result has same type as operands
+    // Result type: prefer concrete type over typevar
+    if (lhs_is_typevar && !rhs_is_typevar) {
+      inferred_type_ = rhs_type;
+    } else {
+      inferred_type_ = lhs_type;
+    }
   } else if (isComparisonOperator(node.op)) {
-    // Comparisons also require same types
-    if (lhs_type != rhs_type) {
+    // Comparisons also require same types (unless typevar)
+    if (!lhs_is_typevar && !rhs_is_typevar && lhs_type != rhs_type) {
       reportError("Type mismatch in comparison: " + lhs_type + " and " +
                   rhs_type);
     }
@@ -739,7 +365,9 @@ void TypeChecker::visit(const NAssignment& node) {
   node.rhs.accept(*this);
   const std::string rhs_type = inferred_type_;
 
-  if (rhs_type != TypeNames::UNKNOWN && rhs_type != var_type) {
+  // Allow typevar to match any type (MLIR will resolve later)
+  if (rhs_type != TypeNames::UNKNOWN && rhs_type != TypeNames::TYPEVAR &&
+      var_type != TypeNames::TYPEVAR && rhs_type != var_type) {
     reportError("Cannot assign " + rhs_type + " to variable '" + node.lhs.name +
                 "' of type " + var_type);
   }
@@ -804,29 +432,7 @@ void TypeChecker::visit(const NLetExpression& node) {
   const auto saved_func_returns = function_return_types_;
   const auto saved_func_params = function_param_types_;
 
-  // Pass 0: Identify functions with untyped parameters for call-site inference
-  std::set<std::string> funcs_needing_inference;
-  for (const auto* binding : node.bindings) {
-    if (binding->isFunction) {
-      for (const auto* arg : binding->func->arguments) {
-        if (arg->type == nullptr) {
-          funcs_needing_inference.insert(binding->func->id.name);
-          break;
-        }
-      }
-    }
-  }
-
-  // Pass 0.5: Collect call sites from the body for functions needing inference
-  std::map<std::string, std::vector<std::vector<std::string>>>
-      call_site_arg_types;
-  if (!funcs_needing_inference.empty()) {
-    CallSiteCollector collector(funcs_needing_inference, saved_locals);
-    node.body.accept(collector);
-    call_site_arg_types = collector.getCallSites();
-  }
-
-  // Pass 1: First collect sibling variable binding types (for closure capture)
+  // Pass 1: Collect sibling variable binding types (for closure capture)
   // This allows functions to capture sibling variables in let...and expressions
   std::map<std::string, std::string> sibling_var_types;
   std::map<std::string, bool> sibling_var_mutability;
@@ -864,67 +470,22 @@ void TypeChecker::visit(const NLetExpression& node) {
       const auto func_saved_locals = local_types_;
       const auto func_saved_mutability = local_mutability_;
 
-      // Collect parameter names and identify untyped parameters
+      // Collect parameter names and set up parameter types
       std::set<std::string> param_names;
-      std::set<std::string> untyped_params;
       std::vector<std::string> param_types;
       for (const auto* arg : func->arguments) {
         param_names.insert(arg->id.name);
         if (arg->type == nullptr) {
-          untyped_params.insert(arg->id.name);
-          param_types.push_back(TypeNames::UNKNOWN);
+          // Untyped parameter - use TYPEVAR for MLIR inference
+          auto& mutable_arg = const_cast<NVariableDeclaration&>(*arg);
+          mutable_arg.type = new NIdentifier(TypeNames::TYPEVAR);
+          local_types_[arg->id.name] = TypeNames::TYPEVAR;
+          local_mutability_[arg->id.name] = arg->isMutable;
+          param_types.push_back(TypeNames::TYPEVAR);
         } else {
           local_types_[arg->id.name] = arg->type->name;
           local_mutability_[arg->id.name] = arg->isMutable;
           param_types.push_back(arg->type->name);
-        }
-      }
-
-      // If there are untyped parameters, run type inference
-      if (!untyped_params.empty()) {
-        // First try body inference
-        ParameterTypeInferrer body_inferrer(untyped_params, local_types_,
-                                            function_param_types_,
-                                            function_return_types_);
-        func->block.accept(body_inferrer);
-        auto inferred = body_inferrer.getInferredTypes();
-
-        // Then try call-site inference
-        auto call_it = call_site_arg_types.find(func->id.name);
-        if (call_it != call_site_arg_types.end()) {
-          for (const auto& call_args : call_it->second) {
-            size_t arg_idx = 0;
-            for (const auto* arg : func->arguments) {
-              if (arg_idx < call_args.size() && arg->type == nullptr &&
-                  inferred.count(arg->id.name) == 0 &&
-                  call_args[arg_idx] != TypeNames::UNKNOWN) {
-                inferred[arg->id.name] = call_args[arg_idx];
-              }
-              ++arg_idx;
-            }
-          }
-        }
-
-        // Update parameter types in AST and local scope
-        size_t idx = 0;
-        for (const auto* arg : func->arguments) {
-          if (arg->type == nullptr) {
-            auto& mutable_arg = const_cast<NVariableDeclaration&>(*arg);
-            auto it = inferred.find(arg->id.name);
-            if (it != inferred.end() && it->second != TypeNames::UNKNOWN) {
-              mutable_arg.type = new NIdentifier(it->second);
-              local_types_[arg->id.name] = it->second;
-              local_mutability_[arg->id.name] = arg->isMutable;
-              param_types[idx] = it->second;
-            } else {
-              // Cannot infer type locally - use type variable for MLIR inference
-              mutable_arg.type = new NIdentifier(TypeNames::TYPEVAR);
-              local_types_[arg->id.name] = TypeNames::TYPEVAR;
-              local_mutability_[arg->id.name] = arg->isMutable;
-              param_types[idx] = TypeNames::TYPEVAR;
-            }
-          }
-          ++idx;
         }
       }
 
@@ -976,14 +537,17 @@ void TypeChecker::visit(const NLetExpression& node) {
       func->block.accept(*this);
       const std::string body_type = inferred_type_;
 
-      // Handle return type inference
+      // Handle return type: use annotation, infer from body, or use TYPEVAR
       if (func->type == nullptr) {
-        if (body_type != TypeNames::UNKNOWN) {
+        if (body_type != TypeNames::UNKNOWN &&
+            body_type != TypeNames::TYPEVAR) {
           mutable_func.type = new NIdentifier(body_type);
         } else {
-          mutable_func.type = new NIdentifier(TypeNames::INT);
+          // Let MLIR infer the return type
+          mutable_func.type = new NIdentifier(TypeNames::TYPEVAR);
         }
       } else if (body_type != TypeNames::UNKNOWN &&
+                 body_type != TypeNames::TYPEVAR &&
                  body_type != func->type->name) {
         reportError("Function '" + func->id.name + "' declared to return " +
                     func->type->name + " but body has type " + body_type);
@@ -1047,7 +611,7 @@ void TypeChecker::visit(const NLetExpression& node) {
     }
   }
 
-  // Pass 2: Add all bindings to scope
+  // Pass 3: Add all bindings to scope
   std::size_t i = 0;
   std::size_t func_idx = 0;
   for (const auto* binding : node.bindings) {
@@ -1055,7 +619,7 @@ void TypeChecker::visit(const NLetExpression& node) {
       const auto* func = binding->func;
       function_param_types_[func->id.name] = func_param_types[func_idx++];
       function_return_types_[func->id.name] =
-          func->type ? func->type->name : TypeNames::INT;
+          func->type ? func->type->name : TypeNames::TYPEVAR;
     } else {
       local_types_[binding->var->id.name] = binding_types[i];
       local_mutability_[binding->var->id.name] = binding_mutability[i];
@@ -1145,15 +709,18 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   const auto saved_locals = local_types_;
   const auto saved_mutability = local_mutability_;
 
-  // Collect parameter names and identify untyped parameters
+  // Collect parameter names and set up parameter types
   std::set<std::string> param_names;
-  std::set<std::string> untyped_params;
   std::vector<std::string> param_types;
   for (const auto* arg : node.arguments) {
     param_names.insert(arg->id.name);
     if (arg->type == nullptr) {
-      untyped_params.insert(arg->id.name);
-      param_types.push_back(TypeNames::UNKNOWN);
+      // Untyped parameter - use TYPEVAR for MLIR inference
+      auto& mutable_arg = const_cast<NVariableDeclaration&>(*arg);
+      mutable_arg.type = new NIdentifier(TypeNames::TYPEVAR);
+      local_types_[arg->id.name] = TypeNames::TYPEVAR;
+      local_mutability_[arg->id.name] = arg->isMutable;
+      param_types.push_back(TypeNames::TYPEVAR);
     } else {
       local_types_[arg->id.name] = arg->type->name;
       local_mutability_[arg->id.name] = arg->isMutable;
@@ -1187,37 +754,6 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
     // If not in outer scope, it will be caught as "undeclared variable" later
   }
 
-  // If there are untyped parameters, run type inference on the body
-  if (!untyped_params.empty()) {
-    ParameterTypeInferrer inferrer(untyped_params, local_types_,
-                                   function_param_types_,
-                                   function_return_types_);
-    node.block.accept(inferrer);
-    const auto inferred = inferrer.getInferredTypes();
-
-    // Update parameter types in AST and local scope
-    size_t idx = 0;
-    for (const auto* arg : node.arguments) {
-      if (arg->type == nullptr) {
-        auto& mutable_arg = const_cast<NVariableDeclaration&>(*arg);
-        auto it = inferred.find(arg->id.name);
-        if (it != inferred.end() && it->second != TypeNames::UNKNOWN) {
-          mutable_arg.type = new NIdentifier(it->second);
-          local_types_[arg->id.name] = it->second;
-          local_mutability_[arg->id.name] = arg->isMutable;
-          param_types[idx] = it->second;
-        } else {
-          // Cannot infer type locally - use type variable for MLIR inference
-          mutable_arg.type = new NIdentifier(TypeNames::TYPEVAR);
-          local_types_[arg->id.name] = TypeNames::TYPEVAR;
-          local_mutability_[arg->id.name] = arg->isMutable;
-          param_types[idx] = TypeNames::TYPEVAR;
-        }
-      }
-      ++idx;
-    }
-  }
-
   // Store parameter types for this function (using mangled name)
   function_param_types_[func_name] = param_types;
 
@@ -1226,20 +762,21 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   const std::string body_type = inferred_type_;
 
   if (node.type == nullptr) {
-    // Return type not annotated - infer from body
-    if (body_type != TypeNames::UNKNOWN) {
+    // Return type not annotated - infer from body or use TYPEVAR
+    if (body_type != TypeNames::UNKNOWN && body_type != TypeNames::TYPEVAR) {
       mutable_node.type = new NIdentifier(body_type);
       function_return_types_[func_name] = body_type;
     } else {
-      // Default to int if we can't infer
-      mutable_node.type = new NIdentifier(TypeNames::INT);
-      function_return_types_[func_name] = TypeNames::INT;
+      // Let MLIR infer the return type
+      mutable_node.type = new NIdentifier(TypeNames::TYPEVAR);
+      function_return_types_[func_name] = TypeNames::TYPEVAR;
     }
   } else {
     // Return type annotated - validate
     const std::string decl_return_type = node.type->name;
 
-    if (body_type != TypeNames::UNKNOWN && body_type != decl_return_type) {
+    if (body_type != TypeNames::UNKNOWN && body_type != TypeNames::TYPEVAR &&
+        body_type != decl_return_type) {
       reportError("Function '" + node.id.name + "' declared to return " +
                   decl_return_type + " but body has type " + body_type +
                   " (no implicit conversion)");
@@ -1267,8 +804,8 @@ void TypeChecker::visit(const NModuleDeclaration& node) {
   }
 
   // Register module exports
-  module_exports_[module_mangled] = std::set<std::string>(node.exports.begin(),
-                                                          node.exports.end());
+  module_exports_[module_mangled] =
+      std::set<std::string>(node.exports.begin(), node.exports.end());
 
   // Visit all members (they will register with mangled names)
   for (const auto* member : node.members) {

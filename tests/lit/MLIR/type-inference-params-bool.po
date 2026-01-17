@@ -1,18 +1,30 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
-; Infer bool parameter from if condition
-; CHECK: {{.*}}polang.func @is_truthy(%{{.*}}: !polang.bool) -> !polang.int{{.*}}
+; Polymorphic functions with untyped parameters used as if conditions
+; Monomorphized versions are created at call sites with bool parameters
+
+; Polymorphic template function
+; CHECK: {{.*}}polang.func @is_truthy(%{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
+
+; Monomorphized version with bool parameter
+; CHECK: {{.*}}polang.func @is_truthy$bool(%{{.*}}: !polang.bool) -> !polang.int{{.*}}
 let is_truthy(x) = if x then 1 else 0
 
-; Infer bool parameter from nested if conditions
-; CHECK: {{.*}}polang.func @both_true(%{{.*}}: !polang.bool, %{{.*}}: !polang.bool) -> !polang.int{{.*}}
+; Polymorphic template function
+; CHECK: {{.*}}polang.func @both_true(%{{.*}}: !polang.typevar{{.*}}, %{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
+
+; Monomorphized version with bool parameters
+; CHECK: {{.*}}polang.func @both_true$bool_bool(%{{.*}}: !polang.bool, %{{.*}}: !polang.bool) -> !polang.int{{.*}}
 let both_true(x, y) = if x then (if y then 1 else 0) else 0
 
-; Infer bool from logical context (negation via if)
-; CHECK: {{.*}}polang.func @negate(%{{.*}}: !polang.bool) -> !polang.int{{.*}}
+; Polymorphic template function
+; CHECK: {{.*}}polang.func @negate(%{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
+
+; Monomorphized version with bool parameter
+; CHECK: {{.*}}polang.func @negate$bool(%{{.*}}: !polang.bool) -> !polang.int{{.*}}
 let negate(x) = if x then 0 else 1
 
-; Call the functions to ensure they're emitted
+; Call the functions to ensure monomorphized versions are emitted
 is_truthy(true)
 both_true(true, true)
 negate(false)

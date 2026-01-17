@@ -353,7 +353,7 @@ def Polang_IfOp : Polang_Op<"if", [
     ```
   }];
 
-  let arguments = (ins Polang_BoolType:$condition);
+  let arguments = (ins Polang_BoolOrTypeVar:$condition);
   let results = (outs Polang_AnyTypeOrVar:$result);
   let regions = (region
     SizedRegion<1>:$thenRegion,
@@ -361,7 +361,7 @@ def Polang_IfOp : Polang_Op<"if", [
   );
 
   let assemblyFormat = [{
-    $condition `->` type($result) $thenRegion `else` $elseRegion attr-dict
+    $condition `:` type($condition) `->` type($result) $thenRegion `else` $elseRegion attr-dict
   }];
 
   let skipDefaultBuilders = 1;
