@@ -370,8 +370,8 @@ TEST(TypeCheckTest, SimpleClosure) {
 
 TEST(TypeCheckTest, ClosureWithParameter) {
   // Function with parameter can also capture
-  EXPECT_TRUE(
-      hasNoTypeError("let multiplier = 3\nlet scale(n: int) = n * multiplier\nscale(5)"));
+  EXPECT_TRUE(hasNoTypeError(
+      "let multiplier = 3\nlet scale(n: int) = n * multiplier\nscale(5)"));
 }
 
 TEST(TypeCheckTest, MultipleCapturedVariables) {
@@ -406,29 +406,105 @@ TEST(TypeCheckTest, ClosureCapturesDoubleType) {
 
 TEST(TypeCheckTest, ClosureCapturesBoolType) {
   // Function can capture bool variable
-  EXPECT_TRUE(hasNoTypeError("let flag = true\nlet f() = if flag then 1 else 0\nf()"));
+  EXPECT_TRUE(
+      hasNoTypeError("let flag = true\nlet f() = if flag then 1 else 0\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithParamsAndCaptures) {
   // Function uses both parameters and captured variables
-  EXPECT_TRUE(hasNoTypeError(
-      "let base = 100\nlet add(x: int) = x + base\nadd(5)"));
+  EXPECT_TRUE(
+      hasNoTypeError("let base = 100\nlet add(x: int) = x + base\nadd(5)"));
 }
 
 TEST(TypeCheckTest, NestedLetWithClosure) {
   // Closure in nested let expression
-  EXPECT_TRUE(hasNoTypeError(
-      "let x = 10 in let f() = x + 1 in f()"));
+  EXPECT_TRUE(hasNoTypeError("let x = 10 in let f() = x + 1 in f()"));
 }
 
 TEST(TypeCheckTest, ClosureInLetWithMultipleSiblings) {
   // Function captures from multiple sibling bindings
-  EXPECT_TRUE(hasNoTypeError(
-      "let a = 1 and b = 2 and sum() = a + b in sum()"));
+  EXPECT_TRUE(hasNoTypeError("let a = 1 and b = 2 and sum() = a + b in sum()"));
 }
 
 TEST(TypeCheckTest, ClosureCaptureFromOuterNotSibling) {
   // Function captures from outer scope, not sibling
+  EXPECT_TRUE(
+      hasNoTypeError("let outer = 5\nlet x = 10 and f() = outer + 1 in f()"));
+}
+
+// ============== FreeVariableCollector Tests ==============
+// These tests specifically exercise the capture analysis paths
+
+TEST(TypeCheckTest, ClosureWithAssignment) {
+  // Assignment inside closure - captures mutable variable
+  EXPECT_TRUE(hasNoTypeError("let mut x = 10\nlet f() = x <- 20\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithAssignmentAndCapture) {
+  // Assignment RHS captures another variable
+  EXPECT_TRUE(
+      hasNoTypeError("let y = 5\nlet mut x = 10\nlet f() = x <- y\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithLetExpression) {
+  // Let expression inside closure that captures outer variable
   EXPECT_TRUE(hasNoTypeError(
-      "let outer = 5\nlet x = 10 and f() = outer + 1 in f()"));
+      "let outer = 10\nlet f() = let inner = 1 in inner + outer\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithLetExpressionFunction) {
+  // Let expression with function binding inside closure
+  EXPECT_TRUE(hasNoTypeError(
+      "let outer = 10\nlet f() = let g(x: int) = x in g(outer)\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithLetExpressionCaptureInInit) {
+  // Capture in let expression initializer inside closure
+  EXPECT_TRUE(
+      hasNoTypeError("let outer = 5\nlet f() = let x = outer + 1 in x\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithNestedLetBindings) {
+  // Multiple bindings in let inside closure
+  EXPECT_TRUE(hasNoTypeError(
+      "let outer = 10\nlet f() = let a = 1 and b = outer in a + b\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithBinaryOpCapture) {
+  // Binary operator with captures on both sides
+  EXPECT_TRUE(hasNoTypeError("let a = 1\nlet b = 2\nlet f() = a + b\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithIfConditionCapture) {
+  // If condition captures variable
+  EXPECT_TRUE(
+      hasNoTypeError("let flag = true\nlet f() = if flag then 1 else 0\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithIfBranchCapture) {
+  // If branches capture variables
+  EXPECT_TRUE(hasNoTypeError(
+      "let x = 1\nlet y = 2\nlet f() = if true then x else y\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithMethodCallArgs) {
+  // Method call arguments capture variables
+  EXPECT_TRUE(hasNoTypeError(
+      "let x = 5\nlet add(a: int, b: int) = a + b\nlet f() = add(x, x)\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithNestedBlocks) {
+  // Block with multiple expression statements
+  EXPECT_TRUE(hasNoTypeError("let x = 1\nlet f() = x + 1\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureDoesNotCaptureLocalLetBinding) {
+  // Local let binding should not be captured
+  EXPECT_TRUE(hasNoTypeError("let f() = let local = 5 in local + 1\nf()"));
+}
+
+TEST(TypeCheckTest, ClosureWithMutableAssignmentCapture) {
+  // Capture mutable variable via assignment LHS
+  EXPECT_TRUE(hasNoTypeError(
+      "let mut counter = 0\nlet inc() = counter <- counter + 1\ninc()"));
 }

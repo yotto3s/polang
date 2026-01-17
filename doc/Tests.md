@@ -36,7 +36,7 @@ Unit tests for the lexer, parser, and type checker.
 | `parser_control_flow_test.cpp` | If expressions and control flow |
 | `parser_statement_test.cpp` | Statement parsing |
 | `error_test.cpp` | Syntax error detection and reporting |
-| `type_check_test.cpp` | Type inference and checking |
+| `type_check_test.cpp` | Type checking, error detection, capture analysis |
 | `ast_printer_test.cpp` | AST serialization |
 | `polang_types_test.cpp` | Type constant utilities |
 | `operator_utils_test.cpp` | Operator classification |
@@ -64,13 +64,13 @@ FileCheck-based tests organized by output type:
 
 | Directory | Count | Description |
 |-----------|-------|-------------|
-| `AST/` | 11 | AST dump verification (`--dump-ast`) |
-| `MLIR/` | 30 | Polang dialect MLIR output (`--emit-mlir`) |
+| `AST/` | 19 | AST dump verification (`--dump-ast`) |
+| `MLIR/` | 31 | Polang dialect MLIR output (`--emit-mlir`) |
 | `LLVMIR/` | 13 | LLVM IR generation |
-| `Execution/` | 23 | REPL execution results |
+| `Execution/` | 28 | REPL execution results |
 | `Errors/` | 13 | Error message verification |
 
-**Total: 90 lit tests**
+**Total: 104 lit tests**
 
 ## Code Coverage
 
@@ -93,8 +93,8 @@ The HTML report is generated at `build/coverage_html/index.html`.
 
 ### Current Coverage
 
-- **Lines:** ~85% (2493 of 2930 lines)
-- **Functions:** ~87% (296 of 341 functions)
+- **Lines:** ~86% (2314 of 2680 lines)
+- **Functions:** ~92% (280 of 304 functions)
 
 ## Intentionally Uncovered Code
 
@@ -133,15 +133,17 @@ Required by MLIR's `CallOpInterface` for call graph analysis, but not used since
 |------|----------|--------|
 | `mlir/lib/Conversion/PolangToStandard.cpp` | `PrintOpLowering::matchAndRewrite()` | Print operation not in language |
 
-### Type Checker Visitor Stubs (21 functions)
+### Type Checker Visitor Stubs (6 functions)
 
-Internal visitor classes in `parser/src/type_checker.cpp` implement the visitor pattern. Many methods are intentional no-ops because each visitor only processes specific node types.
+Internal visitor classes in `parser/src/type_checker.cpp` implement the visitor pattern. Some methods are intentional no-ops because the visitor only processes specific node types.
 
-**CallSiteCollector** (11 stubs): Only processes `NMethodCall` nodes to collect function call sites. Other visit methods return early.
-
-**FreeVariableCollector** (4 stubs): Only processes `NIdentifier`, `NBlock`, and expression nodes to find free variables in closures.
-
-**ParameterTypeInferrer** (5 stubs): Only processes `NInteger`, `NDouble`, `NIdentifier`, `NMethodCall`, `NBinaryOperator`, and `NIfExpression` to infer parameter types from usage.
+**FreeVariableCollector** (6 stubs): Identifies free variables in closures for capture analysis. Only processes `NIdentifier`, `NBlock`, `NLetExpression`, `NIfExpression`, `NBinaryOperator`, `NMethodCall`, and `NAssignment` to find free variables. The following methods are no-ops:
+- `visit(NQualifiedName&)` - qualified names reference module members, not captures
+- `visit(NVariableDeclaration&)` - only reached via NBlock statements
+- `visit(NFunctionDeclaration&)` - nested functions have own capture analysis
+- `visit(NModuleDeclaration&)` - modules don't appear in function bodies
+- `visit(NImportStatement&)` - imports don't appear in function bodies
+- `visit(NInteger&)`, `visit(NDouble&)`, `visit(NBoolean&)` - literals can't be free variables
 
 ### Virtual Destructors (2 functions)
 

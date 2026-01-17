@@ -77,7 +77,6 @@ private:
   std::string mangledName(const std::string& name) const;
 
   void reportError(const std::string& message);
-  std::string inferType(const Node& node);
 
   // Collect identifiers referenced in a block that are not locally defined
   std::set<std::string>

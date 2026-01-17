@@ -29,8 +29,8 @@ Polang uses a Hindley-Milner style type system with:
 
 The type system is implemented in two phases:
 
-1. **Parser-level inference**: Infers types from local usage within function bodies
-2. **MLIR-level inference**: Resolves polymorphic type variables from call sites
+1. **Parser-level type checking**: Validates types and detects errors early; performs capture analysis for closures
+2. **MLIR-level inference**: Resolves all type variables via unification (Hindley-Milner style)
 
 ## Primitive Types
 
@@ -59,41 +59,41 @@ struct TypeNames {
 
 ## Type Inference
 
-### Local Type Inference
+### Parser-Level Type Checking
 
-The parser's type checker (`parser/src/type_checker.cpp`) performs local type inference within function bodies. It analyzes how parameters are used to determine their types.
+The parser's type checker (`parser/src/type_checker.cpp`) focuses on **error detection** and **capture analysis**, while delegating type inference to MLIR. Untyped parameters are marked as `typevar` and resolved later via MLIR's unification algorithm.
 
-**Inference Rules:**
+**Type Checker Responsibilities:**
 
-| Usage Pattern | Inferred Type |
-|---------------|---------------|
-| `x + 1`, `x * 2` (with int literal) | `int` |
-| `x + 1.0`, `x / 2.0` (with double literal) | `double` |
-| `if x then ...` (as condition) | `bool` |
-| `if cond then a else b` (result) | type of branches (must match) |
-| `x + y` (where `y` has known type) | same as `y` |
-| `f(x)` (where `f` expects a type) | parameter type of `f` |
+| Responsibility | Description |
+|----------------|-------------|
+| Error detection | Undefined variables, immutable reassignment, arity mismatch |
+| Type validation | Validates explicit type annotations match usage |
+| Capture analysis | Identifies free variables for closures via `FreeVariableCollector` |
+| Type variable setup | Marks untyped parameters as `typevar` for MLIR inference |
 
 **Example:**
 
 ```polang
-let double_it(x) = x * 2    ; x inferred as int (from * 2)
-let half(x) = x / 2.0       ; x inferred as double (from / 2.0)
-let negate(x) = 0 - x       ; x inferred as int (from 0 - x)
+let double_it(x) = x * 2    ; x marked as typevar, MLIR infers int
+let half(x) = x / 2.0       ; x marked as typevar, MLIR infers double
+let identity(x) = x         ; x marked as typevar, MLIR infers from call site
 ```
 
 **Implementation:**
 
-The `ParameterTypeInferrer` class in `type_checker.cpp` traverses function bodies to collect type constraints:
+The type checker uses the `FreeVariableCollector` class for capture analysis:
 
 ```cpp
-class ParameterTypeInferrer : public Visitor {
-  // Tracks inferred types for each parameter
-  std::map<std::string, std::string> inferred_types_;
+class FreeVariableCollector : public Visitor {
+  std::set<std::string> local_names_;
+  std::set<std::string> referenced_non_locals_;
 
-  void visit(const NBinaryOperator& node) override {
-    // If one operand is a parameter and the other has a known type,
-    // infer the parameter's type from the known operand
+  void visit(const NIdentifier& node) override {
+    // If not locally defined, it's a free variable (capture)
+    if (local_names_.find(node.name) == local_names_.end()) {
+      referenced_non_locals_.insert(node.name);
+    }
   }
 };
 ```
@@ -122,14 +122,18 @@ let x = if true then 1 else 2.0  ; Error: branches have different types
 
 The type checker validates branch type consistency in `TypeChecker::visit(const NIfExpression&)`.
 
-### Polymorphic Type Inference
+### MLIR Type Inference
 
-When local inference cannot determine a parameter's type (e.g., identity function `let id(x) = x`), the parameter is marked as a **type variable**. The MLIR type inference pass then resolves these from call sites.
+All untyped parameters are marked as **type variables** by the parser. The MLIR type inference pass resolves these via unification, using constraints from:
+- Literal values (e.g., `42` is `int`, `3.14` is `double`)
+- Binary operations (operands must have same type)
+- Call sites (argument types constrain parameter types)
+- If conditions (must be `bool`)
 
 **Example:**
 
 ```polang
-let identity(x) = x     ; x cannot be locally inferred
+let identity(x) = x     ; x marked as typevar
 identity(42)            ; call site constrains x to int
 ```
 
@@ -138,13 +142,15 @@ identity(42)            ; call site constrains x to int
 ```
 Source: let identity(x) = x
            ↓
-Parser: x marked as TYPEVAR
+Parser: x marked as TYPEVAR (type checker)
            ↓
-MLIRGen: fn identity(%arg0: !polang.typevar<0>) -> !polang.typevar<1>
+MLIRGen: fn identity(%arg0: !polang.typevar<0>) -> !polang.typevar<0>
            ↓
 Type Inference Pass: Unifies typevar<0> with int from call site
            ↓
-Result: fn identity(%arg0: !polang.int) -> !polang.int
+Monomorphization: Creates identity$int specialized version
+           ↓
+Result: fn identity$int(%arg0: !polang.int) -> !polang.int
 ```
 
 ## Type Variables
@@ -298,7 +304,8 @@ parser/
 │   ├── polang_types.hpp     # Type constants (INT, DOUBLE, BOOL, TYPEVAR)
 │   └── type_checker.hpp     # Type checker interface
 └── src/
-    └── type_checker.cpp     # Local type inference implementation
+    └── type_checker.cpp     # Error detection, capture analysis, typevar setup
+                             # Contains: TypeChecker, FreeVariableCollector
 
 mlir/
 ├── include/polang/
@@ -306,12 +313,13 @@ mlir/
 │   │   ├── PolangTypes.td   # TypeVarType definition
 │   │   └── PolangTypes.h    # Generated type classes
 │   └── Transforms/
-│       └── Passes.h         # Type inference pass declaration
+│       └── Passes.h         # Type inference & monomorphization pass declarations
 └── lib/
     ├── Dialect/
     │   └── PolangTypes.cpp  # TypeVarType implementation
     └── Transforms/
-        └── TypeInference.cpp # Unification and constraint solving
+        ├── TypeInference.cpp    # Unification and constraint solving
+        └── Monomorphization.cpp # Function specialization for call sites
 ```
 
 ### Type Checking Flow
@@ -322,19 +330,24 @@ mlir/
 
 2. Type checker runs (type_checker.cpp)
    ├── Validates explicit type annotations
-   ├── Infers types from local usage
-   └── Marks unresolved parameters as TYPEVAR
+   ├── Detects errors (undefined vars, mutability, arity)
+   ├── Performs capture analysis (FreeVariableCollector)
+   └── Marks untyped parameters as TYPEVAR
 
 3. MLIRGen generates MLIR (MLIRGen.cpp)
    ├── Converts types to MLIR types (!polang.int, etc.)
    └── Generates !polang.typevar<id> for TYPEVAR
 
 4. Type inference pass runs (TypeInference.cpp)
-   ├── Collects constraints from operations
+   ├── Collects constraints from operations and call sites
    ├── Unifies type variables with concrete types
    └── Updates operations with resolved types
 
-5. Lowering proceeds with fully-typed MLIR
+5. Monomorphization pass runs (Monomorphization.cpp)
+   ├── Creates specialized versions for each call site
+   └── Updates calls to use specialized functions
+
+6. Lowering proceeds with fully-typed MLIR
 ```
 
 ### Verifier Compatibility
@@ -371,8 +384,10 @@ add(1, 2)
 
 **Inference:**
 - `x` is explicitly `int`
-- `y` is used in `x + y` where `x: int`, so `y` inferred as `int`
+- `y` is marked as `typevar` by the parser
+- MLIR unifies `y` with `int` (from `x + y` where `x: int`)
 - Return type inferred as `int` (result of `+`)
+- Monomorphization creates `add$int_int`
 
 ### Example 2: Polymorphic Identity
 
@@ -408,9 +423,10 @@ is_positive(5)
 ```
 
 **Inference:**
-- `x > 0` where `0` is `int` → `x` inferred as `int`
+- `x` marked as `typevar` by parser
+- MLIR unifies `x` with `int` (from `x > 0` where `0` is `int`)
 - Return type is `bool` (result of comparison)
-- Final type: `is_positive: (int) -> bool`
+- Final type: `is_positive$int: (int) -> bool`
 
 ## Monomorphization
 

@@ -203,11 +203,6 @@ std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   return errors_;
 }
 
-std::string TypeChecker::inferType(const Node& node) {
-  node.accept(*this);
-  return inferred_type_;
-}
-
 void TypeChecker::reportError(const std::string& message) {
   errors_.push_back(TypeCheckError(message));
   // Use unified error reporter if available

@@ -88,15 +88,15 @@ When adding new language features or modifying compiler output, consider adding 
 - `tests/lit/Execution/` - REPL execution tests
 - `tests/lit/Errors/` - Error handling tests
 
-### Lit Test Coverage (90 tests)
+### Lit Test Coverage (104 tests)
 
-**AST Tests (11 files):** literals, double-literals, bool-literals, variables, mutable-variables, assignment, functions, control-flow, comparisons, let-expressions, method-calls
+**AST Tests (19 files):** literals, double-literals, bool-literals, variables, mutable-variables, assignment, functions, control-flow, comparisons, let-expressions, method-calls, and more
 
-**MLIR Tests (30 files):** arithmetic, comparisons, constants, control-flow, double-arithmetic, function-calls, functions, let-expressions, mutable-variables, polymorphic-binary-op, polymorphic-comparison, polymorphic-double, polymorphic-identity, polymorphic-multi-call, polymorphic-multi-param, polymorphic-recursive, polymorphic-uncalled, polymorphic-unused-param, polymorphic-with-capture, type-inference-expressions, type-inference-functions, type-inference-if, type-inference-literals, type-inference-params, type-inference-params-bool, type-inference-params-callsite, type-inference-params-closure, type-inference-params-funcall, type-inference-params-multiple, types
+**MLIR Tests (31 files):** arithmetic, comparisons, constants, control-flow, double-arithmetic, function-calls, functions, let-expressions, mutable-variables, polymorphic-binary-op, polymorphic-comparison, polymorphic-double, polymorphic-identity, polymorphic-multi-call, polymorphic-multi-param, polymorphic-recursive, polymorphic-uncalled, polymorphic-unused-param, polymorphic-with-capture, type-inference-expressions, type-inference-functions, type-inference-if, type-inference-literals, type-inference-params, type-inference-params-bool, type-inference-params-callsite, type-inference-params-closure, type-inference-params-funcall, type-inference-params-multiple, types
 
 **LLVMIR Tests (13 files):** arithmetic, types, bool-type, functions, control-flow, comparisons, double-comparisons, mutable-variables, let-expressions, variable-shadowing, recursive-function, constant-folding, nested-if
 
-**Execution Tests (23 files):** bool-operations, closures, comparison-operators, conditionals, double-operations, factorial, fibonacci, functions, hello, let-expressions, mutability, polymorphic-binary-op, polymorphic-comparison, polymorphic-double, polymorphic-identity-display, polymorphic-identity-int-display, polymorphic-multi, polymorphic-multi-param, polymorphic-multi-param-double, polymorphic-recursive, polymorphic-with-capture, type-inference-params, variables
+**Execution Tests (28 files):** bool-operations, closures, comparison-operators, conditionals, double-operations, factorial, fibonacci, functions, hello, let-expressions, mutability, polymorphic-binary-op, polymorphic-comparison, polymorphic-double, polymorphic-identity-display, polymorphic-identity-int-display, polymorphic-multi, polymorphic-multi-param, polymorphic-multi-param-double, polymorphic-recursive, polymorphic-with-capture, type-inference-params, variables, and more
 
 **Error Tests (13 files):** syntax-errors, undefined-variable, type-mismatch, immutable-reassignment, undefined-function, function-arity, missing-else, syntax-error-paren, type-error-if-condition, return-type-mismatch, if-branch-type-mismatch, argument-type-mismatch, assignment-type-mismatch
 
