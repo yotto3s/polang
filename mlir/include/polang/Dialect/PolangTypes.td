@@ -43,6 +43,22 @@ def Polang_BoolType : Polang_Type<"Bool", "bool"> {
   }];
 }
 
+def Polang_TypeVarType : Polang_Type<"TypeVar", "typevar"> {
+  let summary = "Type variable for polymorphic types";
+  let description = [{
+    Represents an unresolved type variable used during type inference.
+    The parameter is a unique identifier for the type variable.
+
+    Example:
+    ```mlir
+    %x : !polang.typevar<0>
+    ```
+  }];
+
+  let parameters = (ins "uint64_t":$id);
+  let assemblyFormat = "`<` $id `>`";
+}
+
 //===----------------------------------------------------------------------===//
 // Type constraints
 //===----------------------------------------------------------------------===//
@@ -52,5 +68,14 @@ def Polang_AnyNumericType : AnyTypeOf<[Polang_IntType, Polang_DoubleType],
 
 def Polang_AnyType : AnyTypeOf<[Polang_IntType, Polang_DoubleType, Polang_BoolType],
     "any Polang type">;
+
+// Type constraints that include type variables (for use before type inference)
+def Polang_AnyNumericOrVar : AnyTypeOf<[
+    Polang_IntType, Polang_DoubleType, Polang_TypeVarType
+], "Polang numeric type or type variable">;
+
+def Polang_AnyTypeOrVar : AnyTypeOf<[
+    Polang_IntType, Polang_DoubleType, Polang_BoolType, Polang_TypeVarType
+], "any Polang type or type variable">;
 
 #endif // POLANG_TYPES_TD

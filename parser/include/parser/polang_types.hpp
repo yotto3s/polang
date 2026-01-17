@@ -7,7 +7,7 @@
 namespace polang {
 
 /// Enumeration of Polang's built-in type kinds.
-enum class TypeKind { Int, Double, Bool, Function, Unknown };
+enum class TypeKind { Int, Double, Bool, Function, TypeVar, Unknown };
 
 /// Type name constants to avoid magic strings throughout the codebase.
 /// Use these constants instead of string literals like "int", "double", etc.
@@ -16,6 +16,7 @@ struct TypeNames {
   static constexpr const char* DOUBLE = "double";
   static constexpr const char* BOOL = "bool";
   static constexpr const char* FUNCTION = "function";
+  static constexpr const char* TYPEVAR = "typevar";
   static constexpr const char* UNKNOWN = "unknown";
 };
 
@@ -30,6 +31,8 @@ inline const char* typeKindToString(TypeKind kind) noexcept {
     return TypeNames::BOOL;
   case TypeKind::Function:
     return TypeNames::FUNCTION;
+  case TypeKind::TypeVar:
+    return TypeNames::TYPEVAR;
   case TypeKind::Unknown:
     return TypeNames::UNKNOWN;
   }
@@ -47,6 +50,8 @@ inline std::optional<TypeKind> parseTypeName(const std::string& name) noexcept {
     return TypeKind::Bool;
   if (name == TypeNames::FUNCTION)
     return TypeKind::Function;
+  if (name == TypeNames::TYPEVAR)
+    return TypeKind::TypeVar;
   if (name == TypeNames::UNKNOWN)
     return TypeKind::Unknown;
   return std::nullopt;

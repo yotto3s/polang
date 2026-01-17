@@ -74,12 +74,18 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     }
   }
 
-  // Generate code using MLIR backend
+  // Generate code using MLIR backend - always emit type variables
   polang::MLIRCodeGenContext codegenCtx;
 
-  if (!codegenCtx.generateCode(*ast)) {
+  if (!codegenCtx.generateCode(*ast, true)) {
     std::cerr << "MLIR generation failed: " << codegenCtx.getError() << "\n";
     return EvalResult::error("Code generation failed");
+  }
+
+  // Run type inference to resolve type variables
+  if (!codegenCtx.runTypeInference()) {
+    std::cerr << "Type inference failed: " << codegenCtx.getError() << "\n";
+    return EvalResult::error("Type inference failed");
   }
 
   if (!codegenCtx.lowerToStandard()) {

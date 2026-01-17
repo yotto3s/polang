@@ -1,6 +1,7 @@
 # TableGen for Polang dialect
 # Ensure output directory exists before running TableGen
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include/polang/Dialect)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include/polang/Transforms)
 
 # Add MLIR include directories for TableGen
 # The tablegen() function uses get_directory_property(INCLUDE_DIRECTORIES)
@@ -23,9 +24,14 @@ mlir_tablegen(include/polang/Dialect/PolangTypes.h.inc -gen-typedef-decls)
 mlir_tablegen(include/polang/Dialect/PolangTypes.cpp.inc -gen-typedef-defs)
 add_public_tablegen_target(PolangTypesIncGen)
 
+set(LLVM_TARGET_DEFINITIONS include/polang/Transforms/Passes.td)
+mlir_tablegen(include/polang/Transforms/Passes.h.inc -gen-pass-decls -name PolangTransforms)
+add_public_tablegen_target(PolangTransformsPassIncGen)
+
 add_subdirectory(lib/Dialect)
 add_subdirectory(lib/Conversion)
 add_subdirectory(lib/MLIRGen)
+add_subdirectory(lib/Transforms)
 
 # Combined MLIR library
 add_library(PolangMLIR INTERFACE)
@@ -33,4 +39,5 @@ target_link_libraries(PolangMLIR INTERFACE
   PolangDialect
   PolangConversion
   PolangMLIRGen
+  PolangTransforms
 )

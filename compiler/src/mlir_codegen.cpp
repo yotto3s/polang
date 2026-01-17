@@ -10,6 +10,7 @@
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangOps.h"
 #include "polang/MLIRGen.h"
+#include "polang/Transforms/Passes.h"
 
 #include "parser/node.hpp"
 
@@ -80,19 +81,41 @@ bool MLIRCodeGenContext::initializeContext() {
   return true;
 }
 
-bool MLIRCodeGenContext::generateCode(const NBlock& ast) {
+bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars) {
   if (!initializeContext()) {
     error_ = "Failed to initialize MLIR context";
     return false;
   }
 
-  auto moduleRef = mlirGen(*context_, ast);
+  auto moduleRef = mlirGen(*context_, ast, emitTypeVars);
   if (!moduleRef) {
     error_ = "Failed to generate MLIR from AST";
     return false;
   }
 
   module_ = std::make_unique<OwningOpRef<ModuleOp>>(std::move(moduleRef));
+  return true;
+}
+
+bool MLIRCodeGenContext::runTypeInference() {
+  if (!module_ || !*module_) {
+    error_ = "No module for type inference";
+    return false;
+  }
+
+  PassManager pm(context_.get());
+
+  // Add the type inference pass
+  pm.addPass(polang::createTypeInferencePass());
+
+  // Note: We don't run canonicalization here to preserve all operations
+  // for debugging/testing. Canonicalization happens in later lowering stages.
+
+  if (failed(pm.run(**module_))) {
+    error_ = "Type inference failed";
+    return false;
+  }
+
   return true;
 }
 

@@ -16,6 +16,19 @@
 using namespace mlir;
 using namespace polang;
 
+namespace {
+/// Check if two types are compatible for verification purposes.
+/// Types are compatible if they are equal OR if either is a type variable.
+/// Type variables will be resolved by the type inference pass.
+bool typesAreCompatible(Type t1, Type t2) {
+  if (t1 == t2)
+    return true;
+  if (isa<TypeVarType>(t1) || isa<TypeVarType>(t2))
+    return true;
+  return false;
+}
+} // namespace
+
 #include "polang/Dialect/PolangEnums.cpp.inc"
 
 #define GET_OP_CLASSES
@@ -167,13 +180,15 @@ LogicalResult IfOp::verify() {
   if (!elseYield)
     return emitOpError("else region must end with polang.yield");
 
-  // Check that yield types match result type
-  if (thenYield.getValue().getType() != getResult().getType())
+  // Check that yield types match result type (allow type variables)
+  if (!typesAreCompatible(thenYield.getValue().getType(),
+                          getResult().getType()))
     return emitOpError("then branch yields ")
            << thenYield.getValue().getType() << " but if expects "
            << getResult().getType();
 
-  if (elseYield.getValue().getType() != getResult().getType())
+  if (!typesAreCompatible(elseYield.getValue().getType(),
+                          getResult().getType()))
     return emitOpError("else branch yields ")
            << elseYield.getValue().getType() << " but if expects "
            << getResult().getType();
@@ -195,7 +210,8 @@ LogicalResult ReturnOp::verify() {
   if (getValue()) {
     if (resultTypes.empty())
       return emitOpError("returns a value but function has no return type");
-    if (getValue().getType() != resultTypes[0])
+    // Allow type variables - they will be resolved by type inference pass
+    if (!typesAreCompatible(getValue().getType(), resultTypes[0]))
       return emitOpError("returns ")
              << getValue().getType() << " but function expects "
              << resultTypes[0];
@@ -243,17 +259,17 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
            << getCallee() << "' expects " << funcType.getNumInputs()
            << " argument(s) but got " << getOperands().size();
 
-  // Check argument types
+  // Check argument types (allow type variables)
   for (unsigned i = 0; i < getOperands().size(); ++i) {
-    if (getOperands()[i].getType() != funcType.getInput(i))
+    if (!typesAreCompatible(getOperands()[i].getType(), funcType.getInput(i)))
       return emitOpError("argument ")
              << (i + 1) << " has type " << getOperands()[i].getType()
              << " but function expects " << funcType.getInput(i);
   }
 
-  // Check result type
+  // Check result type (allow type variables)
   if (!funcType.getResults().empty() && getNumResults() > 0) {
-    if (getResult().getType() != funcType.getResult(0))
+    if (!typesAreCompatible(getResult().getType(), funcType.getResult(0)))
       return emitOpError("result type ")
              << getResult().getType() << " does not match function return type "
              << funcType.getResult(0);

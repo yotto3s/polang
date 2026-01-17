@@ -35,8 +35,14 @@ public:
   ~MLIRCodeGenContext();
 
   /// Generate MLIR from the given AST.
+  /// If emitTypeVars is true, untyped positions will emit type variables
+  /// for polymorphic type inference at the MLIR level.
   /// Returns true on success.
-  bool generateCode(const NBlock &ast);
+  bool generateCode(const NBlock &ast, bool emitTypeVars = false);
+
+  /// Run type inference pass to resolve type variables.
+  /// Must be called after generateCode() when emitTypeVars was true.
+  bool runTypeInference();
 
   /// Lower the Polang dialect to standard dialects.
   /// Must be called after generateCode().

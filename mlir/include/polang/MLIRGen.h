@@ -22,8 +22,11 @@ namespace polang {
 
 /// Generate MLIR from a Polang AST.
 /// Returns nullptr on failure.
+/// If emitTypeVars is true, untyped positions will emit type variables
+/// for polymorphic type inference at the MLIR level.
 mlir::OwningOpRef<mlir::ModuleOp> mlirGen(mlir::MLIRContext &context,
-                                           const NBlock &moduleAST);
+                                           const NBlock &moduleAST,
+                                           bool emitTypeVars = false);
 
 } // namespace polang
 

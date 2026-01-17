@@ -591,8 +591,11 @@ void TypeChecker::visit(const NMethodCall& node) {
     } else {
       // Check each argument type
       for (std::size_t i = 0; i < arg_types.size(); ++i) {
+        // Allow type variables to match any type (polymorphic inference)
         if (arg_types[i] != TypeNames::UNKNOWN &&
             param_types[i] != TypeNames::UNKNOWN &&
+            arg_types[i] != TypeNames::TYPEVAR &&
+            param_types[i] != TypeNames::TYPEVAR &&
             arg_types[i] != param_types[i]) {
           reportError("Function '" + node.id.name + "' argument " +
                       std::to_string(i + 1) + " expects " + param_types[i] +
@@ -828,8 +831,11 @@ void TypeChecker::visit(const NLetExpression& node) {
               local_mutability_[arg->id.name] = arg->isMutable;
               param_types[idx] = it->second;
             } else {
-              reportError("Cannot infer type of parameter '" + arg->id.name +
-                          "' in function '" + func->id.name + "'");
+              // Cannot infer type locally - use type variable for MLIR inference
+              mutable_arg.type = new NIdentifier(TypeNames::TYPEVAR);
+              local_types_[arg->id.name] = TypeNames::TYPEVAR;
+              local_mutability_[arg->id.name] = arg->isMutable;
+              param_types[idx] = TypeNames::TYPEVAR;
             }
           }
           ++idx;
@@ -1109,9 +1115,11 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
           local_mutability_[arg->id.name] = arg->isMutable;
           param_types[idx] = it->second;
         } else {
-          reportError("Cannot infer type of parameter '" + arg->id.name +
-                      "' in function '" + node.id.name + "'");
-          param_types[idx] = TypeNames::UNKNOWN;
+          // Cannot infer type locally - use type variable for MLIR inference
+          mutable_arg.type = new NIdentifier(TypeNames::TYPEVAR);
+          local_types_[arg->id.name] = TypeNames::TYPEVAR;
+          local_mutability_[arg->id.name] = arg->isMutable;
+          param_types[idx] = TypeNames::TYPEVAR;
         }
       }
       ++idx;

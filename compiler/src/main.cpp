@@ -12,9 +12,9 @@
 static void printUsage(const char* progName) {
   std::cerr << "Usage: " << progName << " [options] [file]\n";
   std::cerr << "Options:\n";
-  std::cerr << "  --dump-ast   Dump AST and exit (no code generation)\n";
-  std::cerr << "  --emit-mlir  Emit Polang dialect MLIR instead of LLVM IR\n";
-  std::cerr << "  --help       Show this help message\n";
+  std::cerr << "  --dump-ast      Dump AST and exit (no code generation)\n";
+  std::cerr << "  --emit-mlir     Emit Polang dialect MLIR instead of LLVM IR\n";
+  std::cerr << "  --help          Show this help message\n";
 }
 
 int main(int argc, char** argv) {
@@ -65,17 +65,20 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  // Type checking
-  const auto type_errors = polang_check_types(*ast);
-  if (!type_errors.empty()) {
+  // Type checking is done inside generateCode for error detection
+  // (undefined variables, type mismatches, etc.)
+
+  // MLIR backend - always emit type variables for polymorphic inference
+  polang::MLIRCodeGenContext context;
+
+  if (!context.generateCode(*ast, true)) {
+    std::cerr << "MLIR generation failed: " << context.getError() << "\n";
     return 1;
   }
 
-  // MLIR backend
-  polang::MLIRCodeGenContext context;
-
-  if (!context.generateCode(*ast)) {
-    std::cerr << "MLIR generation failed: " << context.getError() << "\n";
+  // Always run type inference to resolve type variables
+  if (!context.runTypeInference()) {
+    std::cerr << "Type inference failed: " << context.getError() << "\n";
     return 1;
   }
 

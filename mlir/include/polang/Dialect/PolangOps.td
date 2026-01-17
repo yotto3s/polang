@@ -103,8 +103,8 @@ class Polang_ArithOp<string mnemonic> : Polang_Op<mnemonic, [
     SameOperandsAndResultType,
     DeclareOpInterfaceMethods<InferTypeOpInterface>
   ]> {
-  let arguments = (ins Polang_AnyNumericType:$lhs, Polang_AnyNumericType:$rhs);
-  let results = (outs Polang_AnyNumericType:$result);
+  let arguments = (ins Polang_AnyNumericOrVar:$lhs, Polang_AnyNumericOrVar:$rhs);
+  let results = (outs Polang_AnyNumericOrVar:$result);
   let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($result)";
 }
 
@@ -192,8 +192,8 @@ def Polang_CmpOp : Polang_Op<"cmp", [
 
   let arguments = (ins
     Polang_CmpPredicate:$predicate,
-    Polang_AnyNumericType:$lhs,
-    Polang_AnyNumericType:$rhs
+    Polang_AnyNumericOrVar:$lhs,
+    Polang_AnyNumericOrVar:$rhs
   );
   let results = (outs Polang_BoolType:$result);
 
@@ -271,8 +271,8 @@ def Polang_CallOp : Polang_Op<"call", [
     ```
   }];
 
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<Polang_AnyType>:$operands);
-  let results = (outs Optional<Polang_AnyType>:$result);
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<Polang_AnyTypeOrVar>:$operands);
+  let results = (outs Optional<Polang_AnyTypeOrVar>:$result);
 
   let assemblyFormat = [{
     $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
@@ -305,7 +305,7 @@ def Polang_ReturnOp : Polang_Op<"return", [
     ```
   }];
 
-  let arguments = (ins Optional<Polang_AnyType>:$value);
+  let arguments = (ins Optional<Polang_AnyTypeOrVar>:$value);
 
   let assemblyFormat = "($value^ `:` type($value))? attr-dict";
 
@@ -347,7 +347,7 @@ def Polang_IfOp : Polang_Op<"if", [
   }];
 
   let arguments = (ins Polang_BoolType:$condition);
-  let results = (outs Polang_AnyType:$result);
+  let results = (outs Polang_AnyTypeOrVar:$result);
   let regions = (region
     SizedRegion<1>:$thenRegion,
     SizedRegion<1>:$elseRegion
@@ -378,7 +378,7 @@ def Polang_YieldOp : Polang_Op<"yield", [
     ```
   }];
 
-  let arguments = (ins Polang_AnyType:$value);
+  let arguments = (ins Polang_AnyTypeOrVar:$value);
 
   let assemblyFormat = "$value `:` type($value) attr-dict";
 }
@@ -420,7 +420,7 @@ def Polang_LoadOp : Polang_Op<"load", [Pure]> {
   }];
 
   let arguments = (ins AnyType:$ref);
-  let results = (outs Polang_AnyType:$result);
+  let results = (outs Polang_AnyTypeOrVar:$result);
 
   let assemblyFormat = "$ref `:` type($ref) `->` type($result) attr-dict";
 }
@@ -436,7 +436,7 @@ def Polang_StoreOp : Polang_Op<"store"> {
     ```
   }];
 
-  let arguments = (ins Polang_AnyType:$value, AnyType:$ref);
+  let arguments = (ins Polang_AnyTypeOrVar:$value, AnyType:$ref);
 
   let assemblyFormat = "$value `,` $ref `:` type($value) `,` type($ref) attr-dict";
 
@@ -458,7 +458,7 @@ def Polang_PrintOp : Polang_Op<"print"> {
     ```
   }];
 
-  let arguments = (ins Polang_AnyType:$value);
+  let arguments = (ins Polang_AnyTypeOrVar:$value);
 
   let assemblyFormat = "$value `:` type($value) attr-dict";
 }

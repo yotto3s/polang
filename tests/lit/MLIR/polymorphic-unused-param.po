@@ -1,0 +1,10 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test polymorphic function with unused parameter
+; Parameter type is inferred from call site even when not used in body
+
+; CHECK: {{.*}}polang.func @unused(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+let unused(x) = 42
+
+; Entry point - call the function with an int
+unused(1)

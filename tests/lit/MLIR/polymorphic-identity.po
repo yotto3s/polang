@@ -1,0 +1,14 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test polymorphic identity function with type inference
+; The identity function has no type annotations, so it uses type variables
+; Type inference resolves the type from the call site
+
+; The entry function calls identity with an int, so type is inferred
+; CHECK: {{.*}}polang.func @__polang_entry() -> !polang.int{{.*}}
+
+; The identity function gets inferred type from call site
+; CHECK: {{.*}}polang.func @identity(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+
+let identity(x) = x
+identity(42)
