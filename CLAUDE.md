@@ -75,6 +75,9 @@ When modifying the language syntax (lexer.l, parser.y, or node.hpp), always upda
 When modifying the MLIR code generation pipeline, update:
 - `doc/Lowering.md` - MLIR lowering process documentation
 
+When modifying the type system or type inference:
+- `doc/TypeSystem.md` - Type system and inference documentation
+
 When adding new language features or modifying compiler output, consider adding lit tests:
 - `tests/lit/AST/` - AST dump tests using `--dump-ast`
 - `tests/lit/MLIR/` - MLIR output tests using `--emit-mlir`
@@ -86,13 +89,13 @@ When adding new language features or modifying compiler output, consider adding 
 
 **AST Tests (11 files):** literals, double-literals, bool-literals, variables, mutable-variables, assignment, functions, control-flow, comparisons, let-expressions, method-calls
 
-**MLIR Tests (20 files):** constants, arithmetic, double-arithmetic, functions, function-calls, control-flow, comparisons, types, mutable-variables, let-expressions, type-inference-literals, type-inference-expressions, type-inference-functions, type-inference-if, type-inference-params, type-inference-params-callsite, type-inference-params-bool, type-inference-params-funcall, type-inference-params-multiple, type-inference-params-closure
+**MLIR Tests (22 files):** constants, arithmetic, double-arithmetic, functions, function-calls, control-flow, comparisons, types, mutable-variables, let-expressions, type-inference-literals, type-inference-expressions, type-inference-functions, type-inference-if, type-inference-params, type-inference-params-callsite, type-inference-params-bool, type-inference-params-funcall, type-inference-params-multiple, type-inference-params-closure, polymorphic-identity, polymorphic-unused-param
 
 **LLVMIR Tests (13 files):** arithmetic, types, bool-type, functions, control-flow, comparisons, double-comparisons, mutable-variables, let-expressions, variable-shadowing, recursive-function, constant-folding, nested-if
 
 **Execution Tests (13 files):** hello, variables, mutability, functions, conditionals, closures, fibonacci, factorial, double-operations, bool-operations, let-expressions, comparison-operators, type-inference-params
 
-**Error Tests (15 files):** syntax-errors, undefined-variable, type-mismatch, immutable-reassignment, undefined-function, function-arity, missing-else, syntax-error-paren, type-error-if-condition, return-type-mismatch, if-branch-type-mismatch, argument-type-mismatch, assignment-type-mismatch, param-type-inference-error, param-type-inference-multiple-errors
+**Error Tests (13 files):** syntax-errors, undefined-variable, type-mismatch, immutable-reassignment, undefined-function, function-arity, missing-else, syntax-error-paren, type-error-if-condition, return-type-mismatch, if-branch-type-mismatch, argument-type-mismatch, assignment-type-mismatch
 
 ## Testing
 

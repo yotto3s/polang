@@ -11,7 +11,11 @@ Source Code
     ↓
    AST
     ↓
-Polang Dialect (custom)
+Polang Dialect (with type variables)
+    ↓
+Type Inference Pass (resolves type variables)
+    ↓
+Polang Dialect (fully typed)
     ↓
 Standard Dialects (arith, func, scf, memref)
     ↓
@@ -54,6 +58,16 @@ Type inference is performed at the AST level before MLIR generation, ensuring al
 | `int` | `!polang.int` | `i64` |
 | `double` | `!polang.double` | `f64` |
 | `bool` | `!polang.bool` | `i1` |
+| (type variable) | `!polang.typevar<id>` | (resolved by type inference) |
+
+#### Type Variables
+
+Type variables (`!polang.typevar<id>`) represent unknown types during the initial MLIR generation phase. They are used for:
+
+- Function parameters without explicit type annotations
+- Return types that depend on polymorphic parameters
+
+Type variables are resolved by the type inference pass before lowering to standard dialects. Each type variable has a unique numeric ID (e.g., `!polang.typevar<0>`, `!polang.typevar<1>`).
 
 ### Operations
 
@@ -168,6 +182,51 @@ module {
     %3 = polang.load %1 : memref<i64> -> !polang.int
     polang.return %3 : !polang.int
   }
+}
+```
+
+### Stage 1.5: Type Inference Pass
+
+The `TypeInferencePass` resolves type variables using Hindley-Milner style unification. This pass:
+
+1. **Collects constraints** from:
+   - Function return statements (return value type must match function return type)
+   - Arithmetic operations (operands and result must have the same type)
+   - Call sites (argument types must match parameter types)
+
+2. **Unifies types** using the standard unification algorithm:
+   - Type variables can be bound to concrete types or other type variables
+   - Occurs check prevents infinite types
+   - Constraints are solved to produce a substitution mapping
+
+3. **Applies substitution** to resolve all type variables:
+   - Function signatures are updated with concrete types
+   - Operations are rebuilt with resolved types
+   - Block arguments are updated to match new types
+
+**Example:**
+
+Before type inference:
+```mlir
+polang.func @identity(%arg0: !polang.typevar<0>) -> !polang.typevar<1> {
+  polang.return %arg0 : !polang.typevar<0>
+}
+polang.func @__polang_entry() -> !polang.int {
+  %0 = polang.constant.int 42 : !polang.int
+  %1 = polang.call @identity(%0) : (!polang.int) -> !polang.typevar<1>
+  polang.return %1 : !polang.typevar<1>
+}
+```
+
+After type inference:
+```mlir
+polang.func @identity(%arg0: !polang.int) -> !polang.int {
+  polang.return %arg0 : !polang.int
+}
+polang.func @__polang_entry() -> !polang.int {
+  %0 = polang.constant.int 42 : !polang.int
+  %1 = polang.call @identity(%0) : (!polang.int) -> !polang.int
+  polang.return %1 : !polang.int
 }
 ```
 
@@ -322,20 +381,25 @@ mlir/
 │   ├── Dialect/
 │   │   ├── PolangDialect.td    # Dialect definition
 │   │   ├── PolangOps.td        # Operation definitions
-│   │   ├── PolangTypes.td      # Type definitions
+│   │   ├── PolangTypes.td      # Type definitions (including TypeVarType)
 │   │   ├── Passes.h            # Dialect pass declarations
 │   │   └── *.h                 # Generated headers
 │   ├── Conversion/
 │   │   └── Passes.h            # Lowering pass declarations
+│   ├── Transforms/
+│   │   ├── Passes.h            # Transform pass declarations
+│   │   └── Passes.td           # TableGen pass definitions
 │   └── MLIRGen.h               # AST to MLIR interface
 └── lib/
     ├── Dialect/
     │   ├── PolangDialect.cpp   # Dialect implementation
     │   ├── PolangOps.cpp       # Operation implementations (includes verifiers)
-    │   ├── PolangTypes.cpp     # Type implementations
-    │   └── PolangTypeInference.cpp # Type inference pass
+    │   └── PolangTypes.cpp     # Type implementations
     ├── Conversion/
     │   └── PolangToStandard.cpp # Lowering pass
+    ├── Transforms/
+    │   ├── TypeInference.cpp   # Type inference pass (unification algorithm)
+    │   └── Monomorphization.cpp # Monomorphization pass (placeholder)
     └── MLIRGen/
         └── MLIRGen.cpp         # AST to MLIR visitor
 ```

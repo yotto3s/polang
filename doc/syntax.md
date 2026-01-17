@@ -152,7 +152,12 @@ let <name>(<param>, ...) = <expression>    ; types inferred
 
 ### Parameter Type Inference
 
-When a parameter type is omitted, Polang infers it from how the parameter is used in the function body:
+Polang uses Hindley-Milner style type inference to determine parameter types. When a parameter type is omitted, Polang infers it from:
+
+1. **Local usage** - How the parameter is used in the function body
+2. **Call-site inference** - The types of arguments passed at call sites (polymorphic inference)
+
+**Local inference examples:**
 
 ```
 let double(x) = x * 2       ; x inferred as int (from * 2)
@@ -161,22 +166,28 @@ let is_zero(x) = x == 0     ; x inferred as int (from == 0)
 let add(x: int, y) = x + y  ; y inferred as int (from + x)
 ```
 
-**Inference rules (top-level functions):**
+**Local inference rules:**
 - `x + 1` or `x * 2` (integer literal) → x is `int`
 - `x + 1.0` or `x / 2.0` (double literal) → x is `double`
 - `if x then ...` (used as condition) → x is `bool`
 - `x + y` where y has known type → x has same type
 - `f(x)` where f expects a type → x has that type
 
-**Let-expression functions** also support call-site inference:
+**Polymorphic call-site inference:**
+
+When a parameter's type cannot be determined from local usage, Polang infers it from the call site:
+
 ```
-let identity(x) = x in identity(42)  ; x inferred as int from call site
+let identity(x) = x         ; x is polymorphic (type variable)
+identity(42)                ; x inferred as int from call site
 ```
 
-If a parameter's type cannot be inferred, a compile-time error is raised:
 ```
-let unused(x) = 42   ; ERROR: Cannot infer type of parameter 'x'
+let unused(x) = 42          ; x is polymorphic (type variable)
+unused(1)                   ; x inferred as int from call site
 ```
+
+This enables polymorphic functions where the same function definition can work with different types based on how it's called. The type inference happens at the MLIR level using a unification-based algorithm.
 
 ### Function Calls
 
