@@ -11,10 +11,118 @@ env:
   IMAGE_NAME: ${{ github.repository }}-dev
 
 jobs:
-  build-and-test:
+  check-changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      docker-changed: ${{ steps.filter.outputs.docker }}
+    name: Check Changes
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for Docker changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docker:
+              - 'docker/**'
+
+  build-image:
+    needs: [check-changes]
+    if: needs.check-changes.outputs.docker-changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    name: Build Docker Image
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-to: type=inline
+
+  format-check:
+    needs: [build-image]
+    if: ${{ !cancelled() && (needs.build-image.result == 'success' || needs.build-image.result == 'skipped') }}
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/${{ github.repository }}-dev:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user root
+    name: Format Check
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check formatting
+        run: ./scripts/run-clang-format.sh --check
+
+  lint:
+    needs: [build-image]
+    if: ${{ !cancelled() && (needs.build-image.result == 'success' || needs.build-image.result == 'skipped') }}
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/${{ github.repository }}-dev:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user root
+    name: Clang-Tidy
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          cmake -S. -Bbuild \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+
+      - name: Run clang-tidy
+        run: ./scripts/run-clang-tidy.sh
+
+  build-and-test:
+    needs: [format-check, lint]
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/${{ github.repository }}-dev:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: --user root
     strategy:
       matrix:
@@ -58,9 +166,13 @@ jobs:
           done
 
   sanitizers:
+    needs: [build-and-test]
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/${{ github.repository }}-dev:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: --user root
     strategy:
       matrix:
@@ -104,9 +216,13 @@ jobs:
           done
 
   coverage:
+    needs: [build-and-test]
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/${{ github.repository }}-dev:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: --user root
     name: Code Coverage
 
@@ -139,37 +255,3 @@ jobs:
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  format-check:
-    runs-on: ubuntu-24.04
-    container:
-      image: ghcr.io/${{ github.repository }}-dev:latest
-      options: --user root
-    name: Format Check
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Check formatting
-        run: ./scripts/run-clang-format.sh --check
-
-  lint:
-    runs-on: ubuntu-24.04
-    container:
-      image: ghcr.io/${{ github.repository }}-dev:latest
-      options: --user root
-    name: Clang-Tidy
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure
-        run: |
-          cmake -S. -Bbuild \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
-
-      - name: Run clang-tidy
-        run: ./scripts/run-clang-tidy.sh

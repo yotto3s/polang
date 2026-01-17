@@ -233,22 +233,24 @@ GitHub Actions workflows run automatically on push and pull requests to `main`.
 
 All jobs run in the project's Docker container (`ghcr.io/<owner>/polang-dev`).
 
+```
+check-changes ─→ build-image (only if docker/** changed)
+                      │
+                      ▼ (runs even if skipped)
+                ┌─ format-check ─┐
+                │                ├─→ build-and-test ─┬─→ sanitizers
+                └─ lint ─────────┘                   └─→ coverage
+```
+
 | Job | Description |
 |-----|-------------|
+| `check-changes` | Detect if `docker/**` files were modified |
+| `build-image` | Build and push Docker image (only when Dockerfile changes) |
+| `format-check` | Verify clang-format compliance |
+| `lint` | Run clang-tidy static analysis |
 | `build-and-test` | Build with GCC/Clang × Debug/Release matrix (4 configurations) |
 | `sanitizers` | AddressSanitizer and UndefinedBehaviorSanitizer checks |
 | `coverage` | Code coverage report uploaded to Codecov |
-| `format-check` | Verify clang-format compliance |
-| `lint` | Run clang-tidy static analysis |
-
-### Docker Image (`.github/workflows/docker.yml`)
-
-Builds and pushes the dev container to GHCR when `docker/` or the workflow file changes.
-
-```bash
-# Manually trigger Docker build (requires repo write access)
-gh workflow run docker.yml
-```
 
 ## Code Coverage
 
