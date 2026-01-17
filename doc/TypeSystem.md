@@ -34,13 +34,42 @@ The type system is implemented in two phases:
 
 ## Primitive Types
 
-Polang supports three primitive types:
+Polang supports a variety of numeric types with explicit width and signedness, plus a boolean type:
+
+### Integer Types
 
 | Type | Description | Size | MLIR Type | LLVM Type |
 |------|-------------|------|-----------|-----------|
-| `int` | Signed integer | 64-bit | `!polang.int` | `i64` |
-| `double` | Floating-point | 64-bit | `!polang.double` | `f64` |
+| `i8` | Signed 8-bit integer | 8-bit | `!polang.integer<8, signed>` | `i8` |
+| `i16` | Signed 16-bit integer | 16-bit | `!polang.integer<16, signed>` | `i16` |
+| `i32` | Signed 32-bit integer | 32-bit | `!polang.integer<32, signed>` | `i32` |
+| `i64` | Signed 64-bit integer | 64-bit | `!polang.integer<64, signed>` | `i64` |
+| `u8` | Unsigned 8-bit integer | 8-bit | `!polang.integer<8, unsigned>` | `i8` |
+| `u16` | Unsigned 16-bit integer | 16-bit | `!polang.integer<16, unsigned>` | `i16` |
+| `u32` | Unsigned 32-bit integer | 32-bit | `!polang.integer<32, unsigned>` | `i32` |
+| `u64` | Unsigned 64-bit integer | 64-bit | `!polang.integer<64, unsigned>` | `i64` |
+
+### Floating-Point Types
+
+| Type | Description | Size | MLIR Type | LLVM Type |
+|------|-------------|------|-----------|-----------|
+| `f32` | Single-precision float | 32-bit | `!polang.float<32>` | `f32` |
+| `f64` | Double-precision float | 64-bit | `!polang.float<64>` | `f64` |
+
+### Boolean Type
+
+| Type | Description | Size | MLIR Type | LLVM Type |
+|------|-------------|------|-----------|-----------|
 | `bool` | Boolean | 1-bit | `!polang.bool` | `i1` |
+
+### Legacy Type Aliases
+
+For compatibility, the following aliases are supported:
+
+| Alias | Maps To |
+|-------|---------|
+| `int` | `i64` |
+| `double` | `f64` |
 
 ### Type Constants
 
@@ -48,14 +77,42 @@ Type names are defined as compile-time constants in `parser/include/parser/polan
 
 ```cpp
 struct TypeNames {
-  static constexpr const char* INT = "int";
-  static constexpr const char* DOUBLE = "double";
+  // Signed integers
+  static constexpr const char* I8 = "i8";
+  static constexpr const char* I16 = "i16";
+  static constexpr const char* I32 = "i32";
+  static constexpr const char* I64 = "i64";
+
+  // Unsigned integers
+  static constexpr const char* U8 = "u8";
+  static constexpr const char* U16 = "u16";
+  static constexpr const char* U32 = "u32";
+  static constexpr const char* U64 = "u64";
+
+  // Floating-point
+  static constexpr const char* F32 = "f32";
+  static constexpr const char* F64 = "f64";
+
+  // Legacy aliases
+  static constexpr const char* INT = "int";     // alias for i64
+  static constexpr const char* DOUBLE = "double"; // alias for f64
+
+  // Other types
   static constexpr const char* BOOL = "bool";
   static constexpr const char* FUNCTION = "function";
   static constexpr const char* TYPEVAR = "typevar";
   static constexpr const char* UNKNOWN = "unknown";
 };
 ```
+
+### Literal Type Defaults
+
+When type inference encounters a numeric literal without explicit type context, it defaults to:
+
+- **Integer literals** → `i64` (signed 64-bit)
+- **Float literals** → `f64` (64-bit double precision)
+
+This means `42` has type `i64` and `3.14` has type `f64` by default.
 
 ## Type Inference
 
@@ -166,26 +223,48 @@ In the parser, type variables are represented as the string `"typevar"`:
 mutable_arg.type = new NIdentifier(TypeNames::TYPEVAR);
 ```
 
-In MLIR, type variables are parameterized types with unique IDs:
+In MLIR, type variables are parameterized types with unique IDs and a **kind** that constrains what types they can resolve to:
 
 ```mlir
-!polang.typevar<0>   ; First type variable
-!polang.typevar<1>   ; Second type variable
+!polang.typevar<0, Any>      ; Can be any type
+!polang.typevar<1, Integer>  ; Must resolve to an integer type
+!polang.typevar<2, Float>    ; Must resolve to a float type
 ```
+
+### Type Variable Kinds
+
+Type variables have a **kind** that constrains their resolution:
+
+| Kind | Description | Default Resolution |
+|------|-------------|-------------------|
+| `Any` | No constraint, can be any type | `i64` (if no other info) |
+| `Integer` | Must be an integer type (i8-i64, u8-u64) | `i64` |
+| `Float` | Must be a float type (f32, f64) | `f64` |
+
+The kind is inferred from usage:
+- Integer literals (e.g., `42`) create `Integer`-kind constraints
+- Float literals (e.g., `3.14`) create `Float`-kind constraints
+- Operations on type variables propagate kind constraints
 
 ### Definition
 
 Type variables are defined in `mlir/include/polang/Dialect/PolangTypes.td`:
 
 ```tablegen
+def Polang_TypeVarKind : I32EnumAttr<"TypeVarKind", "Type variable kind", [
+  I32EnumAttrCase<"Any", 0>,
+  I32EnumAttrCase<"Integer", 1>,
+  I32EnumAttrCase<"Float", 2>
+]>;
+
 def Polang_TypeVarType : Polang_Type<"TypeVar", "typevar"> {
   let summary = "Type variable for polymorphic types";
   let description = [{
     Represents an unresolved type variable used during type inference.
-    The parameter is a unique identifier for the type variable.
+    The id is a unique identifier, and kind constrains resolution.
   }];
-  let parameters = (ins "uint64_t":$id);
-  let assemblyFormat = "`<` $id `>`";
+  let parameters = (ins "uint64_t":$id, "TypeVarKind":$kind);
+  let assemblyFormat = "`<` $id `,` $kind `>`";
 }
 ```
 
@@ -378,16 +457,16 @@ LogicalResult ReturnOp::verify() {
 ### Example 1: Simple Type Inference
 
 ```polang
-let add(x: int, y) = x + y
+let add(x: i64, y) = x + y
 add(1, 2)
 ```
 
 **Inference:**
-- `x` is explicitly `int`
+- `x` is explicitly `i64`
 - `y` is marked as `typevar` by the parser
-- MLIR unifies `y` with `int` (from `x + y` where `x: int`)
-- Return type inferred as `int` (result of `+`)
-- Monomorphization creates `add$int_int`
+- MLIR unifies `y` with `i64` (from `x + y` where `x: i64`)
+- Return type inferred as `i64` (result of `+`)
+- Monomorphization creates `add$i64_i64`
 
 ### Example 2: Polymorphic Identity
 
@@ -397,11 +476,11 @@ identity(42)
 ```
 
 **Inference:**
-- `x` has no local constraints → assigned `typevar<0>`
-- Return type depends on `x` → assigned `typevar<1>`
-- Call `identity(42)` constrains `typevar<0>` to `int`
-- Unification: `typevar<1>` = `typevar<0>` = `int`
-- Final type: `identity: (int) -> int`
+- `x` has no local constraints → assigned `typevar<0, Any>`
+- Return type depends on `x` → assigned `typevar<1, Any>`
+- Call `identity(42)` constrains `typevar<0>` to `i64` (integer literal default)
+- Unification: `typevar<1>` = `typevar<0>` = `i64`
+- Final type: `identity$i64: (i64) -> i64`
 
 ### Example 3: Multiple Parameters
 
@@ -412,8 +491,8 @@ first(1, 2.0)
 
 **Inference:**
 - `x` and `y` both get type variables
-- Call site: `x` constrained to `int`, `y` constrained to `double`
-- Final type: `first: (int, double) -> int`
+- Call site: `x` constrained to `i64` (integer literal), `y` constrained to `f64` (float literal)
+- Final type: `first$i64_f64: (i64, f64) -> i64`
 
 ### Example 4: Inference from Operations
 
@@ -424,9 +503,22 @@ is_positive(5)
 
 **Inference:**
 - `x` marked as `typevar` by parser
-- MLIR unifies `x` with `int` (from `x > 0` where `0` is `int`)
+- MLIR unifies `x` with `Integer`-kind from `x > 0` where `0` is an integer literal
+- At call site, `5` is an integer literal → resolves to `i64`
 - Return type is `bool` (result of comparison)
-- Final type: `is_positive$int: (int) -> bool`
+- Final type: `is_positive$i64: (i64) -> bool`
+
+### Example 5: Float Type Inference
+
+```polang
+let add(x, y) = x + y
+add(1.5, 2.0)
+```
+
+**Inference:**
+- `x` and `y` get type variables with `Float` kind (from float literals at call site)
+- Float-kind type variables default to `f64`
+- Final type: `add$f64_f64: (f64, f64) -> f64`
 
 ## Monomorphization
 
@@ -444,17 +536,17 @@ Polymorphic functions are specialized (monomorphized) for each unique set of arg
 
 ```polang
 let identity(x) = x
-identity(42)     ; Creates identity$int
+identity(42)     ; Creates identity$i64
 identity(true)   ; Creates identity$bool
 ```
 
 **Generated MLIR:**
 
 ```mlir
-polang.func @identity(%arg0: !polang.typevar<0>) -> !polang.typevar<1>
+polang.func @identity(%arg0: !polang.typevar<0, Any>) -> !polang.typevar<1, Any>
     attributes {polang.polymorphic} { ... }
 
-polang.func @identity$int(%arg0: !polang.int) -> !polang.int { ... }
+polang.func @identity$i64(%arg0: !polang.integer<64, signed>) -> !polang.integer<64, signed> { ... }
 
 polang.func @identity$bool(%arg0: !polang.bool) -> !polang.bool { ... }
 ```

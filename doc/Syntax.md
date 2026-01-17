@@ -17,13 +17,47 @@ Polang is a simple programming language with ML-inspired syntax and LLVM backend
 
 ## Types
 
-Polang supports three primitive types:
+Polang supports a variety of numeric types with explicit width and signedness:
 
-| Type     | Description                | Size    |
-|----------|----------------------------|---------|
-| `int`    | Signed integer             | 64-bit  |
-| `double` | Floating-point number      | 64-bit  |
-| `bool`   | Boolean value              | 1-bit   |
+### Integer Types
+
+| Type  | Description                | Size    |
+|-------|----------------------------|---------|
+| `i8`  | Signed 8-bit integer       | 8-bit   |
+| `i16` | Signed 16-bit integer      | 16-bit  |
+| `i32` | Signed 32-bit integer      | 32-bit  |
+| `i64` | Signed 64-bit integer      | 64-bit  |
+| `u8`  | Unsigned 8-bit integer     | 8-bit   |
+| `u16` | Unsigned 16-bit integer    | 16-bit  |
+| `u32` | Unsigned 32-bit integer    | 32-bit  |
+| `u64` | Unsigned 64-bit integer    | 64-bit  |
+
+### Floating-Point Types
+
+| Type  | Description                | Size    |
+|-------|----------------------------|---------|
+| `f32` | Single-precision float     | 32-bit  |
+| `f64` | Double-precision float     | 64-bit  |
+
+### Boolean Type
+
+| Type   | Description   | Size   |
+|--------|---------------|--------|
+| `bool` | Boolean value | 1-bit  |
+
+### Legacy Type Aliases
+
+For compatibility, the following aliases are supported:
+
+| Alias    | Maps To |
+|----------|---------|
+| `int`    | `i64`   |
+| `double` | `f64`   |
+
+### Default Literal Types
+
+- Integer literals (e.g., `42`) default to `i64`
+- Float literals (e.g., `3.14`) default to `f64`
 
 ## Literals
 
@@ -132,10 +166,10 @@ a <- b <- 5         ; assigns 5 to both a and b, evaluates to 5
 Functions are declared using `let` with parameter lists:
 
 ```
-let add(x: int, y: int): int = x + y   ; explicit types
-let square(n: int) = n * n              ; return type inferred as int
-let double(x) = x * 2                   ; parameter type inferred from body
-let half(x) = x / 2.0                   ; parameter type inferred as double
+let add(x: i64, y: i64): i64 = x + y   ; explicit types
+let square(n: i64) = n * n              ; return type inferred as i64
+let double(x) = x * 2                   ; parameter type inferred from body (i64)
+let half(x) = x / 2.0                   ; parameter type inferred as f64
 ```
 
 **Syntax:**
@@ -161,15 +195,15 @@ Polang uses Hindley-Milner style type inference to determine parameter types. Wh
 **Local inference examples:**
 
 ```
-let double(x) = x * 2       ; x inferred as int (from * 2)
-let half(x) = x / 2.0       ; x inferred as double (from / 2.0)
-let is_zero(x) = x == 0     ; x inferred as int (from == 0)
-let add(x: int, y) = x + y  ; y inferred as int (from + x)
+let double(x) = x * 2       ; x inferred as i64 (from * 2)
+let half(x) = x / 2.0       ; x inferred as f64 (from / 2.0)
+let is_zero(x) = x == 0     ; x inferred as i64 (from == 0)
+let add(x: i64, y) = x + y  ; y inferred as i64 (from + x)
 ```
 
 **Local inference rules:**
-- `x + 1` or `x * 2` (integer literal) → x is `int`
-- `x + 1.0` or `x / 2.0` (double literal) → x is `double`
+- `x + 1` or `x * 2` (integer literal) → x is `i64`
+- `x + 1.0` or `x / 2.0` (float literal) → x is `f64`
 - `if x then ...` (used as condition) → x is `bool`
 - `x + y` where y has known type → x has same type
 - `f(x)` where f expects a type → x has that type
@@ -180,12 +214,12 @@ When a parameter's type cannot be determined from local usage, Polang infers it 
 
 ```
 let identity(x) = x         ; x is polymorphic (type variable)
-identity(42)                ; x inferred as int from call site
+identity(42)                ; x inferred as i64 from call site
 ```
 
 ```
 let unused(x) = 42          ; x is polymorphic (type variable)
-unused(1)                   ; x inferred as int from call site
+unused(1)                   ; x inferred as i64 from call site
 ```
 
 This enables polymorphic functions where the same function definition can work with different types based on how it's called. The type inference happens at the MLIR level using a unification-based algorithm.
@@ -230,9 +264,9 @@ if <condition> then <then_expr> else <else_expr>
 **Examples:**
 
 ```
-let max(a: int, b: int): int = if a > b then a else b
-let abs(x: int): int = if x < 0 then 0 - x else x
-let sign(n: int): int = if n > 0 then 1 else if n < 0 then 0 - 1 else 0
+let max(a: i64, b: i64): i64 = if a > b then a else b
+let abs(x: i64): i64 = if x < 0 then 0 - x else x
+let sign(n: i64): i64 = if n > 0 then 1 else if n < 0 then 0 - 1 else 0
 ```
 
 ### Let Expression
@@ -279,16 +313,16 @@ let a = 10 and b = 20 in a + b
 let x = 5 in let y = x + 1 in y * 2
 
 ; Function binding in let expression
-let f(x: int): int = x + 1 in f(5)
+let f(x: i64): i64 = x + 1 in f(5)
 
 ; Multiple function bindings
-let square(n: int): int = n * n and cube(n: int): int = n * n * n in square(3) + cube(2)
+let square(n: i64): i64 = n * n and cube(n: i64): i64 = n * n * n in square(3) + cube(2)
 
 ; Mixed variable and function bindings
-let x = 10 and double(y: int): int = y * 2 in double(x)
+let x = 10 and double(y: i64): i64 = y * 2 in double(x)
 
 ; Function with inferred return type
-let inc(n: int) = n + 1 in inc(41)
+let inc(n: i64) = n + 1 in inc(41)
 ```
 
 ### Variable Capture (Closures)
@@ -312,13 +346,13 @@ f()               ; returns 11
 ```
 ; Simple capture
 let multiplier = 3
-let scale(n: int) = n * multiplier
+let scale(n: i64) = n * multiplier
 scale(10)  ; returns 30
 
 ; Capture in let expression
 let result =
   let base = 100 and
-      add(x: int) = base + x
+      add(x: i64) = base + x
   in add(5)  ; returns 105
 
 ; Multiple captures
@@ -412,8 +446,8 @@ Modules are declared using the `module`/`endmodule` keywords with a Haskell-styl
 ```
 module Math (add, PI)
   let PI = 3.14159
-  let add(x: int, y: int): int = x + y
-  let internal_helper(x: int): int = x * 2  ; not exported
+  let add(x: i64, y: i64): i64 = x + y
+  let internal_helper(x: i64): i64 = x * 2  ; not exported
 endmodule
 ```
 
@@ -436,7 +470,7 @@ Module members are accessed using dot notation:
 ```
 module Math (add, PI)
   let PI = 3.14159
-  let add(x: int, y: int): int = x + y
+  let add(x: i64, y: i64): i64 = x + y
 endmodule
 
 Math.PI              ; access exported variable
@@ -483,8 +517,8 @@ from <module> import *
 ```
 module Math (add, mul, PI)
   let PI = 3.14159
-  let add(x: int, y: int): int = x + y
-  let mul(x: int, y: int): int = x * y
+  let add(x: i64, y: i64): i64 = x + y
+  let mul(x: i64, y: i64): i64 = x * y
 endmodule
 
 ; Using qualified access
@@ -499,10 +533,10 @@ mul(2, add(1, 2))            ; returns 6
 ```
 module Utils (process)
   ; Public function
-  let process(x: int): int = helper(x) + helper(x)
+  let process(x: i64): i64 = helper(x) + helper(x)
 
   ; Private helper (not exported)
-  let helper(x: int): int = x * 2
+  let helper(x: i64): i64 = x * 2
 endmodule
 
 Utils.process(5)   ; returns 20
@@ -513,7 +547,7 @@ Utils.helper(5)    ; ERROR: helper is not exported
 ```
 module Outer (Inner)
   module Inner (foo)
-    let foo(x: int): int = x + 1
+    let foo(x: i64): i64 = x + 1
   endmodule
 endmodule
 
@@ -601,7 +635,11 @@ double      ::= [0-9]+ "." [0-9]*
 
 boolean     ::= "true" | "false"
 
-type        ::= "int" | "double" | "bool"
+type        ::= "i8" | "i16" | "i32" | "i64"
+              | "u8" | "u16" | "u32" | "u64"
+              | "f32" | "f64"
+              | "int" | "double"   ; legacy aliases
+              | "bool"
 
 comment     ::= ";" [^\n]*
 ```
@@ -625,7 +663,7 @@ let sum = a + b
 ### Function Definition and Call
 
 ```
-let multiply(x: int, y: int): int = x * y
+let multiply(x: i64, y: i64): i64 = x * y
 let result = multiply(6, 7)
 ```
 
@@ -640,14 +678,14 @@ let is_less : bool = a < b
 ### Complex Expression
 
 ```
-let compute(a: int, b: int, c: int): int = (a + b) * c
+let compute(a: i64, b: i64, c: i64): i64 = (a + b) * c
 let answer = compute(1, 2, 3)
 ```
 
 ### If Expression
 
 ```
-let max(a: int, b: int): int = if a > b then a else b
+let max(a: i64, b: i64): i64 = if a > b then a else b
 let larger = max(10, 20)
 ```
 
