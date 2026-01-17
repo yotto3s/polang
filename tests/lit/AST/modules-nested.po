@@ -1,0 +1,23 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test nested module declaration AST
+; CHECK:      NBlock
+; CHECK-NEXT: `-NModuleDeclaration 'Outer' (inner_func)
+; CHECK-NEXT:   |-NFunctionDeclaration 'inner_func' (x: int) -> int
+; CHECK-NEXT:   | `-NBlock
+; CHECK-NEXT:   |   `-NExpressionStatement
+; CHECK-NEXT:   |     `-NIdentifier 'x'
+; CHECK-NEXT:   `-NModuleDeclaration 'Inner' (nested_func)
+; CHECK-NEXT:     `-NFunctionDeclaration 'nested_func' (y: int) -> int
+; CHECK-NEXT:       `-NBlock
+; CHECK-NEXT:         `-NExpressionStatement
+; CHECK-NEXT:           `-NBinaryOperator '*'
+; CHECK-NEXT:             |-NIdentifier 'y'
+; CHECK-NEXT:             `-NInteger 2
+
+module Outer (inner_func)
+  let inner_func(x: int): int = x
+  module Inner (nested_func)
+    let nested_func(y: int): int = y * 2
+  endmodule
+endmodule

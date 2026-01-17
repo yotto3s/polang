@@ -9,6 +9,8 @@ void NBoolean::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NIdentifier::accept(Visitor& visitor) const { visitor.visit(*this); }
 
+void NQualifiedName::accept(Visitor& visitor) const { visitor.visit(*this); }
+
 void NMethodCall::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NBinaryOperator::accept(Visitor& visitor) const { visitor.visit(*this); }
@@ -32,3 +34,9 @@ void NVariableDeclaration::accept(Visitor& visitor) const {
 void NFunctionDeclaration::accept(Visitor& visitor) const {
   visitor.visit(*this);
 }
+
+void NModuleDeclaration::accept(Visitor& visitor) const {
+  visitor.visit(*this);
+}
+
+void NImportStatement::accept(Visitor& visitor) const { visitor.visit(*this); }

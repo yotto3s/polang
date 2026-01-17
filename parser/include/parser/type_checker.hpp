@@ -28,6 +28,7 @@ public:
   void visit(const NDouble& node) override;
   void visit(const NBoolean& node) override;
   void visit(const NIdentifier& node) override;
+  void visit(const NQualifiedName& node) override;
   void visit(const NMethodCall& node) override;
   void visit(const NBinaryOperator& node) override;
   void visit(const NAssignment& node) override;
@@ -37,6 +38,8 @@ public:
   void visit(const NExpressionStatement& node) override;
   void visit(const NVariableDeclaration& node) override;
   void visit(const NFunctionDeclaration& node) override;
+  void visit(const NModuleDeclaration& node) override;
+  void visit(const NImportStatement& node) override;
 
   // Get the inferred type of the last visited node
   std::string getInferredType() const { return inferred_type_; }
@@ -57,6 +60,21 @@ private:
   std::map<std::string, std::string> function_return_types_;
   std::map<std::string, std::vector<std::string>> function_param_types_;
   std::vector<TypeCheckError> errors_;
+
+  // Module path for name mangling (e.g., ["Math", "Internal"])
+  std::vector<std::string> module_path_;
+
+  // Module exports: module mangled name -> set of exported symbol names
+  std::map<std::string, std::set<std::string>> module_exports_;
+
+  // Module aliases: alias -> original module path
+  std::map<std::string, std::string> module_aliases_;
+
+  // Imported symbols: local name -> mangled module symbol name
+  std::map<std::string, std::string> imported_symbols_;
+
+  // Get mangled name for a symbol within current module context
+  std::string mangledName(const std::string& name) const;
 
   void reportError(const std::string& message);
   std::string inferType(const Node& node);

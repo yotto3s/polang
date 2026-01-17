@@ -1,0 +1,12 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test qualified variable access AST
+; CHECK:      NBlock
+; CHECK-NEXT: |-NModuleDeclaration 'Math' (PI)
+; CHECK:      `-NExpressionStatement
+; CHECK-NEXT:   `-NQualifiedName 'Math.PI'
+
+module Math (PI)
+  let PI = 3.14
+endmodule
+Math.PI

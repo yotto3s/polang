@@ -1,0 +1,10 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test that module functions get mangled names (call appears before func definition)
+; CHECK: {{.*}}polang.call @Math$$add({{.*}}){{.*}}
+; CHECK: {{.*}}polang.func @Math$$add({{.*}}){{.*}}
+
+module Math (add)
+  let add(x: int, y: int): int = x + y
+endmodule
+Math.add(1, 2)

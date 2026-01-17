@@ -119,7 +119,32 @@ public:
     result = nullptr;
   }
 
+  void visit(const NQualifiedName& node) override {
+    // Qualified name access (e.g., Math.PI)
+    // Look up using mangled name
+    const std::string mangled = node.mangledName();
+    auto value = lookupVariable(mangled);
+    if (value) {
+      result = *value;
+      auto type = lookupType(mangled);
+      resultType = type.value_or(TypeNames::INT);
+      return;
+    }
+
+    emitError(loc()) << "Unknown qualified name: " << node.fullName();
+    result = nullptr;
+  }
+
   void visit(const NMethodCall& node) override {
+    // Get the effective function name (mangled for qualified calls)
+    std::string funcName = node.effectiveName();
+
+    // Resolve imported symbol to mangled name if applicable
+    auto importIt = importedSymbols.find(funcName);
+    if (importIt != importedSymbols.end()) {
+      funcName = importIt->second;
+    }
+
     // Collect arguments
     SmallVector<Value> args;
     for (const auto* arg : node.arguments) {
@@ -130,7 +155,7 @@ public:
     }
 
     // Look up function to get captured variables
-    auto funcIt = functionCaptures.find(node.id.name);
+    auto funcIt = functionCaptures.find(funcName);
     if (funcIt != functionCaptures.end()) {
       // Add captured variables as extra arguments
       for (const auto& captureName : funcIt->second) {
@@ -143,11 +168,11 @@ public:
 
     // Get result type - prefer MLIR type (may include type vars)
     Type resultTy;
-    auto funcRetMLIRIt = functionReturnMLIRTypes.find(node.id.name);
+    auto funcRetMLIRIt = functionReturnMLIRTypes.find(funcName);
     if (funcRetMLIRIt != functionReturnMLIRTypes.end()) {
       resultTy = funcRetMLIRIt->second;
       // Set resultType string if we have it
-      auto funcRetTypeIt = functionReturnTypes.find(node.id.name);
+      auto funcRetTypeIt = functionReturnTypes.find(funcName);
       if (funcRetTypeIt != functionReturnTypes.end()) {
         resultType = funcRetTypeIt->second;
       } else {
@@ -155,7 +180,7 @@ public:
       }
     } else {
       // Fallback to string-based lookup
-      auto funcRetTypeIt = functionReturnTypes.find(node.id.name);
+      auto funcRetTypeIt = functionReturnTypes.find(funcName);
       if (funcRetTypeIt != functionReturnTypes.end()) {
         resultTy = getPolangType(funcRetTypeIt->second);
         resultType = funcRetTypeIt->second;
@@ -167,7 +192,7 @@ public:
     }
 
     auto callOp =
-        builder.create<CallOp>(loc(), node.id.name, TypeRange{resultTy}, args);
+        builder.create<CallOp>(loc(), funcName, TypeRange{resultTy}, args);
     result = callOp.getResult();
   }
 
@@ -317,6 +342,9 @@ public:
   }
 
   void visit(const NVariableDeclaration& node) override {
+    // Get mangled variable name (includes module path)
+    const std::string varName = mangledName(node.id.name);
+
     // Determine the type
     std::string typeName = node.type ? node.type->name : TypeNames::INT;
     if (node.assignmentExpr) {
@@ -331,25 +359,28 @@ public:
       Type llvmType = convertPolangType(polangType);
 
       auto memRefType = MemRefType::get({}, llvmType);
-      auto alloca = builder.create<AllocaOp>(loc(), memRefType, node.id.name,
+      auto alloca = builder.create<AllocaOp>(loc(), memRefType, varName,
                                              polangType, node.isMutable);
 
       if (node.assignmentExpr && result) {
         builder.create<StoreOp>(loc(), result, alloca);
       }
 
-      symbolTable[node.id.name] = alloca;
+      symbolTable[varName] = alloca;
     } else {
       // Immutable: store SSA value directly (no alloca needed)
-      immutableValues[node.id.name] = result;
+      immutableValues[varName] = result;
     }
 
-    typeTable[node.id.name] = typeName;
+    typeTable[varName] = typeName;
   }
 
   void visit(const NFunctionDeclaration& node) override {
     // Save the current insertion point
     OpBuilder::InsertionGuard guard(builder);
+
+    // Get mangled function name (includes module path)
+    const std::string funcName = mangledName(node.id.name);
 
     // Build function type with type variables for untyped parameters
     SmallVector<Type> argTypes;
@@ -373,15 +404,15 @@ public:
       captureNames.push_back(capture->id.name);
     }
 
-    // Store captures for call site
-    functionCaptures[node.id.name] = captureNames;
+    // Store captures for call site (using mangled name)
+    functionCaptures[funcName] = captureNames;
 
     // Return type - use type variable if not specified
     Type returnType = getTypeOrFresh(node.type);
     if (node.type) {
-      functionReturnTypes[node.id.name] = node.type->name;
+      functionReturnTypes[funcName] = node.type->name;
     }
-    functionReturnMLIRTypes[node.id.name] = returnType;
+    functionReturnMLIRTypes[funcName] = returnType;
 
     auto funcType = builder.getFunctionType(argTypes, {returnType});
 
@@ -394,7 +425,7 @@ public:
       captureRefs.push_back(name);
     }
 
-    auto funcOp = builder.create<FuncOp>(loc(), node.id.name, funcType,
+    auto funcOp = builder.create<FuncOp>(loc(), funcName, funcType,
                                          ArrayRef<StringRef>(captureRefs));
 
     // Create entry block with arguments
@@ -440,6 +471,99 @@ public:
     result = nullptr; // Function declarations don't produce a value
   }
 
+  void visit(const NModuleDeclaration& node) override {
+    // Push module name onto path for name mangling
+    currentModulePath_.push_back(node.name.name);
+
+    // Generate module members with mangled names
+    for (const auto* member : node.members) {
+      member->accept(*this);
+    }
+
+    // Pop module name from path
+    currentModulePath_.pop_back();
+    result = nullptr; // Module declarations don't produce a value
+  }
+
+  void visit(const NImportStatement& node) override {
+    // Import statements are processed by the type checker.
+    // For MLIR generation, we need to create aliases for imported symbols.
+    const std::string moduleName = node.modulePath.mangledName();
+
+    switch (node.kind) {
+    case ImportKind::Module:
+    case ImportKind::ModuleAlias:
+      // Module-level imports don't require MLIR generation.
+      // The qualified name access handles the resolution.
+      break;
+
+    case ImportKind::Items:
+      // from Math import add, PI - create local aliases
+      for (const auto& item : node.items) {
+        const std::string mangled = moduleName + "$$" + item.name;
+        const std::string localName = item.effectiveName();
+
+        // Track the import mapping for name resolution
+        importedSymbols[localName] = mangled;
+
+        // Copy variable from mangled name to local name
+        auto value = lookupVariable(mangled);
+        if (value) {
+          immutableValues[localName] = *value;
+          auto type = lookupType(mangled);
+          if (type) {
+            typeTable[localName] = *type;
+          }
+        }
+
+        // Copy function info from mangled name to local name
+        auto retIt = functionReturnTypes.find(mangled);
+        if (retIt != functionReturnTypes.end()) {
+          functionReturnTypes[localName] = retIt->second;
+        }
+        auto retMLIRIt = functionReturnMLIRTypes.find(mangled);
+        if (retMLIRIt != functionReturnMLIRTypes.end()) {
+          functionReturnMLIRTypes[localName] = retMLIRIt->second;
+        }
+        auto captIt = functionCaptures.find(mangled);
+        if (captIt != functionCaptures.end()) {
+          functionCaptures[localName] = captIt->second;
+        }
+      }
+      break;
+
+    case ImportKind::All: {
+      // from Math import * - import all symbols with the module prefix
+      const std::string prefix = moduleName + "$$";
+
+      // Scan function return types for symbols with this prefix
+      for (const auto& [mangled, returnType] : functionReturnTypes) {
+        if (mangled.substr(0, prefix.size()) == prefix) {
+          // Extract local name (after the prefix)
+          const std::string localName = mangled.substr(prefix.size());
+          // Only import if it's a direct child (no more $$ in the name)
+          if (localName.find("$$") == std::string::npos) {
+            importedSymbols[localName] = mangled;
+          }
+        }
+      }
+
+      // Scan immutable values for symbols with this prefix
+      for (const auto& [mangled, value] : immutableValues) {
+        if (mangled.substr(0, prefix.size()) == prefix) {
+          const std::string localName = mangled.substr(prefix.size());
+          if (localName.find("$$") == std::string::npos) {
+            importedSymbols[localName] = mangled;
+          }
+        }
+      }
+      break;
+    }
+    }
+
+    result = nullptr; // Import statements don't produce a value
+  }
+
 private:
   OpBuilder builder;
   ModuleOp module;
@@ -455,6 +579,22 @@ private:
   Value result;
   std::string resultType;
 
+  // Module path for name mangling (e.g., ["Math", "Internal"])
+  std::vector<std::string> currentModulePath_;
+
+  // Get mangled name for a symbol within current module context
+  std::string mangledName(const std::string& name) const {
+    if (currentModulePath_.empty()) {
+      return name;
+    }
+    std::string result;
+    for (const auto& part : currentModulePath_) {
+      result += part + "$$";
+    }
+    result += name;
+    return result;
+  }
+
   // Symbol tables
   std::map<std::string, Value> symbolTable;     // Mutable variable allocas
   std::map<std::string, Value> argValues;       // Function arguments
@@ -464,6 +604,7 @@ private:
   std::map<std::string, std::vector<std::string>> functionCaptures;
   std::map<std::string, std::string> functionReturnTypes;
   std::map<std::string, Type> functionReturnMLIRTypes; // Function return types as MLIR types
+  std::map<std::string, std::string> importedSymbols;  // local name -> mangled name
 
   /// RAII helper class for scoped symbol table management.
   /// Automatically saves and restores symbol tables when entering/exiting

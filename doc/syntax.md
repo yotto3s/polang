@@ -12,6 +12,7 @@ Polang is a simple programming language with ML-inspired syntax and LLVM backend
 - [Expressions](#expressions)
 - [Operators](#operators)
 - [Comments](#comments)
+- [Modules](#modules)
 - [Grammar Summary](#grammar-summary)
 
 ## Types
@@ -400,6 +401,125 @@ let x = 5  ; inline comment after code
 
 Comments are ignored by the parser and do not affect program execution. A file containing only comments is valid (produces an empty program).
 
+## Modules
+
+Polang supports a module system for organizing code into namespaces.
+
+### Module Declaration
+
+Modules are declared using the `module`/`endmodule` keywords with a Haskell-style export list:
+
+```
+module Math (add, PI)
+  let PI = 3.14159
+  let add(x: int, y: int): int = x + y
+  let internal_helper(x: int): int = x * 2  ; not exported
+endmodule
+```
+
+**Syntax:**
+```
+module <name> (<export1>, <export2>, ...)
+  <declarations>
+endmodule
+```
+
+- The export list in parentheses specifies which symbols are public
+- Symbols not in the export list are private to the module
+- A module without an export list has no public symbols
+- Modules can contain variables, functions, and nested modules
+
+### Qualified Access
+
+Module members are accessed using dot notation:
+
+```
+module Math (add, PI)
+  let PI = 3.14159
+  let add(x: int, y: int): int = x + y
+endmodule
+
+Math.PI              ; access exported variable
+Math.add(1, 2)       ; call exported function
+```
+
+### Import Statements
+
+Import statements bring module symbols into the current scope:
+
+**Import entire module:**
+```
+import Math                  ; use as Math.add, Math.PI
+```
+
+**Import with alias:**
+```
+import Math as M             ; use as M.add, M.PI
+```
+
+**Import specific items:**
+```
+from Math import add, PI     ; use directly as add, PI
+from Math import add as plus ; use as plus instead of add
+```
+
+**Import all exports:**
+```
+from Math import *           ; import all exported symbols
+```
+
+**Syntax:**
+```
+import <module>
+import <module> as <alias>
+from <module> import <item1>, <item2>, ...
+from <module> import <item> as <alias>, ...
+from <module> import *
+```
+
+### Module Examples
+
+**Basic module with function and variable:**
+```
+module Math (add, mul, PI)
+  let PI = 3.14159
+  let add(x: int, y: int): int = x + y
+  let mul(x: int, y: int): int = x * y
+endmodule
+
+; Using qualified access
+Math.add(2, Math.mul(2, 3))  ; returns 8
+
+; Using imports
+from Math import add, mul
+mul(2, add(1, 2))            ; returns 6
+```
+
+**Private helpers:**
+```
+module Utils (process)
+  ; Public function
+  let process(x: int): int = helper(x) + helper(x)
+
+  ; Private helper (not exported)
+  let helper(x: int): int = x * 2
+endmodule
+
+Utils.process(5)   ; returns 20
+Utils.helper(5)    ; ERROR: helper is not exported
+```
+
+**Nested modules:**
+```
+module Outer (Inner)
+  module Inner (foo)
+    let foo(x: int): int = x + 1
+  endmodule
+endmodule
+
+Outer.Inner.foo(5)  ; returns 6
+```
+
 ## Grammar Summary
 
 ```ebnf
@@ -407,6 +527,8 @@ program     ::= statement*
 
 statement   ::= var_decl
               | func_decl
+              | module_decl
+              | import_stmt
               | expression
 
 var_decl    ::= "let" identifier "=" expression
@@ -419,13 +541,31 @@ func_decl   ::= "let" identifier "(" param_list ")" ":" type "=" expression
               | "let" identifier "()" ":" type "=" expression
               | "let" identifier "()" "=" expression
 
+module_decl ::= "module" identifier "(" ident_list ")" module_body "endmodule"
+              | "module" identifier module_body "endmodule"
+
+module_body ::= (var_decl | func_decl | module_decl)*
+
+import_stmt ::= "import" qualified_name
+              | "import" qualified_name "as" identifier
+              | "from" qualified_name "import" import_items
+              | "from" qualified_name "import" "*"
+
+import_items ::= identifier ("as" identifier)? ("," identifier ("as" identifier)?)*
+
+qualified_name ::= identifier ("." identifier)*
+
+ident_list  ::= identifier ("," identifier)*
+
 param_list  ::= param ("," param)*
 
 param       ::= identifier ":" type
               | identifier
 
 expression  ::= identifier "<-" expression
+              | qualified_name "(" call_args ")"
               | identifier "(" call_args ")"
+              | qualified_name
               | identifier
               | numeric
               | boolean

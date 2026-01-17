@@ -6,6 +6,7 @@ class NInteger;
 class NDouble;
 class NBoolean;
 class NIdentifier;
+class NQualifiedName;
 class NMethodCall;
 class NBinaryOperator;
 class NAssignment;
@@ -15,6 +16,8 @@ class NLetExpression;
 class NExpressionStatement;
 class NVariableDeclaration;
 class NFunctionDeclaration;
+class NModuleDeclaration;
+class NImportStatement;
 
 /// Base class for implementing the Visitor design pattern on the Polang AST.
 ///
@@ -70,6 +73,7 @@ public:
   virtual void visit(const NDouble& node) = 0;
   virtual void visit(const NBoolean& node) = 0;
   virtual void visit(const NIdentifier& node) = 0;
+  virtual void visit(const NQualifiedName& node) = 0;
   virtual void visit(const NMethodCall& node) = 0;
   virtual void visit(const NBinaryOperator& node) = 0;
   virtual void visit(const NAssignment& node) = 0;
@@ -83,6 +87,8 @@ public:
   virtual void visit(const NExpressionStatement& node) = 0;
   virtual void visit(const NVariableDeclaration& node) = 0;
   virtual void visit(const NFunctionDeclaration& node) = 0;
+  virtual void visit(const NModuleDeclaration& node) = 0;
+  virtual void visit(const NImportStatement& node) = 0;
   /// @}
 };
 

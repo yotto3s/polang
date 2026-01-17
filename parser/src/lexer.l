@@ -41,6 +41,11 @@ void polang_reset_lexer_location() {
 "true"                  { return TOKEN(TTRUE); }
 "false"                 { return TOKEN(TFALSE); }
 "mut"                   { return TOKEN(TMUT); }
+"module"                { return TOKEN(TMODULE); }
+"endmodule"             { return TOKEN(TENDMODULE); }
+"import"                { return TOKEN(TIMPORT); }
+"from"                  { return TOKEN(TFROM); }
+"as"                    { return TOKEN(TAS); }
 [a-zA-Z_][a-zA-Z0-9_]*  { SAVE_TOKEN; return TIDENTIFIER; }
 [0-9]+\.[0-9]*          { SAVE_TOKEN; return TDOUBLE; }
 [0-9]+                  { SAVE_TOKEN; return TINTEGER; }

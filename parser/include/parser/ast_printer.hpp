@@ -17,6 +17,7 @@ public:
   void visit(const NDouble& node) override;
   void visit(const NBoolean& node) override;
   void visit(const NIdentifier& node) override;
+  void visit(const NQualifiedName& node) override;
   void visit(const NMethodCall& node) override;
   void visit(const NBinaryOperator& node) override;
   void visit(const NAssignment& node) override;
@@ -26,6 +27,8 @@ public:
   void visit(const NExpressionStatement& node) override;
   void visit(const NVariableDeclaration& node) override;
   void visit(const NFunctionDeclaration& node) override;
+  void visit(const NModuleDeclaration& node) override;
+  void visit(const NImportStatement& node) override;
 
 private:
   std::ostream& out_;

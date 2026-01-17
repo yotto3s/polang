@@ -1,0 +1,32 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test module declaration AST with exports
+; CHECK:      NBlock
+; CHECK-NEXT: `-NModuleDeclaration 'Math' (add, sub, PI)
+; CHECK-NEXT:   |-NVariableDeclaration 'PI'
+; CHECK-NEXT:   | `-NDouble 3.14159
+; CHECK-NEXT:   |-NFunctionDeclaration 'add' (x: int, y: int) -> int
+; CHECK-NEXT:   | `-NBlock
+; CHECK-NEXT:   |   `-NExpressionStatement
+; CHECK-NEXT:   |     `-NBinaryOperator '+'
+; CHECK-NEXT:   |       |-NIdentifier 'x'
+; CHECK-NEXT:   |       `-NIdentifier 'y'
+; CHECK-NEXT:   |-NFunctionDeclaration 'sub' (x: int, y: int) -> int
+; CHECK-NEXT:   | `-NBlock
+; CHECK-NEXT:   |   `-NExpressionStatement
+; CHECK-NEXT:   |     `-NBinaryOperator '-'
+; CHECK-NEXT:   |       |-NIdentifier 'x'
+; CHECK-NEXT:   |       `-NIdentifier 'y'
+; CHECK-NEXT:   `-NFunctionDeclaration 'internal_helper' (x: int) -> int
+; CHECK-NEXT:     `-NBlock
+; CHECK-NEXT:       `-NExpressionStatement
+; CHECK-NEXT:         `-NBinaryOperator '*'
+; CHECK-NEXT:           |-NIdentifier 'x'
+; CHECK-NEXT:           `-NInteger 2
+
+module Math (add, sub, PI)
+  let PI = 3.14159
+  let add(x: int, y: int): int = x + y
+  let sub(x: int, y: int): int = x - y
+  let internal_helper(x: int): int = x * 2
+endmodule

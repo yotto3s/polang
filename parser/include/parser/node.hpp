@@ -13,6 +13,7 @@ class NFunctionDeclaration;
 typedef std::vector<NStatement*> StatementList;
 typedef std::vector<NExpression*> ExpressionList;
 typedef std::vector<NVariableDeclaration*> VariableList;
+typedef std::vector<std::string> StringList;
 
 // Union type for let bindings (can be variable or function)
 struct NLetBinding {
@@ -66,13 +67,54 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
+// Qualified name for module access: Math.add, Math.Internal.helper
+class NQualifiedName : public NExpression {
+public:
+  StringList parts;  // ["Math", "add"] or ["Math", "Internal", "helper"]
+  NQualifiedName(const StringList &parts) : parts(parts) {}
+  // Convenience constructor from single identifier
+  NQualifiedName(const std::string &name) : parts({name}) {}
+  // Get the full qualified name as a string (e.g., "Math.add")
+  std::string fullName() const {
+    std::string result;
+    for (size_t i = 0; i < parts.size(); ++i) {
+      if (i > 0) result += ".";
+      result += parts[i];
+    }
+    return result;
+  }
+  // Get mangled name for MLIR (e.g., "Math$$add")
+  std::string mangledName() const {
+    std::string result;
+    for (size_t i = 0; i < parts.size(); ++i) {
+      if (i > 0) result += "$$";
+      result += parts[i];
+    }
+    return result;
+  }
+  // Check if this is a simple (unqualified) name
+  bool isSimple() const { return parts.size() == 1; }
+  // Get the simple name (last part)
+  const std::string &simpleName() const { return parts.back(); }
+  void accept(Visitor &visitor) const override;
+};
+
 class NMethodCall : public NExpression {
 public:
-  const NIdentifier &id;
+  const NIdentifier &id;          // For backward compatibility
+  const NQualifiedName *qualifiedId;  // For qualified calls (optional)
   ExpressionList arguments;
   NMethodCall(const NIdentifier &id, const ExpressionList &arguments)
-      : id(id), arguments(arguments) {}
-  NMethodCall(const NIdentifier &id) : id(id) {}
+      : id(id), qualifiedId(nullptr), arguments(arguments) {}
+  NMethodCall(const NIdentifier &id) : id(id), qualifiedId(nullptr) {}
+  // Constructor for qualified calls
+  NMethodCall(const NQualifiedName &qid, const ExpressionList &arguments)
+      : id(*new NIdentifier(qid.simpleName())), qualifiedId(&qid), arguments(arguments) {}
+  // Get the effective function name (mangled if qualified)
+  std::string effectiveName() const {
+    if (qualifiedId) return qualifiedId->mangledName();
+    return id.name;
+  }
   void accept(Visitor &visitor) const override;
 };
 
@@ -162,6 +204,63 @@ public:
   NFunctionDeclaration(NIdentifier *type, const NIdentifier &id,
                        const VariableList &arguments, NBlock &block)
       : type(type), id(id), arguments(arguments), block(block) {}
+  void accept(Visitor &visitor) const override;
+};
+
+class NModuleDeclaration : public NStatement {
+public:
+  const NIdentifier &name;
+  StringList exports;        // Haskell-style export list from module header
+  StatementList members;     // Functions, variables, nested modules
+  // Constructor with exports
+  NModuleDeclaration(const NIdentifier &name, const StringList &exports,
+                     const StatementList &members)
+      : name(name), exports(exports), members(members) {}
+  // Constructor without exports (all private)
+  NModuleDeclaration(const NIdentifier &name, const StatementList &members)
+      : name(name), exports(), members(members) {}
+  void accept(Visitor &visitor) const override;
+};
+
+// Import kinds for different import statement forms
+enum class ImportKind {
+  Module,      // import Math (use as Math.add)
+  ModuleAlias, // import Math as M (use as M.add)
+  Items,       // from Math import add, PI
+  All          // from Math import *
+};
+
+// Item in a "from X import a, b as c" statement
+struct ImportItem {
+  std::string name;   // Original name in the module
+  std::string alias;  // Alias (empty if no alias)
+  ImportItem(const std::string &name, const std::string &alias = "")
+      : name(name), alias(alias) {}
+  // Get the effective name to use in code
+  std::string effectiveName() const {
+    return alias.empty() ? name : alias;
+  }
+};
+
+typedef std::vector<ImportItem> ImportItemList;
+
+class NImportStatement : public NStatement {
+public:
+  ImportKind kind;
+  const NQualifiedName &modulePath;  // Module being imported
+  std::string alias;                  // For "import X as Y"
+  ImportItemList items;               // For "from X import a, b"
+  // Constructor for "import Math"
+  NImportStatement(const NQualifiedName &modulePath)
+      : kind(ImportKind::Module), modulePath(modulePath) {}
+  // Constructor for "import Math as M"
+  NImportStatement(const NQualifiedName &modulePath, const std::string &alias)
+      : kind(ImportKind::ModuleAlias), modulePath(modulePath), alias(alias) {}
+  // Constructor for "from Math import add, PI" or "from Math import *"
+  NImportStatement(const NQualifiedName &modulePath, const ImportItemList &items,
+                   bool importAll = false)
+      : kind(importAll ? ImportKind::All : ImportKind::Items),
+        modulePath(modulePath), items(items) {}
   void accept(Visitor &visitor) const override;
 };
 // clang-format on

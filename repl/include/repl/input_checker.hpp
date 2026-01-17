@@ -12,6 +12,7 @@ public:
   static bool isInputIncomplete(const std::string& input) noexcept {
     int parenDepth = 0;
     int ifWithoutElse = 0;
+    int moduleDepth = 0;
     std::string lastToken;
 
     // Simple tokenization - track keywords and brackets
@@ -55,6 +56,12 @@ public:
           if (ifWithoutElse > 0) {
             --ifWithoutElse;
           }
+        } else if (word == "module") {
+          ++moduleDepth;
+        } else if (word == "endmodule") {
+          if (moduleDepth > 0) {
+            --moduleDepth;
+          }
         }
         continue;
       }
@@ -67,13 +74,14 @@ public:
     // Input is incomplete if:
     // - Unbalanced parentheses
     // - if without matching else
+    // - module without matching endmodule
     // - Ends with 'in' keyword (let expression needs body)
     // - Ends with 'then' keyword (if expression needs else)
     // - Ends with binary operator (expression continues)
-    return parenDepth > 0 || ifWithoutElse > 0 || lastToken == "in" ||
-           lastToken == "then" || lastToken == "+" || lastToken == "-" ||
-           lastToken == "*" || lastToken == "/" || lastToken == "=" ||
-           lastToken == "," || lastToken == "and";
+    return parenDepth > 0 || ifWithoutElse > 0 || moduleDepth > 0 ||
+           lastToken == "in" || lastToken == "then" || lastToken == "+" ||
+           lastToken == "-" || lastToken == "*" || lastToken == "/" ||
+           lastToken == "=" || lastToken == "," || lastToken == "and";
   }
 };
 

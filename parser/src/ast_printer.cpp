@@ -58,9 +58,18 @@ void ASTPrinter::visit(const NIdentifier& node) {
   out_ << "NIdentifier '" << node.name << "'\n";
 }
 
+void ASTPrinter::visit(const NQualifiedName& node) {
+  printPrefix();
+  out_ << "NQualifiedName '" << node.fullName() << "'\n";
+}
+
 void ASTPrinter::visit(const NMethodCall& node) {
   printPrefix();
-  out_ << "NMethodCall '" << node.id.name << "'\n";
+  if (node.qualifiedId) {
+    out_ << "NMethodCall '" << node.qualifiedId->fullName() << "'\n";
+  } else {
+    out_ << "NMethodCall '" << node.id.name << "'\n";
+  }
 
   const auto& args = node.arguments;
   for (size_t i = 0; i < args.size(); ++i) {
@@ -218,4 +227,59 @@ void ASTPrinter::visit(const NFunctionDeclaration& node) {
     DepthScope scope(*this, false);
     node.block.accept(*this);
   }
+}
+
+void ASTPrinter::visit(const NModuleDeclaration& node) {
+  printPrefix();
+  out_ << "NModuleDeclaration '" << node.name.name << "'";
+
+  // Print export list if present
+  if (!node.exports.empty()) {
+    out_ << " (";
+    for (size_t i = 0; i < node.exports.size(); ++i) {
+      if (i > 0) {
+        out_ << ", ";
+      }
+      out_ << node.exports[i];
+    }
+    out_ << ")";
+  }
+  out_ << "\n";
+
+  // Print module members
+  for (size_t i = 0; i < node.members.size(); ++i) {
+    const bool is_last = (i == node.members.size() - 1);
+    DepthScope scope(*this, !is_last);
+    node.members[i]->accept(*this);
+  }
+}
+
+void ASTPrinter::visit(const NImportStatement& node) {
+  printPrefix();
+  out_ << "NImportStatement ";
+
+  switch (node.kind) {
+  case ImportKind::Module:
+    out_ << "import " << node.modulePath.fullName();
+    break;
+  case ImportKind::ModuleAlias:
+    out_ << "import " << node.modulePath.fullName() << " as " << node.alias;
+    break;
+  case ImportKind::Items:
+    out_ << "from " << node.modulePath.fullName() << " import ";
+    for (size_t i = 0; i < node.items.size(); ++i) {
+      if (i > 0) {
+        out_ << ", ";
+      }
+      out_ << node.items[i].name;
+      if (!node.items[i].alias.empty()) {
+        out_ << " as " << node.items[i].alias;
+      }
+    }
+    break;
+  case ImportKind::All:
+    out_ << "from " << node.modulePath.fullName() << " import *";
+    break;
+  }
+  out_ << "\n";
 }

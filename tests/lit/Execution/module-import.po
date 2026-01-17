@@ -1,0 +1,9 @@
+; RUN: %polang_repl %s | %FileCheck %s
+; CHECK: 5 : int
+
+module Math (add, sub)
+  let add(x: int, y: int): int = x + y
+  let sub(x: int, y: int): int = x - y
+endmodule
+from Math import add, sub
+add(3, sub(4, 2))

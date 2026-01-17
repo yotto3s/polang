@@ -79,6 +79,11 @@ public:
     }
   }
 
+  void visit(const NQualifiedName& node) override {
+    // Qualified names reference module members, not local variables
+    // Don't treat as free variables
+  }
+
   void visit(const NMethodCall& node) override {
     // Function name itself is not a capture (functions are global)
     // Only process arguments
@@ -161,6 +166,14 @@ public:
     local_names_.insert(node.id.name);
   }
 
+  void visit(const NModuleDeclaration& node) override {
+    // Don't recurse into modules for free variable collection
+  }
+
+  void visit(const NImportStatement& node) override {
+    // Import statements don't introduce free variables
+  }
+
 private:
   std::set<std::string> local_names_;
   std::set<std::string> referenced_non_locals_;
@@ -215,6 +228,12 @@ public:
     } else {
       current_type_ = TypeNames::UNKNOWN;
     }
+  }
+
+  void visit(const NQualifiedName& node) override {
+    // Qualified names reference module members
+    // For now, treat as unknown type (full module resolution in Phase 2+)
+    current_type_ = TypeNames::UNKNOWN;
   }
 
   void visit(const NBinaryOperator& node) override {
@@ -372,6 +391,14 @@ public:
     known_types_[node.id.name] = TypeNames::FUNCTION;
   }
 
+  void visit(const NModuleDeclaration& node) override {
+    // Don't recurse into modules for parameter type inference
+  }
+
+  void visit(const NImportStatement& node) override {
+    // Import statements don't affect parameter type inference
+  }
+
 private:
   std::set<std::string> untyped_params_;
   std::map<std::string, std::string> known_types_;
@@ -430,6 +457,11 @@ public:
     }
   }
 
+  void visit(const NQualifiedName& node) override {
+    // Qualified names reference module members
+    current_type_ = TypeNames::UNKNOWN;
+  }
+
   void visit(const NMethodCall& node) override {
     // Collect argument types
     std::vector<std::string> arg_types;
@@ -438,9 +470,10 @@ public:
       arg_types.push_back(current_type_);
     }
 
-    // If this is a tracked function, record the call site
-    if (tracked_functions_.count(node.id.name)) {
-      call_sites_[node.id.name].push_back(arg_types);
+    // If this is a tracked function (use effective name for qualified calls)
+    const std::string func_name = node.effectiveName();
+    if (tracked_functions_.count(func_name)) {
+      call_sites_[func_name].push_back(arg_types);
     }
 
     current_type_ = TypeNames::UNKNOWN; // Don't know return type yet
@@ -513,6 +546,14 @@ public:
     // Don't recurse into nested function bodies
   }
 
+  void visit(const NModuleDeclaration& node) override {
+    // Don't recurse into modules for call site collection
+  }
+
+  void visit(const NImportStatement& node) override {
+    // Import statements don't affect call site collection
+  }
+
 private:
   std::set<std::string> tracked_functions_;
   std::map<std::string, std::string> known_types_;
@@ -521,6 +562,18 @@ private:
 };
 
 TypeChecker::TypeChecker() : inferred_type_(TypeNames::INT) {}
+
+std::string TypeChecker::mangledName(const std::string& name) const {
+  if (module_path_.empty()) {
+    return name;
+  }
+  std::string result;
+  for (const auto& part : module_path_) {
+    result += part + "$$";
+  }
+  result += name;
+  return result;
+}
 
 std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   errors_.clear();
@@ -570,7 +623,24 @@ void TypeChecker::visit(const NIdentifier& node) {
   inferred_type_ = local_types_[node.name];
 }
 
+void TypeChecker::visit(const NQualifiedName& node) {
+  // Qualified name access (e.g., Math.PI)
+  // Lookup using mangled name
+  const std::string mangled = node.mangledName();
+  auto it = local_types_.find(mangled);
+  if (it != local_types_.end()) {
+    inferred_type_ = it->second;
+    return;
+  }
+  // Not found - report error
+  reportError("Undefined qualified name: " + node.fullName());
+  inferred_type_ = TypeNames::UNKNOWN;
+}
+
 void TypeChecker::visit(const NMethodCall& node) {
+  // Get effective function name (mangled for qualified calls)
+  const std::string func_name = node.effectiveName();
+
   // Collect argument types
   std::vector<std::string> arg_types;
   for (const auto* arg : node.arguments) {
@@ -579,13 +649,13 @@ void TypeChecker::visit(const NMethodCall& node) {
   }
 
   // Check if function is known
-  const auto param_it = function_param_types_.find(node.id.name);
+  const auto param_it = function_param_types_.find(func_name);
   if (param_it != function_param_types_.end()) {
     const auto& param_types = param_it->second;
 
     // Check argument count
     if (arg_types.size() != param_types.size()) {
-      reportError("Function '" + node.id.name + "' expects " +
+      reportError("Function '" + func_name + "' expects " +
                   std::to_string(param_types.size()) + " argument(s), got " +
                   std::to_string(arg_types.size()));
     } else {
@@ -597,7 +667,7 @@ void TypeChecker::visit(const NMethodCall& node) {
             arg_types[i] != TypeNames::TYPEVAR &&
             param_types[i] != TypeNames::TYPEVAR &&
             arg_types[i] != param_types[i]) {
-          reportError("Function '" + node.id.name + "' argument " +
+          reportError("Function '" + func_name + "' argument " +
                       std::to_string(i + 1) + " expects " + param_types[i] +
                       ", got " + arg_types[i]);
         }
@@ -606,9 +676,9 @@ void TypeChecker::visit(const NMethodCall& node) {
   }
 
   // Get return type from function
-  if (function_return_types_.find(node.id.name) !=
+  if (function_return_types_.find(func_name) !=
       function_return_types_.end()) {
-    inferred_type_ = function_return_types_[node.id.name];
+    inferred_type_ = function_return_types_[func_name];
   } else {
     // Unknown function, assume int
     inferred_type_ = TypeNames::INT;
@@ -1011,6 +1081,9 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
   // Cast away const to allow setting inferred type
   NVariableDeclaration& mutable_node = const_cast<NVariableDeclaration&>(node);
 
+  // Get mangled name (includes module path if inside a module)
+  const std::string var_name = mangledName(node.id.name);
+
   if (node.assignmentExpr == nullptr) {
     // No initializer - must have type annotation
     if (node.type == nullptr) {
@@ -1019,8 +1092,8 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
       inferred_type_ = TypeNames::UNKNOWN;
       return;
     }
-    local_types_[node.id.name] = node.type->name;
-    local_mutability_[node.id.name] = node.isMutable;
+    local_types_[var_name] = node.type->name;
+    local_mutability_[var_name] = node.isMutable;
     inferred_type_ = node.type->name;
     return;
   }
@@ -1032,8 +1105,8 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
   if (expr_type == TypeNames::UNKNOWN) {
     // Error already reported for expression
     if (node.type != nullptr) {
-      local_types_[node.id.name] = node.type->name;
-      local_mutability_[node.id.name] = node.isMutable;
+      local_types_[var_name] = node.type->name;
+      local_mutability_[var_name] = node.isMutable;
       inferred_type_ = node.type->name;
     }
     return;
@@ -1042,8 +1115,8 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
   if (node.type == nullptr) {
     // No type annotation - infer from expression
     mutable_node.type = new NIdentifier(expr_type);
-    local_types_[node.id.name] = expr_type;
-    local_mutability_[node.id.name] = node.isMutable;
+    local_types_[var_name] = expr_type;
+    local_mutability_[var_name] = node.isMutable;
     inferred_type_ = expr_type;
   } else {
     // Type annotation present - validate (no coercion!)
@@ -1055,8 +1128,8 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
                   " (no implicit conversion)");
     }
 
-    local_types_[node.id.name] = decl_type;
-    local_mutability_[node.id.name] = node.isMutable;
+    local_types_[var_name] = decl_type;
+    local_mutability_[var_name] = node.isMutable;
     inferred_type_ = decl_type;
   }
 }
@@ -1064,6 +1137,9 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
 void TypeChecker::visit(const NFunctionDeclaration& node) {
   // Cast away const to allow setting inferred type
   NFunctionDeclaration& mutable_node = const_cast<NFunctionDeclaration&>(node);
+
+  // Get mangled name (includes module path if inside a module)
+  const std::string func_name = mangledName(node.id.name);
 
   // Save current scope
   const auto saved_locals = local_types_;
@@ -1142,8 +1218,8 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
     }
   }
 
-  // Store parameter types for this function
-  function_param_types_[node.id.name] = param_types;
+  // Store parameter types for this function (using mangled name)
+  function_param_types_[func_name] = param_types;
 
   // Check function body
   node.block.accept(*this);
@@ -1153,11 +1229,11 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
     // Return type not annotated - infer from body
     if (body_type != TypeNames::UNKNOWN) {
       mutable_node.type = new NIdentifier(body_type);
-      function_return_types_[node.id.name] = body_type;
+      function_return_types_[func_name] = body_type;
     } else {
       // Default to int if we can't infer
       mutable_node.type = new NIdentifier(TypeNames::INT);
-      function_return_types_[node.id.name] = TypeNames::INT;
+      function_return_types_[func_name] = TypeNames::INT;
     }
   } else {
     // Return type annotated - validate
@@ -1169,13 +1245,118 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
                   " (no implicit conversion)");
     }
 
-    function_return_types_[node.id.name] = decl_return_type;
+    function_return_types_[func_name] = decl_return_type;
   }
 
   // Restore previous scope
   local_types_ = saved_locals;
   local_mutability_ = saved_mutability;
   inferred_type_ = node.type ? node.type->name : body_type;
+}
+
+void TypeChecker::visit(const NModuleDeclaration& node) {
+  // Push module name onto path for name mangling
+  module_path_.push_back(node.name.name);
+
+  // Build module mangled name
+  std::string module_mangled;
+  for (size_t i = 0; i < module_path_.size(); ++i) {
+    if (i > 0)
+      module_mangled += "$$";
+    module_mangled += module_path_[i];
+  }
+
+  // Register module exports
+  module_exports_[module_mangled] = std::set<std::string>(node.exports.begin(),
+                                                          node.exports.end());
+
+  // Visit all members (they will register with mangled names)
+  for (const auto* member : node.members) {
+    member->accept(*this);
+  }
+
+  // Pop module name from path
+  module_path_.pop_back();
+}
+
+void TypeChecker::visit(const NImportStatement& node) {
+  const std::string module_name = node.modulePath.mangledName();
+
+  switch (node.kind) {
+  case ImportKind::Module:
+    // import Math - just register the module alias as itself
+    // Access will be through qualified names like Math.add
+    module_aliases_[node.modulePath.parts.back()] = module_name;
+    break;
+
+  case ImportKind::ModuleAlias:
+    // import Math as M - register the alias
+    module_aliases_[node.alias] = module_name;
+    break;
+
+  case ImportKind::Items: {
+    // from Math import add, PI - import specific items
+    for (const auto& item : node.items) {
+      const std::string mangled_name = module_name + "$$" + item.name;
+      const std::string local_name = item.effectiveName();
+
+      // Check if the symbol exists in local_types_ or function_param_types_
+      auto type_it = local_types_.find(mangled_name);
+      if (type_it != local_types_.end()) {
+        // It's a variable - create an alias
+        local_types_[local_name] = type_it->second;
+        imported_symbols_[local_name] = mangled_name;
+      }
+
+      auto ret_it = function_return_types_.find(mangled_name);
+      if (ret_it != function_return_types_.end()) {
+        // It's a function - create aliases for return type and params
+        function_return_types_[local_name] = ret_it->second;
+        auto param_it = function_param_types_.find(mangled_name);
+        if (param_it != function_param_types_.end()) {
+          function_param_types_[local_name] = param_it->second;
+        }
+        imported_symbols_[local_name] = mangled_name;
+      }
+
+      // If neither found, the error will be caught when the symbol is used
+    }
+    break;
+  }
+
+  case ImportKind::All: {
+    // from Math import * - import all exports
+    // Find all symbols that start with module_name$$
+    const std::string prefix = module_name + "$$";
+
+    // Check module_exports_ for what's exported
+    auto exports_it = module_exports_.find(module_name);
+    if (exports_it != module_exports_.end()) {
+      for (const auto& export_name : exports_it->second) {
+        const std::string mangled_name = prefix + export_name;
+
+        // Import variable if exists
+        auto type_it = local_types_.find(mangled_name);
+        if (type_it != local_types_.end()) {
+          local_types_[export_name] = type_it->second;
+          imported_symbols_[export_name] = mangled_name;
+        }
+
+        // Import function if exists
+        auto ret_it = function_return_types_.find(mangled_name);
+        if (ret_it != function_return_types_.end()) {
+          function_return_types_[export_name] = ret_it->second;
+          auto param_it = function_param_types_.find(mangled_name);
+          if (param_it != function_param_types_.end()) {
+            function_param_types_[export_name] = param_it->second;
+          }
+          imported_symbols_[export_name] = mangled_name;
+        }
+      }
+    }
+    break;
+  }
+  }
 }
 
 std::set<std::string> TypeChecker::collectFreeVariables(

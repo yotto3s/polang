@@ -1,0 +1,11 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test import with alias AST
+; CHECK:      NBlock
+; CHECK-NEXT: |-NModuleDeclaration 'Math' (add)
+; CHECK:      `-NImportStatement import Math as M
+
+module Math (add)
+  let add(x: int, y: int): int = x + y
+endmodule
+import Math as M

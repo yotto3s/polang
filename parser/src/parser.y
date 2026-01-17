@@ -16,11 +16,15 @@ void yyerror(const char *s);
     NExpression *expr;
     NStatement *stmt;
     NIdentifier *ident;
+    NQualifiedName *qualname;
     NVariableDeclaration *var_decl;
     std::vector<NVariableDeclaration*> *varvec;
     std::vector<NExpression*> *exprvec;
     NLetBinding *letbind;
     std::vector<NLetBinding*> *letbindvec;
+    std::vector<std::string> *strvec;
+    std::vector<NStatement*> *stmtvec;
+    ImportItemList *importitems;
     std::string *string;
     int token;
 }
@@ -37,6 +41,8 @@ void yyerror(const char *s);
 %token <token> TIF TTHEN TELSE
 %token <token> TTRUE TFALSE
 %token <token> TMUT TLARROW
+%token <token> TMODULE TENDMODULE
+%token <token> TIMPORT TFROM TAS
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -51,7 +57,11 @@ void yyerror(const char *s);
 %type <letbindvec> let_bindings
 %type <exprvec> call_args
 %type <block> program stmts
-%type <stmt> stmt var_decl func_decl
+%type <stmt> stmt var_decl func_decl module_decl import_stmt
+%type <stmtvec> module_body
+%type <strvec> ident_list
+%type <importitems> import_items
+%type <qualname> qualified_name
 %type <token> comparison
 
 /* Operator precedence (lowest to highest) */
@@ -61,9 +71,13 @@ void yyerror(const char *s);
 %nonassoc COMPARISON TCEQ TCNE TCLT TCLE TCGT TCGE
 %left TPLUS TMINUS
 %left TMUL TDIV
+%left TDOT
 
-/* Expected conflicts: ident TLPAREN (function call vs expr + (expr)) */
-%expect 1
+/* Expected conflicts:
+   - ident TLPAREN (function call vs expr + (expr))
+   - ident TDOT (qualified name vs expr DOT)
+*/
+%expect 3
 
 %start program
 
@@ -76,7 +90,7 @@ stmts : /* empty */ { $$ = new NBlock(); }
       | stmts stmt { $1->statements.push_back($<stmt>2); }
       ;
 
-stmt : var_decl | func_decl
+stmt : var_decl | func_decl | module_decl | import_stmt
      | expr { $$ = new NExpressionStatement(*$1); }
      ;
 
@@ -146,6 +160,93 @@ func_param : ident TCOLON ident {
              }
            ;
 
+/* Module declarations with Haskell-style export list */
+module_decl : TMODULE ident TLPAREN ident_list TRPAREN module_body TENDMODULE {
+                /* module Name (export1, export2, ...) ... endmodule */
+                $$ = new NModuleDeclaration(*$2, *$4, *$6);
+                delete $4;
+                delete $6;
+              }
+            | TMODULE ident module_body TENDMODULE {
+                /* module Name ... endmodule (no exports, all private) */
+                $$ = new NModuleDeclaration(*$2, *$3);
+                delete $3;
+              }
+            ;
+
+module_body : /* empty */ { $$ = new StatementList(); }
+            | module_body var_decl { $1->push_back($2); }
+            | module_body func_decl { $1->push_back($2); }
+            | module_body module_decl { $1->push_back($2); }
+            ;
+
+ident_list : ident {
+               $$ = new StringList();
+               $$->push_back($1->name);
+               delete $1;
+             }
+           | ident_list TCOMMA ident {
+               $1->push_back($3->name);
+               delete $3;
+             }
+           ;
+
+/* Import statements */
+import_stmt : TIMPORT qualified_name {
+                /* import Math */
+                $$ = new NImportStatement(*$2);
+              }
+            | TIMPORT qualified_name TAS ident {
+                /* import Math as M */
+                $$ = new NImportStatement(*$2, $4->name);
+                delete $4;
+              }
+            | TFROM qualified_name TIMPORT import_items {
+                /* from Math import add, PI */
+                $$ = new NImportStatement(*$2, *$4, false);
+                delete $4;
+              }
+            | TFROM qualified_name TIMPORT TMUL {
+                /* from Math import * */
+                $$ = new NImportStatement(*$2, ImportItemList(), true);
+              }
+            ;
+
+qualified_name : ident {
+                   StringList parts;
+                   parts.push_back($1->name);
+                   $$ = new NQualifiedName(parts);
+                   delete $1;
+                 }
+               | qualified_name TDOT ident {
+                   $1->parts.push_back($3->name);
+                   $$ = $1;
+                   delete $3;
+                 }
+               ;
+
+import_items : ident {
+                 $$ = new ImportItemList();
+                 $$->push_back(ImportItem($1->name));
+                 delete $1;
+               }
+             | ident TAS ident {
+                 $$ = new ImportItemList();
+                 $$->push_back(ImportItem($1->name, $3->name));
+                 delete $1;
+                 delete $3;
+               }
+             | import_items TCOMMA ident {
+                 $1->push_back(ImportItem($3->name));
+                 delete $3;
+               }
+             | import_items TCOMMA ident TAS ident {
+                 $1->push_back(ImportItem($3->name, $5->name));
+                 delete $3;
+                 delete $5;
+               }
+             ;
+
 ident : TIDENTIFIER { $$ = new NIdentifier(*$1); delete $1; }
       ;
 
@@ -160,6 +261,40 @@ boolean : TTRUE { $$ = new NBoolean(true); }
 expr : ident TLARROW expr { $$ = new NAssignment(*$<ident>1, *$3); }
      | ident TLPAREN call_args TRPAREN { $$ = new NMethodCall(*$1, *$3); delete $3; }
      | ident { $<ident>$ = $1; }
+     | ident TDOT ident TLPAREN call_args TRPAREN {
+         /* Qualified function call: Math.add(1, 2) */
+         StringList parts;
+         parts.push_back($1->name);
+         parts.push_back($3->name);
+         NQualifiedName *qname = new NQualifiedName(parts);
+         $$ = new NMethodCall(*qname, *$5);
+         delete $5;
+       }
+     | ident TDOT ident TDOT ident TLPAREN call_args TRPAREN {
+         /* Nested qualified function call: Math.Internal.helper(5) */
+         StringList parts;
+         parts.push_back($1->name);
+         parts.push_back($3->name);
+         parts.push_back($5->name);
+         NQualifiedName *qname = new NQualifiedName(parts);
+         $$ = new NMethodCall(*qname, *$7);
+         delete $7;
+       }
+     | ident TDOT ident {
+         /* Qualified variable access: Math.PI */
+         StringList parts;
+         parts.push_back($1->name);
+         parts.push_back($3->name);
+         $$ = new NQualifiedName(parts);
+       }
+     | ident TDOT ident TDOT ident {
+         /* Nested qualified variable access: Math.Internal.PI */
+         StringList parts;
+         parts.push_back($1->name);
+         parts.push_back($3->name);
+         parts.push_back($5->name);
+         $$ = new NQualifiedName(parts);
+       }
      | numeric
      | boolean
      | expr comparison expr %prec COMPARISON { $$ = new NBinaryOperator(*$1, $2, *$3); }
