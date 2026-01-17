@@ -179,6 +179,30 @@ FileCheck patterns:
 - Use exact full-line patterns when possible for maximum precision
 - Use `{{.*}}pattern{{.*}}` for partial matching when full line content varies
 
+## Code Coverage
+
+To measure test coverage with gcov:
+
+```bash
+# Configure with coverage enabled (inside docker container)
+cmake -S. -Bbuild -DPOLANG_ENABLE_COVERAGE=ON \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+
+# Build (inside docker container)
+cmake --build build -j$(nproc)
+
+# Run tests to generate coverage data (inside docker container)
+ctest --test-dir build --output-on-failure
+
+# Generate HTML coverage report (inside docker container)
+cmake --build build --target coverage
+
+# Reset coverage counters (inside docker container)
+cmake --build build --target coverage-clean
+```
+
+The HTML report is generated at `build/coverage_html/index.html`.
+
 ## Project Structure
 
 ```

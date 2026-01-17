@@ -96,7 +96,8 @@ TEST(CompilerIntegration, NestedLetExpression) {
 // RecursiveFunction test moved to lit/LLVMIR/recursive-function.po
 
 // Double comparison and arithmetic tests are covered by lit tests in
-// tests/lit/LLVMIR/double-comparisons.po and tests/lit/MLIR/double-arithmetic.po
+// tests/lit/LLVMIR/double-comparisons.po and
+// tests/lit/MLIR/double-arithmetic.po
 
 // NestedIfExpressionInFunction test moved to lit/LLVMIR/nested-if.po
 
@@ -117,3 +118,14 @@ TEST(CompilerIntegration, LetWithFunctionBinding) {
 }
 
 // ComplexExpressionConstantFolded test moved to lit/LLVMIR/constant-folding.po
+
+// ============== CLI Tests ==============
+
+TEST(CompilerCLI, HelpFlag) {
+  const auto result = runCompilerWithArgs({"--help"});
+  EXPECT_EQ(result.exit_code, 0);
+  // Usage is printed to stderr
+  EXPECT_THAT(result.stderr_output, HasSubstr("Usage:"));
+  EXPECT_THAT(result.stderr_output, HasSubstr("--dump-ast"));
+  EXPECT_THAT(result.stderr_output, HasSubstr("--emit-mlir"));
+}

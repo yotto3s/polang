@@ -5,6 +5,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Werror)
 
+# Code coverage option
+option(POLANG_ENABLE_COVERAGE "Enable code coverage with gcov" OFF)
+
+if(POLANG_ENABLE_COVERAGE)
+  message(STATUS "Code coverage enabled")
+  add_compile_options(--coverage)
+  add_link_options(--coverage)
+endif()
+
 # Output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -48,3 +57,32 @@ add_subdirectory(repl)
 # Enable testing
 enable_testing()
 add_subdirectory(tests)
+
+# Coverage report targets
+if(POLANG_ENABLE_COVERAGE)
+  find_program(LCOV_PATH lcov)
+  find_program(GENHTML_PATH genhtml)
+
+  if(LCOV_PATH AND GENHTML_PATH)
+    add_custom_target(coverage
+      COMMAND ${LCOV_PATH} --capture --directory ${CMAKE_BINARY_DIR}
+              --output-file coverage.info
+              --exclude '/usr/*'
+              --exclude '${CMAKE_BINARY_DIR}/*'
+              --exclude '*/tests/*'
+              --ignore-errors gcov
+      COMMAND ${GENHTML_PATH} coverage.info --output-directory coverage_html
+              --ignore-errors unmapped
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+      COMMENT "Generating HTML coverage report in build/coverage_html/"
+    )
+
+    add_custom_target(coverage-clean
+      COMMAND ${LCOV_PATH} --directory ${CMAKE_BINARY_DIR} --zerocounters
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+      COMMENT "Resetting coverage counters"
+    )
+  else()
+    message(WARNING "lcov/genhtml not found - coverage targets disabled")
+  endif()
+endif()

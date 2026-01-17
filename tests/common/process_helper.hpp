@@ -6,6 +6,7 @@
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <vector>
 
 struct ProcessResult {
   std::string stdout_output;
@@ -67,14 +68,16 @@ inline ProcessResult runProcess(const std::string& executable,
   ssize_t bytes_read = 0;
   while ((bytes_read = read(stdout_pipe[0], buffer.data(), buffer.size())) >
          0) {
-    result.stdout_output.append(buffer.data(), static_cast<std::size_t>(bytes_read));
+    result.stdout_output.append(buffer.data(),
+                                static_cast<std::size_t>(bytes_read));
   }
   close(stdout_pipe[0]);
 
   // Read stderr
   while ((bytes_read = read(stderr_pipe[0], buffer.data(), buffer.size())) >
          0) {
-    result.stderr_output.append(buffer.data(), static_cast<std::size_t>(bytes_read));
+    result.stderr_output.append(buffer.data(),
+                                static_cast<std::size_t>(bytes_read));
   }
   close(stderr_pipe[0]);
 
@@ -91,6 +94,81 @@ inline ProcessResult runProcess(const std::string& executable,
 
 inline ProcessResult runCompiler(const std::string& source) {
   return runProcess(POLANG_COMPILER_PATH, source);
+}
+
+inline ProcessResult runProcessWithArgs(const std::string& executable,
+                                        const std::vector<std::string>& args) {
+  ProcessResult result;
+  result.exit_code = -1;
+
+  int stdout_pipe[2];
+  int stderr_pipe[2];
+
+  if (pipe(stdout_pipe) == -1 || pipe(stderr_pipe) == -1) {
+    return result;
+  }
+
+  const pid_t pid = fork();
+
+  if (pid == -1) {
+    return result;
+  }
+
+  if (pid == 0) {
+    // Child process
+    close(stdout_pipe[0]);
+    close(stderr_pipe[0]);
+
+    dup2(stdout_pipe[1], STDOUT_FILENO);
+    dup2(stderr_pipe[1], STDERR_FILENO);
+
+    close(stdout_pipe[1]);
+    close(stderr_pipe[1]);
+
+    // Build argv array
+    std::vector<char*> argv;
+    argv.push_back(const_cast<char*>(executable.c_str()));
+    for (const auto& arg : args) {
+      argv.push_back(const_cast<char*>(arg.c_str()));
+    }
+    argv.push_back(nullptr);
+
+    execv(executable.c_str(), argv.data());
+    _exit(127);
+  }
+
+  // Parent process
+  close(stdout_pipe[1]);
+  close(stderr_pipe[1]);
+
+  std::array<char, 4096> buffer{};
+  ssize_t bytes_read = 0;
+  while ((bytes_read = read(stdout_pipe[0], buffer.data(), buffer.size())) >
+         0) {
+    result.stdout_output.append(buffer.data(),
+                                static_cast<std::size_t>(bytes_read));
+  }
+  close(stdout_pipe[0]);
+
+  while ((bytes_read = read(stderr_pipe[0], buffer.data(), buffer.size())) >
+         0) {
+    result.stderr_output.append(buffer.data(),
+                                static_cast<std::size_t>(bytes_read));
+  }
+  close(stderr_pipe[0]);
+
+  int status = 0;
+  waitpid(pid, &status, 0);
+
+  if (WIFEXITED(status)) {
+    result.exit_code = WEXITSTATUS(status);
+  }
+
+  return result;
+}
+
+inline ProcessResult runCompilerWithArgs(const std::vector<std::string>& args) {
+  return runProcessWithArgs(POLANG_COMPILER_PATH, args);
 }
 
 inline ProcessResult runRepl(const std::string& source) {

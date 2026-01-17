@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "repl/input_checker.hpp"
+#include "repl/repl_session.hpp"
 
 // ============== isInputIncomplete Unit Tests ==============
 // Direct tests for the InputChecker::isInputIncomplete function
@@ -123,4 +124,30 @@ TEST(IsInputIncomplete, EmptyInput) {
 
 TEST(IsInputIncomplete, WhitespaceOnly) {
   EXPECT_FALSE(InputChecker::isInputIncomplete("   "));
+}
+
+// ============== EvalResult Unit Tests ==============
+
+TEST(EvalResult, OkFactory) {
+  const auto result = EvalResult::ok();
+  EXPECT_TRUE(result.success);
+  EXPECT_FALSE(result.hasValue);
+  EXPECT_EQ(result.type, "void");
+  EXPECT_TRUE(result.errorMessage.empty());
+}
+
+TEST(EvalResult, ValueFactory) {
+  const auto result = EvalResult::value(42, "int");
+  EXPECT_TRUE(result.success);
+  EXPECT_TRUE(result.hasValue);
+  EXPECT_EQ(result.rawValue, 42);
+  EXPECT_EQ(result.type, "int");
+  EXPECT_TRUE(result.errorMessage.empty());
+}
+
+TEST(EvalResult, ErrorFactory) {
+  const auto result = EvalResult::error("test error message");
+  EXPECT_FALSE(result.success);
+  EXPECT_FALSE(result.hasValue);
+  EXPECT_EQ(result.errorMessage, "test error message");
 }
