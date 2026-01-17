@@ -8,6 +8,7 @@ This document describes the Polang type system, including type inference and pol
 - [Primitive Types](#primitive-types)
 - [Type Inference](#type-inference)
   - [Local Type Inference](#local-type-inference)
+  - [If-Expression Type Inference](#if-expression-type-inference)
   - [Polymorphic Type Inference](#polymorphic-type-inference)
 - [Type Variables](#type-variables)
 - [Unification Algorithm](#unification-algorithm)
@@ -66,6 +67,7 @@ The parser's type checker (`parser/src/type_checker.cpp`) performs local type in
 | `x + 1`, `x * 2` (with int literal) | `int` |
 | `x + 1.0`, `x / 2.0` (with double literal) | `double` |
 | `if x then ...` (as condition) | `bool` |
+| `if cond then a else b` (result) | type of branches (must match) |
 | `x + y` (where `y` has known type) | same as `y` |
 | `f(x)` (where `f` expects a type) | parameter type of `f` |
 
@@ -92,6 +94,30 @@ class ParameterTypeInferrer : public Visitor {
   }
 };
 ```
+
+### If-Expression Type Inference
+
+If-expressions in Polang are typed based on their branches:
+
+1. **Condition**: Must be `bool`
+2. **Branches**: Both `then` and `else` branches must have the same type
+3. **Result**: The if-expression's type is the type of both branches
+
+**Example:**
+
+```polang
+let a = if true then 1 else 2        ; a is int (branches are int)
+let b = if false then 1.0 else 2.0   ; b is double (branches are double)
+let c = if true then true else false ; c is bool (branches are bool)
+```
+
+**Type Error:**
+
+```polang
+let x = if true then 1 else 2.0  ; Error: branches have different types
+```
+
+The type checker validates branch type consistency in `TypeChecker::visit(const NIfExpression&)`.
 
 ### Polymorphic Type Inference
 
