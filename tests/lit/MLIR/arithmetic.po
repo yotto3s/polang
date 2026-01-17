@@ -5,7 +5,7 @@
 ; CHECK-NEXT:     %{{[0-9]+}} = polang.constant.int 1 : !polang.int
 ; CHECK-NEXT:     %{{[0-9]+}} = polang.constant.int 2 : !polang.int
 ; CHECK-NEXT:     %{{[0-9]+}} = polang.constant.int 3 : !polang.int
-; CHECK-NEXT:     %{{[0-9]+}} = polang.mul %{{[0-9]+}}, %{{[0-9]+}} : !polang.int
-; CHECK-NEXT:     %{{[0-9]+}} = polang.add %{{[0-9]+}}, %{{[0-9]+}} : !polang.int
+; CHECK-NEXT:     %{{[0-9]+}} = polang.mul %{{[0-9]+}}, %{{[0-9]+}} : !polang.int, !polang.int -> !polang.int
+; CHECK-NEXT:     %{{[0-9]+}} = polang.add %{{[0-9]+}}, %{{[0-9]+}} : !polang.int, !polang.int -> !polang.int
 ; CHECK-NEXT:     polang.return %{{[0-9]+}} : !polang.int
 1 + 2 * 3

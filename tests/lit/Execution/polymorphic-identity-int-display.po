@@ -1,0 +1,7 @@
+; RUN: %polang_repl %s | %FileCheck %s
+; CHECK: 42 : int
+
+; Test that polymorphic function calls display int results correctly.
+
+let identity(x) = x
+identity(42)

@@ -2,7 +2,7 @@
 
 ; Test function generation
 ; CHECK:      polang.func @add(%arg0: !polang.int, %arg1: !polang.int) -> !polang.int {
-; CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.int
+; CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.int, !polang.int -> !polang.int
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.int
 ; CHECK-NEXT: }
 let add(a: int, b: int): int = a + b

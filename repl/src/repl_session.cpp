@@ -67,10 +67,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     // NExpressionStatement wraps expressions as statements
     if (dynamic_cast<const NExpressionStatement*>(lastStmt) != nullptr) {
       lastIsExpression = true;
-      // Get the inferred type of the last expression
-      TypeChecker checker;
-      checker.check(*ast);
-      resultType = checker.getInferredType();
+      // Type will be resolved from MLIR after type inference
     }
   }
 
@@ -86,6 +83,11 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   if (!codegenCtx.runTypeInference()) {
     std::cerr << "Type inference failed: " << codegenCtx.getError() << "\n";
     return EvalResult::error("Type inference failed");
+  }
+
+  // Get resolved type from MLIR (after type inference, before lowering)
+  if (lastIsExpression) {
+    resultType = codegenCtx.getResolvedReturnType();
   }
 
   if (!codegenCtx.lowerToStandard()) {

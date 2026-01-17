@@ -65,12 +65,12 @@ FileCheck-based tests organized by output type:
 | Directory | Count | Description |
 |-----------|-------|-------------|
 | `AST/` | 11 | AST dump verification (`--dump-ast`) |
-| `MLIR/` | 29 | Polang dialect MLIR output (`--emit-mlir`) |
+| `MLIR/` | 30 | Polang dialect MLIR output (`--emit-mlir`) |
 | `LLVMIR/` | 13 | LLVM IR generation |
-| `Execution/` | 19 | REPL execution results |
+| `Execution/` | 23 | REPL execution results |
 | `Errors/` | 13 | Error message verification |
 
-**Total: 85 lit tests**
+**Total: 90 lit tests**
 
 ## Code Coverage
 

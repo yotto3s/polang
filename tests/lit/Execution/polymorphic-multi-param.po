@@ -1,0 +1,5 @@
+; RUN: %polang_repl %s | %FileCheck %s
+; CHECK: 3 : int
+
+let add(x, y) = x + y
+add(1, 2)

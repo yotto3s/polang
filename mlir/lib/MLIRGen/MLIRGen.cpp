@@ -183,18 +183,20 @@ public:
       return;
     Value rhs = result;
 
-    // Arithmetic operations
+    // Arithmetic operations - use LHS type as result type
+    // This allows type variables since the verifier uses typesAreCompatible()
+    Type arithResultTy = lhs.getType();
     if (node.op == TPLUS) {
-      result = builder.create<AddOp>(loc(), lhs, rhs);
+      result = builder.create<AddOp>(loc(), arithResultTy, lhs, rhs);
       resultType = lhsType;
     } else if (node.op == TMINUS) {
-      result = builder.create<SubOp>(loc(), lhs, rhs);
+      result = builder.create<SubOp>(loc(), arithResultTy, lhs, rhs);
       resultType = lhsType;
     } else if (node.op == TMUL) {
-      result = builder.create<MulOp>(loc(), lhs, rhs);
+      result = builder.create<MulOp>(loc(), arithResultTy, lhs, rhs);
       resultType = lhsType;
     } else if (node.op == TDIV) {
-      result = builder.create<DivOp>(loc(), lhs, rhs);
+      result = builder.create<DivOp>(loc(), arithResultTy, lhs, rhs);
       resultType = lhsType;
     }
     // Comparison operations

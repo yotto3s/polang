@@ -99,13 +99,17 @@ def Polang_ConstantBoolOp : Polang_Op<"constant.bool", [Pure]> {
 //===----------------------------------------------------------------------===//
 
 class Polang_ArithOp<string mnemonic> : Polang_Op<mnemonic, [
-    Pure,
-    SameOperandsAndResultType,
-    DeclareOpInterfaceMethods<InferTypeOpInterface>
+    Pure
+    // Note: SameOperandsAndResultType and InferTypeOpInterface removed
+    // to allow type variables. Result type is specified explicitly in MLIRGen.
+    // Custom verifier uses typesAreCompatible() to allow type vars.
   ]> {
   let arguments = (ins Polang_AnyNumericOrVar:$lhs, Polang_AnyNumericOrVar:$rhs);
   let results = (outs Polang_AnyNumericOrVar:$result);
-  let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($result)";
+  // Print all types since they may differ during type inference
+  let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($lhs) `,` type($rhs) `->` type($result)";
+
+  let hasVerifier = 1;
 }
 
 def Polang_AddOp : Polang_ArithOp<"add"> {
@@ -177,7 +181,8 @@ def Polang_CmpPredicate : I64EnumAttr<
 
 def Polang_CmpOp : Polang_Op<"cmp", [
     Pure,
-    SameTypeOperands,
+    // Note: SameTypeOperands removed to allow type variables.
+    // Custom verifier uses typesAreCompatible() to allow type vars.
     DeclareOpInterfaceMethods<InferTypeOpInterface>
   ]> {
   let summary = "Comparison operation";
@@ -186,7 +191,7 @@ def Polang_CmpOp : Polang_Op<"cmp", [
 
     Example:
     ```mlir
-    %0 = polang.cmp eq, %a, %b : !polang.int
+    %0 = polang.cmp eq, %a, %b : !polang.int, !polang.int
     ```
   }];
 
@@ -197,7 +202,10 @@ def Polang_CmpOp : Polang_Op<"cmp", [
   );
   let results = (outs Polang_BoolType:$result);
 
-  let assemblyFormat = "$predicate `,` $lhs `,` $rhs attr-dict `:` type($lhs)";
+  // Print both operand types since they may differ during type inference
+  let assemblyFormat = "$predicate `,` $lhs `,` $rhs attr-dict `:` type($lhs) `,` type($rhs)";
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//

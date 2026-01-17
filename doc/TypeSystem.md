@@ -466,32 +466,3 @@ f(3.14)  ; Error: argument 1 expects int, got double
 ### Unresolved Type Variables
 
 Polymorphic functions without call sites keep their type variables and are marked with `polang.polymorphic`. They are skipped during lowering but can be called in subsequent REPL inputs.
-
-## Known Limitations
-
-### Multiple Polymorphic Parameters
-
-Functions with multiple independently-typed polymorphic parameters that are used together in binary operations do not work:
-
-```polang
-let add(x, y) = x + y  ; ERROR: x and y get different type variables
-add(1, 2)              ; Type inference fails
-```
-
-**Workaround:** Use explicit type annotations or use the same parameter twice:
-
-```polang
-let add(x: int, y: int) = x + y  ; Works with explicit types
-let double_it(x) = x + x          ; Works: same typevar on both sides
-```
-
-### REPL Result Display
-
-When a polymorphic function returns a value, the REPL may not display the result because the AST type checker returns `typevar` as the result type. The execution succeeds but no output is shown.
-
-```polang
-let identity(x) = x
-identity(3.14)      ; Executes correctly but shows no output
-```
-
-**Workaround:** Use explicit type annotations for the function.

@@ -64,6 +64,11 @@ public:
   /// Returns the result of the main function.
   bool runCode(int64_t &result);
 
+  /// Get the resolved return type name of the entry function.
+  /// Must be called after runTypeInference().
+  /// Returns "int", "double", "bool", or "unknown".
+  std::string getResolvedReturnType() const;
+
   /// Get the last error message.
   const std::string &getError() const { return error_; }
 

@@ -259,9 +259,9 @@ private:
     if (!callee)
       return;
 
-    // Skip unification for polymorphic function calls - they will be handled
-    // by the monomorphization pass. Each call site gets its own specialized
-    // version with concrete types.
+    // Skip polymorphic function calls - they can be called with different types
+    // at different call sites (e.g., identity(42) and identity(true)).
+    // Monomorphization handles creating specialized versions for each call site.
     if (isPolymorphicFunction(callee)) {
       return;
     }

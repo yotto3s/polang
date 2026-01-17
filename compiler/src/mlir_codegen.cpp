@@ -9,6 +9,7 @@
 #include "polang/Conversion/Passes.h"
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangOps.h"
+#include "polang/Dialect/PolangTypes.h"
 #include "polang/MLIRGen.h"
 #include "polang/Transforms/Passes.h"
 
@@ -243,6 +244,30 @@ bool MLIRCodeGenContext::runCode(int64_t& result) {
 
   result = resultVal;
   return true;
+}
+
+std::string MLIRCodeGenContext::getResolvedReturnType() const {
+  if (!module_ || !*module_)
+    return "unknown";
+
+  // Find the __polang_entry function
+  auto entryFunc = (*module_)->lookupSymbol<polang::FuncOp>("__polang_entry");
+  if (!entryFunc)
+    return "unknown";
+
+  FunctionType funcType = entryFunc.getFunctionType();
+  if (funcType.getNumResults() == 0)
+    return "void";
+
+  Type returnType = funcType.getResult(0);
+  if (isa<polang::IntType>(returnType))
+    return "int";
+  if (isa<polang::DoubleType>(returnType))
+    return "double";
+  if (isa<polang::BoolType>(returnType))
+    return "bool";
+
+  return "unknown";
 }
 
 } // namespace polang

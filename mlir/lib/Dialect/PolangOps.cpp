@@ -279,13 +279,58 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
 }
 
 //===----------------------------------------------------------------------===//
+// Arithmetic operation verifiers
+//===----------------------------------------------------------------------===//
+
+LogicalResult AddOp::verify() {
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType()))
+    return emitOpError("operand types must be compatible");
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType()))
+    return emitOpError("result type must be compatible with operands");
+  return success();
+}
+
+LogicalResult SubOp::verify() {
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType()))
+    return emitOpError("operand types must be compatible");
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType()))
+    return emitOpError("result type must be compatible with operands");
+  return success();
+}
+
+LogicalResult MulOp::verify() {
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType()))
+    return emitOpError("operand types must be compatible");
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType()))
+    return emitOpError("result type must be compatible with operands");
+  return success();
+}
+
+LogicalResult DivOp::verify() {
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType()))
+    return emitOpError("operand types must be compatible");
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType()))
+    return emitOpError("result type must be compatible with operands");
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// Comparison operation verifier
+//===----------------------------------------------------------------------===//
+
+LogicalResult CmpOp::verify() {
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType()))
+    return emitOpError("comparison operand types must be compatible");
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // InferTypeOpInterface implementations
 //===----------------------------------------------------------------------===//
 
-// Note: Arithmetic ops (Add, Sub, Mul, Div) and CmpOp get their
-// inferReturnTypes implementations automatically from the
-// SameOperandsAndResultType and SameTypeOperands traits respectively when
-// combined with InferTypeOpInterface.
+// Note: Arithmetic ops need explicit result type specification in MLIRGen
+// since we removed SameOperandsAndResultType to allow type variables.
+// CmpOp always returns bool, so it infers the result type automatically.
 
 // Note: LoadOp does not implement InferTypeOpInterface because the memref
 // element type is the LLVM type (i64), not the Polang type (!polang.int).

@@ -2,28 +2,28 @@
 
 ; Test double addition
 ; CHECK:      polang.func @dadd(%arg0: !polang.double, %arg1: !polang.double) -> !polang.double {
-; CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.double
+; CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.double, !polang.double -> !polang.double
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.double
 ; CHECK-NEXT: }
 let dadd(a: double, b: double): double = a + b
 
 ; Test double subtraction
 ; CHECK:      polang.func @dsub(%arg0: !polang.double, %arg1: !polang.double) -> !polang.double {
-; CHECK-NEXT:   %{{[0-9]+}} = polang.sub %arg0, %arg1 : !polang.double
+; CHECK-NEXT:   %{{[0-9]+}} = polang.sub %arg0, %arg1 : !polang.double, !polang.double -> !polang.double
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.double
 ; CHECK-NEXT: }
 let dsub(a: double, b: double): double = a - b
 
 ; Test double multiplication
 ; CHECK:      polang.func @dmul(%arg0: !polang.double, %arg1: !polang.double) -> !polang.double {
-; CHECK-NEXT:   %{{[0-9]+}} = polang.mul %arg0, %arg1 : !polang.double
+; CHECK-NEXT:   %{{[0-9]+}} = polang.mul %arg0, %arg1 : !polang.double, !polang.double -> !polang.double
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.double
 ; CHECK-NEXT: }
 let dmul(a: double, b: double): double = a * b
 
 ; Test double division
 ; CHECK:      polang.func @ddiv(%arg0: !polang.double, %arg1: !polang.double) -> !polang.double {
-; CHECK-NEXT:   %{{[0-9]+}} = polang.div %arg0, %arg1 : !polang.double
+; CHECK-NEXT:   %{{[0-9]+}} = polang.div %arg0, %arg1 : !polang.double, !polang.double -> !polang.double
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.double
 ; CHECK-NEXT: }
 let ddiv(a: double, b: double): double = a / b
