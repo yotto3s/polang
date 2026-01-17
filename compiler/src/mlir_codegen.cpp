@@ -270,11 +270,12 @@ std::string MLIRCodeGenContext::getResolvedReturnType() const {
   }
 
   Type returnType = funcType.getResult(0);
-  if (isa<polang::IntType>(returnType)) {
-    return "int";
+  if (auto intType = dyn_cast<polang::IntegerType>(returnType)) {
+    std::string prefix = intType.isSigned() ? "i" : "u";
+    return prefix + std::to_string(intType.getWidth());
   }
-  if (isa<polang::DoubleType>(returnType)) {
-    return "double";
+  if (auto floatType = dyn_cast<polang::FloatType>(returnType)) {
+    return "f" + std::to_string(floatType.getWidth());
   }
   if (isa<polang::BoolType>(returnType)) {
     return "bool";

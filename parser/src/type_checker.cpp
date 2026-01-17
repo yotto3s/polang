@@ -116,7 +116,7 @@ private:
   std::set<std::string> referencedNonLocals;
 };
 
-TypeChecker::TypeChecker() : inferredType(TypeNames::INT) {}
+TypeChecker::TypeChecker() : inferredType(TypeNames::I64) {}
 
 std::string TypeChecker::mangledName(const std::string& name) const {
   if (modulePath.empty()) {
@@ -150,10 +150,10 @@ void TypeChecker::reportError(const std::string& message) {
   }
 }
 
-void TypeChecker::visit(const NInteger& node) { inferredType = TypeNames::INT; }
+void TypeChecker::visit(const NInteger& node) { inferredType = TypeNames::I64; }
 
 void TypeChecker::visit(const NDouble& node) {
-  inferredType = TypeNames::DOUBLE;
+  inferredType = TypeNames::F64;
 }
 
 void TypeChecker::visit(const NBoolean& node) {
@@ -215,7 +215,7 @@ void TypeChecker::visit(const NMethodCall& node) {
   if (functionReturnTypes.find(funcName) != functionReturnTypes.end()) {
     inferredType = functionReturnTypes[funcName];
   } else {
-    inferredType = TypeNames::INT;
+    inferredType = TypeNames::I64;
   }
 }
 

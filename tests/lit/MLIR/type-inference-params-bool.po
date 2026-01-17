@@ -7,21 +7,21 @@
 ; CHECK: {{.*}}polang.func @is_truthy(%{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
 
 ; Monomorphized version with bool parameter
-; CHECK: {{.*}}polang.func @is_truthy$bool(%{{.*}}: !polang.bool) -> !polang.int{{.*}}
+; CHECK: {{.*}}polang.func @is_truthy$bool(%{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
 let is_truthy(x) = if x then 1 else 0
 
 ; Polymorphic template function
 ; CHECK: {{.*}}polang.func @both_true(%{{.*}}: !polang.typevar{{.*}}, %{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
 
 ; Monomorphized version with bool parameters
-; CHECK: {{.*}}polang.func @both_true$bool_bool(%{{.*}}: !polang.bool, %{{.*}}: !polang.bool) -> !polang.int{{.*}}
+; CHECK: {{.*}}polang.func @both_true$bool_bool(%{{.*}}: !polang.bool, %{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
 let both_true(x, y) = if x then (if y then 1 else 0) else 0
 
 ; Polymorphic template function
 ; CHECK: {{.*}}polang.func @negate(%{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
 
 ; Monomorphized version with bool parameter
-; CHECK: {{.*}}polang.func @negate$bool(%{{.*}}: !polang.bool) -> !polang.int{{.*}}
+; CHECK: {{.*}}polang.func @negate$bool(%{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
 let negate(x) = if x then 0 else 1
 
 ; Call the functions to ensure monomorphized versions are emitted

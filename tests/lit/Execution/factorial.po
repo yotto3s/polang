@@ -1,7 +1,7 @@
 ; RUN: %polang_repl %s | %FileCheck %s
 
 ; Test factorial calculation with let expressions
-; CHECK: 120 : int
+; CHECK: 120 : i64
 let fact5 =
   let n1 = 1 in
   let n2 = n1 * 2 in

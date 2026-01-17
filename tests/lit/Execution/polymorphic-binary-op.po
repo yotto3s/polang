@@ -1,8 +1,8 @@
 ; RUN: %polang_repl %s | %FileCheck %s
-; CHECK: 42 : int
+; CHECK: 42 : i64
 
 ; Test function that uses x twice with explicit type.
 ; Note: Polymorphic version doesn't print result due to REPL type detection limitation.
 
-let double_val(x: int) = x + x
+let double_val(x: i64) = x + x
 double_val(21)

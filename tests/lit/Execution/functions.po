@@ -1,6 +1,6 @@
 ; RUN: %polang_repl %s | %FileCheck %s
 
 ; Test function declarations and calls
-; CHECK: 25 : int
-let square(x: int): int = x * x
+; CHECK: 25 : i64
+let square(x: i64): i64 = x * x
 square(5)

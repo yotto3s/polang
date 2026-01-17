@@ -37,12 +37,19 @@ class PolangTypeConverter : public TypeConverter {
 public:
   PolangTypeConverter() {
     addConversion([](Type type) { return type; });
-    addConversion(
-        [](IntType type) { return IntegerType::get(type.getContext(), 64); });
-    addConversion(
-        [](DoubleType type) { return Float64Type::get(type.getContext()); });
-    addConversion(
-        [](BoolType type) { return IntegerType::get(type.getContext(), 1); });
+    addConversion([](polang::IntegerType type) {
+      // All integer types map to LLVM integer types (signedness is in ops)
+      return mlir::IntegerType::get(type.getContext(), type.getWidth());
+    });
+    addConversion([](polang::FloatType type) {
+      if (type.getWidth() == 32) {
+        return (Type)Float32Type::get(type.getContext());
+      }
+      return (Type)Float64Type::get(type.getContext());
+    });
+    addConversion([](BoolType type) {
+      return mlir::IntegerType::get(type.getContext(), 1);
+    });
   }
 };
 
@@ -50,31 +57,40 @@ public:
 // Constant Lowering
 //===----------------------------------------------------------------------===//
 
-struct ConstantIntOpLowering : public OpConversionPattern<ConstantIntOp> {
-  using OpConversionPattern<ConstantIntOp>::OpConversionPattern;
+struct ConstantIntegerOpLowering
+    : public OpConversionPattern<ConstantIntegerOp> {
+  using OpConversionPattern<ConstantIntegerOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ConstantIntOp op, OpAdaptor adaptor,
+  matchAndRewrite(ConstantIntegerOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
     (void)adaptor; // Unused, but required by MLIR interface
-    auto i64Type = rewriter.getI64Type();
-    auto value = rewriter.create<arith::ConstantIntOp>(op.getLoc(),
-                                                       op.getValue(), i64Type);
+    auto polangType = mlir::cast<polang::IntegerType>(op.getResult().getType());
+    auto intType = rewriter.getIntegerType(polangType.getWidth());
+    auto value = rewriter.create<arith::ConstantIntOp>(
+        op.getLoc(), op.getValue().getSExtValue(), intType);
     rewriter.replaceOp(op, value);
     return success();
   }
 };
 
-struct ConstantDoubleOpLowering : public OpConversionPattern<ConstantDoubleOp> {
-  using OpConversionPattern<ConstantDoubleOp>::OpConversionPattern;
+struct ConstantFloatOpLowering : public OpConversionPattern<ConstantFloatOp> {
+  using OpConversionPattern<ConstantFloatOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ConstantDoubleOp op, OpAdaptor adaptor,
+  matchAndRewrite(ConstantFloatOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
     (void)adaptor; // Unused, but required by MLIR interface
-    auto f64Type = rewriter.getF64Type();
+    auto polangType = mlir::cast<polang::FloatType>(op.getResult().getType());
+    mlir::FloatType floatType;
+    if (polangType.getWidth() == 32) {
+      floatType = rewriter.getF32Type();
+    } else {
+      floatType = rewriter.getF64Type();
+    }
+    // getValue() returns APFloat from the attribute
     auto value = rewriter.create<arith::ConstantFloatOp>(
-        op.getLoc(), op.getValue(), f64Type);
+        op.getLoc(), op.getValue(), floatType);
     rewriter.replaceOp(op, value);
     return success();
   }
@@ -108,7 +124,8 @@ struct AddOpLowering : public OpConversionPattern<AddOp> {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
 
-    if (isa<IntegerType>(lhs.getType())) {
+    // After type conversion, we have mlir::IntegerType, not polang::IntegerType
+    if (isa<mlir::IntegerType>(lhs.getType())) {
       rewriter.replaceOpWithNewOp<arith::AddIOp>(op, lhs, rhs);
     } else {
       rewriter.replaceOpWithNewOp<arith::AddFOp>(op, lhs, rhs);
@@ -126,7 +143,8 @@ struct SubOpLowering : public OpConversionPattern<SubOp> {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
 
-    if (isa<IntegerType>(lhs.getType())) {
+    // After type conversion, we have mlir::IntegerType, not polang::IntegerType
+    if (isa<mlir::IntegerType>(lhs.getType())) {
       rewriter.replaceOpWithNewOp<arith::SubIOp>(op, lhs, rhs);
     } else {
       rewriter.replaceOpWithNewOp<arith::SubFOp>(op, lhs, rhs);
@@ -144,7 +162,8 @@ struct MulOpLowering : public OpConversionPattern<MulOp> {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
 
-    if (isa<IntegerType>(lhs.getType())) {
+    // After type conversion, we have mlir::IntegerType, not polang::IntegerType
+    if (isa<mlir::IntegerType>(lhs.getType())) {
       rewriter.replaceOpWithNewOp<arith::MulIOp>(op, lhs, rhs);
     } else {
       rewriter.replaceOpWithNewOp<arith::MulFOp>(op, lhs, rhs);
@@ -162,7 +181,18 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
 
-    if (isa<IntegerType>(lhs.getType())) {
+    // Check the original type to determine signedness
+    auto origType = op.getLhs().getType();
+    if (isa<polang::FloatType>(origType)) {
+      rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
+    } else if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
+      if (intType.isUnsigned()) {
+        rewriter.replaceOpWithNewOp<arith::DivUIOp>(op, lhs, rhs);
+      } else {
+        rewriter.replaceOpWithNewOp<arith::DivSIOp>(op, lhs, rhs);
+      }
+    } else if (isa<mlir::IntegerType>(lhs.getType())) {
+      // Fallback for already converted types - assume signed
       rewriter.replaceOpWithNewOp<arith::DivSIOp>(op, lhs, rhs);
     } else {
       rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
@@ -184,7 +214,60 @@ struct CmpOpLowering : public OpConversionPattern<CmpOp> {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
 
-    if (isa<IntegerType>(lhs.getType())) {
+    // Check the original type to determine signedness
+    auto origType = op.getLhs().getType();
+
+    if (isa<polang::FloatType>(origType)) {
+      // Float comparison
+      arith::CmpFPredicate pred = arith::CmpFPredicate::OEQ;
+      switch (op.getPredicate()) {
+      case CmpPredicate::eq:
+        pred = arith::CmpFPredicate::OEQ;
+        break;
+      case CmpPredicate::ne:
+        pred = arith::CmpFPredicate::ONE;
+        break;
+      case CmpPredicate::lt:
+        pred = arith::CmpFPredicate::OLT;
+        break;
+      case CmpPredicate::le:
+        pred = arith::CmpFPredicate::OLE;
+        break;
+      case CmpPredicate::gt:
+        pred = arith::CmpFPredicate::OGT;
+        break;
+      case CmpPredicate::ge:
+        pred = arith::CmpFPredicate::OGE;
+        break;
+      }
+      rewriter.replaceOpWithNewOp<arith::CmpFOp>(op, pred, lhs, rhs);
+    } else if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
+      // Integer comparison - choose signed or unsigned predicate
+      bool isUnsigned = intType.isUnsigned();
+      arith::CmpIPredicate pred = arith::CmpIPredicate::eq;
+      switch (op.getPredicate()) {
+      case CmpPredicate::eq:
+        pred = arith::CmpIPredicate::eq;
+        break;
+      case CmpPredicate::ne:
+        pred = arith::CmpIPredicate::ne;
+        break;
+      case CmpPredicate::lt:
+        pred = isUnsigned ? arith::CmpIPredicate::ult : arith::CmpIPredicate::slt;
+        break;
+      case CmpPredicate::le:
+        pred = isUnsigned ? arith::CmpIPredicate::ule : arith::CmpIPredicate::sle;
+        break;
+      case CmpPredicate::gt:
+        pred = isUnsigned ? arith::CmpIPredicate::ugt : arith::CmpIPredicate::sgt;
+        break;
+      case CmpPredicate::ge:
+        pred = isUnsigned ? arith::CmpIPredicate::uge : arith::CmpIPredicate::sge;
+        break;
+      }
+      rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, pred, lhs, rhs);
+    } else if (isa<mlir::IntegerType>(lhs.getType())) {
+      // Fallback for already converted types - assume signed
       arith::CmpIPredicate pred = arith::CmpIPredicate::eq;
       switch (op.getPredicate()) {
       case CmpPredicate::eq:
@@ -208,6 +291,7 @@ struct CmpOpLowering : public OpConversionPattern<CmpOp> {
       }
       rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, pred, lhs, rhs);
     } else {
+      // Fallback to float comparison
       arith::CmpFPredicate pred = arith::CmpFPredicate::OEQ;
       switch (op.getPredicate()) {
       case CmpPredicate::eq:
@@ -459,7 +543,7 @@ struct PolangToStandardPass
     PolangTypeConverter typeConverter;
     RewritePatternSet patterns(&getContext());
 
-    patterns.add<ConstantIntOpLowering, ConstantDoubleOpLowering,
+    patterns.add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
                  ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
                  MulOpLowering, DivOpLowering, CmpOpLowering, FuncOpLowering,
                  CallOpLowering, ReturnOpLowering, IfOpLowering,

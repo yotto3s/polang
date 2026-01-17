@@ -1,7 +1,7 @@
 ; RUN: %polang_repl %s | %FileCheck %s
 
 ; Test mutable variables
-; CHECK: 23 : int
+; CHECK: 23 : i64
 let mut x = 10
 x <- 20
 let y = 3

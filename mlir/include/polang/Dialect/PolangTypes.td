@@ -8,6 +8,7 @@
 #define POLANG_TYPES_TD
 
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/EnumAttr.td"
 include "polang/Dialect/PolangDialect.td"
 
 //===----------------------------------------------------------------------===//
@@ -19,20 +20,63 @@ class Polang_Type<string name, string typeMnemonic, list<Trait> traits = []>
   let mnemonic = typeMnemonic;
 }
 
-def Polang_IntType : Polang_Type<"Int", "int"> {
-  let summary = "64-bit signed integer type";
+//===----------------------------------------------------------------------===//
+// Signedness enum for integer types
+//===----------------------------------------------------------------------===//
+
+def Polang_Signed : I32EnumAttrCase<"Signed", 0, "signed">;
+def Polang_Unsigned : I32EnumAttrCase<"Unsigned", 1, "unsigned">;
+
+def Polang_Signedness : I32EnumAttr<"Signedness", "integer signedness", [
+    Polang_Signed, Polang_Unsigned
+]> {
+  let cppNamespace = "::polang";
+}
+
+//===----------------------------------------------------------------------===//
+// Parameterized numeric types
+//===----------------------------------------------------------------------===//
+
+def Polang_IntegerType : Polang_Type<"Integer", "integer"> {
+  let summary = "Integer type with configurable width and signedness";
   let description = [{
-    The Polang integer type represents a 64-bit signed integer value.
-    It maps to `int` in Polang source code.
+    Parameterized integer type supporting 8, 16, 32, and 64-bit widths,
+    both signed and unsigned.
+
+    Examples:
+    ```mlir
+    !polang.integer<32, signed>   ; i32
+    !polang.integer<8, unsigned>  ; u8
+    !polang.integer<64, signed>   ; i64
+    ```
+  }];
+
+  let parameters = (ins
+    "unsigned":$width,
+    "Signedness":$signedness
+  );
+  let assemblyFormat = "`<` $width `,` $signedness `>`";
+
+  let extraClassDeclaration = [{
+    bool isSigned() const { return getSignedness() == Signedness::Signed; }
+    bool isUnsigned() const { return getSignedness() == Signedness::Unsigned; }
   }];
 }
 
-def Polang_DoubleType : Polang_Type<"Double", "double"> {
-  let summary = "64-bit floating-point type";
+def Polang_FloatType : Polang_Type<"Float", "float"> {
+  let summary = "Floating-point type with configurable width";
   let description = [{
-    The Polang double type represents a 64-bit floating-point value.
-    It maps to `double` in Polang source code.
+    Parameterized floating-point type supporting 32 and 64-bit widths.
+
+    Examples:
+    ```mlir
+    !polang.float<32>  ; f32
+    !polang.float<64>  ; f64
+    ```
   }];
+
+  let parameters = (ins "unsigned":$width);
+  let assemblyFormat = "`<` $width `>`";
 }
 
 def Polang_BoolType : Polang_Type<"Bool", "bool"> {
@@ -63,19 +107,19 @@ def Polang_TypeVarType : Polang_Type<"TypeVar", "typevar"> {
 // Type constraints
 //===----------------------------------------------------------------------===//
 
-def Polang_AnyNumericType : AnyTypeOf<[Polang_IntType, Polang_DoubleType],
+def Polang_AnyNumericType : AnyTypeOf<[Polang_IntegerType, Polang_FloatType],
     "Polang numeric type">;
 
-def Polang_AnyType : AnyTypeOf<[Polang_IntType, Polang_DoubleType, Polang_BoolType],
+def Polang_AnyType : AnyTypeOf<[Polang_IntegerType, Polang_FloatType, Polang_BoolType],
     "any Polang type">;
 
 // Type constraints that include type variables (for use before type inference)
 def Polang_AnyNumericOrVar : AnyTypeOf<[
-    Polang_IntType, Polang_DoubleType, Polang_TypeVarType
+    Polang_IntegerType, Polang_FloatType, Polang_TypeVarType
 ], "Polang numeric type or type variable">;
 
 def Polang_AnyTypeOrVar : AnyTypeOf<[
-    Polang_IntType, Polang_DoubleType, Polang_BoolType, Polang_TypeVarType
+    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_TypeVarType
 ], "any Polang type or type variable">;
 
 // Bool or type variable (for if conditions before type inference)

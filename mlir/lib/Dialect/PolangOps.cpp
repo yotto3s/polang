@@ -330,3 +330,80 @@ LogicalResult CmpOp::verify() {
 // element type is the LLVM type (i64), not the Polang type (!polang.int).
 // The Polang type is stored in AllocaOp's elementType attribute, which requires
 // walking to the defining op. MLIRGen already specifies the type explicitly.
+
+//===----------------------------------------------------------------------===//
+// ConstantIntegerOp custom print/parse
+//===----------------------------------------------------------------------===//
+
+void ConstantIntegerOp::print(OpAsmPrinter& p) {
+  // Print just the integer value (without the IntegerAttr's type)
+  p << " " << getValueAttr().getValue();
+  p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"value"});
+  p << " : ";
+  p.printType(getResult().getType());
+}
+
+ParseResult ConstantIntegerOp::parse(OpAsmParser& parser,
+                                      OperationState& result) {
+  APInt value;
+  Type resultType;
+
+  // Parse the raw integer value
+  if (parser.parseInteger(value) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(resultType)) {
+    return failure();
+  }
+
+  // Create the IntegerAttr with the appropriate bit width
+  auto intType = dyn_cast<polang::IntegerType>(resultType);
+  if (!intType) {
+    return parser.emitError(parser.getNameLoc(), "expected polang.integer type");
+  }
+  auto attr = IntegerAttr::get(
+      mlir::IntegerType::get(parser.getContext(), intType.getWidth()), value);
+  result.addAttribute("value", attr);
+  result.addTypes(resultType);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ConstantFloatOp custom print/parse
+//===----------------------------------------------------------------------===//
+
+void ConstantFloatOp::print(OpAsmPrinter& p) {
+  // Print the float value
+  p << " ";
+  p.printFloat(getValueAttr().getValue());
+  p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"value"});
+  p << " : ";
+  p.printType(getResult().getType());
+}
+
+ParseResult ConstantFloatOp::parse(OpAsmParser& parser, OperationState& result) {
+  double value;
+  Type resultType;
+
+  // Parse the raw float value
+  if (parser.parseFloat(value) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(resultType)) {
+    return failure();
+  }
+
+  // Create the FloatAttr with the appropriate type
+  auto floatType = dyn_cast<polang::FloatType>(resultType);
+  if (!floatType) {
+    return parser.emitError(parser.getNameLoc(), "expected polang.float type");
+  }
+  mlir::Type attrType;
+  if (floatType.getWidth() == 32) {
+    attrType = Float32Type::get(parser.getContext());
+  } else {
+    attrType = Float64Type::get(parser.getContext());
+  }
+  auto attr = FloatAttr::get(attrType, value);
+  result.addAttribute("value", attr);
+  result.addTypes(resultType);
+  return success();
+}

@@ -18,54 +18,86 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
+// Attribute constraints
+//===----------------------------------------------------------------------===//
+
+// Generic integer attribute (any width, any signedness)
+def Polang_AnyIntegerAttr : Attr<CPred<"::llvm::isa<::mlir::IntegerAttr>($_self)">,
+                                  "integer attribute"> {
+  let storageType = [{ ::mlir::IntegerAttr }];
+  let returnType = [{ ::llvm::APInt }];
+  let valueType = AnyInteger;
+  let constBuilderCall = "::mlir::IntegerAttr()";
+}
+
+// Generic float attribute (any width)
+def Polang_AnyFloatAttr : Attr<CPred<"::llvm::isa<::mlir::FloatAttr>($_self)">,
+                                "floating-point attribute"> {
+  let storageType = [{ ::mlir::FloatAttr }];
+  let returnType = [{ ::llvm::APFloat }];
+  let valueType = AnyFloat;
+  let constBuilderCall = "::mlir::FloatAttr()";
+}
+
+//===----------------------------------------------------------------------===//
 // Constant operations
 //===----------------------------------------------------------------------===//
 
-def Polang_ConstantIntOp : Polang_Op<"constant.int", [Pure]> {
+def Polang_ConstantIntegerOp : Polang_Op<"constant.integer", [Pure]> {
   let summary = "Integer constant";
   let description = [{
-    Produces a constant integer value.
+    Produces a constant integer value of any supported width and signedness.
 
     Example:
     ```mlir
-    %0 = polang.constant.int 42 : !polang.int
+    %0 = polang.constant.integer 42 : !polang.integer<64, signed>
+    %1 = polang.constant.integer 255 : !polang.integer<8, unsigned>
     ```
   }];
 
-  let arguments = (ins SI64Attr:$value);
-  let results = (outs Polang_IntType:$result);
+  let arguments = (ins Polang_AnyIntegerAttr:$value);
+  let results = (outs Polang_IntegerType:$result);
 
-  let assemblyFormat = "$value attr-dict `:` type($result)";
+  let hasCustomAssemblyFormat = 1;
 
   let builders = [
-    OpBuilder<(ins "int64_t":$value), [{
-      build($_builder, $_state, $_builder.getType<IntType>(),
+    OpBuilder<(ins "IntegerType":$type, "int64_t":$value), [{
+      unsigned width = type.getWidth();
+      bool isSigned = type.isSigned();
+      build($_builder, $_state, type,
             $_builder.getIntegerAttr(
-                $_builder.getIntegerType(64, /*isSigned=*/true), value));
+                $_builder.getIntegerType(width, isSigned), value));
     }]>
   ];
 }
 
-def Polang_ConstantDoubleOp : Polang_Op<"constant.double", [Pure]> {
-  let summary = "Double constant";
+def Polang_ConstantFloatOp : Polang_Op<"constant.float", [Pure]> {
+  let summary = "Float constant";
   let description = [{
-    Produces a constant double value.
+    Produces a constant float value of any supported width.
 
     Example:
     ```mlir
-    %0 = polang.constant.double 3.14 : !polang.double
+    %0 = polang.constant.float 3.14 : !polang.float<64>
+    %1 = polang.constant.float 1.5 : !polang.float<32>
     ```
   }];
 
-  let arguments = (ins F64Attr:$value);
-  let results = (outs Polang_DoubleType:$result);
+  let arguments = (ins Polang_AnyFloatAttr:$value);
+  let results = (outs Polang_FloatType:$result);
 
-  let assemblyFormat = "$value attr-dict `:` type($result)";
+  let hasCustomAssemblyFormat = 1;
 
   let builders = [
-    OpBuilder<(ins "double":$value), [{
-      build($_builder, $_state, $_builder.getType<DoubleType>(),
-            $_builder.getF64FloatAttr(value));
+    OpBuilder<(ins "FloatType":$type, "double":$value), [{
+      unsigned width = type.getWidth();
+      if (width == 32) {
+        build($_builder, $_state, type,
+              $_builder.getF32FloatAttr(static_cast<float>(value)));
+      } else {
+        build($_builder, $_state, type,
+              $_builder.getF64FloatAttr(value));
+      }
     }]>
   ];
 }
@@ -119,7 +151,7 @@ def Polang_AddOp : Polang_ArithOp<"add"> {
 
     Example:
     ```mlir
-    %0 = polang.add %a, %b : !polang.int
+    %0 = polang.add %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
     ```
   }];
 }
@@ -131,7 +163,7 @@ def Polang_SubOp : Polang_ArithOp<"sub"> {
 
     Example:
     ```mlir
-    %0 = polang.sub %a, %b : !polang.int
+    %0 = polang.sub %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
     ```
   }];
 }
@@ -143,7 +175,7 @@ def Polang_MulOp : Polang_ArithOp<"mul"> {
 
     Example:
     ```mlir
-    %0 = polang.mul %a, %b : !polang.int
+    %0 = polang.mul %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
     ```
   }];
 }
@@ -155,7 +187,7 @@ def Polang_DivOp : Polang_ArithOp<"div"> {
 
     Example:
     ```mlir
-    %0 = polang.div %a, %b : !polang.int
+    %0 = polang.div %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
     ```
   }];
 }
@@ -191,7 +223,7 @@ def Polang_CmpOp : Polang_Op<"cmp", [
 
     Example:
     ```mlir
-    %0 = polang.cmp eq, %a, %b : !polang.int, !polang.int
+    %0 = polang.cmp eq, %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed>
     ```
   }];
 
@@ -223,9 +255,9 @@ def Polang_FuncOp : Polang_Op<"func", [
 
     Example:
     ```mlir
-    polang.func @add(%a: !polang.int, %b: !polang.int) -> !polang.int {
-      %c = polang.add %a, %b : !polang.int
-      polang.return %c : !polang.int
+    polang.func @add(%a: !polang.integer<64, signed>, %b: !polang.integer<64, signed>) -> !polang.integer<64, signed> {
+      %c = polang.add %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+      polang.return %c : !polang.integer<64, signed>
     }
     ```
   }];
@@ -275,7 +307,7 @@ def Polang_CallOp : Polang_Op<"call", [
 
     Example:
     ```mlir
-    %0 = polang.call @add(%a, %b) : (!polang.int, !polang.int) -> !polang.int
+    %0 = polang.call @add(%a, %b) : (!polang.integer<64, signed>, !polang.integer<64, signed>) -> !polang.integer<64, signed>
     ```
   }];
 
@@ -309,7 +341,7 @@ def Polang_ReturnOp : Polang_Op<"return", [
 
     Example:
     ```mlir
-    polang.return %0 : !polang.int
+    polang.return %0 : !polang.integer<64, signed>
     ```
   }];
 
@@ -345,10 +377,10 @@ def Polang_IfOp : Polang_Op<"if", [
 
     Example:
     ```mlir
-    %0 = polang.if %cond -> !polang.int {
-      polang.yield %a : !polang.int
+    %0 = polang.if %cond : !polang.bool -> !polang.integer<64, signed> {
+      polang.yield %a : !polang.integer<64, signed>
     } else {
-      polang.yield %b : !polang.int
+      polang.yield %b : !polang.integer<64, signed>
     }
     ```
   }];
@@ -383,7 +415,7 @@ def Polang_YieldOp : Polang_Op<"yield", [
 
     Example:
     ```mlir
-    polang.yield %0 : !polang.int
+    polang.yield %0 : !polang.integer<64, signed>
     ```
   }];
 
@@ -403,7 +435,7 @@ def Polang_AllocaOp : Polang_Op<"alloca"> {
 
     Example:
     ```mlir
-    %0 = polang.alloca "x" : !polang.int -> memref<!polang.int>
+    %0 = polang.alloca "x" : !polang.integer<64, signed> -> memref<!polang.integer<64, signed>>
     ```
   }];
 
@@ -424,7 +456,7 @@ def Polang_LoadOp : Polang_Op<"load", [Pure]> {
 
     Example:
     ```mlir
-    %0 = polang.load %ref : memref<i64> -> !polang.int
+    %0 = polang.load %ref : memref<i64> -> !polang.integer<64, signed>
     ```
   }];
 
@@ -441,7 +473,7 @@ def Polang_StoreOp : Polang_Op<"store"> {
 
     Example:
     ```mlir
-    polang.store %value, %ref : !polang.int, memref<i64>
+    polang.store %value, %ref : !polang.integer<64, signed>, memref<i64>
     ```
   }];
 
@@ -463,7 +495,7 @@ def Polang_PrintOp : Polang_Op<"print"> {
 
     Example:
     ```mlir
-    polang.print %0 : !polang.int
+    polang.print %0 : !polang.integer<64, signed>
     ```
   }];
 

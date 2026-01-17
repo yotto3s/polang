@@ -2,4 +2,4 @@
 
 ; Test error when parenthesis is malformed
 ; CHECK: {{.*}}error{{.*}}
-let foo (: int = 1
+let foo (: i64 = 1

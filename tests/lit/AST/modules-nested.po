@@ -3,12 +3,12 @@
 ; Test nested module declaration AST
 ; CHECK:      NBlock
 ; CHECK-NEXT: `-NModuleDeclaration 'Outer' (inner_func)
-; CHECK-NEXT:   |-NFunctionDeclaration 'inner_func' (x: int) -> int
+; CHECK-NEXT:   |-NFunctionDeclaration 'inner_func' (x: i64) -> i64
 ; CHECK-NEXT:   | `-NBlock
 ; CHECK-NEXT:   |   `-NExpressionStatement
 ; CHECK-NEXT:   |     `-NIdentifier 'x'
 ; CHECK-NEXT:   `-NModuleDeclaration 'Inner' (nested_func)
-; CHECK-NEXT:     `-NFunctionDeclaration 'nested_func' (y: int) -> int
+; CHECK-NEXT:     `-NFunctionDeclaration 'nested_func' (y: i64) -> i64
 ; CHECK-NEXT:       `-NBlock
 ; CHECK-NEXT:         `-NExpressionStatement
 ; CHECK-NEXT:           `-NBinaryOperator '*'
@@ -16,8 +16,8 @@
 ; CHECK-NEXT:             `-NInteger 2
 
 module Outer (inner_func)
-  let inner_func(x: int): int = x
+  let inner_func(x: i64): i64 = x
   module Inner (nested_func)
-    let nested_func(y: int): int = y * 2
+    let nested_func(y: i64): i64 = y * 2
   endmodule
 endmodule

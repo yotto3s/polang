@@ -1,5 +1,5 @@
 ; RUN: %polang_repl %s | %FileCheck %s
-; CHECK: 42 : int
+; CHECK: 42 : i64
 
 ; Test that polymorphic function calls display int results correctly.
 

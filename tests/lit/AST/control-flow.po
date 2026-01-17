@@ -2,7 +2,7 @@
 
 ; Test if expression
 ; CHECK:      NBlock
-; CHECK-NEXT: `-NFunctionDeclaration 'max' (a: int, b: int) -> int
+; CHECK-NEXT: `-NFunctionDeclaration 'max' (a: i64, b: i64) -> i64
 ; CHECK-NEXT:   `-NBlock
 ; CHECK-NEXT:     `-NExpressionStatement
 ; CHECK-NEXT:       `-NIfExpression
@@ -14,4 +14,4 @@
 ; CHECK-NEXT:         | `-NIdentifier 'a'
 ; CHECK-NEXT:         `-else:
 ; CHECK-NEXT:           `-NIdentifier 'b'
-let max(a: int, b: int): int = if a > b then a else b
+let max(a: i64, b: i64): i64 = if a > b then a else b

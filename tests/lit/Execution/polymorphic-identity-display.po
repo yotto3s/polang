@@ -1,5 +1,5 @@
 ; RUN: %polang_repl %s | %FileCheck %s
-; CHECK: 3.14 : double
+; CHECK: 3.14 : f64
 
 ; Test that polymorphic function calls display results correctly.
 ; Previously this showed no output because result type was "typevar".
