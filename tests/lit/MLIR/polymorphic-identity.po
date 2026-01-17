@@ -1,14 +1,17 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
-; Test polymorphic identity function with type inference
-; The identity function has no type annotations, so it uses type variables
-; Type inference resolves the type from the call site
+; Test polymorphic identity function with type inference and monomorphization.
+; The identity function has no type annotations, so it uses type variables.
+; Monomorphization creates a specialized version (identity$int) for the call site.
 
-; The entry function calls identity with an int, so type is inferred
-; CHECK: {{.*}}polang.func @__polang_entry() -> !polang.int{{.*}}
+; The entry function calls the specialized version
+; CHECK-DAG: {{.*}}polang.func @__polang_entry() -> !polang.int{{.*}}
 
-; The identity function gets inferred type from call site
-; CHECK: {{.*}}polang.func @identity(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+; The specialized identity function with concrete int types
+; CHECK-DAG: {{.*}}polang.func @identity$int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+
+; The original polymorphic identity function is marked as polymorphic
+; CHECK-DAG: {{.*}}polang.func @identity(%{{.*}}: !polang.typevar{{.*}}) -> !polang.typevar{{.*}} attributes {polang.polymorphic}{{.*}}
 
 let identity(x) = x
 identity(42)

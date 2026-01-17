@@ -236,6 +236,13 @@ struct FuncOpLowering : public OpConversionPattern<FuncOp> {
   LogicalResult
   matchAndRewrite(FuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
+    // Skip polymorphic functions - they are templates that should not be
+    // lowered. Only their specialized (monomorphized) versions are lowered.
+    if (op->hasAttr("polang.polymorphic")) {
+      rewriter.eraseOp(op);
+      return success();
+    }
+
     auto funcType = op.getFunctionType();
     TypeConverter::SignatureConversion signatureConversion(
         funcType.getNumInputs());

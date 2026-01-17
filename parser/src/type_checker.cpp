@@ -688,8 +688,10 @@ void TypeChecker::visit(const NIfExpression& node) {
   node.condition.accept(*this);
   const std::string cond_type = inferred_type_;
 
-  // Condition must be bool
-  if (cond_type != TypeNames::UNKNOWN && cond_type != TypeNames::BOOL) {
+  // Condition must be bool (typevar is allowed - will be inferred as bool
+  // at MLIR level when type inference runs)
+  if (cond_type != TypeNames::UNKNOWN && cond_type != TypeNames::BOOL &&
+      cond_type != TypeNames::TYPEVAR) {
     reportError("If condition must be bool, got " + cond_type);
   }
 
@@ -701,14 +703,28 @@ void TypeChecker::visit(const NIfExpression& node) {
   node.elseExpr.accept(*this);
   const std::string else_type = inferred_type_;
 
-  // Both branches must have same type
+  // Both branches must have same type (typevar can match any type -
+  // real type checking happens at MLIR level)
   if (then_type != TypeNames::UNKNOWN && else_type != TypeNames::UNKNOWN &&
+      then_type != TypeNames::TYPEVAR && else_type != TypeNames::TYPEVAR &&
       then_type != else_type) {
     reportError("If branches have different types: " + then_type + " and " +
                 else_type);
   }
 
-  inferred_type_ = then_type;
+  // Determine the inferred type:
+  // - If one branch is typevar, use the other branch's concrete type
+  // - Otherwise use then_type
+  if (then_type == TypeNames::TYPEVAR && else_type != TypeNames::TYPEVAR &&
+      else_type != TypeNames::UNKNOWN) {
+    inferred_type_ = else_type;
+  } else if (else_type == TypeNames::TYPEVAR &&
+             then_type != TypeNames::TYPEVAR &&
+             then_type != TypeNames::UNKNOWN) {
+    inferred_type_ = then_type;
+  } else {
+    inferred_type_ = then_type;
+  }
 }
 
 void TypeChecker::visit(const NLetExpression& node) {

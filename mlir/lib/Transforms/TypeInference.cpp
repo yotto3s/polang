@@ -15,7 +15,9 @@
 #include "mlir/Pass/Pass.h"
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <optional>
@@ -25,6 +27,32 @@ using namespace mlir;
 using namespace polang;
 
 namespace {
+
+//===----------------------------------------------------------------------===//
+// Helper functions for polymorphism detection
+//===----------------------------------------------------------------------===//
+
+/// Check if a type contains any type variables
+bool containsTypeVar(Type type) { return isa<TypeVarType>(type); }
+
+/// Check if a function has any type variables in its signature.
+/// The entry function (__polang_entry) is never considered polymorphic.
+bool isPolymorphicFunction(FuncOp func) {
+  // The entry function is never polymorphic - it should always be resolved
+  if (func.getSymName() == "__polang_entry")
+    return false;
+
+  FunctionType funcType = func.getFunctionType();
+  for (Type input : funcType.getInputs()) {
+    if (containsTypeVar(input))
+      return true;
+  }
+  for (Type result : funcType.getResults()) {
+    if (containsTypeVar(result))
+      return true;
+  }
+  return false;
+}
 
 //===----------------------------------------------------------------------===//
 // Substitution - Maps type variables to types
@@ -231,6 +259,13 @@ private:
     if (!callee)
       return;
 
+    // Skip unification for polymorphic function calls - they will be handled
+    // by the monomorphization pass. Each call site gets its own specialized
+    // version with concrete types.
+    if (isPolymorphicFunction(callee)) {
+      return;
+    }
+
     FunctionType calleeType = callee.getFunctionType();
 
     // Unify argument types with parameter types
@@ -260,8 +295,78 @@ private:
   }
 
   void applySubstitution(ModuleOp module, const Substitution& subst) {
-    // First update function signatures (this is easier)
+    // First, identify which functions are polymorphic (before any modifications)
+    llvm::StringSet<> polymorphicFuncs;
     module.walk([&](FuncOp func) {
+      if (isPolymorphicFunction(func)) {
+        polymorphicFuncs.insert(func.getSymName());
+      }
+    });
+
+    // For CallOps to polymorphic functions, store the actual argument types
+    // and compute the return type for the monomorphization pass.
+    // This must happen BEFORE we update function signatures.
+    module.walk([&](CallOp call) {
+      if (polymorphicFuncs.contains(call.getCallee())) {
+        // Get the callee function
+        auto callee = module.lookupSymbol<FuncOp>(call.getCallee());
+        if (!callee)
+          return;
+
+        FunctionType calleeType = callee.getFunctionType();
+
+        // Store the actual argument types (they should already be concrete
+        // or resolvable through the global substitution)
+        SmallVector<Attribute> resolvedArgTypes;
+        for (Value arg : call.getOperands()) {
+          Type resolvedType = subst.apply(arg.getType());
+          resolvedArgTypes.push_back(TypeAttr::get(resolvedType));
+        }
+        call->setAttr("polang.resolved_arg_types",
+                      ArrayAttr::get(call.getContext(), resolvedArgTypes));
+
+        // Compute the return type by building a local substitution
+        // that maps the function's parameter type vars to the argument types
+        Substitution localSubst;
+
+        // Map parameter type variables to argument types
+        for (size_t i = 0; i < calleeType.getNumInputs() &&
+                           i < call.getOperands().size();
+             ++i) {
+          Type paramType = calleeType.getInput(i);
+          if (auto typeVar = dyn_cast<TypeVarType>(paramType)) {
+            Type argType = subst.apply(call.getOperand(i).getType());
+            localSubst.bind(typeVar.getId(), argType);
+          }
+        }
+
+        // Also include the global substitution to handle relationships
+        // established in the function body (e.g., return type = param type)
+        Substitution combinedSubst = localSubst.compose(subst);
+
+        // Apply to the return type and update the call's result type
+        if (call.getResult()) {
+          Type returnType = calleeType.getResult(0);
+          Type resolvedRetType = combinedSubst.apply(returnType);
+          call->setAttr("polang.resolved_return_type",
+                        TypeAttr::get(resolvedRetType));
+          // Also update the actual result type so subsequent uses see the
+          // concrete type
+          if (!containsTypeVar(resolvedRetType)) {
+            call.getResult().setType(resolvedRetType);
+          }
+        }
+      }
+    });
+
+    // Update function signatures - but SKIP polymorphic functions
+    // (they will be handled by the monomorphization pass)
+    module.walk([&](FuncOp func) {
+      // Skip polymorphic functions - preserve their type variables
+      if (polymorphicFuncs.contains(func.getSymName())) {
+        return;
+      }
+
       FunctionType oldType = func.getFunctionType();
 
       SmallVector<Type> newInputs;
@@ -274,8 +379,8 @@ private:
         newResults.push_back(subst.apply(result));
       }
 
-      FunctionType newType = FunctionType::get(
-          func.getContext(), newInputs, newResults);
+      FunctionType newType =
+          FunctionType::get(func.getContext(), newInputs, newResults);
 
       if (newType != oldType) {
         func.setType(newType);
@@ -292,10 +397,18 @@ private:
 
     // Now rebuild operations that have type variable results
     // We need to do this carefully to update all uses
+    // Skip operations inside polymorphic functions
     module.walk([&](Operation* op) {
       // Skip function ops (handled above)
       if (isa<FuncOp>(op))
         return;
+
+      // Skip operations inside polymorphic functions
+      if (auto parentFunc = op->getParentOfType<FuncOp>()) {
+        if (polymorphicFuncs.contains(parentFunc.getSymName())) {
+          return;
+        }
+      }
 
       bool needsUpdate = false;
       for (Type type : op->getResultTypes()) {

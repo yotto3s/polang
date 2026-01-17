@@ -1,0 +1,16 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test that a polymorphic function called with different types creates
+; multiple specialized versions through monomorphization.
+
+; Specialized versions (order may vary)
+; CHECK-DAG: {{.*}}polang.func @identity$int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+; CHECK-DAG: {{.*}}polang.func @identity$bool(%{{.*}}: !polang.bool) -> !polang.bool{{.*}}
+
+; Original polymorphic function is preserved and marked
+; CHECK-DAG: {{.*}}polang.func @identity(%{{.*}}: !polang.typevar{{.*}}) -> !polang.typevar{{.*}} attributes {polang.polymorphic}{{.*}}
+
+let identity(x) = x
+let a = identity(42)
+let b = identity(true)
+if b then a else 0

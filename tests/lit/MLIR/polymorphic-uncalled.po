@@ -1,0 +1,13 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test that an uncalled polymorphic function is preserved with type variables.
+; No specialized version is created because there are no call sites.
+
+; The polymorphic function is marked and preserved
+; CHECK-DAG: {{.*}}polang.func @unused_identity(%{{.*}}: !polang.typevar{{.*}}) -> !polang.typevar{{.*}} attributes {polang.polymorphic}{{.*}}
+
+; No specialized version should exist
+; CHECK-NOT: @unused_identity$
+
+let unused_identity(x) = x
+42

@@ -1,9 +1,15 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
-; Test polymorphic function with unused parameter
-; Parameter type is inferred from call site even when not used in body
+; Test polymorphic function with unused parameter.
+; Parameter type is inferred from call site even when not used in body.
+; Monomorphization creates a specialized version.
 
-; CHECK: {{.*}}polang.func @unused(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+; The specialized function with concrete int type
+; CHECK-DAG: {{.*}}polang.func @unused$int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+
+; The original polymorphic function is marked
+; CHECK-DAG: {{.*}}polang.func @unused(%{{.*}}: !polang.typevar{{.*}}) -> !polang.int{{.*}} attributes {polang.polymorphic}{{.*}}
+
 let unused(x) = 42
 
 ; Entry point - call the function with an int
