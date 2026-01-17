@@ -1,0 +1,14 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test function with type inference from comparison.
+; Parameter type is inferred from comparison with literal 0 (int).
+; This is NOT polymorphic - type is fully resolved at AST level.
+
+; Function with inferred int parameter (not polymorphic)
+; CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.int) -> !polang.bool{{.*}}
+
+; Verify comparison operation exists
+; CHECK: {{.*}}polang.cmp eq{{.*}}
+
+let is_zero(x) = x == 0
+is_zero(5)

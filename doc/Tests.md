@@ -65,12 +65,12 @@ FileCheck-based tests organized by output type:
 | Directory | Count | Description |
 |-----------|-------|-------------|
 | `AST/` | 11 | AST dump verification (`--dump-ast`) |
-| `MLIR/` | 22 | Polang dialect MLIR output (`--emit-mlir`) |
+| `MLIR/` | 29 | Polang dialect MLIR output (`--emit-mlir`) |
 | `LLVMIR/` | 13 | LLVM IR generation |
-| `Execution/` | 13 | REPL execution results |
+| `Execution/` | 19 | REPL execution results |
 | `Errors/` | 13 | Error message verification |
 
-**Total: 72 lit tests**
+**Total: 85 lit tests**
 
 ## Code Coverage
 
@@ -100,7 +100,7 @@ The HTML report is generated at `build/coverage_html/index.html`.
 
 Some functions are intentionally not covered by tests because they are infrastructure code required by MLIR/LLVM but not used in our execution path.
 
-### MLIR Pass Infrastructure (5 functions)
+### MLIR Pass Infrastructure (7 functions)
 
 These methods are required by MLIR's pass infrastructure for CLI tools like `mlir-opt`, but Polang runs passes programmatically.
 
@@ -111,6 +111,8 @@ These methods are required by MLIR's pass infrastructure for CLI tools like `mli
 | `mlir/lib/Conversion/PolangToStandard.cpp` | `registerPolangConversionPasses()` | Registers passes with MLIR CLI |
 | `mlir/lib/Transforms/TypeInference.cpp` | `TypeInferencePass::getArgument()` | Returns pass name for CLI |
 | `mlir/lib/Transforms/TypeInference.cpp` | `TypeInferencePass::getDescription()` | Returns pass description |
+| `mlir/lib/Transforms/Monomorphization.cpp` | `MonomorphizationPass::getArgument()` | Returns pass name for CLI |
+| `mlir/lib/Transforms/Monomorphization.cpp` | `MonomorphizationPass::getDescription()` | Returns pass description |
 
 ### MLIR Op Interface Methods (8 functions)
 

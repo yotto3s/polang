@@ -1,0 +1,8 @@
+; RUN: %polang_repl %s | %FileCheck %s
+; CHECK: 120 : int
+
+; Test recursive polymorphic function execution.
+; Factorial function with polymorphic parameter type inference.
+
+let fact(n) = if n == 0 then 1 else n * fact(n - 1)
+fact(5)

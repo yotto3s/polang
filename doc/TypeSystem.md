@@ -14,6 +14,9 @@ This document describes the Polang type system, including type inference and pol
 - [Unification Algorithm](#unification-algorithm)
 - [Implementation Details](#implementation-details)
 - [Examples](#examples)
+- [Monomorphization](#monomorphization)
+- [Error Handling](#error-handling)
+- [Known Limitations](#known-limitations)
 
 ## Overview
 
@@ -409,6 +412,46 @@ is_positive(5)
 - Return type is `bool` (result of comparison)
 - Final type: `is_positive: (int) -> bool`
 
+## Monomorphization
+
+Polymorphic functions are specialized (monomorphized) for each unique set of argument types at call sites.
+
+### How It Works
+
+1. **Identification**: Functions with type variables in their signature are marked as polymorphic
+2. **Call Site Analysis**: Each call to a polymorphic function records the concrete argument types
+3. **Specialization**: A new function is created for each unique type signature
+4. **Name Mangling**: Specialized functions use a mangled name (e.g., `identity$int`)
+5. **Call Update**: Calls are updated to reference the specialized version
+
+### Example
+
+```polang
+let identity(x) = x
+identity(42)     ; Creates identity$int
+identity(true)   ; Creates identity$bool
+```
+
+**Generated MLIR:**
+
+```mlir
+polang.func @identity(%arg0: !polang.typevar<0>) -> !polang.typevar<1>
+    attributes {polang.polymorphic} { ... }
+
+polang.func @identity$int(%arg0: !polang.int) -> !polang.int { ... }
+
+polang.func @identity$bool(%arg0: !polang.bool) -> !polang.bool { ... }
+```
+
+### Uncalled Polymorphic Functions
+
+Polymorphic functions that are never called remain in MLIR with the `polang.polymorphic` attribute. They are skipped during lowering to LLVM IR (since there's no concrete type to lower to).
+
+```polang
+let unused(x) = x  ; Kept with polang.polymorphic attribute
+42                 ; No call to unused, so no specialization created
+```
+
 ## Error Handling
 
 ### Type Mismatch Errors
@@ -422,11 +465,33 @@ f(3.14)  ; Error: argument 1 expects int, got double
 
 ### Unresolved Type Variables
 
-If type variables cannot be resolved (no call sites), they remain as type variables. The lowering pass will fail:
+Polymorphic functions without call sites keep their type variables and are marked with `polang.polymorphic`. They are skipped during lowering but can be called in subsequent REPL inputs.
+
+## Known Limitations
+
+### Multiple Polymorphic Parameters
+
+Functions with multiple independently-typed polymorphic parameters that are used together in binary operations do not work:
 
 ```polang
-let unused(x) = 42  ; OK if called
-; If never called, typevar<0> cannot be resolved
+let add(x, y) = x + y  ; ERROR: x and y get different type variables
+add(1, 2)              ; Type inference fails
 ```
 
-However, in practice, top-level expressions ensure functions are called, providing type constraints.
+**Workaround:** Use explicit type annotations or use the same parameter twice:
+
+```polang
+let add(x: int, y: int) = x + y  ; Works with explicit types
+let double_it(x) = x + x          ; Works: same typevar on both sides
+```
+
+### REPL Result Display
+
+When a polymorphic function returns a value, the REPL may not display the result because the AST type checker returns `typevar` as the result type. The execution succeeds but no output is shown.
+
+```polang
+let identity(x) = x
+identity(3.14)      ; Executes correctly but shows no output
+```
+
+**Workaround:** Use explicit type annotations for the function.

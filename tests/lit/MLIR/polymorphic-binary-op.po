@@ -1,0 +1,13 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test polymorphic function that uses x twice (same typevar).
+; When the same parameter is used multiple times, the type is consistent.
+
+; Specialized version for int
+; CHECK-DAG: {{.*}}polang.func @double_val$int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+
+; Original polymorphic function is preserved
+; CHECK-DAG: {{.*}}polang.func @double_val(%{{.*}}: !polang.typevar{{.*}}) -> !polang.typevar{{.*}} attributes {polang.polymorphic}{{.*}}
+
+let double_val(x) = x + x
+double_val(21)

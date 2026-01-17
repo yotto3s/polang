@@ -1,0 +1,12 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test polymorphic function specialization with double type.
+
+; Specialized version for double
+; CHECK-DAG: {{.*}}polang.func @identity$double(%{{.*}}: !polang.double) -> !polang.double{{.*}}
+
+; Original polymorphic function is preserved
+; CHECK-DAG: {{.*}}polang.func @identity(%{{.*}}: !polang.typevar{{.*}}) -> !polang.typevar{{.*}} attributes {polang.polymorphic}{{.*}}
+
+let identity(x) = x
+identity(3.14)

@@ -1,0 +1,15 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test function with captured variable.
+; Captured variables are passed as explicit parameters.
+; Type is inferred from 'base' (int) and usage (x + base).
+
+; Function has 2 parameters: x and captured base (both int)
+; CHECK: {{.*}}polang.func @add_base(%{{.*}}: !polang.int, %{{.*}}: !polang.int) -> !polang.int{{.*}}
+
+; Verify add operation
+; CHECK: {{.*}}polang.add{{.*}}
+
+let base = 10
+let add_base(x) = x + base
+add_base(5)
