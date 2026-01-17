@@ -12,8 +12,7 @@
 namespace mlir {
 class MLIRContext;
 class ModuleOp;
-template <typename OpTy>
-class OwningOpRef;
+template <typename OpTy> class OwningOpRef;
 } // namespace mlir
 
 class NBlock;
@@ -24,9 +23,9 @@ namespace polang {
 /// Returns nullptr on failure.
 /// If emitTypeVars is true, untyped positions will emit type variables
 /// for polymorphic type inference at the MLIR level.
-mlir::OwningOpRef<mlir::ModuleOp> mlirGen(mlir::MLIRContext &context,
-                                           const NBlock &moduleAST,
-                                           bool emitTypeVars = false);
+mlir::OwningOpRef<mlir::ModuleOp> mlirGen(mlir::MLIRContext& context,
+                                          const NBlock& moduleAST,
+                                          bool emitTypeVars = false);
 
 } // namespace polang
 

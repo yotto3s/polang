@@ -29,17 +29,55 @@ clangd --path-mappings=$(pwd)=/workspace/polang --enable-config
 
 ## Code Style
 
+### General Guidelines
 - Make variables and functions `const` whenever possible
 - Mark functions `noexcept` when they don't throw exceptions
 - Prefer `const` references for function parameters that aren't modified
 
-## clang-format Commands
+### Naming Conventions (LLVM Style)
+
+| Element | Case | Example |
+|---------|------|---------|
+| Classes/Structs | `CamelCase` | `TypeChecker`, `NBlock` |
+| Enums | `CamelCase` | `ErrorSeverity` |
+| Enum constants | `CamelCase` | `ImportKind::Module` |
+| Functions/Methods | `lowerCamelCase` | `checkTypes()`, `getError()` |
+| Variables | `lowerCamelCase` | `errorList`, `funcName` |
+| Parameters | `lowerCamelCase` | `emitTypeVars`, `hasMore` |
+| Members | `lowerCamelCase` | `inferredType`, `context` |
+| Global/Static constants | `UPPER_CASE` | `TypeNames::INT` |
+| Namespaces | `lowercase` | `polang` |
+
+Configuration is defined in `.clang-tidy`.
+
+## clang-format
 
 Always apply clang-format to files you edit (C/C++ files only, not .l or .y files).
 
 ```bash
-# Run clang-format (inside docker container)
+# Format all source files (inside docker container)
+./scripts/run-clang-format.sh
+
+# Check formatting without modifying (CI mode)
+./scripts/run-clang-format.sh --check
+
+# Format specific file
 clang-format -i <path/to/edited-file>
+```
+
+## clang-tidy
+
+Run clang-tidy to check for issues:
+
+```bash
+# Run on all source files (inside docker container)
+./scripts/run-clang-tidy.sh
+
+# Run with auto-fix
+./scripts/run-clang-tidy.sh --fix
+
+# Run on specific files
+./scripts/run-clang-tidy.sh parser/src/ast_printer.cpp
 ```
 
 ## Build Commands
@@ -292,6 +330,9 @@ polang/
 │   ├── factorial.po
 │   ├── mutability.po
 │   └── closures.po
+├── scripts/                    # Development scripts
+│   ├── run-clang-format.sh     # Format source files
+│   └── run-clang-tidy.sh       # Run static analysis
 └── docker/                     # Docker build environment
 ```
 

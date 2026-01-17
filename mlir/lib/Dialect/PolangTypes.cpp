@@ -5,9 +5,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "polang/Dialect/PolangTypes.h"
-#include "polang/Dialect/PolangDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "polang/Dialect/PolangDialect.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;

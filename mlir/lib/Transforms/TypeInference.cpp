@@ -4,10 +4,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "polang/Transforms/Passes.h"
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangOps.h"
 #include "polang/Dialect/PolangTypes.h"
+#include "polang/Transforms/Passes.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -210,7 +210,7 @@ struct TypeInferencePass
 
 private:
   void collectFunctionConstraints(FuncOp func, Substitution& subst,
-                                   Unifier& unifier, bool& hadError) {
+                                  Unifier& unifier, bool& hadError) {
     // For each return operation, unify return value type with function
     // return type
     FunctionType funcType = func.getFunctionType();
@@ -263,7 +263,7 @@ private:
   }
 
   void collectCallConstraints(CallOp call, ModuleOp module, Substitution& subst,
-                               Unifier& unifier, bool& hadError) {
+                              Unifier& unifier, bool& hadError) {
     // Find the callee function
     auto callee = module.lookupSymbol<FuncOp>(call.getCallee());
     if (!callee)
@@ -271,7 +271,8 @@ private:
 
     // Skip polymorphic function calls - they can be called with different types
     // at different call sites (e.g., identity(42) and identity(true)).
-    // Monomorphization handles creating specialized versions for each call site.
+    // Monomorphization handles creating specialized versions for each call
+    // site.
     if (isPolymorphicFunction(callee)) {
       return;
     }
@@ -279,8 +280,8 @@ private:
     FunctionType calleeType = callee.getFunctionType();
 
     // Unify argument types with parameter types
-    for (size_t i = 0; i < call.getOperands().size() &&
-                       i < calleeType.getNumInputs(); ++i) {
+    for (size_t i = 0;
+         i < call.getOperands().size() && i < calleeType.getNumInputs(); ++i) {
       Type argType = call.getOperand(i).getType();
       Type paramType = calleeType.getInput(i);
 
@@ -305,7 +306,8 @@ private:
   }
 
   void applySubstitution(ModuleOp module, const Substitution& subst) {
-    // First, identify which functions are polymorphic (before any modifications)
+    // First, identify which functions are polymorphic (before any
+    // modifications)
     llvm::StringSet<> polymorphicFuncs;
     module.walk([&](FuncOp func) {
       if (isPolymorphicFunction(func)) {
@@ -340,8 +342,8 @@ private:
         Substitution localSubst;
 
         // Map parameter type variables to argument types
-        for (size_t i = 0; i < calleeType.getNumInputs() &&
-                           i < call.getOperands().size();
+        for (size_t i = 0;
+             i < calleeType.getNumInputs() && i < call.getOperands().size();
              ++i) {
           Type paramType = calleeType.getInput(i);
           if (auto typeVar = dyn_cast<TypeVarType>(paramType)) {
