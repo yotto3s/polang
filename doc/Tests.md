@@ -22,6 +22,16 @@ python3 /usr/lib/llvm-20/build/utils/lit/lit.py -v build/tests/lit
 ctest --test-dir build -R "CompilerIntegration"
 ```
 
+### Continuous Integration
+
+Tests run automatically on every push and pull request via GitHub Actions:
+
+- **Build matrix**: GCC/Clang × Debug/Release (4 configurations)
+- **Sanitizers**: AddressSanitizer and UndefinedBehaviorSanitizer
+- **Coverage**: Uploaded to Codecov automatically
+
+See `.github/workflows/ci.yml` for the full CI configuration.
+
 ## Test Categories
 
 ### Parser Tests (`tests/parser/`)

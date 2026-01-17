@@ -6,18 +6,23 @@ Use clangd to find and fix bugs efficiently.
 
 ## Docker Environment
 
-Project is to be built inside docker container.
-You can start a container if it is not running.
+Project is to be built inside docker container. The container includes:
+- Ubuntu 24.04 base
+- GCC and Clang 20 compilers
+- CMake, Bison, Flex
+- LLVM 20 with MLIR
+- clang-format, clang-tidy, clangd
+- lcov (for coverage), Python 3 (for lit tests)
 
 ```bash
 # Start a container
 docker/docker_run.sh
-```
 
-And you can execute commands inside the container using run_docker_command.sh.
-```bash
 # Run any command inside the docker container
 docker/run_docker_command.sh <command> [options]
+
+# Build the Docker image locally
+docker/docker_build.sh
 ```
 
 ## clangd Commands
@@ -219,6 +224,31 @@ FileCheck patterns:
 - Prefer `CHECK-NEXT` over `CHECK` when testing consecutive lines
 - Use exact full-line patterns when possible for maximum precision
 - Use `{{.*}}pattern{{.*}}` for partial matching when full line content varies
+
+## CI/CD
+
+GitHub Actions workflows run automatically on push and pull requests to `main`.
+
+### CI Pipeline (`.github/workflows/ci.yml`)
+
+All jobs run in the project's Docker container (`ghcr.io/<owner>/polang-dev`).
+
+| Job | Description |
+|-----|-------------|
+| `build-and-test` | Build with GCC/Clang × Debug/Release matrix (4 configurations) |
+| `sanitizers` | AddressSanitizer and UndefinedBehaviorSanitizer checks |
+| `coverage` | Code coverage report uploaded to Codecov |
+| `format-check` | Verify clang-format compliance |
+| `lint` | Run clang-tidy static analysis |
+
+### Docker Image (`.github/workflows/docker.yml`)
+
+Builds and pushes the dev container to GHCR when `docker/` or the workflow file changes.
+
+```bash
+# Manually trigger Docker build (requires repo write access)
+gh workflow run docker.yml
+```
 
 ## Code Coverage
 
