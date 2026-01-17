@@ -336,8 +336,7 @@ def Polang_ReturnOp : Polang_Op<"return", [
 //===----------------------------------------------------------------------===//
 
 def Polang_IfOp : Polang_Op<"if", [
-    RecursiveMemoryEffects,
-    SingleBlockImplicitTerminator<"YieldOp">
+    RecursiveMemoryEffects
   ]> {
   let summary = "If-then-else expression";
   let description = [{
@@ -361,7 +360,9 @@ def Polang_IfOp : Polang_Op<"if", [
     SizedRegion<1>:$elseRegion
   );
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = [{
+    $condition `->` type($result) $thenRegion `else` $elseRegion attr-dict
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [

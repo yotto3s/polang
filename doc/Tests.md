@@ -93,8 +93,8 @@ The HTML report is generated at `build/coverage_html/index.html`.
 
 ### Current Coverage
 
-- **Lines:** ~83% (1899 of 2278 lines)
-- **Functions:** ~86% (237 of 275 functions)
+- **Lines:** ~85% (2493 of 2930 lines)
+- **Functions:** ~87% (296 of 341 functions)
 
 ## Intentionally Uncovered Code
 
@@ -114,7 +114,7 @@ These methods are required by MLIR's pass infrastructure for CLI tools like `mli
 | `mlir/lib/Transforms/Monomorphization.cpp` | `MonomorphizationPass::getArgument()` | Returns pass name for CLI |
 | `mlir/lib/Transforms/Monomorphization.cpp` | `MonomorphizationPass::getDescription()` | Returns pass description |
 
-### MLIR Op Interface Methods (8 functions)
+### MLIR Op Interface Methods (6 functions)
 
 Required by MLIR's `CallOpInterface` for call graph analysis, but not used since we build MLIR programmatically rather than parsing MLIR text.
 
@@ -126,7 +126,6 @@ Required by MLIR's `CallOpInterface` for call graph analysis, but not used since
 | `mlir/lib/Dialect/PolangOps.cpp` | `CallOp::getCalleeType()` | Call graph analysis |
 | `mlir/lib/Dialect/PolangOps.cpp` | `CallOp::setCalleeFromCallable()` | Call graph analysis |
 | `mlir/lib/Dialect/PolangOps.cpp` | `FuncOp::parse()` | MLIR text parsing |
-| `mlir/lib/Dialect/PolangOps.cpp` | `IfOp::parse()` | MLIR text parsing |
 
 ### PrintOp Lowering (1 function)
 

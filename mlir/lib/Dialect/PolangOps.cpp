@@ -123,45 +123,6 @@ void IfOp::build(OpBuilder& builder, OperationState& state, Type resultType,
   elseRegion->push_back(new Block());
 }
 
-ParseResult IfOp::parse(OpAsmParser& parser, OperationState& result) {
-  OpAsmParser::UnresolvedOperand condition;
-  Type resultType;
-
-  if (parser.parseOperand(condition) || parser.parseArrow() ||
-      parser.parseType(resultType))
-    return failure();
-
-  if (parser.resolveOperand(condition, BoolType::get(parser.getContext()),
-                            result.operands))
-    return failure();
-
-  result.addTypes(resultType);
-
-  // Parse then region
-  Region* thenRegion = result.addRegion();
-  if (parser.parseRegion(*thenRegion, /*arguments=*/{}, /*argTypes=*/{}))
-    return failure();
-
-  // Parse else region
-  if (parser.parseKeyword("else"))
-    return failure();
-
-  Region* elseRegion = result.addRegion();
-  if (parser.parseRegion(*elseRegion, /*arguments=*/{}, /*argTypes=*/{}))
-    return failure();
-
-  return success();
-}
-
-void IfOp::print(OpAsmPrinter& p) {
-  p << " " << getCondition() << " -> " << getResult().getType() << " ";
-  p.printRegion(getThenRegion(), /*printEntryBlockArgs=*/false,
-                /*printBlockTerminators=*/true);
-  p << " else ";
-  p.printRegion(getElseRegion(), /*printEntryBlockArgs=*/false,
-                /*printBlockTerminators=*/true);
-}
-
 LogicalResult IfOp::verify() {
   // Check that both regions have terminators
   if (getThenRegion().empty() || getThenRegion().front().empty())

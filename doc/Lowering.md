@@ -38,18 +38,18 @@ The Polang dialect is a custom MLIR dialect that closely mirrors the language se
 
 ### MLIR Verification
 
-The Polang dialect leverages MLIR's built-in verification infrastructure to catch type errors during compilation:
+The Polang dialect uses custom verifiers to catch type errors during compilation while supporting type variables for polymorphism:
 
 | Operation | Verification |
 |-----------|--------------|
-| `polang.add`, `polang.sub`, `polang.mul`, `polang.div` | `SameOperandsAndResultType` trait ensures operands and result have matching types |
-| `polang.cmp` | Verifies operands have the same type |
+| `polang.add`, `polang.sub`, `polang.mul`, `polang.div` | Custom verifier ensures operands and result have compatible types (allows type variables) |
+| `polang.cmp` | Custom verifier ensures operands have compatible types |
 | `polang.if` | Verifies condition is `!polang.bool`, both branches yield same type |
 | `polang.return` | Verifies return value matches function signature |
 | `polang.call` | Verifies function exists, arity matches, and argument types match |
 | `polang.store` | Verifies target variable is mutable |
 
-Type inference is performed at the AST level before MLIR generation, ensuring all operations have explicit types in the generated MLIR.
+Type variables are resolved by the type inference pass before lowering to standard dialects.
 
 ### Types
 
