@@ -113,7 +113,7 @@ Build outputs:
 ## Documentation
 
 When modifying the language syntax (lexer.l, parser.y, or node.hpp), always update:
-- `doc/syntax.md` - Language syntax reference
+- `doc/Syntax.md` - Language syntax reference
 
 When modifying the MLIR code generation pipeline, update:
 - `doc/Lowering.md` - MLIR lowering process documentation
@@ -227,30 +227,9 @@ FileCheck patterns:
 
 ## CI/CD
 
-GitHub Actions workflows run automatically on push and pull requests to `main`.
+GitHub Actions workflows run automatically on push and pull requests to `main`. All jobs run in the project's Docker container.
 
-### CI Pipeline (`.github/workflows/ci.yml`)
-
-All jobs run in the project's Docker container (`ghcr.io/<owner>/polang-dev`).
-
-```
-check-changes ─→ build-image (only if docker/** changed)
-                      │
-                      ▼ (runs even if skipped)
-                ┌─ format-check ─┐
-                │                ├─→ build-and-test ─┬─→ sanitizers
-                └─ lint ─────────┘                   └─→ coverage
-```
-
-| Job | Description |
-|-----|-------------|
-| `check-changes` | Detect if `docker/**` files were modified |
-| `build-image` | Build and push Docker image (only when Dockerfile changes) |
-| `format-check` | Verify clang-format compliance |
-| `lint` | Run clang-tidy static analysis |
-| `build-and-test` | Build with GCC/Clang × Debug/Release matrix (4 configurations) |
-| `sanitizers` | AddressSanitizer and UndefinedBehaviorSanitizer checks |
-| `coverage` | Code coverage report uploaded to Codecov |
+See `doc/CI_CD.md` for detailed CI documentation including job dependencies, troubleshooting, and local reproduction steps.
 
 ## Code Coverage
 

@@ -1,32 +1,43 @@
 # Polang
 
-A simple programming language with ML-inspired syntax and LLVM backend.
+A simple programming language with ML-inspired syntax and an MLIR/LLVM backend.
 
-## How to Build
+## Features
+
+- **ML-inspired syntax**: Let bindings, type annotations, first-class functions
+- **Type inference**: Hindley-Milner style type inference with polymorphism
+- **MLIR backend**: Custom Polang dialect lowered through MLIR to LLVM IR
+- **Interactive REPL**: JIT compilation with state persistence
+- **Comprehensive testing**: Unit tests, lit tests, sanitizers, and coverage
+
+## Quick Start
+
+### Building
+
+The project uses Docker for a consistent build environment:
 
 ```bash
-# Configure
-cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+# Start the development container
+docker/docker_run.sh
 
-# Build
+# Configure and build (inside container)
+cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
 cmake --build build -j$(nproc)
 ```
 
-## Usage
+Or using the helper script:
 
-### REPL (Interactive Mode)
+```bash
+docker/run_docker_command.sh cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+docker/run_docker_command.sh cmake --build build -j$(nproc)
+```
 
-The REPL provides an interactive environment for evaluating Polang expressions:
+### Running
 
+**Interactive REPL:**
 ```bash
 ./build/bin/PolangRepl
 ```
-
-**Features:**
-- **Interactive evaluation**: Enter expressions and see results immediately
-- **State persistence**: Variables and functions persist across evaluations
-- **Multi-line input**: Incomplete expressions (unbalanced parentheses, `if` without `else`, `let` without `in`) automatically continue to the next line
-- **Type display**: Results are displayed with their types (e.g., `42 : int`)
 
 **Example session:**
 ```
@@ -42,39 +53,61 @@ Polang REPL (type 'exit' or Ctrl+D to quit)
 42 : int
 > if x > 3 then true else false
 true : bool
-> let y = 1
-... in y + 1
-2 : int
 > exit
 ```
 
-**Pipe mode:**
-```bash
-echo "1 + 2" | ./build/bin/PolangRepl
-# Output: 3 : int
-```
-
-### Compiler
-
-The compiler reads Polang source code and outputs LLVM IR:
-
+**Compile to LLVM IR:**
 ```bash
 echo "let x = 42" | ./build/bin/PolangCompiler
 ```
 
-## Testing
-
-Run the test suite:
-
+**Run a source file:**
 ```bash
-ctest --test-dir build --output-on-failure
+./build/bin/PolangRepl example/fibonacci.po
 ```
 
-Tests are organized by component:
-- `tests/parser/` - Lexer, parser, and type checker unit tests
-- `tests/compiler/` - LLVM IR generation tests
-- `tests/repl/` - REPL execution and input handling tests
+## Testing
+
+```bash
+# Run all tests
+ctest --test-dir build --output-on-failure
+
+# Run example programs
+for f in example/*.po; do echo "=== $(basename $f) ==="; ./build/bin/PolangRepl "$f"; done
+```
 
 ## Documentation
 
-- [Language Syntax](doc/syntax.md) - Complete syntax reference
+| Document | Description |
+|----------|-------------|
+| [Syntax](doc/Syntax.md) | Language syntax reference |
+| [TypeSystem](doc/TypeSystem.md) | Type system and inference |
+| [Lowering](doc/Lowering.md) | MLIR lowering pipeline |
+| [Tests](doc/Tests.md) | Test infrastructure and coverage |
+| [CI/CD](doc/CI_CD.md) | Continuous integration pipeline |
+
+## Project Structure
+
+```
+polang/
+├── parser/          # Lexer, parser, type checker
+├── compiler/        # LLVM IR compiler
+├── repl/            # Interactive REPL with JIT
+├── mlir/            # Polang MLIR dialect and lowering
+├── tests/           # Unit tests and lit tests
+├── example/         # Example programs
+├── doc/             # Documentation
+├── scripts/         # Development scripts
+└── docker/          # Docker build environment
+```
+
+## Dependencies
+
+- CMake 3.20+
+- LLVM 20+ with MLIR
+- Bison and Flex
+- GCC or Clang
+
+## License
+
+See [LICENSE](LICENSE) for details.

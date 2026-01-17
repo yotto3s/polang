@@ -72,8 +72,6 @@ jobs:
           cache-to: type=inline
 
   format-check:
-    needs: [build-image]
-    if: ${{ !cancelled() && (needs.build-image.result == 'success' || needs.build-image.result == 'skipped') }}
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/${{ github.repository }}-dev:latest
@@ -91,8 +89,6 @@ jobs:
         run: ./scripts/run-clang-format.sh --check
 
   lint:
-    needs: [build-image]
-    if: ${{ !cancelled() && (needs.build-image.result == 'success' || needs.build-image.result == 'skipped') }}
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/${{ github.repository }}-dev:latest
@@ -116,7 +112,12 @@ jobs:
         run: ./scripts/run-clang-tidy.sh
 
   build-and-test:
-    needs: [format-check, lint]
+    needs: [format-check, lint, build-image]
+    if: >-
+      always() &&
+      needs.format-check.result == 'success' &&
+      needs.lint.result == 'success' &&
+      (needs.build-image.result == 'success' || needs.build-image.result == 'skipped')
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/${{ github.repository }}-dev:latest
