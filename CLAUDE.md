@@ -78,6 +78,9 @@ When modifying the MLIR code generation pipeline, update:
 When modifying the type system or type inference:
 - `doc/TypeSystem.md` - Type system and inference documentation
 
+When modifying tests or analyzing coverage:
+- `doc/Tests.md` - Test infrastructure and coverage documentation
+
 When adding new language features or modifying compiler output, consider adding lit tests:
 - `tests/lit/AST/` - AST dump tests using `--dump-ast`
 - `tests/lit/MLIR/` - MLIR output tests using `--emit-mlir`
