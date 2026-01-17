@@ -4,6 +4,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <parser/visitor.hpp>
@@ -15,8 +16,8 @@ struct TypeCheckError {
   std::string message;
   int line;
   int column;
-  TypeCheckError(const std::string& msg, int l = 0, int c = 0)
-      : message(msg), line(l), column(c) {}
+  TypeCheckError(std::string msg, int l = 0, int c = 0)
+      : message(std::move(msg)), line(l), column(c) {}
 };
 
 class TypeChecker : public Visitor {
@@ -42,46 +43,48 @@ public:
   void visit(const NImportStatement& node) override;
 
   // Get the inferred type of the last visited node
-  std::string getInferredType() const { return inferred_type_; }
+  [[nodiscard]] std::string getInferredType() const { return inferredType; }
 
   // Retrieve all collected errors
-  const std::vector<TypeCheckError>& getErrors() const { return errors_; }
+  [[nodiscard]] const std::vector<TypeCheckError>& getErrors() const {
+    return errors;
+  }
 
   // Check if there were any errors
-  bool hasErrors() const { return !errors_.empty(); }
+  [[nodiscard]] bool hasErrors() const { return !errors.empty(); }
 
   // Check an AST and return errors
   std::vector<TypeCheckError> check(const NBlock& ast);
 
 private:
-  std::string inferred_type_;
-  std::map<std::string, std::string> local_types_;
-  std::map<std::string, bool> local_mutability_;
-  std::map<std::string, std::string> function_return_types_;
-  std::map<std::string, std::vector<std::string>> function_param_types_;
-  std::vector<TypeCheckError> errors_;
+  std::string inferredType;
+  std::map<std::string, std::string> localTypes;
+  std::map<std::string, bool> localMutability;
+  std::map<std::string, std::string> functionReturnTypes;
+  std::map<std::string, std::vector<std::string>> functionParamTypes;
+  std::vector<TypeCheckError> errors;
 
   // Module path for name mangling (e.g., ["Math", "Internal"])
-  std::vector<std::string> module_path_;
+  std::vector<std::string> modulePath;
 
   // Module exports: module mangled name -> set of exported symbol names
-  std::map<std::string, std::set<std::string>> module_exports_;
+  std::map<std::string, std::set<std::string>> moduleExports;
 
   // Module aliases: alias -> original module path
-  std::map<std::string, std::string> module_aliases_;
+  std::map<std::string, std::string> moduleAliases;
 
   // Imported symbols: local name -> mangled module symbol name
-  std::map<std::string, std::string> imported_symbols_;
+  std::map<std::string, std::string> importedSymbols;
 
   // Get mangled name for a symbol within current module context
-  std::string mangledName(const std::string& name) const;
+  [[nodiscard]] std::string mangledName(const std::string& name) const;
 
   void reportError(const std::string& message);
 
   // Collect identifiers referenced in a block that are not locally defined
-  std::set<std::string>
+  [[nodiscard]] std::set<std::string>
   collectFreeVariables(const NBlock& block,
-                       const std::set<std::string>& local_names) const;
+                       const std::set<std::string>& localNames) const;
 };
 
 #endif // POLANG_TYPE_CHECKER_HPP

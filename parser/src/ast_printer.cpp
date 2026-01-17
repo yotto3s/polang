@@ -3,25 +3,25 @@
 #include "parser/node.hpp"
 #include "parser/operator_utils.hpp"
 
-ASTPrinter::ASTPrinter(std::ostream& out) noexcept : out_(out) {}
+ASTPrinter::ASTPrinter(std::ostream& out) noexcept : out(out) {}
 
 void ASTPrinter::print(const NBlock& root) {
-  depth_has_more_.clear();
-  out_ << "NBlock\n";
+  depthHasMore.clear();
+  out << "NBlock\n";
   const auto& stmts = root.statements;
   for (size_t i = 0; i < stmts.size(); ++i) {
-    const bool is_last = (i == stmts.size() - 1);
-    DepthScope scope(*this, !is_last);
+    const bool isLast = (i == stmts.size() - 1);
+    DepthScope scope(*this, !isLast);
     stmts[i]->accept(*this);
   }
 }
 
 void ASTPrinter::printPrefix() const {
-  for (size_t i = 0; i + 1 < depth_has_more_.size(); ++i) {
-    out_ << (depth_has_more_[i] ? "| " : "  ");
+  for (size_t i = 0; i + 1 < depthHasMore.size(); ++i) {
+    out << (depthHasMore[i] ? "| " : "  ");
   }
-  if (!depth_has_more_.empty()) {
-    out_ << (depth_has_more_.back() ? "|-" : "`-");
+  if (!depthHasMore.empty()) {
+    out << (depthHasMore.back() ? "|-" : "`-");
   }
 }
 
@@ -29,59 +29,59 @@ std::string ASTPrinter::operatorToString(int op) noexcept {
   return polang::operatorToString(op);
 }
 
-ASTPrinter::DepthScope::DepthScope(ASTPrinter& printer, bool has_more) noexcept
-    : printer_(printer) {
-  printer_.depth_has_more_.push_back(has_more);
+ASTPrinter::DepthScope::DepthScope(ASTPrinter& printer, bool hasMore) noexcept
+    : printer(printer) {
+  printer.depthHasMore.push_back(hasMore);
 }
 
 ASTPrinter::DepthScope::~DepthScope() noexcept {
-  printer_.depth_has_more_.pop_back();
+  printer.depthHasMore.pop_back();
 }
 
 void ASTPrinter::visit(const NInteger& node) {
   printPrefix();
-  out_ << "NInteger " << node.value << "\n";
+  out << "NInteger " << node.value << "\n";
 }
 
 void ASTPrinter::visit(const NDouble& node) {
   printPrefix();
-  out_ << "NDouble " << node.value << "\n";
+  out << "NDouble " << node.value << "\n";
 }
 
 void ASTPrinter::visit(const NBoolean& node) {
   printPrefix();
-  out_ << "NBoolean " << (node.value ? "true" : "false") << "\n";
+  out << "NBoolean " << (node.value ? "true" : "false") << "\n";
 }
 
 void ASTPrinter::visit(const NIdentifier& node) {
   printPrefix();
-  out_ << "NIdentifier '" << node.name << "'\n";
+  out << "NIdentifier '" << node.name << "'\n";
 }
 
 void ASTPrinter::visit(const NQualifiedName& node) {
   printPrefix();
-  out_ << "NQualifiedName '" << node.fullName() << "'\n";
+  out << "NQualifiedName '" << node.fullName() << "'\n";
 }
 
 void ASTPrinter::visit(const NMethodCall& node) {
   printPrefix();
-  if (node.qualifiedId) {
-    out_ << "NMethodCall '" << node.qualifiedId->fullName() << "'\n";
+  if (node.qualifiedId != nullptr) {
+    out << "NMethodCall '" << node.qualifiedId->fullName() << "'\n";
   } else {
-    out_ << "NMethodCall '" << node.id.name << "'\n";
+    out << "NMethodCall '" << node.id.name << "'\n";
   }
 
   const auto& args = node.arguments;
   for (size_t i = 0; i < args.size(); ++i) {
-    const bool is_last = (i == args.size() - 1);
-    DepthScope scope(*this, !is_last);
+    const bool isLast = (i == args.size() - 1);
+    DepthScope scope(*this, !isLast);
     args[i]->accept(*this);
   }
 }
 
 void ASTPrinter::visit(const NBinaryOperator& node) {
   printPrefix();
-  out_ << "NBinaryOperator '" << operatorToString(node.op) << "'\n";
+  out << "NBinaryOperator '" << operatorToString(node.op) << "'\n";
 
   {
     DepthScope scope(*this, true);
@@ -95,7 +95,7 @@ void ASTPrinter::visit(const NBinaryOperator& node) {
 
 void ASTPrinter::visit(const NAssignment& node) {
   printPrefix();
-  out_ << "NAssignment\n";
+  out << "NAssignment\n";
 
   {
     DepthScope scope(*this, true);
@@ -109,24 +109,24 @@ void ASTPrinter::visit(const NAssignment& node) {
 
 void ASTPrinter::visit(const NBlock& node) {
   printPrefix();
-  out_ << "NBlock\n";
+  out << "NBlock\n";
 
   const auto& stmts = node.statements;
   for (size_t i = 0; i < stmts.size(); ++i) {
-    const bool is_last = (i == stmts.size() - 1);
-    DepthScope scope(*this, !is_last);
+    const bool isLast = (i == stmts.size() - 1);
+    DepthScope scope(*this, !isLast);
     stmts[i]->accept(*this);
   }
 }
 
 void ASTPrinter::visit(const NIfExpression& node) {
   printPrefix();
-  out_ << "NIfExpression\n";
+  out << "NIfExpression\n";
 
   {
     DepthScope scope(*this, true);
     printPrefix();
-    out_ << "condition:\n";
+    out << "condition:\n";
     {
       DepthScope inner(*this, false);
       node.condition.accept(*this);
@@ -135,7 +135,7 @@ void ASTPrinter::visit(const NIfExpression& node) {
   {
     DepthScope scope(*this, true);
     printPrefix();
-    out_ << "then:\n";
+    out << "then:\n";
     {
       DepthScope inner(*this, false);
       node.thenExpr.accept(*this);
@@ -144,7 +144,7 @@ void ASTPrinter::visit(const NIfExpression& node) {
   {
     DepthScope scope(*this, false);
     printPrefix();
-    out_ << "else:\n";
+    out << "else:\n";
     {
       DepthScope inner(*this, false);
       node.elseExpr.accept(*this);
@@ -154,21 +154,20 @@ void ASTPrinter::visit(const NIfExpression& node) {
 
 void ASTPrinter::visit(const NLetExpression& node) {
   printPrefix();
-  out_ << "NLetExpression\n";
+  out << "NLetExpression\n";
 
-  const auto& bindings = node.bindings;
-  for (size_t i = 0; i < bindings.size(); ++i) {
+  for (const auto* binding : node.bindings) {
     DepthScope scope(*this, true);
-    if (bindings[i]->isFunction) {
-      bindings[i]->func->accept(*this);
+    if (binding->isFunction) {
+      binding->func->accept(*this);
     } else {
-      bindings[i]->var->accept(*this);
+      binding->var->accept(*this);
     }
   }
   {
     DepthScope scope(*this, false);
     printPrefix();
-    out_ << "body:\n";
+    out << "body:\n";
     {
       DepthScope inner(*this, false);
       node.body.accept(*this);
@@ -178,7 +177,7 @@ void ASTPrinter::visit(const NLetExpression& node) {
 
 void ASTPrinter::visit(const NExpressionStatement& node) {
   printPrefix();
-  out_ << "NExpressionStatement\n";
+  out << "NExpressionStatement\n";
 
   {
     DepthScope scope(*this, false);
@@ -188,14 +187,14 @@ void ASTPrinter::visit(const NExpressionStatement& node) {
 
 void ASTPrinter::visit(const NVariableDeclaration& node) {
   printPrefix();
-  out_ << "NVariableDeclaration '" << node.id.name << "'";
+  out << "NVariableDeclaration '" << node.id.name << "'";
   if (node.isMutable) {
-    out_ << " mut";
+    out << " mut";
   }
   if (node.type != nullptr) {
-    out_ << " : " << node.type->name;
+    out << " : " << node.type->name;
   }
-  out_ << "\n";
+  out << "\n";
 
   if (node.assignmentExpr != nullptr) {
     DepthScope scope(*this, false);
@@ -205,23 +204,23 @@ void ASTPrinter::visit(const NVariableDeclaration& node) {
 
 void ASTPrinter::visit(const NFunctionDeclaration& node) {
   printPrefix();
-  out_ << "NFunctionDeclaration '" << node.id.name << "' (";
+  out << "NFunctionDeclaration '" << node.id.name << "' (";
 
   for (size_t i = 0; i < node.arguments.size(); ++i) {
     if (i > 0) {
-      out_ << ", ";
+      out << ", ";
     }
-    out_ << node.arguments[i]->id.name;
+    out << node.arguments[i]->id.name;
     if (node.arguments[i]->type != nullptr) {
-      out_ << ": " << node.arguments[i]->type->name;
+      out << ": " << node.arguments[i]->type->name;
     }
   }
-  out_ << ")";
+  out << ")";
 
   if (node.type != nullptr) {
-    out_ << " -> " << node.type->name;
+    out << " -> " << node.type->name;
   }
-  out_ << "\n";
+  out << "\n";
 
   {
     DepthScope scope(*this, false);
@@ -231,55 +230,55 @@ void ASTPrinter::visit(const NFunctionDeclaration& node) {
 
 void ASTPrinter::visit(const NModuleDeclaration& node) {
   printPrefix();
-  out_ << "NModuleDeclaration '" << node.name.name << "'";
+  out << "NModuleDeclaration '" << node.name.name << "'";
 
   // Print export list if present
   if (!node.exports.empty()) {
-    out_ << " (";
+    out << " (";
     for (size_t i = 0; i < node.exports.size(); ++i) {
       if (i > 0) {
-        out_ << ", ";
+        out << ", ";
       }
-      out_ << node.exports[i];
+      out << node.exports[i];
     }
-    out_ << ")";
+    out << ")";
   }
-  out_ << "\n";
+  out << "\n";
 
   // Print module members
   for (size_t i = 0; i < node.members.size(); ++i) {
-    const bool is_last = (i == node.members.size() - 1);
-    DepthScope scope(*this, !is_last);
+    const bool isLast = (i == node.members.size() - 1);
+    DepthScope scope(*this, !isLast);
     node.members[i]->accept(*this);
   }
 }
 
 void ASTPrinter::visit(const NImportStatement& node) {
   printPrefix();
-  out_ << "NImportStatement ";
+  out << "NImportStatement ";
 
   switch (node.kind) {
   case ImportKind::Module:
-    out_ << "import " << node.modulePath.fullName();
+    out << "import " << node.modulePath.fullName();
     break;
   case ImportKind::ModuleAlias:
-    out_ << "import " << node.modulePath.fullName() << " as " << node.alias;
+    out << "import " << node.modulePath.fullName() << " as " << node.alias;
     break;
   case ImportKind::Items:
-    out_ << "from " << node.modulePath.fullName() << " import ";
+    out << "from " << node.modulePath.fullName() << " import ";
     for (size_t i = 0; i < node.items.size(); ++i) {
       if (i > 0) {
-        out_ << ", ";
+        out << ", ";
       }
-      out_ << node.items[i].name;
+      out << node.items[i].name;
       if (!node.items[i].alias.empty()) {
-        out_ << " as " << node.items[i].alias;
+        out << " as " << node.items[i].alias;
       }
     }
     break;
   case ImportKind::All:
-    out_ << "from " << node.modulePath.fullName() << " import *";
+    out << "from " << node.modulePath.fullName() << " import *";
     break;
   }
-  out_ << "\n";
+  out << "\n";
 }

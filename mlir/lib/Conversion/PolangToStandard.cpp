@@ -254,8 +254,10 @@ struct FuncOpLowering : public OpConversionPattern<FuncOp> {
     }
 
     SmallVector<Type> resultTypes;
-    if (failed(typeConverter->convertTypes(funcType.getResults(), resultTypes)))
+    if (failed(
+            typeConverter->convertTypes(funcType.getResults(), resultTypes))) {
       return failure();
+    }
 
     auto newFuncType = rewriter.getFunctionType(
         signatureConversion.getConvertedTypes(), resultTypes);
@@ -265,8 +267,9 @@ struct FuncOpLowering : public OpConversionPattern<FuncOp> {
 
     rewriter.inlineRegionBefore(op.getBody(), newFunc.getBody(), newFunc.end());
     if (failed(rewriter.convertRegionTypes(&newFunc.getBody(), *typeConverter,
-                                           &signatureConversion)))
+                                           &signatureConversion))) {
       return failure();
+    }
 
     rewriter.eraseOp(op);
     return success();
@@ -280,9 +283,10 @@ struct CallOpLowering : public OpConversionPattern<CallOp> {
   matchAndRewrite(CallOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
     SmallVector<Type> resultTypes;
-    if (failed(
-            getTypeConverter()->convertTypes(op.getResultTypes(), resultTypes)))
+    if (failed(getTypeConverter()->convertTypes(op.getResultTypes(),
+                                                resultTypes))) {
       return failure();
+    }
 
     rewriter.replaceOpWithNewOp<func::CallOp>(op, op.getCallee(), resultTypes,
                                               adaptor.getOperands());
@@ -312,8 +316,9 @@ struct IfOpLowering : public OpConversionPattern<IfOp> {
   matchAndRewrite(IfOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
     auto resultType = getTypeConverter()->convertType(op.getResult().getType());
-    if (!resultType)
+    if (!resultType) {
       return failure();
+    }
 
     // Create scf::IfOp with empty regions (no withElseRegion to avoid
     // auto-created blocks)
@@ -321,10 +326,12 @@ struct IfOpLowering : public OpConversionPattern<IfOp> {
                                             adaptor.getCondition());
 
     // Erase the auto-generated empty blocks if any
-    if (!scfIf.getThenRegion().empty())
+    if (!scfIf.getThenRegion().empty()) {
       rewriter.eraseBlock(&scfIf.getThenRegion().front());
-    if (!scfIf.getElseRegion().empty())
+    }
+    if (!scfIf.getElseRegion().empty()) {
       rewriter.eraseBlock(&scfIf.getElseRegion().front());
+    }
 
     // Move then region
     rewriter.inlineRegionBefore(op.getThenRegion(), scfIf.getThenRegion(),
@@ -360,8 +367,9 @@ struct AllocaOpLowering : public OpConversionPattern<AllocaOp> {
   matchAndRewrite(AllocaOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
     auto elementType = getTypeConverter()->convertType(op.getElementType());
-    if (!elementType)
+    if (!elementType) {
       return failure();
+    }
 
     auto memRefType = MemRefType::get({}, elementType);
     rewriter.replaceOpWithNewOp<memref::AllocaOp>(op, memRefType);
@@ -446,8 +454,9 @@ struct PolangToStandardPass
                                                    &getContext());
 
     if (failed(applyPartialConversion(getOperation(), target,
-                                      std::move(patterns))))
+                                      std::move(patterns)))) {
       signalPassFailure();
+    }
   }
 };
 

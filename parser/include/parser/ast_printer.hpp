@@ -31,19 +31,19 @@ public:
   void visit(const NImportStatement& node) override;
 
 private:
-  std::ostream& out_;
-  std::vector<bool> depth_has_more_;
+  std::ostream& out;
+  std::vector<bool> depthHasMore;
 
   void printPrefix() const;
   static std::string operatorToString(int op) noexcept;
 
   class DepthScope {
   public:
-    DepthScope(ASTPrinter& printer, bool has_more) noexcept;
+    DepthScope(ASTPrinter& printer, bool hasMore) noexcept;
     ~DepthScope() noexcept;
 
   private:
-    ASTPrinter& printer_;
+    ASTPrinter& printer;
   };
 };
 

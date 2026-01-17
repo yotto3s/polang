@@ -21,10 +21,12 @@ namespace {
 /// Types are compatible if they are equal OR if either is a type variable.
 /// Type variables will be resolved by the type inference pass.
 bool typesAreCompatible(Type t1, Type t2) {
-  if (t1 == t2)
+  if (t1 == t2) {
     return true;
-  if (isa<TypeVarType>(t1) || isa<TypeVarType>(t2))
+  }
+  if (isa<TypeVarType>(t1) || isa<TypeVarType>(t2)) {
     return true;
+  }
   return false;
 }
 } // namespace
@@ -125,10 +127,12 @@ void IfOp::build(OpBuilder& builder, OperationState& state, Type resultType,
 
 LogicalResult IfOp::verify() {
   // Check that both regions have terminators
-  if (getThenRegion().empty() || getThenRegion().front().empty())
+  if (getThenRegion().empty() || getThenRegion().front().empty()) {
     return emitOpError("then region must not be empty");
-  if (getElseRegion().empty() || getElseRegion().front().empty())
+  }
+  if (getElseRegion().empty() || getElseRegion().front().empty()) {
     return emitOpError("else region must not be empty");
+  }
 
   auto* thenTerminator = getThenRegion().front().getTerminator();
   auto* elseTerminator = getElseRegion().front().getTerminator();
@@ -136,23 +140,27 @@ LogicalResult IfOp::verify() {
   auto thenYield = dyn_cast<YieldOp>(thenTerminator);
   auto elseYield = dyn_cast<YieldOp>(elseTerminator);
 
-  if (!thenYield)
+  if (!thenYield) {
     return emitOpError("then region must end with polang.yield");
-  if (!elseYield)
+  }
+  if (!elseYield) {
     return emitOpError("else region must end with polang.yield");
+  }
 
   // Check that yield types match result type (allow type variables)
   if (!typesAreCompatible(thenYield.getValue().getType(),
-                          getResult().getType()))
+                          getResult().getType())) {
     return emitOpError("then branch yields ")
            << thenYield.getValue().getType() << " but if expects "
            << getResult().getType();
+  }
 
   if (!typesAreCompatible(elseYield.getValue().getType(),
-                          getResult().getType()))
+                          getResult().getType())) {
     return emitOpError("else branch yields ")
            << elseYield.getValue().getType() << " but if expects "
            << getResult().getType();
+  }
 
   return success();
 }
@@ -163,22 +171,26 @@ LogicalResult IfOp::verify() {
 
 LogicalResult ReturnOp::verify() {
   auto funcOp = dyn_cast<FuncOp>((*this)->getParentOp());
-  if (!funcOp)
+  if (!funcOp) {
     return emitOpError("must be inside a polang.func");
+  }
 
   auto resultTypes = funcOp.getResultTypes();
 
   if (getValue()) {
-    if (resultTypes.empty())
+    if (resultTypes.empty()) {
       return emitOpError("returns a value but function has no return type");
+    }
     // Allow type variables - they will be resolved by type inference pass
-    if (!typesAreCompatible(getValue().getType(), resultTypes[0]))
+    if (!typesAreCompatible(getValue().getType(), resultTypes[0])) {
       return emitOpError("returns ")
              << getValue().getType() << " but function expects "
              << resultTypes[0];
+    }
   } else {
-    if (!resultTypes.empty())
+    if (!resultTypes.empty()) {
       return emitOpError("must return a value of type ") << resultTypes[0];
+    }
   }
   return success();
 }
@@ -190,9 +202,10 @@ LogicalResult ReturnOp::verify() {
 LogicalResult StoreOp::verify() {
   // Check if the reference comes from an alloca
   if (auto allocaOp = getRef().getDefiningOp<AllocaOp>()) {
-    if (!allocaOp.getIsMutable())
+    if (!allocaOp.getIsMutable()) {
       return emitOpError("cannot store to immutable variable '")
              << allocaOp.getName() << "'";
+    }
   }
   return success();
 }
@@ -209,31 +222,35 @@ LogicalResult CallOp::verify() {
 LogicalResult CallOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
   auto funcOp =
       symbolTable.lookupNearestSymbolFrom<FuncOp>(*this, getCalleeAttr());
-  if (!funcOp)
+  if (!funcOp) {
     return emitOpError("references undefined function '") << getCallee() << "'";
+  }
 
   auto funcType = funcOp.getFunctionType();
 
   // Check argument count
-  if (getOperands().size() != funcType.getNumInputs())
+  if (getOperands().size() != funcType.getNumInputs()) {
     return emitOpError("function '")
            << getCallee() << "' expects " << funcType.getNumInputs()
            << " argument(s) but got " << getOperands().size();
+  }
 
   // Check argument types (allow type variables)
   for (unsigned i = 0; i < getOperands().size(); ++i) {
-    if (!typesAreCompatible(getOperands()[i].getType(), funcType.getInput(i)))
+    if (!typesAreCompatible(getOperands()[i].getType(), funcType.getInput(i))) {
       return emitOpError("argument ")
              << (i + 1) << " has type " << getOperands()[i].getType()
              << " but function expects " << funcType.getInput(i);
+    }
   }
 
   // Check result type (allow type variables)
   if (!funcType.getResults().empty() && getNumResults() > 0) {
-    if (!typesAreCompatible(getResult().getType(), funcType.getResult(0)))
+    if (!typesAreCompatible(getResult().getType(), funcType.getResult(0))) {
       return emitOpError("result type ")
              << getResult().getType() << " does not match function return type "
              << funcType.getResult(0);
+    }
   }
 
   return success();
@@ -244,34 +261,42 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult AddOp::verify() {
-  if (!typesAreCompatible(getLhs().getType(), getRhs().getType()))
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType())) {
     return emitOpError("operand types must be compatible");
-  if (!typesAreCompatible(getLhs().getType(), getResult().getType()))
+  }
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType())) {
     return emitOpError("result type must be compatible with operands");
+  }
   return success();
 }
 
 LogicalResult SubOp::verify() {
-  if (!typesAreCompatible(getLhs().getType(), getRhs().getType()))
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType())) {
     return emitOpError("operand types must be compatible");
-  if (!typesAreCompatible(getLhs().getType(), getResult().getType()))
+  }
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType())) {
     return emitOpError("result type must be compatible with operands");
+  }
   return success();
 }
 
 LogicalResult MulOp::verify() {
-  if (!typesAreCompatible(getLhs().getType(), getRhs().getType()))
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType())) {
     return emitOpError("operand types must be compatible");
-  if (!typesAreCompatible(getLhs().getType(), getResult().getType()))
+  }
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType())) {
     return emitOpError("result type must be compatible with operands");
+  }
   return success();
 }
 
 LogicalResult DivOp::verify() {
-  if (!typesAreCompatible(getLhs().getType(), getRhs().getType()))
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType())) {
     return emitOpError("operand types must be compatible");
-  if (!typesAreCompatible(getLhs().getType(), getResult().getType()))
+  }
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType())) {
     return emitOpError("result type must be compatible with operands");
+  }
   return success();
 }
 
@@ -280,8 +305,9 @@ LogicalResult DivOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult CmpOp::verify() {
-  if (!typesAreCompatible(getLhs().getType(), getRhs().getType()))
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType())) {
     return emitOpError("comparison operand types must be compatible");
+  }
   return success();
 }
 

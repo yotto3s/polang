@@ -7,7 +7,7 @@
 #include <sstream>
 
 // Flex buffer type
-typedef struct yy_buffer_state* YY_BUFFER_STATE;
+using YY_BUFFER_STATE = struct yy_buffer_state*;
 
 // Flex functions for string scanning
 extern YY_BUFFER_STATE yy_scan_string(const char* str);
@@ -34,7 +34,7 @@ NBlock* polang_parse(const std::string& source) {
 NBlock* polang_parse_file(const char* filename) {
   std::ifstream file(filename);
   if (!file.is_open()) {
-    std::cerr << "ERROR: Cannot open file: " << filename << std::endl;
+    std::cerr << "ERROR: Cannot open file: " << filename << '\n';
     return nullptr;
   }
   std::stringstream buffer;

@@ -6,10 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "polang/Transforms/Passes.h"
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangOps.h"
 #include "polang/Dialect/PolangTypes.h"
+#include "polang/Transforms/Passes.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -206,9 +206,8 @@ struct MonomorphizationPass
         std::string mangledName = getMangledName(funcName, sig.argTypes);
 
         // Clone and specialize the function
-        FuncOp specializedFunc =
-            cloneAndSpecialize(origFunc, mangledName, sig.argTypes,
-                               sig.returnType, module);
+        FuncOp specializedFunc = cloneAndSpecialize(
+            origFunc, mangledName, sig.argTypes, sig.returnType, module);
 
         if (specializedFunc) {
           specializedNames[funcName][sigKey] = mangledName;
@@ -326,9 +325,8 @@ private:
     // Update block argument types
     if (!newFunc.getBody().empty()) {
       Block& entry = newFunc.getBody().front();
-      for (size_t i = 0; i < entry.getNumArguments() &&
-                         i < concreteArgTypes.size();
-           ++i) {
+      for (size_t i = 0;
+           i < entry.getNumArguments() && i < concreteArgTypes.size(); ++i) {
         entry.getArgument(i).setType(concreteArgTypes[i]);
       }
     }
@@ -341,9 +339,10 @@ private:
   }
 
   /// Update types of operations in the specialized function body
-  void updateFunctionBodyTypes(FuncOp func,
-                               const llvm::DenseMap<uint64_t, Type>& typeMapping,
-                               StringRef origFuncName, StringRef newFuncName) {
+  void
+  updateFunctionBodyTypes(FuncOp func,
+                          const llvm::DenseMap<uint64_t, Type>& typeMapping,
+                          StringRef origFuncName, StringRef newFuncName) {
     // Collect operations that need type updates (we can't modify while walking)
     SmallVector<Operation*> opsToUpdate;
     func.walk([&](Operation* op) {

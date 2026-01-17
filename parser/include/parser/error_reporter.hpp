@@ -3,11 +3,12 @@
 
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace polang {
 
-/// Severity level for compiler errors.
+/// Severity level for compiler errorList.
 enum class ErrorSeverity { Warning, Error, Fatal };
 
 /// Represents a single compiler error with location information.
@@ -18,15 +19,15 @@ struct CompilerError {
   int line;
   int column;
 
-  CompilerError(ErrorSeverity sev, const std::string& msg, int l = 0, int c = 0)
-      : severity(sev), message(msg), line(l), column(c) {}
+  CompilerError(ErrorSeverity sev, std::string msg, int l = 0, int c = 0)
+      : severity(sev), message(std::move(msg)), line(l), column(c) {}
 
   /// Format the error as a human-readable string.
-  std::string format() const;
+  [[nodiscard]] std::string format() const;
 };
 
 /// Unified error reporter for the Polang compiler.
-/// Provides a consistent way to report errors across all components.
+/// Provides a consistent way to report errorList across all components.
 class ErrorReporter {
 public:
   using ErrorCallback = std::function<void(const CompilerError&)>;
@@ -49,33 +50,35 @@ public:
   void error(const std::string& message, int line = 0, int column = 0);
   void fatal(const std::string& message, int line = 0, int column = 0);
 
-  /// Set a callback to be invoked for each error reported.
-  void setCallback(ErrorCallback callback);
+  /// Set a errorCallback to be invoked for each error reported.
+  void setCallback(ErrorCallback cb);
 
   /// Set the current filename for error messages.
   void setFilename(const std::string& filename);
 
-  /// Get all errors collected so far.
-  const std::vector<CompilerError>& errors() const { return errors_; }
+  /// Get all errorList collected so far.
+  [[nodiscard]] const std::vector<CompilerError>& errors() const {
+    return errorList;
+  }
 
-  /// Check if any errors have been reported.
-  bool hasErrors() const;
+  /// Check if any errorList have been reported.
+  [[nodiscard]] bool hasErrors() const;
 
   /// Check if any warnings have been reported.
-  bool hasWarnings() const;
+  [[nodiscard]] bool hasWarnings() const;
 
-  /// Clear all collected errors.
+  /// Clear all collected errorList.
   void clear();
 
 private:
-  std::vector<CompilerError> errors_;
-  ErrorCallback callback_;
-  std::string currentFilename_;
+  std::vector<CompilerError> errorList;
+  ErrorCallback errorCallback;
+  std::string currentFilename;
 };
 
 } // namespace polang
 
-/// C-compatible function for the lexer to report errors.
+/// C-compatible function for the lexer to report errorList.
 /// This allows the lexer (which is C code) to call the error reporter.
 extern "C" void polang_report_error(const char* message, int line, int column);
 

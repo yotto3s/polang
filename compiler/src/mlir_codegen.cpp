@@ -61,50 +61,51 @@ MLIRCodeGenContext::MLIRCodeGenContext() = default;
 MLIRCodeGenContext::~MLIRCodeGenContext() = default;
 
 bool MLIRCodeGenContext::initializeContext() {
-  if (context_)
+  if (context) {
     return true;
+  }
 
-  context_ = std::make_unique<MLIRContext>();
+  context = std::make_unique<MLIRContext>();
 
   // Register all required dialects
-  context_->getOrLoadDialect<PolangDialect>();
-  context_->getOrLoadDialect<arith::ArithDialect>();
-  context_->getOrLoadDialect<func::FuncDialect>();
-  context_->getOrLoadDialect<scf::SCFDialect>();
-  context_->getOrLoadDialect<cf::ControlFlowDialect>();
-  context_->getOrLoadDialect<memref::MemRefDialect>();
-  context_->getOrLoadDialect<LLVM::LLVMDialect>();
+  context->getOrLoadDialect<PolangDialect>();
+  context->getOrLoadDialect<arith::ArithDialect>();
+  context->getOrLoadDialect<func::FuncDialect>();
+  context->getOrLoadDialect<scf::SCFDialect>();
+  context->getOrLoadDialect<cf::ControlFlowDialect>();
+  context->getOrLoadDialect<memref::MemRefDialect>();
+  context->getOrLoadDialect<LLVM::LLVMDialect>();
 
   // Register LLVM IR translation
-  registerBuiltinDialectTranslation(*context_);
-  registerLLVMDialectTranslation(*context_);
+  registerBuiltinDialectTranslation(*context);
+  registerLLVMDialectTranslation(*context);
 
   return true;
 }
 
 bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars) {
   if (!initializeContext()) {
-    error_ = "Failed to initialize MLIR context";
+    error = "Failed to initialize MLIR context";
     return false;
   }
 
-  auto moduleRef = mlirGen(*context_, ast, emitTypeVars);
+  auto moduleRef = mlirGen(*context, ast, emitTypeVars);
   if (!moduleRef) {
-    error_ = "Failed to generate MLIR from AST";
+    error = "Failed to generate MLIR from AST";
     return false;
   }
 
-  module_ = std::make_unique<OwningOpRef<ModuleOp>>(std::move(moduleRef));
+  module = std::make_unique<OwningOpRef<ModuleOp>>(std::move(moduleRef));
   return true;
 }
 
 bool MLIRCodeGenContext::runTypeInference() {
-  if (!module_ || !*module_) {
-    error_ = "No module for type inference";
+  if (!module || !*module) {
+    error = "No module for type inference";
     return false;
   }
 
-  PassManager pm(context_.get());
+  PassManager pm(context.get());
 
   // Add the type inference pass - collects constraints and resolves types
   // for non-polymorphic functions. Polymorphic functions are preserved
@@ -118,8 +119,8 @@ bool MLIRCodeGenContext::runTypeInference() {
   // Note: We don't run canonicalization here to preserve all operations
   // for debugging/testing. Canonicalization happens in later lowering stages.
 
-  if (failed(pm.run(**module_))) {
-    error_ = "Type inference failed";
+  if (failed(pm.run(**module))) {
+    error = "Type inference failed";
     return false;
   }
 
@@ -127,12 +128,12 @@ bool MLIRCodeGenContext::runTypeInference() {
 }
 
 bool MLIRCodeGenContext::lowerToStandard() {
-  if (!module_ || !*module_) {
-    error_ = "No module to lower";
+  if (!module || !*module) {
+    error = "No module to lower";
     return false;
   }
 
-  PassManager pm(context_.get());
+  PassManager pm(context.get());
 
   // Add the Polang to Standard lowering pass
   pm.addPass(createPolangToStandardPass());
@@ -140,8 +141,8 @@ bool MLIRCodeGenContext::lowerToStandard() {
   // Run canonicalization
   pm.addPass(createCanonicalizerPass());
 
-  if (failed(pm.run(**module_))) {
-    error_ = "Failed to lower Polang dialect to standard dialects";
+  if (failed(pm.run(**module))) {
+    error = "Failed to lower Polang dialect to standard dialects";
     return false;
   }
 
@@ -149,12 +150,12 @@ bool MLIRCodeGenContext::lowerToStandard() {
 }
 
 bool MLIRCodeGenContext::lowerToLLVM() {
-  if (!module_ || !*module_) {
-    error_ = "No module to lower";
+  if (!module || !*module) {
+    error = "No module to lower";
     return false;
   }
 
-  PassManager pm(context_.get());
+  PassManager pm(context.get());
 
   // Lower SCF to CF
   pm.addPass(createConvertSCFToCFPass());
@@ -168,8 +169,8 @@ bool MLIRCodeGenContext::lowerToLLVM() {
   // Reconcile unrealized casts
   pm.addPass(createReconcileUnrealizedCastsPass());
 
-  if (failed(pm.run(**module_))) {
-    error_ = "Failed to lower to LLVM dialect";
+  if (failed(pm.run(**module))) {
+    error = "Failed to lower to LLVM dialect";
     return false;
   }
 
@@ -177,14 +178,14 @@ bool MLIRCodeGenContext::lowerToLLVM() {
 }
 
 void MLIRCodeGenContext::printMLIR(llvm::raw_ostream& os) {
-  if (module_ && *module_) {
-    (*module_)->print(os);
+  if (module && *module) {
+    (*module)->print(os);
   }
 }
 
 bool MLIRCodeGenContext::printLLVMIR(llvm::raw_ostream& os) {
-  if (!module_ || !*module_) {
-    error_ = "No module to translate";
+  if (!module || !*module) {
+    error = "No module to translate";
     return false;
   }
 
@@ -195,9 +196,9 @@ bool MLIRCodeGenContext::printLLVMIR(llvm::raw_ostream& os) {
   llvm::LLVMContext llvmContext;
 
   // Translate to LLVM IR
-  auto llvmModule = translateModuleToLLVMIR(**module_, llvmContext);
+  auto llvmModule = translateModuleToLLVMIR(**module, llvmContext);
   if (!llvmModule) {
-    error_ = "Failed to translate MLIR to LLVM IR";
+    error = "Failed to translate MLIR to LLVM IR";
     return false;
   }
 
@@ -206,8 +207,8 @@ bool MLIRCodeGenContext::printLLVMIR(llvm::raw_ostream& os) {
 }
 
 bool MLIRCodeGenContext::runCode(int64_t& result) {
-  if (!module_ || !*module_) {
-    error_ = "No module to execute";
+  if (!module || !*module) {
+    error = "No module to execute";
     return false;
   }
 
@@ -221,10 +222,10 @@ bool MLIRCodeGenContext::runCode(int64_t& result) {
   ExecutionEngineOptions options;
   options.transformer = optPipeline;
 
-  auto maybeEngine = ExecutionEngine::create(**module_, options);
+  auto maybeEngine = ExecutionEngine::create(**module, options);
   if (!maybeEngine) {
-    error_ = "Failed to create execution engine: " +
-             llvm::toString(maybeEngine.takeError());
+    error = "Failed to create execution engine: " +
+            llvm::toString(maybeEngine.takeError());
     return false;
   }
 
@@ -238,7 +239,7 @@ bool MLIRCodeGenContext::runCode(int64_t& result) {
 
   auto invocationResult = engine->invokePacked("__polang_entry", args);
   if (invocationResult) {
-    error_ = "Execution failed: " + llvm::toString(std::move(invocationResult));
+    error = "Execution failed: " + llvm::toString(std::move(invocationResult));
     return false;
   }
 
@@ -247,25 +248,31 @@ bool MLIRCodeGenContext::runCode(int64_t& result) {
 }
 
 std::string MLIRCodeGenContext::getResolvedReturnType() const {
-  if (!module_ || !*module_)
+  if (!module || !*module) {
     return "unknown";
+  }
 
   // Find the __polang_entry function
-  auto entryFunc = (*module_)->lookupSymbol<polang::FuncOp>("__polang_entry");
-  if (!entryFunc)
+  auto entryFunc = (*module)->lookupSymbol<polang::FuncOp>("__polang_entry");
+  if (!entryFunc) {
     return "unknown";
+  }
 
   FunctionType funcType = entryFunc.getFunctionType();
-  if (funcType.getNumResults() == 0)
+  if (funcType.getNumResults() == 0) {
     return "void";
+  }
 
   Type returnType = funcType.getResult(0);
-  if (isa<polang::IntType>(returnType))
+  if (isa<polang::IntType>(returnType)) {
     return "int";
-  if (isa<polang::DoubleType>(returnType))
+  }
+  if (isa<polang::DoubleType>(returnType)) {
     return "double";
-  if (isa<polang::BoolType>(returnType))
+  }
+  if (isa<polang::BoolType>(returnType)) {
     return "bool";
+  }
 
   return "unknown";
 }

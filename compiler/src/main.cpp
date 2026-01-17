@@ -13,7 +13,8 @@ static void printUsage(const char* progName) {
   std::cerr << "Usage: " << progName << " [options] [file]\n";
   std::cerr << "Options:\n";
   std::cerr << "  --dump-ast      Dump AST and exit (no code generation)\n";
-  std::cerr << "  --emit-mlir     Emit Polang dialect MLIR instead of LLVM IR\n";
+  std::cerr
+      << "  --emit-mlir     Emit Polang dialect MLIR instead of LLVM IR\n";
   std::cerr << "  --help          Show this help message\n";
 }
 

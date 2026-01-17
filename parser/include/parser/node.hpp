@@ -2,6 +2,7 @@
 #define POLANG_NODE_HPP
 
 #include <string>
+#include <utility>
 #include <vector>
 
 class Visitor;
@@ -10,10 +11,10 @@ class NExpression;
 class NVariableDeclaration;
 class NFunctionDeclaration;
 
-typedef std::vector<NStatement*> StatementList;
-typedef std::vector<NExpression*> ExpressionList;
-typedef std::vector<NVariableDeclaration*> VariableList;
-typedef std::vector<std::string> StringList;
+using StatementList = std::vector<NStatement*>;
+using ExpressionList = std::vector<NExpression*>;
+using VariableList = std::vector<NVariableDeclaration*>;
+using StringList = std::vector<std::string>;
 
 // Union type for let bindings (can be variable or function)
 struct NLetBinding {
@@ -26,12 +27,12 @@ struct NLetBinding {
       : isFunction(true), var(nullptr), func(f) {}
 };
 
-typedef std::vector<NLetBinding*> LetBindingList;
+using LetBindingList = std::vector<NLetBinding*>;
 
 // clang-format off
 class Node {
 public:
-  virtual ~Node() noexcept {}
+  virtual ~Node() noexcept = default;
   virtual void accept(Visitor &visitor) const = 0;
 };
 
@@ -63,7 +64,7 @@ public:
 class NIdentifier : public NExpression {
 public:
   std::string name;
-  NIdentifier(const std::string &name) : name(name) {}
+  NIdentifier(std::string name) : name(std::move(name)) {}
   void accept(Visitor &visitor) const override;
 };
 
@@ -71,31 +72,35 @@ public:
 class NQualifiedName : public NExpression {
 public:
   StringList parts;  // ["Math", "add"] or ["Math", "Internal", "helper"]
-  NQualifiedName(const StringList &parts) : parts(parts) {}
+  NQualifiedName(StringList parts) : parts(std::move(parts)) {}
   // Convenience constructor from single identifier
-  NQualifiedName(const std::string &name) : parts({name}) {}
+  NQualifiedName(std::string name) : parts({std::move(name)}) {}
   // Get the full qualified name as a string (e.g., "Math.add")
-  std::string fullName() const {
+  [[nodiscard]] std::string fullName() const {
     std::string result;
     for (size_t i = 0; i < parts.size(); ++i) {
-      if (i > 0) result += ".";
+      if (i > 0) {
+        result += ".";
+      }
       result += parts[i];
     }
     return result;
   }
   // Get mangled name for MLIR (e.g., "Math$$add")
-  std::string mangledName() const {
+  [[nodiscard]] std::string mangledName() const {
     std::string result;
     for (size_t i = 0; i < parts.size(); ++i) {
-      if (i > 0) result += "$$";
+      if (i > 0) {
+        result += "$$";
+      }
       result += parts[i];
     }
     return result;
   }
   // Check if this is a simple (unqualified) name
-  bool isSimple() const { return parts.size() == 1; }
+  [[nodiscard]] bool isSimple() const { return parts.size() == 1; }
   // Get the simple name (last part)
-  const std::string &simpleName() const { return parts.back(); }
+  [[nodiscard]] const std::string &simpleName() const { return parts.back(); }
   void accept(Visitor &visitor) const override;
 };
 
@@ -111,8 +116,10 @@ public:
   NMethodCall(const NQualifiedName &qid, const ExpressionList &arguments)
       : id(*new NIdentifier(qid.simpleName())), qualifiedId(&qid), arguments(arguments) {}
   // Get the effective function name (mangled if qualified)
-  std::string effectiveName() const {
-    if (qualifiedId) return qualifiedId->mangledName();
+  [[nodiscard]] std::string effectiveName() const {
+    if (qualifiedId != nullptr) {
+      return qualifiedId->mangledName();
+    }
     return id.name;
   }
   void accept(Visitor &visitor) const override;
@@ -139,7 +146,7 @@ public:
 class NBlock : public NExpression {
 public:
   StatementList statements;
-  NBlock() {}
+  NBlock() = default;
   void accept(Visitor &visitor) const override;
 };
 
@@ -213,12 +220,12 @@ public:
   StringList exports;        // Haskell-style export list from module header
   StatementList members;     // Functions, variables, nested modules
   // Constructor with exports
-  NModuleDeclaration(const NIdentifier &name, const StringList &exports,
-                     const StatementList &members)
-      : name(name), exports(exports), members(members) {}
+  NModuleDeclaration(const NIdentifier &name, StringList exports,
+                     StatementList members)
+      : name(name), exports(std::move(exports)), members(std::move(members)) {}
   // Constructor without exports (all private)
-  NModuleDeclaration(const NIdentifier &name, const StatementList &members)
-      : name(name), exports(), members(members) {}
+  NModuleDeclaration(const NIdentifier &name, StatementList members)
+      : name(name), members(std::move(members)) {}
   void accept(Visitor &visitor) const override;
 };
 
@@ -234,15 +241,15 @@ enum class ImportKind {
 struct ImportItem {
   std::string name;   // Original name in the module
   std::string alias;  // Alias (empty if no alias)
-  ImportItem(const std::string &name, const std::string &alias = "")
-      : name(name), alias(alias) {}
+  ImportItem(std::string name, std::string alias = "")
+      : name(std::move(name)), alias(std::move(alias)) {}
   // Get the effective name to use in code
-  std::string effectiveName() const {
+  [[nodiscard]] std::string effectiveName() const {
     return alias.empty() ? name : alias;
   }
 };
 
-typedef std::vector<ImportItem> ImportItemList;
+using ImportItemList = std::vector<ImportItem>;
 
 class NImportStatement : public NStatement {
 public:
@@ -254,13 +261,14 @@ public:
   NImportStatement(const NQualifiedName &modulePath)
       : kind(ImportKind::Module), modulePath(modulePath) {}
   // Constructor for "import Math as M"
-  NImportStatement(const NQualifiedName &modulePath, const std::string &alias)
-      : kind(ImportKind::ModuleAlias), modulePath(modulePath), alias(alias) {}
+  NImportStatement(const NQualifiedName &modulePath, std::string alias)
+      : kind(ImportKind::ModuleAlias), modulePath(modulePath),
+        alias(std::move(alias)) {}
   // Constructor for "from Math import add, PI" or "from Math import *"
-  NImportStatement(const NQualifiedName &modulePath, const ImportItemList &items,
+  NImportStatement(const NQualifiedName &modulePath, ImportItemList items,
                    bool importAll = false)
       : kind(importAll ? ImportKind::All : ImportKind::Items),
-        modulePath(modulePath), items(items) {}
+        modulePath(modulePath), items(std::move(items)) {}
   void accept(Visitor &visitor) const override;
 };
 // clang-format on

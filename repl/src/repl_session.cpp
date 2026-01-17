@@ -16,14 +16,14 @@ ReplSession::ReplSession() noexcept = default;
 ReplSession::~ReplSession() noexcept = default;
 
 bool ReplSession::initialize() {
-  if (initialized_) {
+  if (initialized) {
     return true;
   }
 
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
 
-  initialized_ = true;
+  initialized = true;
   return true;
 }
 
@@ -32,12 +32,12 @@ bool ReplSession::isInputIncomplete(const std::string& input) noexcept {
 }
 
 EvalResult ReplSession::evaluate(const std::string& input) {
-  if (!initialized_) {
+  if (!initialized) {
     return EvalResult::error("REPL session not initialized");
   }
 
   // Combine accumulated code with new input
-  const std::string fullCode = accumulatedCode_ + input;
+  const std::string fullCode = accumulatedCode + input;
 
   // Parse the combined input
   NBlock* ast = polang_parse(fullCode);
@@ -109,7 +109,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   }
 
   // Update accumulated code on success
-  accumulatedCode_ = fullCode + "\n";
+  accumulatedCode = fullCode + "\n";
 
   // Only return a value if the last statement was an expression
   if (lastIsExpression) {

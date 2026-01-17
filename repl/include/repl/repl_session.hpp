@@ -39,10 +39,10 @@ public:
   static bool isInputIncomplete(const std::string& input) noexcept;
 
 private:
-  bool initialized_ = false;
+  bool initialized = false;
 
   // Accumulated source code from previous successful evaluations
-  std::string accumulatedCode_ = "";
+  std::string accumulatedCode;
 };
 
 #endif // POLANG_REPL_SESSION_HPP

@@ -19,7 +19,7 @@ public:
     std::size_t i = 0;
     while (i < input.size()) {
       // Skip whitespace
-      if (std::isspace(static_cast<unsigned char>(input[i]))) {
+      if (std::isspace(static_cast<unsigned char>(input[i])) != 0) {
         ++i;
         continue;
       }
@@ -39,11 +39,11 @@ public:
       }
 
       // Check for keywords and identifiers
-      if (std::isalpha(static_cast<unsigned char>(input[i])) ||
+      if (std::isalpha(static_cast<unsigned char>(input[i])) != 0 ||
           input[i] == '_') {
         const std::size_t start = i;
         while (i < input.size() &&
-               (std::isalnum(static_cast<unsigned char>(input[i])) ||
+               (std::isalnum(static_cast<unsigned char>(input[i])) != 0 ||
                 input[i] == '_')) {
           ++i;
         }

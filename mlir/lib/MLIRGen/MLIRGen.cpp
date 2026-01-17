@@ -44,20 +44,18 @@ namespace {
 
 class MLIRGenVisitor : public Visitor {
 public:
-  MLIRGenVisitor(MLIRContext& context, bool emitTypeVars = false)
-      : builder(&context), emitTypeVars_(emitTypeVars) {
+  MLIRGenVisitor(MLIRContext& context, bool /*emitTypeVars*/ = false)
+      : builder(&context) {
     // Create a new module
     module = ModuleOp::create(builder.getUnknownLoc());
   }
 
   /// Generate a fresh type variable
-  Type freshTypeVar() {
-    return builder.getType<TypeVarType>(nextTypeVarId_++);
-  }
+  Type freshTypeVar() { return builder.getType<TypeVarType>(nextTypeVarId_++); }
 
   /// Get a Polang type from annotation, or a fresh type variable if none
   Type getTypeOrFresh(const NIdentifier* typeAnnotation) {
-    if (typeAnnotation) {
+    if (typeAnnotation != nullptr) {
       return getPolangType(typeAnnotation->name);
     }
     // No annotation - always emit type variable for polymorphic inference
@@ -80,12 +78,7 @@ public:
     // Skip module verification since type variables may be present.
     // Type inference pass will resolve them and verification will happen later.
     // We keep verification disabled to allow polymorphic types.
-    if (false) { // Disabled: verification happens after type inference
-      if (failed(verify(module))) {
-        module.emitError("module verification failed");
-        return nullptr;
-      }
-    }
+    // Note: Verification is intentionally disabled here.
 
     return module;
   }
@@ -149,8 +142,9 @@ public:
     SmallVector<Value> args;
     for (const auto* arg : node.arguments) {
       arg->accept(*this);
-      if (!result)
+      if (!result) {
         return;
+      }
       args.push_back(result);
     }
 
@@ -198,14 +192,16 @@ public:
 
   void visit(const NBinaryOperator& node) override {
     node.lhs.accept(*this);
-    if (!result)
+    if (!result) {
       return;
+    }
     Value lhs = result;
     std::string lhsType = resultType;
 
     node.rhs.accept(*this);
-    if (!result)
+    if (!result) {
       return;
+    }
     Value rhs = result;
 
     // Arithmetic operations - use LHS type as result type
@@ -252,8 +248,9 @@ public:
   void visit(const NAssignment& node) override {
     // Evaluate RHS
     node.rhs.accept(*this);
-    if (!result)
+    if (!result) {
       return;
+    }
     Value value = result;
 
     // Get the alloca for the variable
@@ -276,8 +273,9 @@ public:
 
     for (const auto* stmt : node.statements) {
       stmt->accept(*this);
-      if (result)
+      if (result) {
         lastValue = result;
+      }
     }
 
     result = lastValue;
@@ -286,8 +284,9 @@ public:
   void visit(const NIfExpression& node) override {
     // Evaluate condition
     node.condition.accept(*this);
-    if (!result)
+    if (!result) {
       return;
+    }
     Value condition = result;
 
     // Infer result type from the type checker
@@ -303,8 +302,9 @@ public:
       OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
       node.thenExpr.accept(*this);
-      if (result)
+      if (result) {
         builder.create<YieldOp>(loc(), result);
+      }
     }
 
     // Generate else region
@@ -312,8 +312,9 @@ public:
       OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
       node.elseExpr.accept(*this);
-      if (result)
+      if (result) {
         builder.create<YieldOp>(loc(), result);
+      }
     }
 
     result = ifOp.getResult();
@@ -346,8 +347,9 @@ public:
     const std::string varName = mangledName(node.id.name);
 
     // Determine the type
-    std::string typeName = node.type ? node.type->name : TypeNames::INT;
-    if (node.assignmentExpr) {
+    std::string typeName =
+        node.type != nullptr ? node.type->name : TypeNames::INT;
+    if (node.assignmentExpr != nullptr) {
       // Infer type from assignment
       node.assignmentExpr->accept(*this);
       typeName = resultType;
@@ -362,7 +364,7 @@ public:
       auto alloca = builder.create<AllocaOp>(loc(), memRefType, varName,
                                              polangType, node.isMutable);
 
-      if (node.assignmentExpr && result) {
+      if (node.assignmentExpr != nullptr && result) {
         builder.create<StoreOp>(loc(), result, alloca);
       }
 
@@ -409,7 +411,7 @@ public:
 
     // Return type - use type variable if not specified
     Type returnType = getTypeOrFresh(node.type);
-    if (node.type) {
+    if (node.type != nullptr) {
       functionReturnTypes[funcName] = node.type->name;
     }
     functionReturnMLIRTypes[funcName] = returnType;
@@ -441,7 +443,7 @@ public:
       const auto* arg = node.arguments[i];
       argValues[arg->id.name] = entryBlock->getArgument(argIdx);
       typeVarTable[arg->id.name] = argMLIRTypes[i];
-      if (arg->type) {
+      if (arg->type != nullptr) {
         typeTable[arg->id.name] = arg->type->name;
       }
       ++argIdx;
@@ -452,7 +454,7 @@ public:
       const auto* capture = node.captures[i];
       argValues[capture->id.name] = entryBlock->getArgument(argIdx);
       typeVarTable[capture->id.name] = captureMLIRTypes[i];
-      if (capture->type) {
+      if (capture->type != nullptr) {
         typeTable[capture->id.name] = capture->type->name;
       }
       ++argIdx;
@@ -569,9 +571,6 @@ private:
   ModuleOp module;
   TypeChecker typeChecker;
 
-  // Whether to emit type variables for untyped positions (polymorphic mode)
-  bool emitTypeVars_;
-
   // Type variable counter for generating fresh type variables
   uint64_t nextTypeVarId_ = 0;
 
@@ -583,7 +582,7 @@ private:
   std::vector<std::string> currentModulePath_;
 
   // Get mangled name for a symbol within current module context
-  std::string mangledName(const std::string& name) const {
+  [[nodiscard]] std::string mangledName(const std::string& name) const {
     if (currentModulePath_.empty()) {
       return name;
     }
@@ -600,11 +599,14 @@ private:
   std::map<std::string, Value> argValues;       // Function arguments
   std::map<std::string, Value> immutableValues; // Immutable variable SSA values
   std::map<std::string, std::string> typeTable; // Variable types
-  std::map<std::string, Type> typeVarTable;     // Variable types as MLIR types (for type vars)
+  std::map<std::string, Type>
+      typeVarTable; // Variable types as MLIR types (for type vars)
   std::map<std::string, std::vector<std::string>> functionCaptures;
   std::map<std::string, std::string> functionReturnTypes;
-  std::map<std::string, Type> functionReturnMLIRTypes; // Function return types as MLIR types
-  std::map<std::string, std::string> importedSymbols;  // local name -> mangled name
+  std::map<std::string, Type>
+      functionReturnMLIRTypes; // Function return types as MLIR types
+  std::map<std::string, std::string>
+      importedSymbols; // local name -> mangled name
 
   /// RAII helper class for scoped symbol table management.
   /// Automatically saves and restores symbol tables when entering/exiting
@@ -680,14 +682,18 @@ private:
   }
 
   Type getPolangType(const std::string& typeName) {
-    if (typeName == TypeNames::INT)
+    if (typeName == TypeNames::INT) {
       return builder.getType<IntType>();
-    if (typeName == TypeNames::DOUBLE)
+    }
+    if (typeName == TypeNames::DOUBLE) {
       return builder.getType<DoubleType>();
-    if (typeName == TypeNames::BOOL)
+    }
+    if (typeName == TypeNames::BOOL) {
       return builder.getType<BoolType>();
-    if (typeName == TypeNames::TYPEVAR)
+    }
+    if (typeName == TypeNames::TYPEVAR) {
       return freshTypeVar();
+    }
     // Default to int
     return builder.getType<IntType>();
   }
@@ -707,12 +713,15 @@ private:
   }
 
   Type convertPolangType(Type polangType) {
-    if (isa<IntType>(polangType))
+    if (isa<IntType>(polangType)) {
       return builder.getI64Type();
-    if (isa<DoubleType>(polangType))
+    }
+    if (isa<DoubleType>(polangType)) {
       return builder.getF64Type();
-    if (isa<BoolType>(polangType))
+    }
+    if (isa<BoolType>(polangType)) {
       return builder.getI1Type();
+    }
     return builder.getI64Type();
   }
 
@@ -763,8 +772,9 @@ mlir::OwningOpRef<mlir::ModuleOp> polang::mlirGen(mlir::MLIRContext& context,
 
   MLIRGenVisitor generator(context, emitTypeVars);
   ModuleOp module = generator.generate(moduleAST);
-  if (!module)
+  if (!module) {
     return nullptr;
+  }
 
   return module;
 }

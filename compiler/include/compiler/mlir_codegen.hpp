@@ -14,14 +14,13 @@
 namespace mlir {
 class MLIRContext;
 class ModuleOp;
-template <typename T>
-class OwningOpRef;
+template <typename T> class OwningOpRef;
 } // namespace mlir
 
 namespace llvm {
 class LLVMContext;
 class raw_ostream;
-}
+} // namespace llvm
 
 class NBlock;
 
@@ -38,7 +37,7 @@ public:
   /// If emitTypeVars is true, untyped positions will emit type variables
   /// for polymorphic type inference at the MLIR level.
   /// Returns true on success.
-  bool generateCode(const NBlock &ast, bool emitTypeVars = false);
+  bool generateCode(const NBlock& ast, bool emitTypeVars = false);
 
   /// Run type inference pass to resolve type variables.
   /// Must be called after generateCode() when emitTypeVars was true.
@@ -53,30 +52,30 @@ public:
   bool lowerToLLVM();
 
   /// Print the current MLIR module.
-  void printMLIR(llvm::raw_ostream &os);
+  void printMLIR(llvm::raw_ostream& os);
 
   /// Convert to LLVM IR and print.
   /// Must be called after lowerToLLVM().
-  bool printLLVMIR(llvm::raw_ostream &os);
+  bool printLLVMIR(llvm::raw_ostream& os);
 
   /// Execute the code via JIT and return the result.
   /// Must be called after lowerToLLVM().
   /// Returns the result of the main function.
-  bool runCode(int64_t &result);
+  bool runCode(int64_t& result);
 
   /// Get the resolved return type name of the entry function.
   /// Must be called after runTypeInference().
   /// Returns "int", "double", "bool", or "unknown".
-  std::string getResolvedReturnType() const;
+  [[nodiscard]] std::string getResolvedReturnType() const;
 
   /// Get the last error message.
-  const std::string &getError() const { return error_; }
+  [[nodiscard]] const std::string& getError() const { return error; }
 
 private:
-  std::unique_ptr<mlir::MLIRContext> context_;
-  std::unique_ptr<llvm::LLVMContext> llvmContext_;
-  std::unique_ptr<mlir::OwningOpRef<mlir::ModuleOp>> module_;
-  std::string error_;
+  std::unique_ptr<mlir::MLIRContext> context;
+  std::unique_ptr<llvm::LLVMContext> llvmContext;
+  std::unique_ptr<mlir::OwningOpRef<mlir::ModuleOp>> module;
+  std::string error;
 
   bool initializeContext();
 };
