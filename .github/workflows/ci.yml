@@ -1,0 +1,175 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}-dev
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/${{ github.repository }}-dev:latest
+      options: --user root
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+        build_type: [Debug, Release]
+
+    name: Build (${{ matrix.compiler }}, ${{ matrix.build_type }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set compiler
+        run: |
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            echo "CC=clang-20" >> $GITHUB_ENV
+            echo "CXX=clang++-20" >> $GITHUB_ENV
+          else
+            echo "CC=gcc" >> $GITHUB_ENV
+            echo "CXX=g++" >> $GITHUB_ENV
+          fi
+
+      - name: Configure
+        run: |
+          cmake -S. -Bbuild \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Run unit tests
+        run: ctest --test-dir build --output-on-failure -j$(nproc)
+
+      - name: Run example programs
+        run: |
+          for f in example/*.po; do
+            echo "=== $(basename $f) ==="
+            ./build/bin/PolangRepl "$f"
+          done
+
+  sanitizers:
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/${{ github.repository }}-dev:latest
+      options: --user root
+    strategy:
+      matrix:
+        sanitizer: [address, undefined]
+
+    name: Sanitizer (${{ matrix.sanitizer }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure with ${{ matrix.sanitizer }} sanitizer
+        run: |
+          cmake -S. -Bbuild \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=clang-20 \
+            -DCMAKE_CXX_COMPILER=clang++-20 \
+            -DCMAKE_CXX_FLAGS="-fsanitize=${{ matrix.sanitizer }} -fno-omit-frame-pointer -g" \
+            -DCMAKE_C_FLAGS="-fsanitize=${{ matrix.sanitizer }} -fno-omit-frame-pointer -g" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=${{ matrix.sanitizer }}" \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Run unit tests
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build --output-on-failure -j$(nproc)
+
+      - name: Run example programs
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          for f in example/*.po; do
+            echo "=== $(basename $f) ==="
+            ./build/bin/PolangRepl "$f"
+          done
+
+  coverage:
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/${{ github.repository }}-dev:latest
+      options: --user root
+    name: Code Coverage
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure with coverage
+        run: |
+          cmake -S. -Bbuild \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DPOLANG_ENABLE_COVERAGE=ON \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure -j$(nproc)
+
+      - name: Generate coverage report
+        run: cmake --build build --target coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: build/coverage.info
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  format-check:
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/${{ github.repository }}-dev:latest
+      options: --user root
+    name: Format Check
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check formatting
+        run: ./scripts/run-clang-format.sh --check
+
+  lint:
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/${{ github.repository }}-dev:latest
+      options: --user root
+    name: Clang-Tidy
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          cmake -S. -Bbuild \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+
+      - name: Run clang-tidy
+        run: ./scripts/run-clang-tidy.sh

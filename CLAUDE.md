@@ -248,6 +248,9 @@ The HTML report is generated at `build/coverage_html/index.html`.
 
 ```
 polang/
+├── .github/workflows/          # GitHub Actions CI/CD
+│   ├── ci.yml                  # Build, test, format, lint
+│   └── docker.yml              # Build dev container image
 ├── CMakeLists.txt              # Root CMake configuration
 ├── doc/                        # Documentation
 │   ├── syntax.md               # Language syntax reference

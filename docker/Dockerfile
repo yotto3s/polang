@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y \
     libzstd-dev \
     libz-dev \
     lcov \
+    python3 \
     && apt-get clean
 
 RUN wget https://apt.llvm.org/llvm.sh && \
