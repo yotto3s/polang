@@ -27,7 +27,12 @@ docker/run_docker_command.sh <command> [options]
 ## Essential Commands
 
 ```bash
-# Build (Debug)
+# Build using presets (recommended)
+cmake --preset clang-debug
+cmake --build --preset clang-debug
+ctest --preset clang-debug
+
+# Or build manually
 cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
 cmake --build build -j$(nproc)
 
@@ -43,6 +48,8 @@ ctest --test-dir build --output-on-failure
 # Verify examples work
 for f in example/*.po; do echo "=== $(basename $f) ==="; ./build/bin/PolangRepl "$f"; done
 ```
+
+Available presets: `default`, `gcc-debug`, `gcc-release`, `clang-debug`, `clang-release`, `asan`, `ubsan`, `coverage`, `lint`
 
 ## Code Style Summary
 

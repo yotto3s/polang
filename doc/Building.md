@@ -39,6 +39,38 @@ docker/docker_build.sh
 
 All commands should be run inside the Docker container (or with equivalent dependencies installed).
 
+### Using CMake Presets (Recommended)
+
+The project includes CMake presets that match CI configurations:
+
+```bash
+# List available presets
+cmake --list-presets
+
+# Configure, build, and test with a preset
+cmake --preset clang-debug
+cmake --build --preset clang-debug
+ctest --preset clang-debug
+```
+
+### Available Presets
+
+| Preset | Compiler | Build Type | Description |
+|--------|----------|------------|-------------|
+| `default` | System default | Debug | Quick local development |
+| `gcc-debug` | GCC | Debug | GCC Debug build |
+| `gcc-release` | GCC | Release | GCC Release build |
+| `clang-debug` | Clang-20 | Debug | Clang Debug build |
+| `clang-release` | Clang-20 | Release | Clang Release build |
+| `asan` | Clang-20 | Debug | AddressSanitizer enabled |
+| `ubsan` | Clang-20 | Debug | UndefinedBehaviorSanitizer enabled |
+| `coverage` | GCC | Debug | Code coverage enabled |
+| `lint` | System default | Debug | For clang-tidy (generates compile_commands.json) |
+
+Each preset creates a separate build directory: `build/<preset-name>/`
+
+### Manual Configuration
+
 ```bash
 # Configure Debug build (default)
 cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
