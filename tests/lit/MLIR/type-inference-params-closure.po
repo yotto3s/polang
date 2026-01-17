@@ -1,0 +1,14 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Captured variable with inferred parameter
+let base = 10
+; CHECK: {{.*}}polang.func @add_base(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+let add_base(x) = x + base
+
+; Double captured variable with inferred parameter
+let factor = 2.5
+; CHECK: {{.*}}polang.func @scale(%{{.*}}: !polang.double) -> !polang.double{{.*}}
+let scale(x) = x * factor
+
+; Entry point
+0

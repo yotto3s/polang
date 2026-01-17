@@ -1,0 +1,7 @@
+; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+
+; Multiple unused parameters - should report errors for both
+; CHECK: {{.*}}Cannot infer type of parameter 'x'{{.*}}
+; CHECK: {{.*}}Cannot infer type of parameter 'y'{{.*}}
+let both_unused(x, y) = 42
+both_unused(1, 2)

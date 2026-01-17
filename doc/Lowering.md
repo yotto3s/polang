@@ -80,6 +80,8 @@ Type inference is performed at the AST level before MLIR generation, ensuring al
 |-----------|------------|---------|
 | `polang.cmp` | `eq`, `ne`, `lt`, `le`, `gt`, `ge` | `%2 = polang.cmp gt, %0, %1 : !polang.int` |
 
+**Note:** Comparison operations only support numeric types (`!polang.int` and `!polang.double`). Boolean values cannot be compared with `==` or `!=`; use conditional logic instead.
+
 #### Functions
 
 | Operation | Description | Example |

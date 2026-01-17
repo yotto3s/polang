@@ -1,0 +1,20 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Known function with explicit types
+; CHECK: {{.*}}polang.func @double_int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+let double_int(x: int): int = x * 2
+
+; Infer parameter type from passing to known function
+; CHECK: {{.*}}polang.func @wrapper(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+let wrapper(y) = double_int(y)
+
+; Known function for double type
+; CHECK: {{.*}}polang.func @half_double(%{{.*}}: !polang.double) -> !polang.double{{.*}}
+let half_double(x: double): double = x / 2.0
+
+; Infer double parameter type from passing to known function
+; CHECK: {{.*}}polang.func @wrapper_double(%{{.*}}: !polang.double) -> !polang.double{{.*}}
+let wrapper_double(y) = half_double(y)
+
+; Entry point
+0

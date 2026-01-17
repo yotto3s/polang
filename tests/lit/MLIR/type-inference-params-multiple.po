@@ -1,0 +1,18 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Infer multiple int parameters - each param directly used with literal
+; CHECK: {{.*}}polang.func @add3(%{{.*}}: !polang.int, %{{.*}}: !polang.int, %{{.*}}: !polang.int) -> !polang.int{{.*}}
+let add3(a, b, c) = (a + 0) + (b + 0) + (c + 0)
+
+; Infer multiple double parameters - each param directly used with literal
+; CHECK: {{.*}}polang.func @scale3(%{{.*}}: !polang.double, %{{.*}}: !polang.double, %{{.*}}: !polang.double) -> !polang.double{{.*}}
+let scale3(a, b, c) = (a * 1.0) + (b * 1.0) + (c * 1.0)
+
+; Infer one param from another typed param (chained)
+; CHECK: {{.*}}polang.func @add_typed(%{{.*}}: !polang.int, %{{.*}}: !polang.int) -> !polang.int{{.*}}
+let add_typed(x: int, y) = x + y
+
+; Call functions to ensure they're emitted
+add3(1, 2, 3)
+scale3(1.0, 2.0, 3.0)
+add_typed(1, 2)

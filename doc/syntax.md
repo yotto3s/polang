@@ -164,7 +164,7 @@ let add(x: int, y) = x + y  ; y inferred as int (from + x)
 **Inference rules (top-level functions):**
 - `x + 1` or `x * 2` (integer literal) → x is `int`
 - `x + 1.0` or `x / 2.0` (double literal) → x is `double`
-- `x == true` or `x != false` → x is `bool`
+- `if x then ...` (used as condition) → x is `bool`
 - `x + y` where y has known type → x has same type
 - `f(x)` where f expects a type → x has that type
 
