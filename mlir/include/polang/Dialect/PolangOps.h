@@ -7,6 +7,12 @@
 #ifndef POLANG_DIALECT_POLANGOPS_H
 #define POLANG_DIALECT_POLANGOPS_H
 
+// Suppress Clang warnings from MLIR headers (OperationSupport.h)
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdangling-assignment-gsl"
+#endif
+
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -16,6 +22,10 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangTypes.h"

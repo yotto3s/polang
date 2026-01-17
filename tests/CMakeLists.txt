@@ -8,6 +8,12 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
+# Suppress Clang warnings in GoogleTest code
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  target_compile_options(gtest PRIVATE -Wno-covered-switch-default)
+  target_compile_options(gmock PRIVATE -Wno-covered-switch-default)
+endif()
+
 include(GoogleTest)
 
 # Common test utilities directory
