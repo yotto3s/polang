@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 // Standard library
+#include <memory>
 #include <string>
 
 // clang-format off
@@ -15,7 +16,7 @@
 // ============== Helper Functions ==============
 
 std::vector<TypeCheckError> checkTypes(const std::string& source) {
-  NBlock* block = polang_parse(source);
+  auto block = polang_parse(source);
   if (!block) {
     return {TypeCheckError("Parse error")};
   }

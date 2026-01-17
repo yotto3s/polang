@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 // Standard library
+#include <memory>
 #include <string>
 
 // clang-format off
@@ -15,8 +16,8 @@
 // clang-format on
 
 // Parse and return root block, fails test if null
-inline NBlock* parseOrFail(const std::string& source) {
-  NBlock* block = polang_parse(source);
+inline std::unique_ptr<NBlock> parseOrFail(const std::string& source) {
+  auto block = polang_parse(source);
   EXPECT_NE(block, nullptr) << "Failed to parse: " << source;
   return block;
 }
@@ -26,7 +27,7 @@ template <typename T> T* getFirstStatement(NBlock* block) {
   EXPECT_FALSE(block->statements.empty());
   if (block->statements.empty())
     return nullptr;
-  T* stmt = dynamic_cast<T*>(block->statements[0]);
+  T* stmt = dynamic_cast<T*>(block->statements[0].get());
   EXPECT_NE(stmt, nullptr) << "First statement is not of expected type";
   return stmt;
 }

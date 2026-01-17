@@ -1,6 +1,7 @@
 #ifndef POLANG_NODE_HPP
 #define POLANG_NODE_HPP
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -10,24 +11,26 @@ class NStatement;
 class NExpression;
 class NVariableDeclaration;
 class NFunctionDeclaration;
+class NIdentifier;
 
-using StatementList = std::vector<NStatement*>;
-using ExpressionList = std::vector<NExpression*>;
-using VariableList = std::vector<NVariableDeclaration*>;
+// Smart pointer type aliases for owning containers
+using StatementList = std::vector<std::unique_ptr<NStatement>>;
+using ExpressionList = std::vector<std::unique_ptr<NExpression>>;
+using VariableList = std::vector<std::unique_ptr<NVariableDeclaration>>;
 using StringList = std::vector<std::string>;
 
 // Union type for let bindings (can be variable or function)
 struct NLetBinding {
   bool isFunction;
-  NVariableDeclaration* var;
-  NFunctionDeclaration* func;
-  NLetBinding(NVariableDeclaration* v)
-      : isFunction(false), var(v), func(nullptr) {}
-  NLetBinding(NFunctionDeclaration* f)
-      : isFunction(true), var(nullptr), func(f) {}
+  std::unique_ptr<NVariableDeclaration> var;
+  std::unique_ptr<NFunctionDeclaration> func;
+  explicit NLetBinding(std::unique_ptr<NVariableDeclaration> v)
+      : isFunction(false), var(std::move(v)), func(nullptr) {}
+  explicit NLetBinding(std::unique_ptr<NFunctionDeclaration> f)
+      : isFunction(true), var(nullptr), func(std::move(f)) {}
 };
 
-using LetBindingList = std::vector<NLetBinding*>;
+using LetBindingList = std::vector<std::unique_ptr<NLetBinding>>;
 
 // clang-format off
 class Node {
@@ -43,38 +46,48 @@ class NStatement : public Node {};
 class NInteger : public NExpression {
 public:
   long long value;
-  NInteger(long long value) : value(value) {}
+  explicit NInteger(long long value) : value(value) {}
   void accept(Visitor &visitor) const override;
 };
 
 class NDouble : public NExpression {
 public:
   double value;
-  NDouble(double value) : value(value) {}
+  explicit NDouble(double value) : value(value) {}
   void accept(Visitor &visitor) const override;
 };
 
 class NBoolean : public NExpression {
 public:
   bool value;
-  NBoolean(bool value) : value(value) {}
+  explicit NBoolean(bool value) : value(value) {}
   void accept(Visitor &visitor) const override;
 };
 
 class NIdentifier : public NExpression {
 public:
   std::string name;
-  NIdentifier(std::string name) : name(std::move(name)) {}
+  explicit NIdentifier(std::string name) : name(std::move(name)) {}
   void accept(Visitor &visitor) const override;
+};
+
+// Capture entry for closures (owns its type and id via unique_ptr)
+struct CaptureEntry {
+  std::unique_ptr<NIdentifier> type;
+  std::unique_ptr<NIdentifier> id;
+  bool isMutable;
+  CaptureEntry(std::unique_ptr<NIdentifier> type, std::unique_ptr<NIdentifier> id,
+               bool isMutable)
+      : type(std::move(type)), id(std::move(id)), isMutable(isMutable) {}
 };
 
 // Qualified name for module access: Math.add, Math.Internal.helper
 class NQualifiedName : public NExpression {
 public:
   StringList parts;  // ["Math", "add"] or ["Math", "Internal", "helper"]
-  NQualifiedName(StringList parts) : parts(std::move(parts)) {}
+  explicit NQualifiedName(StringList parts) : parts(std::move(parts)) {}
   // Convenience constructor from single identifier
-  NQualifiedName(std::string name) : parts({std::move(name)}) {}
+  explicit NQualifiedName(std::string name) : parts({std::move(name)}) {}
   // Get the full qualified name as a string (e.g., "Math.add")
   [[nodiscard]] std::string fullName() const {
     std::string result;
@@ -106,21 +119,23 @@ public:
 
 class NMethodCall : public NExpression {
 public:
-  const NIdentifier &id;          // For backward compatibility
-  const NQualifiedName *qualifiedId;  // For qualified calls (optional)
+  std::unique_ptr<NIdentifier> id;          // For simple calls
+  std::unique_ptr<NQualifiedName> qualifiedId;  // For qualified calls (optional)
   ExpressionList arguments;
-  NMethodCall(const NIdentifier &id, const ExpressionList &arguments)
-      : id(id), qualifiedId(nullptr), arguments(arguments) {}
-  NMethodCall(const NIdentifier &id) : id(id), qualifiedId(nullptr) {}
+  NMethodCall(std::unique_ptr<NIdentifier> id, ExpressionList arguments)
+      : id(std::move(id)), qualifiedId(nullptr), arguments(std::move(arguments)) {}
+  explicit NMethodCall(std::unique_ptr<NIdentifier> id)
+      : id(std::move(id)), qualifiedId(nullptr) {}
   // Constructor for qualified calls
-  NMethodCall(const NQualifiedName &qid, const ExpressionList &arguments)
-      : id(*new NIdentifier(qid.simpleName())), qualifiedId(&qid), arguments(arguments) {}
+  NMethodCall(std::unique_ptr<NQualifiedName> qid, ExpressionList arguments)
+      : id(std::make_unique<NIdentifier>(qid->simpleName())),
+        qualifiedId(std::move(qid)), arguments(std::move(arguments)) {}
   // Get the effective function name (mangled if qualified)
   [[nodiscard]] std::string effectiveName() const {
     if (qualifiedId != nullptr) {
       return qualifiedId->mangledName();
     }
-    return id.name;
+    return id->name;
   }
   void accept(Visitor &visitor) const override;
 };
@@ -128,18 +143,20 @@ public:
 class NBinaryOperator : public NExpression {
 public:
   int op;
-  const NExpression &lhs;
-  const NExpression &rhs;
-  NBinaryOperator(const NExpression &lhs, int op, const NExpression &rhs)
-      : op(op), lhs(lhs), rhs(rhs) {}
+  std::unique_ptr<NExpression> lhs;
+  std::unique_ptr<NExpression> rhs;
+  NBinaryOperator(std::unique_ptr<NExpression> lhs, int op,
+                  std::unique_ptr<NExpression> rhs)
+      : op(op), lhs(std::move(lhs)), rhs(std::move(rhs)) {}
   void accept(Visitor &visitor) const override;
 };
 
 class NAssignment : public NExpression {
 public:
-  const NIdentifier &lhs;
-  const NExpression &rhs;
-  NAssignment(const NIdentifier &lhs, const NExpression &rhs) : lhs(lhs), rhs(rhs) {}
+  std::unique_ptr<NIdentifier> lhs;
+  std::unique_ptr<NExpression> rhs;
+  NAssignment(std::unique_ptr<NIdentifier> lhs, std::unique_ptr<NExpression> rhs)
+      : lhs(std::move(lhs)), rhs(std::move(rhs)) {}
   void accept(Visitor &visitor) const override;
 };
 
@@ -152,80 +169,90 @@ public:
 
 class NIfExpression : public NExpression {
 public:
-  const NExpression &condition;
-  const NExpression &thenExpr;
-  const NExpression &elseExpr;
-  NIfExpression(const NExpression &condition, const NExpression &thenExpr,
-                const NExpression &elseExpr)
-      : condition(condition), thenExpr(thenExpr), elseExpr(elseExpr) {}
+  std::unique_ptr<NExpression> condition;
+  std::unique_ptr<NExpression> thenExpr;
+  std::unique_ptr<NExpression> elseExpr;
+  NIfExpression(std::unique_ptr<NExpression> condition,
+                std::unique_ptr<NExpression> thenExpr,
+                std::unique_ptr<NExpression> elseExpr)
+      : condition(std::move(condition)), thenExpr(std::move(thenExpr)),
+        elseExpr(std::move(elseExpr)) {}
   void accept(Visitor &visitor) const override;
 };
 
 class NLetExpression : public NExpression {
 public:
   LetBindingList bindings;
-  const NExpression &body;
-  NLetExpression(const LetBindingList &bindings, const NExpression &body)
-      : bindings(bindings), body(body) {}
+  std::unique_ptr<NExpression> body;
+  NLetExpression(LetBindingList bindings, std::unique_ptr<NExpression> body)
+      : bindings(std::move(bindings)), body(std::move(body)) {}
   void accept(Visitor &visitor) const override;
 };
 
 class NExpressionStatement : public NStatement {
 public:
-  const NExpression &expression;
-  NExpressionStatement(const NExpression &expression) : expression(expression) {}
+  std::unique_ptr<NExpression> expression;
+  explicit NExpressionStatement(std::unique_ptr<NExpression> expression)
+      : expression(std::move(expression)) {}
   void accept(Visitor &visitor) const override;
 };
 
 class NVariableDeclaration : public NStatement {
 public:
-  NIdentifier *type;  // nullptr when type should be inferred
-  NIdentifier &id;
-  NExpression *assignmentExpr;
+  std::unique_ptr<NIdentifier> type;  // nullptr when type should be inferred
+  std::unique_ptr<NIdentifier> id;
+  std::unique_ptr<NExpression> assignmentExpr;
   bool isMutable;  // true for 'let mut', false for 'let'
   // Constructor for inferred type (no annotation)
-  NVariableDeclaration(NIdentifier &id, NExpression *assignmentExpr,
+  NVariableDeclaration(std::unique_ptr<NIdentifier> id,
+                       std::unique_ptr<NExpression> assignmentExpr,
                        bool isMutable = false)
-      : type(nullptr), id(id), assignmentExpr(assignmentExpr),
+      : type(nullptr), id(std::move(id)), assignmentExpr(std::move(assignmentExpr)),
         isMutable(isMutable) {}
   // Constructor for explicit type annotation
-  NVariableDeclaration(NIdentifier *type, NIdentifier &id,
-                       NExpression *assignmentExpr, bool isMutable = false)
-      : type(type), id(id), assignmentExpr(assignmentExpr),
-        isMutable(isMutable) {}
+  NVariableDeclaration(std::unique_ptr<NIdentifier> type,
+                       std::unique_ptr<NIdentifier> id,
+                       std::unique_ptr<NExpression> assignmentExpr,
+                       bool isMutable = false)
+      : type(std::move(type)), id(std::move(id)),
+        assignmentExpr(std::move(assignmentExpr)), isMutable(isMutable) {}
   void accept(Visitor &visitor) const override;
 };
 
 class NFunctionDeclaration : public NStatement {
 public:
-  NIdentifier *type;  // nullptr when return type should be inferred
-  const NIdentifier &id;
+  std::unique_ptr<NIdentifier> type;  // nullptr when return type should be inferred
+  std::unique_ptr<NIdentifier> id;
   VariableList arguments;
-  NBlock &block;
-  VariableList captures;  // captured variables (filled by type checker)
+  std::unique_ptr<NBlock> block;
+  std::vector<CaptureEntry> captures;  // captured variables (filled by type checker)
   // Constructor for inferred return type
-  NFunctionDeclaration(const NIdentifier &id, const VariableList &arguments,
-                       NBlock &block)
-      : type(nullptr), id(id), arguments(arguments), block(block) {}
+  NFunctionDeclaration(std::unique_ptr<NIdentifier> id, VariableList arguments,
+                       std::unique_ptr<NBlock> block)
+      : type(nullptr), id(std::move(id)), arguments(std::move(arguments)),
+        block(std::move(block)) {}
   // Constructor for explicit return type
-  NFunctionDeclaration(NIdentifier *type, const NIdentifier &id,
-                       const VariableList &arguments, NBlock &block)
-      : type(type), id(id), arguments(arguments), block(block) {}
+  NFunctionDeclaration(std::unique_ptr<NIdentifier> type,
+                       std::unique_ptr<NIdentifier> id, VariableList arguments,
+                       std::unique_ptr<NBlock> block)
+      : type(std::move(type)), id(std::move(id)), arguments(std::move(arguments)),
+        block(std::move(block)) {}
   void accept(Visitor &visitor) const override;
 };
 
 class NModuleDeclaration : public NStatement {
 public:
-  const NIdentifier &name;
+  std::unique_ptr<NIdentifier> name;
   StringList exports;        // Haskell-style export list from module header
   StatementList members;     // Functions, variables, nested modules
   // Constructor with exports
-  NModuleDeclaration(const NIdentifier &name, StringList exports,
+  NModuleDeclaration(std::unique_ptr<NIdentifier> name, StringList exports,
                      StatementList members)
-      : name(name), exports(std::move(exports)), members(std::move(members)) {}
+      : name(std::move(name)), exports(std::move(exports)),
+        members(std::move(members)) {}
   // Constructor without exports (all private)
-  NModuleDeclaration(const NIdentifier &name, StatementList members)
-      : name(name), members(std::move(members)) {}
+  NModuleDeclaration(std::unique_ptr<NIdentifier> name, StatementList members)
+      : name(std::move(name)), members(std::move(members)) {}
   void accept(Visitor &visitor) const override;
 };
 
@@ -254,21 +281,21 @@ using ImportItemList = std::vector<ImportItem>;
 class NImportStatement : public NStatement {
 public:
   ImportKind kind;
-  const NQualifiedName &modulePath;  // Module being imported
+  std::unique_ptr<NQualifiedName> modulePath;  // Module being imported
   std::string alias;                  // For "import X as Y"
   ImportItemList items;               // For "from X import a, b"
   // Constructor for "import Math"
-  NImportStatement(const NQualifiedName &modulePath)
-      : kind(ImportKind::Module), modulePath(modulePath) {}
+  explicit NImportStatement(std::unique_ptr<NQualifiedName> modulePath)
+      : kind(ImportKind::Module), modulePath(std::move(modulePath)) {}
   // Constructor for "import Math as M"
-  NImportStatement(const NQualifiedName &modulePath, std::string alias)
-      : kind(ImportKind::ModuleAlias), modulePath(modulePath),
+  NImportStatement(std::unique_ptr<NQualifiedName> modulePath, std::string alias)
+      : kind(ImportKind::ModuleAlias), modulePath(std::move(modulePath)),
         alias(std::move(alias)) {}
   // Constructor for "from Math import add, PI" or "from Math import *"
-  NImportStatement(const NQualifiedName &modulePath, ImportItemList items,
+  NImportStatement(std::unique_ptr<NQualifiedName> modulePath, ImportItemList items,
                    bool importAll = false)
       : kind(importAll ? ImportKind::All : ImportKind::Items),
-        modulePath(modulePath), items(std::move(items)) {}
+        modulePath(std::move(modulePath)), items(std::move(items)) {}
   void accept(Visitor &visitor) const override;
 };
 // clang-format on

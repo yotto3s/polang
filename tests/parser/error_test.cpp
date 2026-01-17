@@ -3,6 +3,7 @@
 
 // Standard library
 #include <cstdio>
+#include <memory>
 #include <regex>
 #include <sstream>
 #include <string>
@@ -63,7 +64,7 @@ private:
 
 TEST(ErrorTest, SyntaxErrorAtEndOfLine) {
   StderrCapture capture;
-  NBlock* block = polang_parse("let x =");
+  auto block = polang_parse("let x =");
   std::string error = capture.getCaptured();
 
   // Error should mention line 1
@@ -76,7 +77,7 @@ TEST(ErrorTest, SyntaxErrorAtEndOfLine) {
 
 TEST(ErrorTest, SyntaxErrorOnSecondLine) {
   StderrCapture capture;
-  NBlock* block = polang_parse("let x: int = 5\nlet y =");
+  auto block = polang_parse("let x: int = 5\nlet y =");
   std::string error = capture.getCaptured();
 
   // Error should be on line 2
@@ -86,7 +87,7 @@ TEST(ErrorTest, SyntaxErrorOnSecondLine) {
 
 TEST(ErrorTest, SyntaxErrorOnThirdLine) {
   StderrCapture capture;
-  NBlock* block = polang_parse("let x: int = 1\nlet y: int = 2\nlet z =");
+  auto block = polang_parse("let x: int = 1\nlet y: int = 2\nlet z =");
   std::string error = capture.getCaptured();
 
   // Error should be on line 3
@@ -96,7 +97,7 @@ TEST(ErrorTest, SyntaxErrorOnThirdLine) {
 
 TEST(ErrorTest, SyntaxErrorColumnPosition) {
   StderrCapture capture;
-  NBlock* block = polang_parse("let longname: int = )");
+  auto block = polang_parse("let longname: int = )");
   std::string error = capture.getCaptured();
 
   // Error should be around column 21 (where ')' appears)
@@ -106,7 +107,7 @@ TEST(ErrorTest, SyntaxErrorColumnPosition) {
 
 TEST(ErrorTest, SyntaxErrorMissingThen) {
   StderrCapture capture;
-  NBlock* block = polang_parse("if 1 2 else 3");
+  auto block = polang_parse("if 1 2 else 3");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("syntax error") != std::string::npos)
@@ -117,7 +118,7 @@ TEST(ErrorTest, SyntaxErrorMissingThen) {
 
 TEST(ErrorTest, SyntaxErrorMissingElse) {
   StderrCapture capture;
-  NBlock* block = polang_parse("if 1 then 2");
+  auto block = polang_parse("if 1 then 2");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("syntax error") != std::string::npos)
@@ -126,7 +127,7 @@ TEST(ErrorTest, SyntaxErrorMissingElse) {
 
 TEST(ErrorTest, SyntaxErrorUnclosedParen) {
   StderrCapture capture;
-  NBlock* block = polang_parse("(1 + 2");
+  auto block = polang_parse("(1 + 2");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("syntax error") != std::string::npos)
@@ -135,7 +136,7 @@ TEST(ErrorTest, SyntaxErrorUnclosedParen) {
 
 TEST(ErrorTest, SyntaxErrorMismatchedParen) {
   StderrCapture capture;
-  NBlock* block = polang_parse("(1 + 2))");
+  auto block = polang_parse("(1 + 2))");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("syntax error") != std::string::npos)
@@ -146,7 +147,7 @@ TEST(ErrorTest, SyntaxErrorMismatchedParen) {
 
 TEST(ErrorTest, UnknownTokenAtStart) {
   StderrCapture capture;
-  NBlock* block = polang_parse("@");
+  auto block = polang_parse("@");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)
@@ -161,7 +162,7 @@ TEST(ErrorTest, UnknownTokenAtStart) {
 
 TEST(ErrorTest, UnknownTokenInMiddle) {
   StderrCapture capture;
-  NBlock* block = polang_parse("let x = @");
+  auto block = polang_parse("let x = @");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)
@@ -174,7 +175,7 @@ TEST(ErrorTest, UnknownTokenInMiddle) {
 
 TEST(ErrorTest, UnknownTokenOnSecondLine) {
   StderrCapture capture;
-  NBlock* block = polang_parse("let x: int = 5\n@");
+  auto block = polang_parse("let x: int = 5\n@");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)
@@ -187,7 +188,7 @@ TEST(ErrorTest, UnknownTokenOnSecondLine) {
 
 TEST(ErrorTest, UnknownTokenWithOffset) {
   StderrCapture capture;
-  NBlock* block = polang_parse("let x: int = 5\n    @");
+  auto block = polang_parse("let x: int = 5\n    @");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)
@@ -204,7 +205,7 @@ TEST(ErrorTest, UnknownTokenDifferentChars) {
 
   for (const char* ch : unknown_chars) {
     StderrCapture capture;
-    NBlock* block = polang_parse(ch);
+    auto block = polang_parse(ch);
     std::string error = capture.getCaptured();
 
     std::string expected_token = std::string("'") + ch + "'";
@@ -218,7 +219,7 @@ TEST(ErrorTest, UnknownTokenDifferentChars) {
 TEST(ErrorTest, MultipleErrorsOnDifferentLines) {
   // First error terminates lexing, so we only get one error
   StderrCapture capture;
-  NBlock* block = polang_parse("let x: int = @\nlet y: int = #");
+  auto block = polang_parse("let x: int = @\nlet y: int = #");
   std::string error = capture.getCaptured();
 
   // Should get at least the first error
@@ -236,7 +237,7 @@ TEST(ErrorTest, ValidCodeAfterError) {
 
   // Now parse valid code - it should work
   StderrCapture capture2;
-  NBlock* block = polang_parse("let x: int = 5");
+  auto block = polang_parse("let x: int = 5");
   std::string error2 = capture2.getCaptured();
 
   EXPECT_TRUE(error2.empty() || error2.find("error") == std::string::npos)
@@ -268,7 +269,7 @@ TEST(ErrorTest, LocationResetBetweenParses) {
 
 TEST(ErrorTest, ErrorInFunctionDeclaration) {
   StderrCapture capture;
-  NBlock* block = polang_parse("let add(x: int, y: int) = @");
+  auto block = polang_parse("let add(x: int, y: int) = @");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)
@@ -277,7 +278,7 @@ TEST(ErrorTest, ErrorInFunctionDeclaration) {
 
 TEST(ErrorTest, ErrorInNestedExpression) {
   StderrCapture capture;
-  NBlock* block = polang_parse("let x = (1 + (2 * @))");
+  auto block = polang_parse("let x = (1 + (2 * @))");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)
@@ -286,7 +287,7 @@ TEST(ErrorTest, ErrorInNestedExpression) {
 
 TEST(ErrorTest, ErrorInIfExpression) {
   StderrCapture capture;
-  NBlock* block = polang_parse("if @ then 1 else 0");
+  auto block = polang_parse("if @ then 1 else 0");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)

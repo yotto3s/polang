@@ -85,8 +85,27 @@ polang/
 The parser library handles lexical analysis, parsing, and type checking.
 
 - **Input**: Source code string via `polang_parse()` API
-- **Output**: AST (`NBlock*`)
+- **Output**: AST (`std::unique_ptr<NBlock>`)
 - **Built as**: Static library `libPolangParser.a`
+
+#### AST Ownership Model
+
+The AST uses `std::unique_ptr` for memory management, ensuring automatic cleanup with no memory leaks:
+
+- **Container ownership**: `StatementList`, `ExpressionList`, `VariableList`, and `LetBindingList` are all `std::vector<std::unique_ptr<T>>`, owning their elements
+- **Node ownership**: Parent nodes own their children via `std::unique_ptr` (e.g., `NBinaryOperator` owns its `lhs` and `rhs` expressions)
+- **Parser API**: `polang_parse()` returns `std::unique_ptr<NBlock>`, transferring ownership to the caller
+
+**Example usage:**
+```cpp
+#include "parser/parser_api.hpp"
+
+auto ast = polang_parse("let x = 5");
+if (ast) {
+    // Use ast->statements, etc.
+    // Memory automatically freed when ast goes out of scope
+}
+```
 
 **Key modules:**
 
@@ -520,6 +539,7 @@ At the call site, the captured value is passed as an extra argument:
 | Type | Location | Description |
 |------|----------|-------------|
 | `NBlock` | `node.hpp` | Root AST node containing statements |
+| `std::unique_ptr<NBlock>` | `parser_api.hpp` | Owned pointer returned by `polang_parse()` |
 | `MLIRCodeGenContext` | `mlir_codegen.hpp` | MLIR code generation context |
 | `Visitor` | `visitor.hpp` | Base class for AST visitors |
 | `ErrorReporter` | `error_reporter.hpp` | Unified error reporting |

@@ -103,13 +103,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure
-        run: |
-          cmake -S. -Bbuild \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+        run: cmake --preset lint
 
       - name: Run clang-tidy
-        run: ./scripts/run-clang-tidy.sh
+        run: ./scripts/run-clang-tidy.sh build/lint
 
   build-and-test:
     needs: [format-check, lint, build-image]
@@ -127,43 +124,28 @@ jobs:
       options: --user root
     strategy:
       matrix:
-        compiler: [gcc, clang]
-        build_type: [Debug, Release]
+        preset: [gcc-debug, gcc-release, clang-debug, clang-release]
 
-    name: Build (${{ matrix.compiler }}, ${{ matrix.build_type }})
+    name: Build (${{ matrix.preset }})
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set compiler
-        run: |
-          if [ "${{ matrix.compiler }}" = "clang" ]; then
-            echo "CC=clang-20" >> $GITHUB_ENV
-            echo "CXX=clang++-20" >> $GITHUB_ENV
-          else
-            echo "CC=gcc" >> $GITHUB_ENV
-            echo "CXX=g++" >> $GITHUB_ENV
-          fi
-
       - name: Configure
-        run: |
-          cmake -S. -Bbuild \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+        run: cmake --preset ${{ matrix.preset }}
 
       - name: Build
-        run: cmake --build build -j$(nproc)
+        run: cmake --build --preset ${{ matrix.preset }}
 
       - name: Run unit tests
-        run: ctest --test-dir build --output-on-failure -j$(nproc)
+        run: ctest --preset ${{ matrix.preset }}
 
       - name: Run example programs
         run: |
           for f in example/*.po; do
             echo "=== $(basename $f) ==="
-            ./build/bin/PolangRepl "$f"
+            ./build/${{ matrix.preset }}/bin/PolangRepl "$f"
           done
 
   sanitizers:
@@ -177,34 +159,22 @@ jobs:
       options: --user root
     strategy:
       matrix:
-        sanitizer: [address, undefined]
+        preset: [asan, ubsan]
 
-    name: Sanitizer (${{ matrix.sanitizer }})
+    name: Sanitizer (${{ matrix.preset }})
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure with ${{ matrix.sanitizer }} sanitizer
-        run: |
-          cmake -S. -Bbuild \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_C_COMPILER=clang-20 \
-            -DCMAKE_CXX_COMPILER=clang++-20 \
-            -DCMAKE_CXX_FLAGS="-fsanitize=${{ matrix.sanitizer }} -fno-omit-frame-pointer -g" \
-            -DCMAKE_C_FLAGS="-fsanitize=${{ matrix.sanitizer }} -fno-omit-frame-pointer -g" \
-            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=${{ matrix.sanitizer }}" \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
 
       - name: Build
-        run: cmake --build build -j$(nproc)
+        run: cmake --build --preset ${{ matrix.preset }}
 
       - name: Run unit tests
-        env:
-          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-        run: ctest --test-dir build --output-on-failure -j$(nproc)
+        run: ctest --preset ${{ matrix.preset }}
 
       - name: Run example programs
         env:
@@ -213,7 +183,7 @@ jobs:
         run: |
           for f in example/*.po; do
             echo "=== $(basename $f) ==="
-            ./build/bin/PolangRepl "$f"
+            ./build/${{ matrix.preset }}/bin/PolangRepl "$f"
           done
 
   coverage:
@@ -231,27 +201,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure with coverage
-        run: |
-          cmake -S. -Bbuild \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DPOLANG_ENABLE_COVERAGE=ON \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+      - name: Configure
+        run: cmake --preset coverage
 
       - name: Build
-        run: cmake --build build -j$(nproc)
+        run: cmake --build --preset coverage
 
       - name: Run tests
-        run: ctest --test-dir build --output-on-failure -j$(nproc)
+        run: ctest --preset coverage
 
       - name: Generate coverage report
-        run: cmake --build build --target coverage
+        run: cmake --build build/coverage --target coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: build/coverage.info
+          files: build/coverage/coverage.info
           fail_ci_if_error: false
           verbose: true
         env:

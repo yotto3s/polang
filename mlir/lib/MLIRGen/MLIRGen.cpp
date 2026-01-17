@@ -146,7 +146,7 @@ public:
 
     // Collect arguments
     SmallVector<Value> args;
-    for (const auto* arg : node.arguments) {
+    for (const auto& arg : node.arguments) {
       arg->accept(*this);
       if (!result) {
         return;
@@ -197,14 +197,14 @@ public:
   }
 
   void visit(const NBinaryOperator& node) override {
-    node.lhs.accept(*this);
+    node.lhs->accept(*this);
     if (!result) {
       return;
     }
     Value lhs = result;
     std::string lhsType = resultType;
 
-    node.rhs.accept(*this);
+    node.rhs->accept(*this);
     if (!result) {
       return;
     }
@@ -253,16 +253,16 @@ public:
 
   void visit(const NAssignment& node) override {
     // Evaluate RHS
-    node.rhs.accept(*this);
+    node.rhs->accept(*this);
     if (!result) {
       return;
     }
     Value value = result;
 
     // Get the alloca for the variable
-    auto it = symbolTable.find(node.lhs.name);
+    auto it = symbolTable.find(node.lhs->name);
     if (it == symbolTable.end()) {
-      emitError(loc()) << "Unknown variable in assignment: " << node.lhs.name;
+      emitError(loc()) << "Unknown variable in assignment: " << node.lhs->name;
       result = nullptr;
       return;
     }
@@ -277,7 +277,7 @@ public:
   void visit(const NBlock& node) override {
     Value lastValue = nullptr;
 
-    for (const auto* stmt : node.statements) {
+    for (const auto& stmt : node.statements) {
       stmt->accept(*this);
       if (result) {
         lastValue = result;
@@ -289,14 +289,14 @@ public:
 
   void visit(const NIfExpression& node) override {
     // Evaluate condition
-    node.condition.accept(*this);
+    node.condition->accept(*this);
     if (!result) {
       return;
     }
     Value condition = result;
 
     // Infer result type from the type checker
-    node.thenExpr.accept(*this);
+    node.thenExpr->accept(*this);
     std::string ifResultType = resultType;
 
     // Create if operation
@@ -307,7 +307,7 @@ public:
     {
       OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
-      node.thenExpr.accept(*this);
+      node.thenExpr->accept(*this);
       if (result) {
         builder.create<YieldOp>(loc(), result);
       }
@@ -317,7 +317,7 @@ public:
     {
       OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
-      node.elseExpr.accept(*this);
+      node.elseExpr->accept(*this);
       if (result) {
         builder.create<YieldOp>(loc(), result);
       }
@@ -332,7 +332,7 @@ public:
     SymbolTableScope scope(*this);
 
     // Process bindings
-    for (const auto* binding : node.bindings) {
+    for (const auto& binding : node.bindings) {
       if (binding->isFunction) {
         binding->func->accept(*this);
       } else {
@@ -341,16 +341,16 @@ public:
     }
 
     // Evaluate body
-    node.body.accept(*this);
+    node.body->accept(*this);
   }
 
   void visit(const NExpressionStatement& node) override {
-    node.expression.accept(*this);
+    node.expression->accept(*this);
   }
 
   void visit(const NVariableDeclaration& node) override {
     // Get mangled variable name (includes module path)
-    const std::string varName = mangledName(node.id.name);
+    const std::string varName = mangledName(node.id->name);
 
     // Determine the type
     std::string typeName =
@@ -388,35 +388,35 @@ public:
     OpBuilder::InsertionGuard guard(builder);
 
     // Get mangled function name (includes module path)
-    const std::string funcName = mangledName(node.id.name);
+    const std::string funcName = mangledName(node.id->name);
 
     // Build function type with type variables for untyped parameters
     SmallVector<Type> argTypes;
     std::vector<std::string> argNames;
     std::vector<Type> argMLIRTypes; // Track MLIR types including type vars
 
-    for (const auto* arg : node.arguments) {
-      Type argType = getTypeOrFresh(arg->type);
+    for (const auto& arg : node.arguments) {
+      Type argType = getTypeOrFresh(arg->type.get());
       argTypes.push_back(argType);
       argMLIRTypes.push_back(argType);
-      argNames.push_back(arg->id.name);
+      argNames.push_back(arg->id->name);
     }
 
     // Add captured variables as extra parameters
     std::vector<std::string> captureNames;
     std::vector<Type> captureMLIRTypes;
-    for (const auto* capture : node.captures) {
-      Type captureType = getTypeOrFresh(capture->type);
+    for (const auto& capture : node.captures) {
+      Type captureType = getTypeOrFresh(capture.type.get());
       argTypes.push_back(captureType);
       captureMLIRTypes.push_back(captureType);
-      captureNames.push_back(capture->id.name);
+      captureNames.push_back(capture.id->name);
     }
 
     // Store captures for call site (using mangled name)
     functionCaptures[funcName] = captureNames;
 
     // Return type - use type variable if not specified
-    Type returnType = getTypeOrFresh(node.type);
+    Type returnType = getTypeOrFresh(node.type.get());
     if (node.type != nullptr) {
       functionReturnTypes[funcName] = node.type->name;
     }
@@ -446,28 +446,28 @@ public:
     // Register function arguments with their MLIR types
     size_t argIdx = 0;
     for (size_t i = 0; i < node.arguments.size(); ++i) {
-      const auto* arg = node.arguments[i];
-      argValues[arg->id.name] = entryBlock->getArgument(argIdx);
-      typeVarTable[arg->id.name] = argMLIRTypes[i];
+      const auto& arg = node.arguments[i];
+      argValues[arg->id->name] = entryBlock->getArgument(argIdx);
+      typeVarTable[arg->id->name] = argMLIRTypes[i];
       if (arg->type != nullptr) {
-        typeTable[arg->id.name] = arg->type->name;
+        typeTable[arg->id->name] = arg->type->name;
       }
       ++argIdx;
     }
 
     // Register captured variables as arguments
     for (size_t i = 0; i < node.captures.size(); ++i) {
-      const auto* capture = node.captures[i];
-      argValues[capture->id.name] = entryBlock->getArgument(argIdx);
-      typeVarTable[capture->id.name] = captureMLIRTypes[i];
-      if (capture->type != nullptr) {
-        typeTable[capture->id.name] = capture->type->name;
+      const auto& capture = node.captures[i];
+      argValues[capture.id->name] = entryBlock->getArgument(argIdx);
+      typeVarTable[capture.id->name] = captureMLIRTypes[i];
+      if (capture.type != nullptr) {
+        typeTable[capture.id->name] = capture.type->name;
       }
       ++argIdx;
     }
 
     // Generate function body
-    node.block.accept(*this);
+    node.block->accept(*this);
 
     // Add return
     if (result) {
@@ -481,10 +481,10 @@ public:
 
   void visit(const NModuleDeclaration& node) override {
     // Push module name onto path for name mangling
-    currentModulePath.push_back(node.name.name);
+    currentModulePath.push_back(node.name->name);
 
     // Generate module members with mangled names
-    for (const auto* member : node.members) {
+    for (const auto& member : node.members) {
       member->accept(*this);
     }
 
@@ -496,7 +496,7 @@ public:
   void visit(const NImportStatement& node) override {
     // Import statements are processed by the type checker.
     // For MLIR generation, we need to create aliases for imported symbols.
-    const std::string moduleName = node.modulePath.mangledName();
+    const std::string moduleName = node.modulePath->mangledName();
 
     switch (node.kind) {
     case ImportKind::Module:

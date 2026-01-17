@@ -1,10 +1,19 @@
 %{
+#include <memory>
 #include <vector>
 #include "parser/node.hpp"
-NBlock *programBlock; /* the top level root node of our final AST */
+
+// Global AST root (now uses unique_ptr for proper cleanup)
+std::unique_ptr<NBlock> programBlock;
 
 extern int yylex();
 void yyerror(const char *s);
+
+// Helper to wrap raw pointer in unique_ptr
+template<typename T>
+std::unique_ptr<T> wrap(T* ptr) {
+    return std::unique_ptr<T>(ptr);
+}
 %}
 
 %locations
@@ -18,12 +27,12 @@ void yyerror(const char *s);
     NIdentifier *ident;
     NQualifiedName *qualname;
     NVariableDeclaration *var_decl;
-    std::vector<NVariableDeclaration*> *varvec;
-    std::vector<NExpression*> *exprvec;
+    std::vector<std::unique_ptr<NVariableDeclaration>> *varvec;
+    std::vector<std::unique_ptr<NExpression>> *exprvec;
     NLetBinding *letbind;
-    std::vector<NLetBinding*> *letbindvec;
+    std::vector<std::unique_ptr<NLetBinding>> *letbindvec;
     std::vector<std::string> *strvec;
-    std::vector<NStatement*> *stmtvec;
+    std::vector<std::unique_ptr<NStatement>> *stmtvec;
     ImportItemList *importitems;
     std::string *string;
     int token;
@@ -83,47 +92,47 @@ void yyerror(const char *s);
 
 %%
 
-program : stmts { programBlock = $1; }
+program : stmts { programBlock = wrap($1); }
         ;
-        
+
 stmts : /* empty */ { $$ = new NBlock(); }
-      | stmts stmt { $1->statements.push_back($<stmt>2); }
+      | stmts stmt { $1->statements.push_back(wrap($<stmt>2)); $$ = $1; }
       ;
 
 stmt : var_decl | func_decl | module_decl | import_stmt
-     | expr { $$ = new NExpressionStatement(*$1); }
+     | expr { $$ = new NExpressionStatement(wrap($1)); }
      ;
 
 var_decl : TLET ident TEQUAL expr {
              /* let x = expr (immutable, type to be inferred) */
-             $$ = new NVariableDeclaration(*$2, $4, false);
+             $$ = new NVariableDeclaration(wrap($2), wrap($4), false);
            }
          | TLET ident TCOLON ident TEQUAL expr {
              /* let x : type = expr (immutable) */
-             $$ = new NVariableDeclaration($4, *$2, $6, false);
+             $$ = new NVariableDeclaration(wrap($4), wrap($2), wrap($6), false);
            }
          | TLET TMUT ident TEQUAL expr {
              /* let mut x = expr (mutable, type to be inferred) */
-             $$ = new NVariableDeclaration(*$3, $5, true);
+             $$ = new NVariableDeclaration(wrap($3), wrap($5), true);
            }
          | TLET TMUT ident TCOLON ident TEQUAL expr {
              /* let mut x : type = expr (mutable) */
-             $$ = new NVariableDeclaration($5, *$3, $7, true);
+             $$ = new NVariableDeclaration(wrap($5), wrap($3), wrap($7), true);
            }
          ;
-        
+
 func_decl : TLET ident func_decl_args TCOLON ident TEQUAL expr {
               /* let fname (x : type) ... : rettype = expr */
-              NBlock *body = new NBlock();
-              body->statements.push_back(new NExpressionStatement(*$7));
-              $$ = new NFunctionDeclaration($5, *$2, *$3, *body);
+              auto body = std::make_unique<NBlock>();
+              body->statements.push_back(std::make_unique<NExpressionStatement>(wrap($7)));
+              $$ = new NFunctionDeclaration(wrap($5), wrap($2), std::move(*$3), std::move(body));
               delete $3;
             }
           | TLET ident func_decl_args TEQUAL expr {
               /* let fname (x : type) ... = expr (return type to be inferred) */
-              NBlock *body = new NBlock();
-              body->statements.push_back(new NExpressionStatement(*$5));
-              $$ = new NFunctionDeclaration(*$2, *$3, *body);
+              auto body = std::make_unique<NBlock>();
+              body->statements.push_back(std::make_unique<NExpressionStatement>(wrap($5)));
+              $$ = new NFunctionDeclaration(wrap($2), std::move(*$3), std::move(body));
               delete $3;
             }
           ;
@@ -141,43 +150,43 @@ func_decl_args : TLPAREN func_param_list TRPAREN {
 func_param_list : func_param {
                 /* First parameter */
                 $$ = new VariableList();
-                $$->push_back($1);
+                $$->push_back(wrap($1));
               }
             | func_param_list TCOMMA func_param {
                 /* Additional parameters */
-                $1->push_back($3);
+                $1->push_back(wrap($3));
                 $$ = $1;
               }
             ;
 
 func_param : ident TCOLON ident {
                /* x : type (explicit type annotation) */
-               $$ = new NVariableDeclaration($3, *$1, nullptr);
+               $$ = new NVariableDeclaration(wrap($3), wrap($1), nullptr);
              }
            | ident {
                /* x (type to be inferred) */
-               $$ = new NVariableDeclaration(*$1, nullptr, false);
+               $$ = new NVariableDeclaration(wrap($1), nullptr, false);
              }
            ;
 
 /* Module declarations with Haskell-style export list */
 module_decl : TMODULE ident TLPAREN ident_list TRPAREN module_body TENDMODULE {
                 /* module Name (export1, export2, ...) ... endmodule */
-                $$ = new NModuleDeclaration(*$2, *$4, *$6);
+                $$ = new NModuleDeclaration(wrap($2), std::move(*$4), std::move(*$6));
                 delete $4;
                 delete $6;
               }
             | TMODULE ident module_body TENDMODULE {
                 /* module Name ... endmodule (no exports, all private) */
-                $$ = new NModuleDeclaration(*$2, *$3);
+                $$ = new NModuleDeclaration(wrap($2), std::move(*$3));
                 delete $3;
               }
             ;
 
 module_body : /* empty */ { $$ = new StatementList(); }
-            | module_body var_decl { $1->push_back($2); }
-            | module_body func_decl { $1->push_back($2); }
-            | module_body module_decl { $1->push_back($2); }
+            | module_body var_decl { $1->push_back(wrap($2)); $$ = $1; }
+            | module_body func_decl { $1->push_back(wrap($2)); $$ = $1; }
+            | module_body module_decl { $1->push_back(wrap($2)); $$ = $1; }
             ;
 
 ident_list : ident {
@@ -188,34 +197,35 @@ ident_list : ident {
            | ident_list TCOMMA ident {
                $1->push_back($3->name);
                delete $3;
+               $$ = $1;
              }
            ;
 
 /* Import statements */
 import_stmt : TIMPORT qualified_name {
                 /* import Math */
-                $$ = new NImportStatement(*$2);
+                $$ = new NImportStatement(wrap($2));
               }
             | TIMPORT qualified_name TAS ident {
                 /* import Math as M */
-                $$ = new NImportStatement(*$2, $4->name);
+                $$ = new NImportStatement(wrap($2), $4->name);
                 delete $4;
               }
             | TFROM qualified_name TIMPORT import_items {
                 /* from Math import add, PI */
-                $$ = new NImportStatement(*$2, *$4, false);
+                $$ = new NImportStatement(wrap($2), std::move(*$4), false);
                 delete $4;
               }
             | TFROM qualified_name TIMPORT TMUL {
                 /* from Math import * */
-                $$ = new NImportStatement(*$2, ImportItemList(), true);
+                $$ = new NImportStatement(wrap($2), ImportItemList(), true);
               }
             ;
 
 qualified_name : ident {
                    StringList parts;
                    parts.push_back($1->name);
-                   $$ = new NQualifiedName(parts);
+                   $$ = new NQualifiedName(std::move(parts));
                    delete $1;
                  }
                | qualified_name TDOT ident {
@@ -239,11 +249,13 @@ import_items : ident {
              | import_items TCOMMA ident {
                  $1->push_back(ImportItem($3->name));
                  delete $3;
+                 $$ = $1;
                }
              | import_items TCOMMA ident TAS ident {
                  $1->push_back(ImportItem($3->name, $5->name));
                  delete $3;
                  delete $5;
+                 $$ = $1;
                }
              ;
 
@@ -258,16 +270,21 @@ boolean : TTRUE { $$ = new NBoolean(true); }
         | TFALSE { $$ = new NBoolean(false); }
         ;
 
-expr : ident TLARROW expr { $$ = new NAssignment(*$<ident>1, *$3); }
-     | ident TLPAREN call_args TRPAREN { $$ = new NMethodCall(*$1, *$3); delete $3; }
+expr : ident TLARROW expr { $$ = new NAssignment(wrap($<ident>1), wrap($3)); }
+     | ident TLPAREN call_args TRPAREN {
+         $$ = new NMethodCall(wrap($1), std::move(*$3));
+         delete $3;
+       }
      | ident { $<ident>$ = $1; }
      | ident TDOT ident TLPAREN call_args TRPAREN {
          /* Qualified function call: Math.add(1, 2) */
          StringList parts;
          parts.push_back($1->name);
          parts.push_back($3->name);
-         NQualifiedName *qname = new NQualifiedName(parts);
-         $$ = new NMethodCall(*qname, *$5);
+         auto qname = std::make_unique<NQualifiedName>(std::move(parts));
+         $$ = new NMethodCall(std::move(qname), std::move(*$5));
+         delete $1;
+         delete $3;
          delete $5;
        }
      | ident TDOT ident TDOT ident TLPAREN call_args TRPAREN {
@@ -276,8 +293,11 @@ expr : ident TLARROW expr { $$ = new NAssignment(*$<ident>1, *$3); }
          parts.push_back($1->name);
          parts.push_back($3->name);
          parts.push_back($5->name);
-         NQualifiedName *qname = new NQualifiedName(parts);
-         $$ = new NMethodCall(*qname, *$7);
+         auto qname = std::make_unique<NQualifiedName>(std::move(parts));
+         $$ = new NMethodCall(std::move(qname), std::move(*$7));
+         delete $1;
+         delete $3;
+         delete $5;
          delete $7;
        }
      | ident TDOT ident {
@@ -285,7 +305,9 @@ expr : ident TLARROW expr { $$ = new NAssignment(*$<ident>1, *$3); }
          StringList parts;
          parts.push_back($1->name);
          parts.push_back($3->name);
-         $$ = new NQualifiedName(parts);
+         $$ = new NQualifiedName(std::move(parts));
+         delete $1;
+         delete $3;
        }
      | ident TDOT ident TDOT ident {
          /* Nested qualified variable access: Math.Internal.PI */
@@ -293,63 +315,69 @@ expr : ident TLARROW expr { $$ = new NAssignment(*$<ident>1, *$3); }
          parts.push_back($1->name);
          parts.push_back($3->name);
          parts.push_back($5->name);
-         $$ = new NQualifiedName(parts);
+         $$ = new NQualifiedName(std::move(parts));
+         delete $1;
+         delete $3;
+         delete $5;
        }
      | numeric
      | boolean
-     | expr comparison expr %prec COMPARISON { $$ = new NBinaryOperator(*$1, $2, *$3); }
-     | expr TPLUS expr { $$ = new NBinaryOperator(*$1, TPLUS, *$3); }
-     | expr TMINUS expr { $$ = new NBinaryOperator(*$1, TMINUS, *$3); }
-     | expr TMUL expr { $$ = new NBinaryOperator(*$1, TMUL, *$3); }
-     | expr TDIV expr { $$ = new NBinaryOperator(*$1, TDIV, *$3); }
+     | expr comparison expr %prec COMPARISON { $$ = new NBinaryOperator(wrap($1), $2, wrap($3)); }
+     | expr TPLUS expr { $$ = new NBinaryOperator(wrap($1), TPLUS, wrap($3)); }
+     | expr TMINUS expr { $$ = new NBinaryOperator(wrap($1), TMINUS, wrap($3)); }
+     | expr TMUL expr { $$ = new NBinaryOperator(wrap($1), TMUL, wrap($3)); }
+     | expr TDIV expr { $$ = new NBinaryOperator(wrap($1), TDIV, wrap($3)); }
      | TLPAREN expr TRPAREN { $$ = $2; }
-     | TIF expr TTHEN expr TELSE expr { $$ = new NIfExpression(*$2, *$4, *$6); }
-     | TLET let_bindings TIN expr { $$ = new NLetExpression(*$2, *$4); delete $2; }
+     | TIF expr TTHEN expr TELSE expr { $$ = new NIfExpression(wrap($2), wrap($4), wrap($6)); }
+     | TLET let_bindings TIN expr {
+         $$ = new NLetExpression(std::move(*$2), wrap($4));
+         delete $2;
+       }
      ;
-    
+
 call_args : /*blank*/  { $$ = new ExpressionList(); }
-          | expr { $$ = new ExpressionList(); $$->push_back($1); }
-          | call_args TCOMMA expr  { $1->push_back($3); }
+          | expr { $$ = new ExpressionList(); $$->push_back(wrap($1)); }
+          | call_args TCOMMA expr { $1->push_back(wrap($3)); $$ = $1; }
           ;
 
 let_bindings : let_binding {
                  $$ = new LetBindingList();
-                 $$->push_back($1);
+                 $$->push_back(wrap($1));
                }
              | let_bindings TAND let_binding {
-                 $1->push_back($3);
+                 $1->push_back(wrap($3));
                  $$ = $1;
                }
              ;
 
 let_binding : ident TEQUAL expr {
                 /* x = expr (immutable, type to be inferred) */
-                $$ = new NLetBinding(new NVariableDeclaration(*$1, $3, false));
+                $$ = new NLetBinding(std::make_unique<NVariableDeclaration>(wrap($1), wrap($3), false));
               }
             | ident TCOLON ident TEQUAL expr {
                 /* x : type = expr (immutable) */
-                $$ = new NLetBinding(new NVariableDeclaration($3, *$1, $5, false));
+                $$ = new NLetBinding(std::make_unique<NVariableDeclaration>(wrap($3), wrap($1), wrap($5), false));
               }
             | TMUT ident TEQUAL expr {
                 /* mut x = expr (mutable, type to be inferred) */
-                $$ = new NLetBinding(new NVariableDeclaration(*$2, $4, true));
+                $$ = new NLetBinding(std::make_unique<NVariableDeclaration>(wrap($2), wrap($4), true));
               }
             | TMUT ident TCOLON ident TEQUAL expr {
                 /* mut x : type = expr (mutable) */
-                $$ = new NLetBinding(new NVariableDeclaration($4, *$2, $6, true));
+                $$ = new NLetBinding(std::make_unique<NVariableDeclaration>(wrap($4), wrap($2), wrap($6), true));
               }
             | ident func_decl_args TCOLON ident TEQUAL expr {
                 /* f(x: int): int = expr */
-                NBlock *body = new NBlock();
-                body->statements.push_back(new NExpressionStatement(*$6));
-                $$ = new NLetBinding(new NFunctionDeclaration($4, *$1, *$2, *body));
+                auto body = std::make_unique<NBlock>();
+                body->statements.push_back(std::make_unique<NExpressionStatement>(wrap($6)));
+                $$ = new NLetBinding(std::make_unique<NFunctionDeclaration>(wrap($4), wrap($1), std::move(*$2), std::move(body)));
                 delete $2;
               }
             | ident func_decl_args TEQUAL expr {
                 /* f(x: int) = expr (return type inferred) */
-                NBlock *body = new NBlock();
-                body->statements.push_back(new NExpressionStatement(*$4));
-                $$ = new NLetBinding(new NFunctionDeclaration(*$1, *$2, *body));
+                auto body = std::make_unique<NBlock>();
+                body->statements.push_back(std::make_unique<NExpressionStatement>(wrap($4)));
+                $$ = new NLetBinding(std::make_unique<NFunctionDeclaration>(wrap($1), std::move(*$2), std::move(body)));
                 delete $2;
               }
             ;

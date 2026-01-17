@@ -52,6 +52,38 @@ clangd --path-mappings=$(pwd)=/workspace/polang --enable-config
 - Add `[[nodiscard]]` to functions whose return value should not be ignored
 - Use braces around all control flow statement bodies
 
+### Smart Pointer Guidelines
+
+**Avoid raw pointers for ownership.** Use smart pointers (`std::unique_ptr`, `std::shared_ptr`) to manage dynamically allocated memory. This prevents memory leaks and makes ownership semantics explicit.
+
+The AST uses `std::unique_ptr` for automatic memory management:
+
+- **Use `std::unique_ptr`** for exclusive ownership of AST nodes
+- **Use `std::make_unique`** for creating new nodes (exception-safe)
+- **Use `.get()`** to obtain raw pointers for non-owning access (e.g., in visitors)
+- **Use `std::move`** when transferring ownership between containers
+- **Iterate with `const auto&`** over vectors of unique_ptr:
+  ```cpp
+  for (const auto& stmt : block->statements) {
+      stmt->accept(visitor);
+  }
+  ```
+- **Access members with `->`** through unique_ptr:
+  ```cpp
+  auto* varDecl = dynamic_cast<NVariableDeclaration*>(stmt.get());
+  std::string name = varDecl->id->name;  // id is unique_ptr
+  ```
+
+**When raw pointers are acceptable:**
+- Interfacing with C APIs or libraries that require raw pointers
+
+**For non-owning access**, prefer references (`const T&` or `T&`) over raw pointers. References cannot be null and make non-owning semantics explicit.
+
+**Avoid:**
+- `new`/`delete` for memory management (use `std::make_unique` instead)
+- Returning raw pointers that transfer ownership (return `std::unique_ptr`)
+- Storing raw pointers in containers (use `std::vector<std::unique_ptr<T>>`)
+
 ### Naming Conventions (LLVM Style)
 
 | Element | Case | Example |
