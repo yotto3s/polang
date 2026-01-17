@@ -40,6 +40,9 @@ RUN apt-get update && apt-get install -y \
     mlir-20-tools \
     && apt-get clean
 
+# Configure LLVM library path for dynamic linker
+RUN echo "/usr/lib/llvm-20/lib" > /etc/ld.so.conf.d/llvm-20.conf && ldconfig
+
 # Register clang
 RUN sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100 \
     --slave /usr/bin/clang++ clang++ /usr/bin/clang++-20 \

@@ -125,7 +125,9 @@ cmake -S. -Bbuild -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
 
 ### Shared Library Errors at Runtime
 
-If you see errors about missing `.so` files, set `LD_LIBRARY_PATH`:
+The Docker environment has LLVM library paths configured via ldconfig, so shared library errors should not occur inside the container.
+
+If you're building outside Docker and see errors about missing `.so` files, set `LD_LIBRARY_PATH`:
 
 ```bash
 export LD_LIBRARY_PATH=/usr/lib/llvm-20/lib:$LD_LIBRARY_PATH
