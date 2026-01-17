@@ -25,6 +25,9 @@ struct TypeNames {
   // Floats
   static constexpr const char* F32 = "f32";
   static constexpr const char* F64 = "f64";
+  // Generic types (for literals before type inference)
+  static constexpr const char* GENERIC_INT = "{int}";
+  static constexpr const char* GENERIC_FLOAT = "{float}";
   // Other types
   static constexpr const char* BOOL = "bool";
   static constexpr const char* FUNCTION = "function";
@@ -46,8 +49,16 @@ parseTypeName(const std::string& name) noexcept {
       name == TypeNames::U32 || name == TypeNames::U64) {
     return TypeKind::Integer;
   }
+  // Generic integer (unresolved literal)
+  if (name == TypeNames::GENERIC_INT) {
+    return TypeKind::Integer;
+  }
   // Floats
   if (name == TypeNames::F32 || name == TypeNames::F64) {
+    return TypeKind::Float;
+  }
+  // Generic float (unresolved literal)
+  if (name == TypeNames::GENERIC_FLOAT) {
     return TypeKind::Float;
   }
   // Other types
@@ -113,6 +124,91 @@ isUnsignedIntegerType(const std::string& typeName) noexcept {
 /// Check if a type name represents an unknown/error type.
 [[nodiscard]] inline bool isUnknownType(const std::string& typeName) noexcept {
   return typeName == TypeNames::UNKNOWN;
+}
+
+/// Check if a type name represents a generic (unresolved) integer type.
+[[nodiscard]] inline bool
+isGenericIntegerType(const std::string& typeName) noexcept {
+  return typeName == TypeNames::GENERIC_INT;
+}
+
+/// Check if a type name represents a generic (unresolved) float type.
+[[nodiscard]] inline bool
+isGenericFloatType(const std::string& typeName) noexcept {
+  return typeName == TypeNames::GENERIC_FLOAT;
+}
+
+/// Check if a type name represents any generic (unresolved) type.
+[[nodiscard]] inline bool isGenericType(const std::string& typeName) noexcept {
+  return isGenericIntegerType(typeName) || isGenericFloatType(typeName);
+}
+
+/// Check if two types are compatible for assignment/operations.
+/// Generic types are compatible with their concrete counterparts.
+[[nodiscard]] inline bool
+areTypesCompatible(const std::string& t1, const std::string& t2) noexcept {
+  // Exact match
+  if (t1 == t2) {
+    return true;
+  }
+  // Generic int is compatible with any concrete integer type
+  if (isGenericIntegerType(t1) && isIntegerType(t2)) {
+    return true;
+  }
+  if (isGenericIntegerType(t2) && isIntegerType(t1)) {
+    return true;
+  }
+  // Generic float is compatible with any concrete float type
+  if (isGenericFloatType(t1) && isFloatType(t2)) {
+    return true;
+  }
+  if (isGenericFloatType(t2) && isFloatType(t1)) {
+    return true;
+  }
+  // Two generic ints are compatible
+  if (isGenericIntegerType(t1) && isGenericIntegerType(t2)) {
+    return true;
+  }
+  // Two generic floats are compatible
+  if (isGenericFloatType(t1) && isGenericFloatType(t2)) {
+    return true;
+  }
+  return false;
+}
+
+/// Resolve a generic type to a concrete type given a context type.
+/// If the type is not generic, returns it unchanged.
+/// If context is also generic, returns the default type.
+[[nodiscard]] inline std::string
+resolveGenericType(const std::string& type,
+                   const std::string& contextType) noexcept {
+  if (isGenericIntegerType(type)) {
+    if (isIntegerType(contextType)) {
+      return contextType;
+    }
+    // Default to i64
+    return TypeNames::I64;
+  }
+  if (isGenericFloatType(type)) {
+    if (isFloatType(contextType)) {
+      return contextType;
+    }
+    // Default to f64
+    return TypeNames::F64;
+  }
+  return type;
+}
+
+/// Resolve a generic type to its default concrete type.
+[[nodiscard]] inline std::string
+resolveGenericToDefault(const std::string& type) noexcept {
+  if (isGenericIntegerType(type)) {
+    return TypeNames::I64;
+  }
+  if (isGenericFloatType(type)) {
+    return TypeNames::F64;
+  }
+  return type;
 }
 
 /// Convert a TypeKind to its string representation.

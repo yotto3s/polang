@@ -1,0 +1,14 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test MLIR representation of f64 (default float type)
+
+; CHECK: {{.*}}polang.constant.float {{.*}} : !polang.float<64>
+let a = 3.14
+
+; CHECK: {{.*}}polang.constant.float {{.*}} : !polang.float<64>
+let b = 2.71828
+
+; Explicit f64 annotation works since literal is f64
+; CHECK: {{.*}}polang.constant.float {{.*}} : !polang.float<64>
+let c: f64 = 1.5
+c

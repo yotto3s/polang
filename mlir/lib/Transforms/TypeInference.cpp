@@ -35,11 +35,29 @@ using namespace polang;
 namespace {
 
 //===----------------------------------------------------------------------===//
-// Helper functions for polymorphism detection
+// Helper functions for polymorphism detection and type defaulting
 //===----------------------------------------------------------------------===//
 
 /// Check if a type contains any type variables
 bool containsTypeVar(Type type) { return isa<TypeVarType>(type); }
+
+/// Apply default type for a type variable based on its kind.
+/// Returns the resolved type (either the original if not a type var,
+/// or the default type based on the kind).
+Type applyTypeVarDefault(Type type, MLIRContext* ctx) {
+  if (auto typeVar = dyn_cast<TypeVarType>(type)) {
+    switch (typeVar.getKind()) {
+    case TypeVarKind::Integer:
+      return polang::IntegerType::get(ctx, 64, Signedness::Signed);
+    case TypeVarKind::Float:
+      return polang::FloatType::get(ctx, 64);
+    case TypeVarKind::Any:
+      // Leave as type var - may be polymorphic
+      return type;
+    }
+  }
+  return type;
+}
 
 /// Check if a function has any type variables in its signature.
 /// The entry function (__polang_entry) is never considered polymorphic.
@@ -342,12 +360,15 @@ private:
         // Store the actual argument types (they should already be concrete
         // or resolvable through the global substitution)
         SmallVector<Attribute> resolvedArgTypes;
+        auto ctx = call.getContext();
         for (Value arg : call.getOperands()) {
           Type resolvedType = subst.apply(arg.getType());
+          // Apply defaults for numeric type vars (integer -> i64, float -> f64)
+          resolvedType = applyTypeVarDefault(resolvedType, ctx);
           resolvedArgTypes.push_back(TypeAttr::get(resolvedType));
         }
         call->setAttr("polang.resolved_arg_types",
-                      ArrayAttr::get(call.getContext(), resolvedArgTypes));
+                      ArrayAttr::get(ctx, resolvedArgTypes));
 
         // Compute the return type by building a local substitution
         // that maps the function's parameter type vars to the argument types
@@ -372,6 +393,8 @@ private:
         if (call.getResult()) {
           Type returnType = calleeType.getResult(0);
           Type resolvedRetType = combinedSubst.apply(returnType);
+          // Apply defaults for numeric type vars (integer -> i64, float -> f64)
+          resolvedRetType = applyTypeVarDefault(resolvedRetType, ctx);
           call->setAttr("polang.resolved_return_type",
                         TypeAttr::get(resolvedRetType));
           // Also update the actual result type so subsequent uses see the
@@ -392,15 +415,22 @@ private:
       }
 
       FunctionType oldType = func.getFunctionType();
+      auto ctx = func.getContext();
 
       SmallVector<Type> newInputs;
       for (Type input : oldType.getInputs()) {
-        newInputs.push_back(subst.apply(input));
+        Type resolved = subst.apply(input);
+        // Apply defaults for numeric type vars (integer -> i64, float -> f64)
+        resolved = applyTypeVarDefault(resolved, ctx);
+        newInputs.push_back(resolved);
       }
 
       SmallVector<Type> newResults;
       for (Type result : oldType.getResults()) {
-        newResults.push_back(subst.apply(result));
+        Type resolved = subst.apply(result);
+        // Apply defaults for numeric type vars (integer -> i64, float -> f64)
+        resolved = applyTypeVarDefault(resolved, ctx);
+        newResults.push_back(resolved);
       }
 
       FunctionType newType =
@@ -435,13 +465,13 @@ private:
         }
       }
 
+      auto ctx = op->getContext();
       bool needsUpdate = false;
       for (Type type : op->getResultTypes()) {
-        if (!isa<TypeVarType>(subst.apply(type)) && isa<TypeVarType>(type)) {
-          needsUpdate = true;
-          break;
-        }
-        if (subst.apply(type) != type) {
+        Type resolved = subst.apply(type);
+        // Apply defaults for numeric type vars
+        resolved = applyTypeVarDefault(resolved, ctx);
+        if (resolved != type) {
           needsUpdate = true;
           break;
         }
@@ -455,7 +485,10 @@ private:
       OpBuilder builder(op);
       SmallVector<Type> newResultTypes;
       for (Type type : op->getResultTypes()) {
-        newResultTypes.push_back(subst.apply(type));
+        Type resolved = subst.apply(type);
+        // Apply defaults for numeric type vars (integer -> i64, float -> f64)
+        resolved = applyTypeVarDefault(resolved, ctx);
+        newResultTypes.push_back(resolved);
       }
 
       // For most operations, we can just change the result type

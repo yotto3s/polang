@@ -1,0 +1,14 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test MLIR representation of i64 (default integer type)
+
+; CHECK: {{.*}}polang.constant.integer 42 : !polang.integer<64, signed>
+let a = 42
+
+; CHECK: {{.*}}polang.constant.integer 100 : !polang.integer<64, signed>
+let b = 100
+
+; Explicit i64 annotation works since literal is i64
+; CHECK: {{.*}}polang.constant.integer 50 : !polang.integer<64, signed>
+let c: i64 = 50
+c

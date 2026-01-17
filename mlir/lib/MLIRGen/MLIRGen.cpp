@@ -56,8 +56,10 @@ public:
     module = ModuleOp::create(builder.getUnknownLoc());
   }
 
-  /// Generate a fresh type variable
-  Type freshTypeVar() { return builder.getType<TypeVarType>(nextTypeVarId++); }
+  /// Generate a fresh type variable with optional kind constraint
+  Type freshTypeVar(TypeVarKind kind = TypeVarKind::Any) {
+    return builder.getType<TypeVarType>(nextTypeVarId++, kind);
+  }
 
   /// Get a Polang type from annotation, or a fresh type variable if none
   Type getTypeOrFresh(const NIdentifier* typeAnnotation) {
@@ -91,15 +93,17 @@ public:
 
   // Visitor interface implementations
   void visit(const NInteger& node) override {
-    auto type = polang::IntegerType::get(builder.getContext(), 64, Signedness::Signed);
+    // Create type variable constrained to integer types
+    auto type = freshTypeVar(TypeVarKind::Integer);
     result = builder.create<ConstantIntegerOp>(loc(), type, node.value);
-    resultType = TypeNames::I64;
+    resultType = TypeNames::GENERIC_INT;
   }
 
   void visit(const NDouble& node) override {
-    auto type = polang::FloatType::get(builder.getContext(), 64);
+    // Create type variable constrained to float types
+    auto type = freshTypeVar(TypeVarKind::Float);
     result = builder.create<ConstantFloatOp>(loc(), type, node.value);
-    resultType = TypeNames::F64;
+    resultType = TypeNames::GENERIC_FLOAT;
   }
 
   void visit(const NBoolean& node) override {
@@ -730,6 +734,13 @@ private:
     // Type variable
     if (typeName == TypeNames::TYPEVAR) {
       return freshTypeVar();
+    }
+    // Generic types (unresolved literals)
+    if (typeName == TypeNames::GENERIC_INT) {
+      return freshTypeVar(TypeVarKind::Integer);
+    }
+    if (typeName == TypeNames::GENERIC_FLOAT) {
+      return freshTypeVar(TypeVarKind::Float);
     }
     // Default to i64
     return polang::IntegerType::get(builder.getContext(), 64, Signedness::Signed);

@@ -56,7 +56,7 @@ def Polang_ConstantIntegerOp : Polang_Op<"constant.integer", [Pure]> {
   }];
 
   let arguments = (ins Polang_AnyIntegerAttr:$value);
-  let results = (outs Polang_IntegerType:$result);
+  let results = (outs Polang_IntegerOrTypeVar:$result);
 
   let hasCustomAssemblyFormat = 1;
 
@@ -67,6 +67,20 @@ def Polang_ConstantIntegerOp : Polang_Op<"constant.integer", [Pure]> {
       build($_builder, $_state, type,
             $_builder.getIntegerAttr(
                 $_builder.getIntegerType(width, isSigned), value));
+    }]>,
+    // Builder for type variables (before type inference)
+    OpBuilder<(ins "mlir::Type":$type, "int64_t":$value), [{
+      if (auto intType = ::llvm::dyn_cast<IntegerType>(type)) {
+        unsigned width = intType.getWidth();
+        bool isSigned = intType.isSigned();
+        build($_builder, $_state, type,
+              $_builder.getIntegerAttr(
+                  $_builder.getIntegerType(width, isSigned), value));
+      } else {
+        // For type variables, use i64 attribute (actual type resolved later)
+        build($_builder, $_state, type,
+              $_builder.getIntegerAttr($_builder.getI64Type(), value));
+      }
     }]>
   ];
 }
@@ -84,7 +98,7 @@ def Polang_ConstantFloatOp : Polang_Op<"constant.float", [Pure]> {
   }];
 
   let arguments = (ins Polang_AnyFloatAttr:$value);
-  let results = (outs Polang_FloatType:$result);
+  let results = (outs Polang_FloatOrTypeVar:$result);
 
   let hasCustomAssemblyFormat = 1;
 
@@ -97,6 +111,22 @@ def Polang_ConstantFloatOp : Polang_Op<"constant.float", [Pure]> {
       } else {
         build($_builder, $_state, type,
               $_builder.getF64FloatAttr(value));
+      }
+    }]>,
+    // Builder for type variables (before type inference)
+    OpBuilder<(ins "mlir::Type":$type, "double":$value), [{
+      if (auto floatType = ::llvm::dyn_cast<FloatType>(type)) {
+        unsigned width = floatType.getWidth();
+        if (width == 32) {
+          build($_builder, $_state, type,
+                $_builder.getF32FloatAttr(static_cast<float>(value)));
+        } else {
+          build($_builder, $_state, type,
+                $_builder.getF64FloatAttr(value));
+        }
+      } else {
+        // For type variables, use f64 attribute (actual type resolved later)
+        build($_builder, $_state, type, $_builder.getF64FloatAttr(value));
       }
     }]>
   ];

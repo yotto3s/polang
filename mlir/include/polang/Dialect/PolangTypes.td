@@ -34,6 +34,20 @@ def Polang_Signedness : I32EnumAttr<"Signedness", "integer signedness", [
 }
 
 //===----------------------------------------------------------------------===//
+// TypeVarKind enum for type variable constraints
+//===----------------------------------------------------------------------===//
+
+def Polang_TypeVarKind_Any : I32EnumAttrCase<"Any", 0, "any">;
+def Polang_TypeVarKind_Integer : I32EnumAttrCase<"Integer", 1, "integer">;
+def Polang_TypeVarKind_Float : I32EnumAttrCase<"Float", 2, "float">;
+
+def Polang_TypeVarKind : I32EnumAttr<"TypeVarKind", "type variable kind", [
+    Polang_TypeVarKind_Any, Polang_TypeVarKind_Integer, Polang_TypeVarKind_Float
+]> {
+  let cppNamespace = "::polang";
+}
+
+//===----------------------------------------------------------------------===//
 // Parameterized numeric types
 //===----------------------------------------------------------------------===//
 
@@ -88,19 +102,35 @@ def Polang_BoolType : Polang_Type<"Bool", "bool"> {
 }
 
 def Polang_TypeVarType : Polang_Type<"TypeVar", "typevar"> {
-  let summary = "Type variable for polymorphic types";
+  let summary = "Type variable for polymorphic type inference";
   let description = [{
-    Represents an unresolved type variable used during type inference.
-    The parameter is a unique identifier for the type variable.
+    Represents an unresolved type that will be determined by type inference.
+    The optional `kind` parameter constrains what concrete types this variable
+    can unify with:
+    - `any` (default): Can unify with any type (for polymorphic functions)
+    - `integer`: Can only unify with integer types (for integer literals)
+    - `float`: Can only unify with float types (for float literals)
 
-    Example:
+    Examples:
     ```mlir
-    %x : !polang.typevar<0>
+    !polang.typevar<1>          ; unconstrained type variable
+    !polang.typevar<2, integer> ; must resolve to an integer type
+    !polang.typevar<3, float>   ; must resolve to a float type
     ```
   }];
 
-  let parameters = (ins "uint64_t":$id);
-  let assemblyFormat = "`<` $id `>`";
+  let parameters = (ins
+    "uint64_t":$id,
+    DefaultValuedParameter<"TypeVarKind", "TypeVarKind::Any">:$kind
+  );
+
+  let hasCustomAssemblyFormat = 1;
+
+  let extraClassDeclaration = [{
+    bool isAny() const { return getKind() == TypeVarKind::Any; }
+    bool isIntegerKind() const { return getKind() == TypeVarKind::Integer; }
+    bool isFloatKind() const { return getKind() == TypeVarKind::Float; }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -126,5 +156,15 @@ def Polang_AnyTypeOrVar : AnyTypeOf<[
 def Polang_BoolOrTypeVar : AnyTypeOf<[
     Polang_BoolType, Polang_TypeVarType
 ], "bool or type variable">;
+
+// Integer or type variable (for integer constants before type inference)
+def Polang_IntegerOrTypeVar : AnyTypeOf<[
+    Polang_IntegerType, Polang_TypeVarType
+], "integer or type variable">;
+
+// Float or type variable (for float constants before type inference)
+def Polang_FloatOrTypeVar : AnyTypeOf<[
+    Polang_FloatType, Polang_TypeVarType
+], "float or type variable">;
 
 #endif // POLANG_TYPES_TD

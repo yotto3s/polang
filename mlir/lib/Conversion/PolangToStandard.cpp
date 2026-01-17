@@ -50,6 +50,22 @@ public:
     addConversion([](BoolType type) {
       return mlir::IntegerType::get(type.getContext(), 1);
     });
+    // Handle type variables that weren't resolved - apply defaults based on kind
+    addConversion([](TypeVarType type) -> Type {
+      auto ctx = type.getContext();
+      switch (type.getKind()) {
+      case TypeVarKind::Integer:
+        // Default integer type variables to i64
+        return mlir::IntegerType::get(ctx, 64);
+      case TypeVarKind::Float:
+        // Default float type variables to f64
+        return Float64Type::get(ctx);
+      case TypeVarKind::Any:
+        // Generic type vars default to i64 (legacy behavior)
+        return mlir::IntegerType::get(ctx, 64);
+      }
+      llvm_unreachable("Unknown TypeVarKind");
+    });
   }
 };
 
@@ -65,8 +81,18 @@ struct ConstantIntegerOpLowering
   matchAndRewrite(ConstantIntegerOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
     (void)adaptor; // Unused, but required by MLIR interface
-    auto polangType = mlir::cast<polang::IntegerType>(op.getResult().getType());
-    auto intType = rewriter.getIntegerType(polangType.getWidth());
+    Type resultType = op.getResult().getType();
+    unsigned width = 64; // Default width
+
+    if (auto polangType = dyn_cast<polang::IntegerType>(resultType)) {
+      width = polangType.getWidth();
+    } else if (auto typeVar = dyn_cast<TypeVarType>(resultType)) {
+      // Type variable - use default width based on kind
+      // Integer kind defaults to 64, which is already set
+      (void)typeVar;
+    }
+
+    auto intType = rewriter.getIntegerType(width);
     auto value = rewriter.create<arith::ConstantIntOp>(
         op.getLoc(), op.getValue().getSExtValue(), intType);
     rewriter.replaceOp(op, value);
@@ -81,13 +107,20 @@ struct ConstantFloatOpLowering : public OpConversionPattern<ConstantFloatOp> {
   matchAndRewrite(ConstantFloatOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
     (void)adaptor; // Unused, but required by MLIR interface
-    auto polangType = mlir::cast<polang::FloatType>(op.getResult().getType());
-    mlir::FloatType floatType;
-    if (polangType.getWidth() == 32) {
-      floatType = rewriter.getF32Type();
-    } else {
-      floatType = rewriter.getF64Type();
+    Type resultType = op.getResult().getType();
+    mlir::FloatType floatType = rewriter.getF64Type(); // Default to f64
+
+    if (auto polangType = dyn_cast<polang::FloatType>(resultType)) {
+      if (polangType.getWidth() == 32) {
+        floatType = rewriter.getF32Type();
+      } else {
+        floatType = rewriter.getF64Type();
+      }
+    } else if (auto typeVar = dyn_cast<TypeVarType>(resultType)) {
+      // Type variable - float kind defaults to f64
+      (void)typeVar;
     }
+
     // getValue() returns APFloat from the attribute
     auto value = rewriter.create<arith::ConstantFloatOp>(
         op.getLoc(), op.getValue(), floatType);

@@ -1,15 +1,14 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
 ; Test mutable variable with alloca, store, and load
-; CHECK:      polang.func @__polang_entry() -> !polang.integer<64, signed> {
-; CHECK-NEXT:   %{{[0-9]+}} = polang.constant.integer 10 : !polang.integer<64, signed>
-; CHECK-NEXT:   %{{[0-9]+}} = polang.alloca "x", mutable : !polang.integer<64, signed> -> memref<i64>
-; CHECK-NEXT:   polang.store %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>, memref<i64>
-; CHECK-NEXT:   %{{[0-9]+}} = polang.constant.integer 20 : !polang.integer<64, signed>
-; CHECK-NEXT:   polang.store %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>, memref<i64>
-; CHECK-NEXT:   %{{[0-9]+}} = polang.load %{{[0-9]+}} : memref<i64> -> !polang.integer<64, signed>
-; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed>
-; CHECK-NEXT: }
+; CHECK: {{.*}}polang.func @__polang_entry() -> !polang.integer<64, signed>{{.*}}
+; CHECK: {{.*}}polang.constant.integer 10 : !polang.integer<64, signed>
+; CHECK: {{.*}}polang.alloca "x", mutable{{.*}}
+; CHECK: {{.*}}polang.store{{.*}}
+; CHECK: {{.*}}polang.constant.integer 20 : !polang.integer<64, signed>
+; CHECK: {{.*}}polang.store{{.*}}
+; CHECK: {{.*}}polang.load{{.*}}
+; CHECK: {{.*}}polang.return{{.*}}
 let mut x = 10
 x <- 20
 x

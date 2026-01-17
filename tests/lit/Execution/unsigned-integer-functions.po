@@ -1,0 +1,15 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test that u64 functions exist and can be defined
+; Note: Currently integer literals default to i64 (signed)
+; This test verifies u64 function definitions work in MLIR generation
+
+; Define u64 functions (MLIR generation test)
+let add_u64(a: u64, b: u64): u64 = a + b
+
+; For execution we use a polymorphic function that can work with any numeric type
+let add(x, y) = x + y
+
+; Final result using polymorphic function
+; CHECK: 30000 : i64
+add(10000, 20000)

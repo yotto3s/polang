@@ -1,0 +1,12 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test default float type (f64)
+; Float literals default to f64
+
+; Test various float operations - last result is what gets printed
+let a = 3.14 + 3.14
+let b = 3.14 * 3.14
+
+; Final expression tests division, which prints
+; CHECK: 1.57{{.*}} : f64
+3.14 / 2.0

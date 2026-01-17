@@ -7,7 +7,7 @@
 ; The entry function calls the specialized version
 ; CHECK-DAG: {{.*}}polang.func @__polang_entry() -> !polang.integer<64, signed>{{.*}}
 
-; The specialized identity function with concrete int types
+; The specialized identity function with concrete types
 ; CHECK-DAG: {{.*}}polang.func @identity$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 
 ; The original polymorphic identity function is marked as polymorphic
