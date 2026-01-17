@@ -5,7 +5,7 @@
 // ============== Literal Tests ==============
 
 TEST(ASTPrinterTest, PrintInteger) {
-  NBlock* block = parseOrFail("42");
+  auto block = parseOrFail("42");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -17,7 +17,7 @@ TEST(ASTPrinterTest, PrintInteger) {
 }
 
 TEST(ASTPrinterTest, PrintDouble) {
-  NBlock* block = parseOrFail("3.14");
+  auto block = parseOrFail("3.14");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -26,7 +26,7 @@ TEST(ASTPrinterTest, PrintDouble) {
 }
 
 TEST(ASTPrinterTest, PrintBooleanTrue) {
-  NBlock* block = parseOrFail("true");
+  auto block = parseOrFail("true");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -35,7 +35,7 @@ TEST(ASTPrinterTest, PrintBooleanTrue) {
 }
 
 TEST(ASTPrinterTest, PrintBooleanFalse) {
-  NBlock* block = parseOrFail("false");
+  auto block = parseOrFail("false");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -44,7 +44,7 @@ TEST(ASTPrinterTest, PrintBooleanFalse) {
 }
 
 TEST(ASTPrinterTest, PrintIdentifier) {
-  NBlock* block = parseOrFail("myVar");
+  auto block = parseOrFail("myVar");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -55,7 +55,7 @@ TEST(ASTPrinterTest, PrintIdentifier) {
 // ============== Binary Operator Tests ==============
 
 TEST(ASTPrinterTest, PrintBinaryOperatorAdd) {
-  NBlock* block = parseOrFail("1 + 2");
+  auto block = parseOrFail("1 + 2");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -67,7 +67,7 @@ TEST(ASTPrinterTest, PrintBinaryOperatorAdd) {
 }
 
 TEST(ASTPrinterTest, PrintBinaryOperatorCompare) {
-  NBlock* block = parseOrFail("x > 5");
+  auto block = parseOrFail("x > 5");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -78,7 +78,7 @@ TEST(ASTPrinterTest, PrintBinaryOperatorCompare) {
 // ============== Declaration Tests ==============
 
 TEST(ASTPrinterTest, PrintVariableDeclaration) {
-  NBlock* block = parseOrFail("let x = 5");
+  auto block = parseOrFail("let x = 5");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -89,7 +89,7 @@ TEST(ASTPrinterTest, PrintVariableDeclaration) {
 }
 
 TEST(ASTPrinterTest, PrintMutableVariable) {
-  NBlock* block = parseOrFail("let mut y = 10");
+  auto block = parseOrFail("let mut y = 10");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -98,7 +98,7 @@ TEST(ASTPrinterTest, PrintMutableVariable) {
 }
 
 TEST(ASTPrinterTest, PrintTypedVariable) {
-  NBlock* block = parseOrFail("let z: int = 42");
+  auto block = parseOrFail("let z: int = 42");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -108,7 +108,7 @@ TEST(ASTPrinterTest, PrintTypedVariable) {
 }
 
 TEST(ASTPrinterTest, PrintFunctionDeclaration) {
-  NBlock* block = parseOrFail("let add(a: int, b: int): int = a + b");
+  auto block = parseOrFail("let add(a: int, b: int): int = a + b");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -123,7 +123,7 @@ TEST(ASTPrinterTest, PrintFunctionDeclaration) {
 // ============== Control Flow Tests ==============
 
 TEST(ASTPrinterTest, PrintIfExpression) {
-  NBlock* block = parseOrFail("if x > 0 then 1 else 2");
+  auto block = parseOrFail("if x > 0 then 1 else 2");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -136,7 +136,7 @@ TEST(ASTPrinterTest, PrintIfExpression) {
 }
 
 TEST(ASTPrinterTest, PrintLetExpression) {
-  NBlock* block = parseOrFail("let x = 1 and y = 2 in x + y");
+  auto block = parseOrFail("let x = 1 and y = 2 in x + y");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -149,7 +149,7 @@ TEST(ASTPrinterTest, PrintLetExpression) {
 // ============== Method Call Tests ==============
 
 TEST(ASTPrinterTest, PrintMethodCall) {
-  NBlock* block = parseOrFail("foo(1, 2)");
+  auto block = parseOrFail("foo(1, 2)");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -163,7 +163,7 @@ TEST(ASTPrinterTest, PrintMethodCall) {
 // ============== Tree Structure Tests ==============
 
 TEST(ASTPrinterTest, TreeConnectors) {
-  NBlock* block = parseOrFail("1 + 2 * 3");
+  auto block = parseOrFail("1 + 2 * 3");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -175,7 +175,7 @@ TEST(ASTPrinterTest, TreeConnectors) {
 }
 
 TEST(ASTPrinterTest, MultipleStatements) {
-  NBlock* block = parseOrFail("let x = 1\nlet y = 2\nx + y");
+  auto block = parseOrFail("let x = 1\nlet y = 2\nx + y");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -189,7 +189,7 @@ TEST(ASTPrinterTest, MultipleStatements) {
 // ============== Assignment Tests ==============
 
 TEST(ASTPrinterTest, PrintAssignment) {
-  NBlock* block = parseOrFail("x <- 10");
+  auto block = parseOrFail("x <- 10");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);

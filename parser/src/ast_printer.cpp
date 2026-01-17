@@ -68,7 +68,7 @@ void ASTPrinter::visit(const NMethodCall& node) {
   if (node.qualifiedId != nullptr) {
     out << "NMethodCall '" << node.qualifiedId->fullName() << "'\n";
   } else {
-    out << "NMethodCall '" << node.id.name << "'\n";
+    out << "NMethodCall '" << node.id->name << "'\n";
   }
 
   const auto& args = node.arguments;
@@ -85,11 +85,11 @@ void ASTPrinter::visit(const NBinaryOperator& node) {
 
   {
     DepthScope scope(*this, true);
-    node.lhs.accept(*this);
+    node.lhs->accept(*this);
   }
   {
     DepthScope scope(*this, false);
-    node.rhs.accept(*this);
+    node.rhs->accept(*this);
   }
 }
 
@@ -99,11 +99,11 @@ void ASTPrinter::visit(const NAssignment& node) {
 
   {
     DepthScope scope(*this, true);
-    node.lhs.accept(*this);
+    node.lhs->accept(*this);
   }
   {
     DepthScope scope(*this, false);
-    node.rhs.accept(*this);
+    node.rhs->accept(*this);
   }
 }
 
@@ -129,7 +129,7 @@ void ASTPrinter::visit(const NIfExpression& node) {
     out << "condition:\n";
     {
       DepthScope inner(*this, false);
-      node.condition.accept(*this);
+      node.condition->accept(*this);
     }
   }
   {
@@ -138,7 +138,7 @@ void ASTPrinter::visit(const NIfExpression& node) {
     out << "then:\n";
     {
       DepthScope inner(*this, false);
-      node.thenExpr.accept(*this);
+      node.thenExpr->accept(*this);
     }
   }
   {
@@ -147,7 +147,7 @@ void ASTPrinter::visit(const NIfExpression& node) {
     out << "else:\n";
     {
       DepthScope inner(*this, false);
-      node.elseExpr.accept(*this);
+      node.elseExpr->accept(*this);
     }
   }
 }
@@ -156,7 +156,7 @@ void ASTPrinter::visit(const NLetExpression& node) {
   printPrefix();
   out << "NLetExpression\n";
 
-  for (const auto* binding : node.bindings) {
+  for (const auto& binding : node.bindings) {
     DepthScope scope(*this, true);
     if (binding->isFunction) {
       binding->func->accept(*this);
@@ -170,7 +170,7 @@ void ASTPrinter::visit(const NLetExpression& node) {
     out << "body:\n";
     {
       DepthScope inner(*this, false);
-      node.body.accept(*this);
+      node.body->accept(*this);
     }
   }
 }
@@ -181,13 +181,13 @@ void ASTPrinter::visit(const NExpressionStatement& node) {
 
   {
     DepthScope scope(*this, false);
-    node.expression.accept(*this);
+    node.expression->accept(*this);
   }
 }
 
 void ASTPrinter::visit(const NVariableDeclaration& node) {
   printPrefix();
-  out << "NVariableDeclaration '" << node.id.name << "'";
+  out << "NVariableDeclaration '" << node.id->name << "'";
   if (node.isMutable) {
     out << " mut";
   }
@@ -204,13 +204,13 @@ void ASTPrinter::visit(const NVariableDeclaration& node) {
 
 void ASTPrinter::visit(const NFunctionDeclaration& node) {
   printPrefix();
-  out << "NFunctionDeclaration '" << node.id.name << "' (";
+  out << "NFunctionDeclaration '" << node.id->name << "' (";
 
   for (size_t i = 0; i < node.arguments.size(); ++i) {
     if (i > 0) {
       out << ", ";
     }
-    out << node.arguments[i]->id.name;
+    out << node.arguments[i]->id->name;
     if (node.arguments[i]->type != nullptr) {
       out << ": " << node.arguments[i]->type->name;
     }
@@ -224,13 +224,13 @@ void ASTPrinter::visit(const NFunctionDeclaration& node) {
 
   {
     DepthScope scope(*this, false);
-    node.block.accept(*this);
+    node.block->accept(*this);
   }
 }
 
 void ASTPrinter::visit(const NModuleDeclaration& node) {
   printPrefix();
-  out << "NModuleDeclaration '" << node.name.name << "'";
+  out << "NModuleDeclaration '" << node.name->name << "'";
 
   // Print export list if present
   if (!node.exports.empty()) {
@@ -259,13 +259,13 @@ void ASTPrinter::visit(const NImportStatement& node) {
 
   switch (node.kind) {
   case ImportKind::Module:
-    out << "import " << node.modulePath.fullName();
+    out << "import " << node.modulePath->fullName();
     break;
   case ImportKind::ModuleAlias:
-    out << "import " << node.modulePath.fullName() << " as " << node.alias;
+    out << "import " << node.modulePath->fullName() << " as " << node.alias;
     break;
   case ImportKind::Items:
-    out << "from " << node.modulePath.fullName() << " import ";
+    out << "from " << node.modulePath->fullName() << " import ";
     for (size_t i = 0; i < node.items.size(); ++i) {
       if (i > 0) {
         out << ", ";
@@ -277,7 +277,7 @@ void ASTPrinter::visit(const NImportStatement& node) {
     }
     break;
   case ImportKind::All:
-    out << "from " << node.modulePath.fullName() << " import *";
+    out << "from " << node.modulePath->fullName() << " import *";
     break;
   }
   out << "\n";

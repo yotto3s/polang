@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  NBlock* ast = nullptr;
+  std::unique_ptr<NBlock> ast;
 
   if (inputFile != nullptr) {
     // File input mode

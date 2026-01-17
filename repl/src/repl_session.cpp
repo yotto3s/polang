@@ -46,7 +46,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   const std::string fullCode = accumulatedCode + input;
 
   // Parse the combined input
-  NBlock* ast = polang_parse(fullCode);
+  auto ast = polang_parse(fullCode);
   if (ast == nullptr) {
     return EvalResult::error("Parse error");
   }
@@ -69,7 +69,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   bool lastIsExpression = false;
   std::string resultType = "void";
   if (!ast->statements.empty()) {
-    const NStatement* lastStmt = ast->statements.back();
+    const NStatement* lastStmt = ast->statements.back().get();
     // NExpressionStatement wraps expressions as statements
     if (dynamic_cast<const NExpressionStatement*>(lastStmt) != nullptr) {
       lastIsExpression = true;

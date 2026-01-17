@@ -16,9 +16,9 @@ extern void polang_reset_lexer_location();
 
 // Bison parser function and result
 extern int yyparse();
-extern NBlock* programBlock;
+extern std::unique_ptr<NBlock> programBlock;
 
-NBlock* polang_parse(const std::string& source) {
+std::unique_ptr<NBlock> polang_parse(const std::string& source) {
   polang_reset_lexer_location();
   programBlock = nullptr; // Reset before parsing
   const YY_BUFFER_STATE buffer = yy_scan_string(source.c_str());
@@ -28,10 +28,10 @@ NBlock* polang_parse(const std::string& source) {
   if (parseResult != 0) {
     return nullptr;
   }
-  return programBlock;
+  return std::move(programBlock);
 }
 
-NBlock* polang_parse_file(const char* filename) {
+std::unique_ptr<NBlock> polang_parse_file(const char* filename) {
   std::ifstream file(filename);
   if (!file.is_open()) {
     std::cerr << "ERROR: Cannot open file: " << filename << '\n';
