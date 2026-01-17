@@ -1,30 +1,179 @@
-# MLIR Lowering Process
+# Polang Architecture
 
-This document describes the MLIR-based code generation pipeline used by the Polang compiler.
+This document describes the architecture and structure of the Polang compiler, including the MLIR-based code generation pipeline.
 
 ## Overview
 
-The Polang compiler uses MLIR (Multi-Level Intermediate Representation) for code generation. The compilation pipeline consists of multiple lowering stages:
+Polang is a simple programming language compiler with an MLIR-based backend. It compiles source code to LLVM IR through a series of lowering passes.
+
+## Project Structure
 
 ```
-Source Code
-    ↓
-   AST
-    ↓
-Polang Dialect (with type variables)
-    ↓
-Type Inference Pass (resolves type variables)
-    ↓
-Polang Dialect (fully typed)
-    ↓
-Standard Dialects (arith, func, scf, memref)
-    ↓
-LLVM Dialect
-    ↓
-LLVM IR
+polang/
+├── CMakeLists.txt              # Root CMake configuration
+├── doc/                        # Documentation
+│   ├── Syntax.md               # Language syntax reference
+│   ├── TypeSystem.md           # Type system documentation
+│   ├── Architecture.md         # This file
+│   ├── Building.md             # Build instructions
+│   ├── Development.md          # Development guidelines
+│   └── Testing.md              # Test and CI documentation
+├── mlir/                       # MLIR dialect and code generation
+│   ├── CMakeLists.txt
+│   ├── include/polang/
+│   │   ├── Dialect/            # Polang dialect definitions (.td files)
+│   │   ├── Conversion/         # Lowering pass headers
+│   │   ├── Transforms/         # Transform pass headers
+│   │   └── MLIRGen.h           # AST to MLIR interface
+│   └── lib/
+│       ├── Dialect/            # Dialect implementation
+│       ├── Conversion/         # PolangToStandard lowering pass
+│       ├── Transforms/         # Type inference, monomorphization
+│       └── MLIRGen/            # AST to MLIR visitor
+├── parser/                     # Parser library
+│   ├── CMakeLists.txt
+│   ├── src/
+│   │   ├── lexer.l             # Flex lexer
+│   │   ├── parser.y            # Bison grammar
+│   │   ├── parser_api.cpp      # Parser API implementation
+│   │   ├── ast_printer.cpp     # AST printer implementation
+│   │   ├── type_checker.cpp    # Type checking and inference
+│   │   ├── operator_utils.cpp  # Operator utility functions
+│   │   └── error_reporter.cpp  # Unified error reporting
+│   └── include/parser/
+│       ├── node.hpp            # AST node definitions
+│       ├── parser_api.hpp      # Parser API header
+│       ├── ast_printer.hpp     # AST printer header
+│       ├── visitor.hpp         # Visitor pattern base class
+│       ├── polang_types.hpp    # Type constants and utilities
+│       ├── operator_utils.hpp  # Operator classification utilities
+│       └── error_reporter.hpp  # Error reporting interface
+├── compiler/                   # Compiler application
+│   ├── CMakeLists.txt
+│   ├── src/
+│   │   ├── main.cpp            # Compiler entry point
+│   │   └── mlir_codegen.cpp    # MLIR-based code generation
+│   └── include/compiler/
+│       └── mlir_codegen.hpp    # MLIR code generation header
+├── repl/                       # REPL application
+│   ├── CMakeLists.txt
+│   ├── src/
+│   │   ├── main.cpp            # REPL entry point
+│   │   └── repl_session.cpp    # REPL session management
+│   └── include/repl/
+│       ├── repl_session.hpp    # REPL session header
+│       └── input_checker.hpp   # Multi-line input detection
+├── tests/                      # Test suite
+│   ├── CMakeLists.txt          # Root test config (fetches GTest)
+│   ├── common/
+│   │   └── process_helper.hpp  # Shared test utilities
+│   ├── parser/                 # Parser unit tests
+│   ├── compiler/               # Compiler integration tests
+│   ├── repl/                   # REPL tests
+│   └── lit/                    # llvm-lit FileCheck tests
+├── example/                    # Example programs
+├── scripts/                    # Development scripts
+│   ├── run-clang-format.sh     # Format source files
+│   └── run-clang-tidy.sh       # Run static analysis
+└── docker/                     # Docker build environment
 ```
 
-## Polang Dialect
+## Components
+
+### 1. Parser Library (`parser/`)
+
+The parser library handles lexical analysis, parsing, and type checking.
+
+- **Input**: Source code string via `polang_parse()` API
+- **Output**: AST (`NBlock*`)
+- **Built as**: Static library `libPolangParser.a`
+
+**Key modules:**
+
+| Module | Description |
+|--------|-------------|
+| `polang_types.hpp` | Centralized type constants (`TypeNames::INT`, etc.) |
+| `operator_utils.hpp` | Operator classification and string conversion |
+| `error_reporter.hpp` | Unified error reporting across all components |
+| `visitor.hpp` | Visitor pattern base class for AST traversal |
+
+### 2. MLIR Dialect (`mlir/`)
+
+Custom MLIR dialect that closely mirrors Polang language semantics.
+
+- **Types**: `!polang.int`, `!polang.double`, `!polang.bool`, `!polang.typevar<id>`
+- **Operations**: Constants, arithmetic, comparisons, control flow, functions
+- **Passes**: Type inference, monomorphization, lowering to standard dialects
+
+### 3. Compiler (`compiler/`)
+
+The compiler application that produces LLVM IR.
+
+- **Input**: Source from stdin or file
+- **Output**: LLVM IR to stdout
+- **Process**: Parse → Type check → MLIR generation → Lowering → LLVM IR
+
+### 4. REPL (`repl/`)
+
+Interactive read-eval-print loop with JIT execution.
+
+- **Features**:
+  - Multi-line input for incomplete expressions
+  - Variable and function persistence across evaluations
+  - LLVM OrcJIT for code execution
+
+## Compilation Pipeline
+
+```
+Source Code (.po)
+       │
+       ▼
+┌─────────────────┐
+│  Lexer (Flex)   │  parser/src/lexer.l
+└────────┬────────┘
+         │ Tokens
+         ▼
+┌─────────────────┐
+│  Parser (Bison) │  parser/src/parser.y
+└────────┬────────┘
+         │ AST
+         ▼
+┌─────────────────┐
+│  Type Checker   │  parser/src/type_checker.cpp
+└────────┬────────┘
+         │ Typed AST
+         ▼
+┌─────────────────┐
+│   MLIRGen       │  mlir/lib/MLIRGen/MLIRGen.cpp
+└────────┬────────┘
+         │ Polang Dialect MLIR (with type variables)
+         ▼
+┌─────────────────┐
+│ Type Inference  │  mlir/lib/Transforms/TypeInference.cpp
+└────────┬────────┘
+         │ Polang Dialect MLIR (types resolved)
+         ▼
+┌─────────────────┐
+│ Monomorphization│  mlir/lib/Transforms/Monomorphization.cpp
+└────────┬────────┘
+         │ Polang Dialect MLIR (specialized functions)
+         ▼
+┌─────────────────┐
+│PolangToStandard │  mlir/lib/Conversion/PolangToStandard.cpp
+└────────┬────────┘
+         │ Standard Dialects (arith, func, scf, memref)
+         ▼
+┌─────────────────┐
+│ Standard to LLVM│  Built-in MLIR passes
+└────────┬────────┘
+         │ LLVM Dialect
+         ▼
+┌─────────────────┐
+│  LLVM IR Output │  translateModuleToLLVMIR
+└─────────────────┘
+```
+
+## Polang MLIR Dialect
 
 The Polang dialect is a custom MLIR dialect that closely mirrors the language semantics. This provides:
 
@@ -185,7 +334,7 @@ module {
 }
 ```
 
-### Stage 1.5: Type Inference Pass
+### Stage 2: Type Inference Pass
 
 The `TypeInferencePass` resolves type variables using Hindley-Milner style unification. This pass:
 
@@ -230,7 +379,7 @@ polang.func @__polang_entry() -> !polang.int {
 }
 ```
 
-### Stage 2: Polang to Standard Dialects
+### Stage 3: Polang to Standard Dialects
 
 The `PolangToStandardPass` lowers Polang dialect operations to standard MLIR dialects:
 
@@ -266,7 +415,7 @@ The `PolangToStandardPass` lowers Polang dialect operations to standard MLIR dia
 | `!polang.double` | `f64` |
 | `!polang.bool` | `i1` |
 
-### Stage 3: Standard to LLVM Dialect
+### Stage 4: Standard to LLVM Dialect
 
 This stage uses built-in MLIR passes to lower standard dialects to the LLVM dialect:
 
@@ -277,7 +426,7 @@ This stage uses built-in MLIR passes to lower standard dialects to the LLVM dial
 5. `finalize-memref-to-llvm` - Converts memory operations
 6. `reconcile-unrealized-casts` - Cleans up type conversion casts
 
-### Stage 4: LLVM Dialect to LLVM IR
+### Stage 5: LLVM Dialect to LLVM IR
 
 The final stage translates the LLVM dialect to actual LLVM IR using `translateModuleToLLVMIR`. This produces standard LLVM IR that can be:
 
@@ -366,14 +515,45 @@ At the call site, the captured value is passed as an extra argument:
 %result = polang.call @add_base(%arg, %base_val) : (!polang.int, !polang.int) -> !polang.int
 ```
 
-## Compiler Flags
+## Key Types
+
+| Type | Location | Description |
+|------|----------|-------------|
+| `NBlock` | `node.hpp` | Root AST node containing statements |
+| `MLIRCodeGenContext` | `mlir_codegen.hpp` | MLIR code generation context |
+| `Visitor` | `visitor.hpp` | Base class for AST visitors |
+| `ErrorReporter` | `error_reporter.hpp` | Unified error reporting |
+| `TypeNames` | `polang_types.hpp` | Compile-time type name constants |
+
+## Usage
+
+```bash
+# Compile source to LLVM IR
+echo "let x = 5" | ./build/bin/PolangCompiler
+
+# Dump AST (for debugging)
+echo "let x = 5" | ./build/bin/PolangCompiler --dump-ast
+
+# Output Polang dialect MLIR (for debugging)
+echo "let x = 5" | ./build/bin/PolangCompiler --emit-mlir
+
+# Execute source file via REPL
+./build/bin/PolangRepl example/hello.po
+
+# Interactive REPL session
+./build/bin/PolangRepl
+```
+
+### Compiler Flags
 
 | Flag | Description |
 |------|-------------|
 | (default) | Output LLVM IR |
-| `--emit-mlir` | Output Polang dialect MLIR |
+| `--dump-ast` | Dump AST and exit (no code generation) |
+| `--emit-mlir` | Output Polang dialect MLIR instead of LLVM IR |
+| `--help` | Show help message |
 
-## File Structure
+## MLIR File Structure
 
 ```
 mlir/
@@ -403,3 +583,10 @@ mlir/
     └── MLIRGen/
         └── MLIRGen.cpp         # AST to MLIR visitor
 ```
+
+## Related Documentation
+
+- `doc/Syntax.md` - Language syntax reference
+- `doc/TypeSystem.md` - Type system and inference
+- `doc/Building.md` - Build instructions
+- `doc/Testing.md` - Test infrastructure and CI/CD

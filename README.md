@@ -82,9 +82,10 @@ for f in example/*.po; do echo "=== $(basename $f) ==="; ./build/bin/PolangRepl 
 |----------|-------------|
 | [Syntax](doc/Syntax.md) | Language syntax reference |
 | [TypeSystem](doc/TypeSystem.md) | Type system and inference |
-| [Lowering](doc/Lowering.md) | MLIR lowering pipeline |
-| [Tests](doc/Tests.md) | Test infrastructure and coverage |
-| [CI/CD](doc/CI_CD.md) | Continuous integration pipeline |
+| [Architecture](doc/Architecture.md) | Project structure, components, MLIR lowering |
+| [Building](doc/Building.md) | Build instructions, dependencies |
+| [Development](doc/Development.md) | Code style and tooling |
+| [Testing](doc/Testing.md) | Test infrastructure and CI/CD |
 
 ## Project Structure
 
