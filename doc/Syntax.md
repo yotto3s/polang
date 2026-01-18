@@ -7,6 +7,7 @@ Polang is a simple programming language with ML-inspired syntax and LLVM backend
 - [Types](#types)
 - [Literals](#literals)
 - [Variables](#variables)
+- [Reference Types](#reference-types)
 - [Functions](#functions)
 - [Control Flow](#control-flow)
 - [Expressions](#expressions)
@@ -158,6 +159,117 @@ a <- b <- 5         ; assigns 5 to both a and b, evaluates to 5
 ```
 
 **Note:** The `=` operator is used only for initial binding (declaration). The `<-` operator is used for reassignment (mutation).
+
+## Reference Types
+
+Polang supports reference types for working with mutable and immutable memory locations.
+
+### Mutable References (`mut T`)
+
+Variables declared with `let mut` have mutable reference type. A mutable reference allows both reading and writing the underlying value.
+
+```
+let mut x = 10       ; x has type 'mut i64' (mutable reference)
+x <- 20              ; write through mutable reference
+*x                   ; read value through dereference (20)
+```
+
+**Type Annotations:**
+```
+mut i64              ; mutable reference to i64
+mut f64              ; mutable reference to f64
+mut bool             ; mutable reference to bool
+```
+
+### Copying Mutable References
+
+When you assign a mutable reference to a new variable, the reference is copied (both point to the same location):
+
+```
+let mut x = 10       ; x is mut i64
+let r = x            ; r is also mut i64, points to same location
+r <- 20              ; writes through r
+*x                   ; reads 20 (x and r share the location)
+```
+
+### Extracting Values
+
+To copy the underlying value (not the reference), use the dereference operator `*`:
+
+```
+let mut x = 10       ; x is mut i64
+let v = *x           ; v is i64 (the value 10, not a reference)
+x <- 20              ; modify x
+v                    ; still 10 (v holds a copy of the value)
+```
+
+### Immutable References (`ref T`)
+
+Immutable references provide read-only access to a memory location. Create them using the `ref` keyword on a value:
+
+```
+let mut x = 10       ; x is mut i64
+let r = ref *x       ; r is ref i64 (immutable reference to x's location)
+*r                   ; read value (10)
+x <- 20              ; write through mutable reference
+*r                   ; reads 20 (r sees the update)
+; r <- 30            ; ERROR: cannot write through immutable reference
+```
+
+**Type Annotations:**
+```
+ref i64              ; immutable reference to i64
+ref f64              ; immutable reference to f64
+ref bool             ; immutable reference to bool
+```
+
+### Dereference Operator (`*`)
+
+The `*` operator dereferences a reference to access the underlying value:
+
+```
+let mut x = 10
+*x                   ; read value from mutable reference (10)
+
+let r = ref *x
+*r                   ; read value from immutable reference (10)
+```
+
+### Reference Type Rules
+
+1. `let mut x = v` where `v : T` → `x` has type `mut T`
+2. `let y = x` where `x : mut T` → `y` has type `mut T` (reference copy)
+3. `ref e` where `e : T` → result type is `ref T`
+4. `*x` where `x : mut T` or `x : ref T` → result type is `T`
+5. `x <- v` requires `x : mut T` (cannot write through `ref T`)
+
+### Reference Examples
+
+```
+; Basic mutable variable
+let mut counter = 0
+counter <- counter + 1
+*counter              ; 1
+
+; Reference aliasing
+let mut a = 10
+let b = a            ; b is a copy of the reference
+b <- 20
+*a                   ; 20 (a and b refer to same location)
+
+; Value extraction
+let mut x = 100
+let copy = *x        ; copy holds the value 100
+x <- 200
+copy                 ; still 100
+
+; Immutable reference
+let mut data = 42
+let reader = ref *data
+*reader              ; 42
+data <- 99
+*reader              ; 99 (sees the mutation)
+```
 
 ## Functions
 
@@ -426,16 +538,26 @@ The reassignment operator returns the assigned value, allowing chained assignmen
 
 **Note:** The `=` operator is used only for initial binding in declarations (`let x = 5`).
 
+### Reference Operators
+
+| Operator | Description                       | Example   | Returns        |
+|----------|-----------------------------------|-----------|----------------|
+| `ref`    | Create immutable reference        | `ref *x`  | Immutable ref  |
+| `*`      | Dereference (read through ref)    | `*x`      | Underlying value |
+
+**Note:** The `*` operator when used as a prefix (unary) dereferences a reference. As an infix (binary) operator, it remains multiplication.
+
 ### Operator Precedence
 
 From highest to lowest:
 
-1. Unary `-`, `!` (negation, logical not)
-2. `as` (type conversion)
-3. `*`, `/` (multiplication, division)
-4. `+`, `-` (addition, subtraction)
-5. `==`, `!=`, `<`, `<=`, `>`, `>=` (comparisons)
-6. `<-` (reassignment, right-associative)
+1. `*expr` (unary dereference), `ref expr` (reference creation)
+2. Unary `-`, `!` (negation, logical not)
+3. `as` (type conversion)
+4. `*`, `/` (multiplication, division - binary)
+5. `+`, `-` (addition, subtraction)
+6. `==`, `!=`, `<`, `<=`, `>`, `>=` (comparisons)
+7. `<-` (reassignment, right-associative)
 
 Parentheses can be used to override precedence:
 
@@ -628,6 +750,8 @@ expression  ::= identifier "<-" expression
               | "(" expression ")"
               | "if" expression "then" expression "else" expression
               | "let" let_bindings "in" expression
+              | "ref" expression
+              | "*" expression
 
 call_args   ::= ε
               | expression ("," expression)*
@@ -656,7 +780,11 @@ double      ::= [0-9]+ "." [0-9]*
 
 boolean     ::= "true" | "false"
 
-type        ::= "i8" | "i16" | "i32" | "i64"
+type        ::= base_type
+              | "mut" base_type
+              | "ref" base_type
+
+base_type   ::= "i8" | "i16" | "i32" | "i64"
               | "u8" | "u16" | "u32" | "u64"
               | "f32" | "f64"
               | "int" | "double"   ; legacy aliases

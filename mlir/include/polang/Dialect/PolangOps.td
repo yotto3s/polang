@@ -545,6 +545,97 @@ def Polang_StoreOp : Polang_Op<"store"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Reference operations
+//===----------------------------------------------------------------------===//
+
+def Polang_MutRefDerefOp : Polang_Op<"mutref.deref", [Pure]> {
+  let summary = "Dereference a mutable reference to read the value";
+  let description = [{
+    Reads the value from a mutable reference.
+
+    Example:
+    ```mlir
+    %val = polang.mutref.deref %ref : !polang.mutref<!polang.integer<64, signed>> -> !polang.integer<64, signed>
+    ```
+  }];
+
+  let arguments = (ins Polang_MutRefOrTypeVar:$ref);
+  let results = (outs Polang_AnyTypeOrVar:$result);
+
+  let assemblyFormat = "$ref `:` type($ref) `->` type($result) attr-dict";
+}
+
+def Polang_MutRefStoreOp : Polang_Op<"mutref.store"> {
+  let summary = "Store a value through a mutable reference";
+  let description = [{
+    Writes a value through a mutable reference.
+
+    Example:
+    ```mlir
+    polang.mutref.store %val, %ref : !polang.integer<64, signed>, !polang.mutref<!polang.integer<64, signed>>
+    ```
+  }];
+
+  let arguments = (ins Polang_AnyTypeOrVar:$value, Polang_MutRefOrTypeVar:$ref);
+  let results = (outs Polang_AnyTypeOrVar:$result);
+
+  let assemblyFormat = "$value `,` $ref `:` type($value) `,` type($ref) `->` type($result) attr-dict";
+}
+
+def Polang_RefCreateOp : Polang_Op<"ref.create", [Pure]> {
+  let summary = "Create an immutable reference from a mutable reference";
+  let description = [{
+    Creates an immutable reference from a mutable reference.
+    The resulting reference can only be used for reading.
+
+    Example:
+    ```mlir
+    %imm = polang.ref.create %mut : !polang.mutref<!polang.integer<64, signed>> -> !polang.ref<!polang.integer<64, signed>>
+    ```
+  }];
+
+  let arguments = (ins Polang_MutRefOrTypeVar:$source);
+  let results = (outs Polang_AnyRefOrTypeVar:$result);
+
+  let assemblyFormat = "$source `:` type($source) `->` type($result) attr-dict";
+}
+
+def Polang_RefDerefOp : Polang_Op<"ref.deref", [Pure]> {
+  let summary = "Dereference an immutable reference to read the value";
+  let description = [{
+    Reads the value from an immutable reference.
+
+    Example:
+    ```mlir
+    %val = polang.ref.deref %ref : !polang.ref<!polang.integer<64, signed>> -> !polang.integer<64, signed>
+    ```
+  }];
+
+  let arguments = (ins AnyTypeOf<[Polang_RefType, Polang_TypeVarType]>:$ref);
+  let results = (outs Polang_AnyTypeOrVar:$result);
+
+  let assemblyFormat = "$ref `:` type($ref) `->` type($result) attr-dict";
+}
+
+def Polang_MutRefCreateOp : Polang_Op<"mutref.create"> {
+  let summary = "Create a mutable reference from an initial value";
+  let description = [{
+    Creates a new mutable reference initialized with the given value.
+    This allocates memory for the value and returns a mutable reference.
+
+    Example:
+    ```mlir
+    %ref = polang.mutref.create %val : !polang.integer<64, signed> -> !polang.mutref<!polang.integer<64, signed>>
+    ```
+  }];
+
+  let arguments = (ins Polang_AnyTypeOrVar:$initialValue);
+  let results = (outs Polang_MutRefOrTypeVar:$result);
+
+  let assemblyFormat = "$initialValue `:` type($initialValue) `->` type($result) attr-dict";
+}
+
+//===----------------------------------------------------------------------===//
 // Print operation (for debugging/output)
 //===----------------------------------------------------------------------===//
 

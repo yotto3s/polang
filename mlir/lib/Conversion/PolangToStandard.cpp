@@ -67,6 +67,23 @@ public:
       }
       llvm_unreachable("Unknown TypeVarKind");
     });
+    // Handle mutable reference types - convert to memref
+    addConversion([this](MutRefType type) -> Type {
+      Type elemType = convertType(type.getElementType());
+      if (!elemType) {
+        return nullptr;
+      }
+      return MemRefType::get({}, elemType);
+    });
+    // Handle immutable reference types - also convert to memref
+    // (immutability is enforced at the type checker level)
+    addConversion([this](RefType type) -> Type {
+      Type elemType = convertType(type.getElementType());
+      if (!elemType) {
+        return nullptr;
+      }
+      return MemRefType::get({}, elemType);
+    });
   }
 };
 
@@ -641,6 +658,89 @@ struct StoreOpLowering : public OpConversionPattern<StoreOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// Reference Operations Lowering
+//===----------------------------------------------------------------------===//
+
+struct MutRefCreateOpLowering : public OpConversionPattern<MutRefCreateOp> {
+  using OpConversionPattern<MutRefCreateOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(MutRefCreateOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    // Convert the result type (mutref -> memref)
+    auto resultType = getTypeConverter()->convertType(op.getResult().getType());
+    if (!resultType) {
+      return failure();
+    }
+    auto memRefType = cast<MemRefType>(resultType);
+
+    // Allocate memory
+    auto alloca = rewriter.create<memref::AllocaOp>(op.getLoc(), memRefType);
+
+    // Store the initial value
+    rewriter.create<memref::StoreOp>(op.getLoc(), adaptor.getInitialValue(),
+                                     alloca);
+
+    // Replace the op with the allocated memref
+    rewriter.replaceOp(op, alloca.getResult());
+    return success();
+  }
+};
+
+struct MutRefDerefOpLowering : public OpConversionPattern<MutRefDerefOp> {
+  using OpConversionPattern<MutRefDerefOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(MutRefDerefOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    // Dereference is just a memref.load
+    rewriter.replaceOpWithNewOp<memref::LoadOp>(op, adaptor.getRef());
+    return success();
+  }
+};
+
+struct MutRefStoreOpLowering : public OpConversionPattern<MutRefStoreOp> {
+  using OpConversionPattern<MutRefStoreOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(MutRefStoreOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    // Store through mutable reference is just memref.store
+    rewriter.create<memref::StoreOp>(op.getLoc(), adaptor.getValue(),
+                                     adaptor.getRef());
+    // The store operation returns the stored value
+    rewriter.replaceOp(op, adaptor.getValue());
+    return success();
+  }
+};
+
+struct RefCreateOpLowering : public OpConversionPattern<RefCreateOp> {
+  using OpConversionPattern<RefCreateOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(RefCreateOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    // Creating an immutable reference from a mutable reference is a no-op
+    // at the memref level (both are memref). The immutability is enforced
+    // at the type checker level.
+    rewriter.replaceOp(op, adaptor.getSource());
+    return success();
+  }
+};
+
+struct RefDerefOpLowering : public OpConversionPattern<RefDerefOp> {
+  using OpConversionPattern<RefDerefOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(RefDerefOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    // Dereference immutable reference is just a memref.load
+    rewriter.replaceOpWithNewOp<memref::LoadOp>(op, adaptor.getRef());
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Print Operation Lowering
 //===----------------------------------------------------------------------===//
 
@@ -694,8 +794,9 @@ struct PolangToStandardPass
                  MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
                  FuncOpLowering, CallOpLowering, ReturnOpLowering, IfOpLowering,
                  YieldOpLowering, AllocaOpLowering, LoadOpLowering,
-                 StoreOpLowering, PrintOpLowering>(typeConverter,
-                                                   &getContext());
+                 StoreOpLowering, MutRefCreateOpLowering, MutRefDerefOpLowering,
+                 MutRefStoreOpLowering, RefCreateOpLowering, RefDerefOpLowering,
+                 PrintOpLowering>(typeConverter, &getContext());
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {

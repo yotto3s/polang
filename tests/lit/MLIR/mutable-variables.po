@@ -1,14 +1,13 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
-; Test mutable variable with alloca, store, and load
+; Test mutable variable with mutref operations
 ; CHECK: {{.*}}polang.func @__polang_entry() -> !polang.integer<64, signed>{{.*}}
-; CHECK: {{.*}}polang.constant.integer 10 : !polang.integer<64, signed>
-; CHECK: {{.*}}polang.alloca "x", mutable{{.*}}
-; CHECK: {{.*}}polang.store{{.*}}
-; CHECK: {{.*}}polang.constant.integer 20 : !polang.integer<64, signed>
-; CHECK: {{.*}}polang.store{{.*}}
-; CHECK: {{.*}}polang.load{{.*}}
+; CHECK: {{.*}}polang.constant.integer{{.*}}
+; CHECK: {{.*}}polang.mutref.create{{.*}}
+; CHECK: {{.*}}polang.constant.integer 20{{.*}}
+; CHECK: {{.*}}polang.mutref.store{{.*}}
+; CHECK: {{.*}}polang.mutref.deref{{.*}}
 ; CHECK: {{.*}}polang.return{{.*}}
 let mut x = 10
 x <- 20
-x
+(*x)

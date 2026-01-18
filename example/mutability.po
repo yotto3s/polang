@@ -1,22 +1,24 @@
 ; Mutability demonstration
 ; Variables are immutable by default, use 'let mut' for mutable variables
+; Mutable variables require explicit dereference with (*x) to access values
 
 ; Immutable variable (default)
 let x = 10
 
-; Mutable variable
+; Mutable variable - has type 'mut i64' (mutable reference)
 let mut counter = 0
 
 ; Reassign mutable variable using <- operator
 ; Assignment is an expression that returns the assigned value
-counter <- counter + 1
-counter <- counter + 1
-counter <- counter + 1
+; Use (*counter) to read the current value
+counter <- (*counter) + 1
+counter <- (*counter) + 1
+counter <- (*counter) + 1
 
 ; Chained assignment: both a and b get the value 5
 let mut a = 0
 let mut b = 0
-a <- b <- 5
+a <- (b <- 5)
 
-; Final result: x + counter + a + b = 10 + 3 + 5 + 5 = 23
-x + counter + a + b
+; Final result: x + (*counter) + (*a) + (*b) = 10 + 3 + 5 + 5 = 23
+x + (*counter) + (*a) + (*b)

@@ -86,6 +86,7 @@ yy::parser::symbol_type yylex();
 %token TTRUE "true"
 %token TFALSE "false"
 %token TMUT "mut"
+%token TREF "ref"
 %token TLARROW "<-"
 %token TMODULE "module"
 %token TENDMODULE "endmodule"
@@ -122,12 +123,15 @@ yy::parser::symbol_type yylex();
 %left TMUL TDIV
 %left TAS
 %left TDOT
+%precedence TREF         // ref expr (unary)
+%precedence TDEREF       // *expr (unary dereference)
 
 /* Expected conflicts:
    - ident TLPAREN (function call vs expr + (expr))
    - ident TDOT (qualified name vs expr DOT)
+   - TMUL expr (unary deref vs binary multiplication)
 */
-%expect 3
+%expect 4
 
 %start program
 
@@ -360,6 +364,14 @@ expr : ident TLARROW expr { $$ = std::make_unique<NAssignment>(std::move($1), st
        }
      | TLET let_bindings TIN expr {
          $$ = std::make_unique<NLetExpression>(std::move($2), std::move($4));
+       }
+     | TREF expr %prec TREF {
+         /* ref expr - create immutable reference */
+         $$ = std::make_unique<NRefExpression>(std::move($2));
+       }
+     | TMUL expr %prec TDEREF {
+         /* *expr - dereference a reference */
+         $$ = std::make_unique<NDerefExpression>(std::move($2));
        }
      ;
 

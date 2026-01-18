@@ -19,6 +19,10 @@ void NCastExpression::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NAssignment::accept(Visitor& visitor) const { visitor.visit(*this); }
 
+void NRefExpression::accept(Visitor& visitor) const { visitor.visit(*this); }
+
+void NDerefExpression::accept(Visitor& visitor) const { visitor.visit(*this); }
+
 void NBlock::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NIfExpression::accept(Visitor& visitor) const { visitor.visit(*this); }

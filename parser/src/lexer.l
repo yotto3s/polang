@@ -49,6 +49,7 @@ void polang_reset_lexer_location() {
 "true"                  { return yy::parser::make_TTRUE(LOC); }
 "false"                 { return yy::parser::make_TFALSE(LOC); }
 "mut"                   { return yy::parser::make_TMUT(LOC); }
+"ref"                   { return yy::parser::make_TREF(LOC); }
 "module"                { return yy::parser::make_TMODULE(LOC); }
 "endmodule"             { return yy::parser::make_TENDMODULE(LOC); }
 "import"                { return yy::parser::make_TIMPORT(LOC); }

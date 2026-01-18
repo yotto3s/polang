@@ -280,20 +280,86 @@ public:
       return;
     }
     Value value = result;
+    std::string valueType = resultType;
 
-    // Get the alloca for the variable
-    auto it = symbolTable.find(node.lhs->name);
-    if (it == symbolTable.end()) {
+    // Look up the mutable reference for the variable
+    auto refValue = lookupMutableRef(node.lhs->name);
+    if (!refValue) {
       emitError(loc()) << "Unknown variable in assignment: " << node.lhs->name;
       result = nullptr;
       return;
     }
 
-    // Store the value
-    builder.create<StoreOp>(loc(), value, it->second);
+    // Get the element type
+    Type elemType = getPolangType(getReferentType(lookupType(node.lhs->name).value_or(TypeNames::I64)));
+
+    // Store through the mutable reference
+    auto storeOp = builder.create<MutRefStoreOp>(loc(), elemType, value, *refValue);
 
     // Assignment expression returns the assigned value
-    result = value;
+    result = storeOp.getResult();
+    resultType = valueType;
+  }
+
+  void visit(const NRefExpression& node) override {
+    // Evaluate the inner expression
+    node.expr->accept(*this);
+    if (!result) {
+      return;
+    }
+
+    // The inner expression should produce a value
+    // We wrap it in an immutable reference type
+    Value innerValue = result;
+    std::string innerType = resultType;
+
+    // If the inner type is a mutable reference, create an immutable ref from it
+    if (isMutableRefType(innerType)) {
+      // Convert mut ref to immutable ref
+      Type elemType = getPolangType(getReferentType(innerType));
+      Type refType = RefType::get(builder.getContext(), elemType);
+      result = builder.create<RefCreateOp>(loc(), refType, innerValue);
+      resultType = makeImmutableRefType(getReferentType(innerType));
+    } else {
+      // The inner value is a plain value; create an immutable reference to it
+      // First create a mutable reference to the value, then convert to immutable
+      Type innerMLIRType = innerValue.getType();
+
+      // Create a mutable reference from the value
+      Type mutRefType = MutRefType::get(builder.getContext(), innerMLIRType);
+      auto mutRef = builder.create<MutRefCreateOp>(loc(), mutRefType, innerValue);
+
+      // Convert the mutable reference to an immutable reference
+      Type refType = RefType::get(builder.getContext(), innerMLIRType);
+      result = builder.create<RefCreateOp>(loc(), refType, mutRef.getResult());
+      resultType = makeImmutableRefType(innerType);
+    }
+  }
+
+  void visit(const NDerefExpression& node) override {
+    // Evaluate the reference expression
+    node.ref->accept(*this);
+    if (!result) {
+      return;
+    }
+    Value refValue = result;
+    std::string refType = resultType;
+
+    // Check if it's a reference type and dereference accordingly
+    if (isMutableRefType(refType)) {
+      std::string elemTypeName = getReferentType(refType);
+      Type elemType = getPolangType(elemTypeName);
+      result = builder.create<MutRefDerefOp>(loc(), elemType, refValue);
+      resultType = elemTypeName;
+    } else if (isImmutableRefType(refType)) {
+      std::string elemTypeName = getReferentType(refType);
+      Type elemType = getPolangType(elemTypeName);
+      result = builder.create<RefDerefOp>(loc(), elemType, refValue);
+      resultType = elemTypeName;
+    } else {
+      emitError(loc()) << "Cannot dereference non-reference type: " << refType;
+      result = nullptr;
+    }
   }
 
   void visit(const NBlock& node) override {
@@ -374,35 +440,75 @@ public:
     // Get mangled variable name (includes module path)
     const std::string varName = mangledName(node.id->name);
 
-    // Determine the type
+    // Determine the type - prefer type annotation from type checker
     std::string typeName =
         node.type != nullptr ? node.type->name : TypeNames::I64;
+    Value initValue = nullptr;
     if (node.assignmentExpr != nullptr) {
-      // Infer type from assignment
+      // Evaluate the assignment expression
       node.assignmentExpr->accept(*this);
-      typeName = resultType;
+      initValue = result;
+
+      // Only use resultType if we don't have a type annotation
+      // The type checker sets node.type with resolved types
+      if (node.type == nullptr) {
+        typeName = resultType;
+      }
     }
 
     if (node.isMutable) {
-      // Mutable: use alloca/store pattern
-      Type polangType = getPolangType(typeName);
-      Type llvmType = convertPolangType(polangType);
-
-      auto memRefType = MemRefType::get({}, llvmType);
-      auto alloca = builder.create<AllocaOp>(loc(), memRefType, varName,
-                                             polangType, node.isMutable);
-
-      if (node.assignmentExpr != nullptr && result) {
-        builder.create<StoreOp>(loc(), result, alloca);
+      // Get the base type (strip mut prefix if present for type storage)
+      std::string baseTypeName = typeName;
+      if (isMutableRefType(baseTypeName)) {
+        baseTypeName = getReferentType(baseTypeName);
       }
 
-      symbolTable[varName] = alloca;
+      // Mutable: Create a mutable reference using the resolved type from type checker
+      Type polangType = getPolangType(baseTypeName);
+      Type mutRefType = MutRefType::get(builder.getContext(), polangType);
+
+      if (initValue) {
+        // If initializing from an existing mutable reference, copy it
+        if (isMutableRefType(typeName) && mlir::isa<MutRefType>(initValue.getType())) {
+          // Copying a mutable reference
+          mutableRefTable[varName] = initValue;
+        } else {
+          // Create new mutable reference with initial value
+          auto mutRefOp = builder.create<MutRefCreateOp>(loc(), mutRefType, initValue);
+          mutableRefTable[varName] = mutRefOp.getResult();
+        }
+      } else {
+        // Create uninitialized mutable reference - use default value
+        Type llvmType = convertPolangType(polangType);
+        auto memRefType = MemRefType::get({}, llvmType);
+        auto alloca = builder.create<AllocaOp>(loc(), memRefType, varName,
+                                               polangType, node.isMutable);
+        mutableRefTable[varName] = alloca;
+      }
+
+      // Store the mutable reference type
+      typeTable[varName] = makeMutableRefType(baseTypeName);
     } else {
-      // Immutable: store SSA value directly (no alloca needed)
-      immutableValues[varName] = result;
+      // Immutable binding
+      if (isMutableRefType(typeName)) {
+        // Copying a mutable reference to an immutable binding
+        // Store in mutableRefTable so assignment through the reference works
+        mutableRefTable[varName] = initValue;
+      } else {
+        // Regular immutable value - store SSA value directly (no alloca needed)
+        immutableValues[varName] = initValue;
+      }
+      typeTable[varName] = typeName;
     }
 
-    typeTable[varName] = typeName;
+    // For mutable declarations, clear result since the type (mut T) doesn't match
+    // what most callers expect (T). For immutable declarations, keep the value.
+    if (node.isMutable) {
+      result = nullptr;
+    } else {
+      result = initValue;
+      resultType = typeName;
+    }
   }
 
   void visit(const NFunctionDeclaration& node) override {
@@ -623,10 +729,11 @@ private:
   }
 
   // Symbol tables
-  std::map<std::string, Value> symbolTable;     // Mutable variable allocas
-  std::map<std::string, Value> argValues;       // Function arguments
-  std::map<std::string, Value> immutableValues; // Immutable variable SSA values
-  std::map<std::string, std::string> typeTable; // Variable types
+  std::map<std::string, Value> symbolTable;      // Mutable variable allocas (old style)
+  std::map<std::string, Value> mutableRefTable;  // Mutable reference values
+  std::map<std::string, Value> argValues;        // Function arguments
+  std::map<std::string, Value> immutableValues;  // Immutable variable SSA values
+  std::map<std::string, std::string> typeTable;  // Variable types
   std::map<std::string, Type>
       typeVarTable; // Variable types as MLIR types (for type vars)
   std::map<std::string, std::vector<std::string>> functionCaptures;
@@ -643,12 +750,14 @@ private:
   public:
     SymbolTableScope(MLIRGenVisitor& visitor, bool clearAllTables = false)
         : visitor(visitor), savedSymbolTable(visitor.symbolTable),
+          savedMutableRefTable(visitor.mutableRefTable),
           savedTypeTable(visitor.typeTable),
           savedTypeVarTable(visitor.typeVarTable),
           savedArgValues(visitor.argValues),
           savedImmutableValues(visitor.immutableValues) {
       if (clearAllTables) {
         visitor.symbolTable.clear();
+        visitor.mutableRefTable.clear();
         visitor.typeTable.clear();
         visitor.typeVarTable.clear();
         visitor.argValues.clear();
@@ -658,6 +767,7 @@ private:
 
     ~SymbolTableScope() {
       visitor.symbolTable = savedSymbolTable;
+      visitor.mutableRefTable = savedMutableRefTable;
       visitor.typeTable = savedTypeTable;
       visitor.typeVarTable = savedTypeVarTable;
       visitor.argValues = savedArgValues;
@@ -667,6 +777,7 @@ private:
   private:
     MLIRGenVisitor& visitor;
     std::map<std::string, Value> savedSymbolTable;
+    std::map<std::string, Value> savedMutableRefTable;
     std::map<std::string, std::string> savedTypeTable;
     std::map<std::string, Type> savedTypeVarTable;
     std::map<std::string, Value> savedArgValues;
@@ -675,8 +786,27 @@ private:
 
   Location loc() { return builder.getUnknownLoc(); }
 
+  /// Look up a mutable reference by name.
+  /// Returns the reference value itself (not dereferenced).
+  std::optional<Value> lookupMutableRef(const std::string& name) {
+    // Check mutable reference table
+    auto refIt = mutableRefTable.find(name);
+    if (refIt != mutableRefTable.end()) {
+      return refIt->second;
+    }
+
+    // Check old-style allocas (for backward compatibility)
+    auto it = symbolTable.find(name);
+    if (it != symbolTable.end()) {
+      return it->second;
+    }
+
+    return std::nullopt;
+  }
+
   /// Look up a variable by name in the symbol tables.
-  /// Checks immutable values, mutable allocas, and function arguments.
+  /// For mutable references, returns the reference (not dereferenced).
+  /// Checks immutable values, mutable references, and function arguments.
   /// Returns nullopt if the variable is not found.
   std::optional<Value> lookupVariable(const std::string& name) {
     // Check immutable values first (SSA values, no load needed)
@@ -685,7 +815,13 @@ private:
       return immIt->second;
     }
 
-    // Check mutable variables (allocas, need load)
+    // Check mutable references - return the reference itself
+    auto refIt = mutableRefTable.find(name);
+    if (refIt != mutableRefTable.end()) {
+      return refIt->second;
+    }
+
+    // Check old-style mutable variables (allocas, need load)
     auto it = symbolTable.find(name);
     if (it != symbolTable.end()) {
       return builder.create<LoadOp>(loc(), getTypeForName(name), it->second);
@@ -710,6 +846,17 @@ private:
   }
 
   Type getPolangType(const std::string& typeName) {
+    // Handle reference types
+    if (isMutableRefType(typeName)) {
+      std::string elemTypeName = getReferentType(typeName);
+      Type elemType = getPolangType(elemTypeName);
+      return MutRefType::get(builder.getContext(), elemType);
+    }
+    if (isImmutableRefType(typeName)) {
+      std::string elemTypeName = getReferentType(typeName);
+      Type elemType = getPolangType(elemTypeName);
+      return RefType::get(builder.getContext(), elemType);
+    }
     // Signed integers
     if (typeName == TypeNames::I8) {
       return polang::IntegerType::get(builder.getContext(), 8,

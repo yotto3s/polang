@@ -386,8 +386,8 @@ TEST(TypeCheckTest, ClosureInLetExpression) {
 }
 
 TEST(TypeCheckTest, ClosureCapturesMutableVariable) {
-  // Function can capture mutable variable
-  EXPECT_TRUE(hasNoTypeError("let mut x = 10\nlet f() = x + 1\nf()"));
+  // Function can capture mutable variable (requires explicit dereference)
+  EXPECT_TRUE(hasNoTypeError("let mut x = 10\nlet f() = (*x) + 1\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureTypeMismatch) {
@@ -505,7 +505,7 @@ TEST(TypeCheckTest, ClosureDoesNotCaptureLocalLetBinding) {
 }
 
 TEST(TypeCheckTest, ClosureWithMutableAssignmentCapture) {
-  // Capture mutable variable via assignment LHS
+  // Capture mutable variable via assignment LHS (requires explicit dereference)
   EXPECT_TRUE(hasNoTypeError(
-      "let mut counter = 0\nlet inc() = counter <- counter + 1\ninc()"));
+      "let mut counter = 0\nlet inc() = counter <- (*counter) + 1\ninc()"));
 }

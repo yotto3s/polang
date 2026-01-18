@@ -77,7 +77,8 @@ TEST(CompilerIntegration, ModuleDefinition) {
 // ============== Additional CodeGen Tests ==============
 
 TEST(CompilerIntegration, VariableReassignment) {
-  const auto result = runCompiler("let mut x = 5\nx <- 10\nx");
+  // Explicit dereference required for mutable variable values
+  const auto result = runCompiler("let mut x = 5\nx <- 10\n(*x)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("store"));
 }
