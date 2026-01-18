@@ -260,8 +260,8 @@ struct CastOpLowering : public OpConversionPattern<CastOp> {
     (void)loc; // Used in some branches
 
     // Determine if types are integer or float
-    bool inputIsInt = isa<mlir::IntegerType>(inputType);
-    bool resultIsInt = isa<mlir::IntegerType>(resultType);
+    const bool inputIsInt = isa<mlir::IntegerType>(inputType);
+    const bool resultIsInt = isa<mlir::IntegerType>(resultType);
 
     if (inputIsInt && resultIsInt) {
       // Integer to integer conversion

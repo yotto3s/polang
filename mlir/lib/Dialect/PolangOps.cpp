@@ -321,10 +321,10 @@ LogicalResult CastOp::verify() {
   }
 
   // Both types must be numeric (not bool)
-  bool inputIsNumeric =
+  const bool inputIsNumeric =
       isa<polang::IntegerType>(inputType) || isa<polang::FloatType>(inputType);
-  bool resultIsNumeric = isa<polang::IntegerType>(resultType) ||
-                         isa<polang::FloatType>(resultType);
+  const bool resultIsNumeric = isa<polang::IntegerType>(resultType) ||
+                               isa<polang::FloatType>(resultType);
 
   if (!inputIsNumeric) {
     return emitOpError("input type must be numeric, got ") << inputType;
@@ -425,7 +425,8 @@ ParseResult ConstantFloatOp::parse(OpAsmParser& parser,
   }
 
   // Create the FloatAttr with the appropriate type
-  mlir::Type attrType = Float64Type::get(parser.getContext()); // Default for type vars
+  mlir::Type attrType =
+      Float64Type::get(parser.getContext()); // Default for type vars
   if (auto floatType = dyn_cast<polang::FloatType>(resultType)) {
     if (floatType.getWidth() == 32) {
       attrType = Float32Type::get(parser.getContext());

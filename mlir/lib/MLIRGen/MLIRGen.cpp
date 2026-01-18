@@ -263,7 +263,7 @@ public:
     if (!result) {
       return;
     }
-    Value inputValue = result;
+    const Value inputValue = result;
 
     // Get the target type
     Type targetType = getPolangType(node.targetType->name);

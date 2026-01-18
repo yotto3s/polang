@@ -88,16 +88,16 @@ When modifying code, update the relevant documentation:
 
 | Example | Output |
 |---------|--------|
-| `closures.po` | `21 : int` |
-| `conditionals.po` | `10 : int` |
-| `factorial.po` | `120 : int` |
-| `fibonacci.po` | `5 : int` |
-| `functions.po` | `25 : int` |
-| `hello.po` | `7 : int` |
-| `let_expressions.po` | `16 : int` |
-| `mutability.po` | `23 : int` |
-| `types.po` | `84 : int` |
-| `variables.po` | `30 : int` |
+| `closures.po` | `21 : i64` |
+| `conditionals.po` | `10 : i64` |
+| `factorial.po` | `120 : i64` |
+| `fibonacci.po` | `5 : i64` |
+| `functions.po` | `25 : i64` |
+| `hello.po` | `7 : i64` |
+| `let_expressions.po` | `16 : i64` |
+| `mutability.po` | `23 : i64` |
+| `types.po` | `84 : i64` |
+| `variables.po` | `30 : i64` |
 
 ## clangd
 
