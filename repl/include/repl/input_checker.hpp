@@ -46,6 +46,17 @@ public:
         continue;
       }
 
+      // Check for numeric literals
+      if (std::isdigit(static_cast<unsigned char>(input[i])) != 0) {
+        while (i < input.size() &&
+               (std::isdigit(static_cast<unsigned char>(input[i])) != 0 ||
+                input[i] == '.')) {
+          ++i;
+        }
+        lastToken = "number";
+        continue;
+      }
+
       // Check for keywords and identifiers
       if (std::isalpha(static_cast<unsigned char>(input[i])) != 0 ||
           input[i] == '_') {
