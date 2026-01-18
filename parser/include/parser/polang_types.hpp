@@ -301,7 +301,8 @@ isImmutableRefType(const std::string& typeName) noexcept {
 }
 
 /// Check if a type name represents any reference type (mutable or immutable).
-[[nodiscard]] inline bool isReferenceType(const std::string& typeName) noexcept {
+[[nodiscard]] inline bool
+isReferenceType(const std::string& typeName) noexcept {
   return isMutableRefType(typeName) || isImmutableRefType(typeName);
 }
 

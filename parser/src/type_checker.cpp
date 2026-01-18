@@ -12,16 +12,16 @@
 
 using polang::ErrorReporter;
 using polang::ErrorSeverity;
+using polang::getReferentType;
 using polang::isArithmeticOperator;
 using polang::isComparisonOperator;
+using polang::isImmutableRefType;
+using polang::isMutableRefType;
+using polang::isReferenceType;
+using polang::makeImmutableRefType;
+using polang::makeMutableRefType;
 using polang::operatorToString;
 using polang::TypeNames;
-using polang::isMutableRefType;
-using polang::isImmutableRefType;
-using polang::isReferenceType;
-using polang::getReferentType;
-using polang::makeMutableRefType;
-using polang::makeImmutableRefType;
 
 /// FreeVariableCollector - A visitor that identifies free variables in an
 /// expression or block.
@@ -681,7 +681,8 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
     // Declaration is a statement, not an expression - use underlying type
     // so function return type matches the default return value
     // Strip reference types for inferredType
-    inferredType = isReferenceType(exprType) ? getReferentType(exprType) : exprType;
+    inferredType =
+        isReferenceType(exprType) ? getReferentType(exprType) : exprType;
   } else {
     const std::string declType = node.type->name;
 
@@ -714,7 +715,8 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
     // Declaration is a statement, not an expression - use underlying type
     // so function return type matches the default return value
     // Strip reference types for inferredType
-    inferredType = isReferenceType(exprType) ? getReferentType(exprType) : exprType;
+    inferredType =
+        isReferenceType(exprType) ? getReferentType(exprType) : exprType;
   }
 }
 

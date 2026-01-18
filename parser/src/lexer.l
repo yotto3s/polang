@@ -37,7 +37,7 @@ void polang_reset_lexer_location() {
 %%
 
 [ \t]+                  { /* skip spaces and tabs */ }
-\n                      { yycolumn = 1; /* reset column on newline */ }
+\n                      { yycolumn = 1; /* newline resets column */ }
 ;[^\n]*                 { /* skip single-line comments */ }
 "let"                   { return yy::parser::make_TLET(LOC); }
 "fun"                   { return yy::parser::make_TFUN(LOC); }

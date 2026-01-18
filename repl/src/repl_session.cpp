@@ -42,18 +42,29 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     return EvalResult::error("REPL session not initialized");
   }
 
-  // Combine accumulated code with new input
-  const std::string fullCode = accumulatedCode + input;
-
-  // Parse the combined input
-  auto ast = polang_parse(fullCode);
-  if (ast == nullptr) {
+  // Parse the new input separately
+  auto newAst = polang_parse(input);
+  if (newAst == nullptr) {
     return EvalResult::error("Parse error");
   }
 
-  // Type check the combined code
-  const auto errors = polang_check_types(*ast);
+  // Count statements before merging (to identify new statements)
+  const size_t previousStatementCount =
+      accumulatedAst ? accumulatedAst->statements.size() : 0;
+
+  // Merge new statements into accumulated AST
+  if (!accumulatedAst) {
+    accumulatedAst = std::make_unique<NBlock>();
+  }
+  for (auto& stmt : newAst->statements) {
+    accumulatedAst->statements.push_back(std::move(stmt));
+  }
+
+  // Type check the combined AST
+  const auto errors = polang_check_types(*accumulatedAst);
   if (!errors.empty()) {
+    // Rollback: remove newly added statements on error
+    accumulatedAst->statements.resize(previousStatementCount);
     std::string errMsg;
     for (const auto& err : errors) {
       errMsg += err.message;
@@ -68,8 +79,8 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   // vs a declaration (shouldn't print result)
   bool lastIsExpression = false;
   std::string resultType = "void";
-  if (!ast->statements.empty()) {
-    const NStatement* lastStmt = ast->statements.back().get();
+  if (!accumulatedAst->statements.empty()) {
+    const NStatement* lastStmt = accumulatedAst->statements.back().get();
     // NExpressionStatement wraps expressions as statements
     if (dynamic_cast<const NExpressionStatement*>(lastStmt) != nullptr) {
       lastIsExpression = true;
@@ -80,14 +91,17 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   // Generate code using MLIR backend - always emit type variables
   polang::MLIRCodeGenContext codegenCtx;
 
-  if (!codegenCtx.generateCode(*ast, true)) {
+  if (!codegenCtx.generateCode(*accumulatedAst, true)) {
     std::cerr << "MLIR generation failed: " << codegenCtx.getError() << "\n";
+    // Rollback on failure
+    accumulatedAst->statements.resize(previousStatementCount);
     return EvalResult::error("Code generation failed");
   }
 
   // Run type inference to resolve type variables
   if (!codegenCtx.runTypeInference()) {
     std::cerr << "Type inference failed: " << codegenCtx.getError() << "\n";
+    accumulatedAst->statements.resize(previousStatementCount);
     return EvalResult::error("Type inference failed");
   }
 
@@ -99,11 +113,13 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   if (!codegenCtx.lowerToStandard()) {
     std::cerr << "Lowering to standard failed: " << codegenCtx.getError()
               << "\n";
+    accumulatedAst->statements.resize(previousStatementCount);
     return EvalResult::error("Code generation failed");
   }
 
   if (!codegenCtx.lowerToLLVM()) {
     std::cerr << "Lowering to LLVM failed: " << codegenCtx.getError() << "\n";
+    accumulatedAst->statements.resize(previousStatementCount);
     return EvalResult::error("Code generation failed");
   }
 
@@ -111,11 +127,11 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   int64_t result = 0;
   if (!codegenCtx.runCode(result)) {
     std::cerr << "JIT execution failed: " << codegenCtx.getError() << "\n";
+    accumulatedAst->statements.resize(previousStatementCount);
     return EvalResult::error("Execution failed");
   }
 
-  // Update accumulated code on success
-  accumulatedCode = fullCode + "\n";
+  // Success - keep the merged AST (already merged above)
 
   // Only return a value if the last statement was an expression
   if (lastIsExpression) {
