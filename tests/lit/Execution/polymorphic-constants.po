@@ -1,0 +1,22 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test polymorphic functions that return constants
+; This exercises the constant operation type inference and resolution
+
+; Polymorphic function returning integer constant
+let always_zero(x) = 0
+let always_one(x) = 1
+
+; Polymorphic function returning float constant
+let always_pi(x) = 3.14
+
+; Test integer constants work with polymorphic functions
+let a = always_zero(42)      ; should be 0
+let b = always_one(true)     ; should be 1
+let c = always_zero(3.14)    ; should be 0
+
+; Sum the integer results
+let sum = a + b + c
+
+; CHECK: 1 : i64
+sum

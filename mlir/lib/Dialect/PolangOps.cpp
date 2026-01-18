@@ -385,13 +385,15 @@ ParseResult ConstantIntegerOp::parse(OpAsmParser& parser,
   }
 
   // Create the IntegerAttr with the appropriate bit width
-  auto intType = dyn_cast<polang::IntegerType>(resultType);
-  if (!intType) {
+  unsigned width = 64; // Default width for type variables
+  if (auto intType = dyn_cast<polang::IntegerType>(resultType)) {
+    width = intType.getWidth();
+  } else if (!isa<TypeVarType>(resultType)) {
     return parser.emitError(parser.getNameLoc(),
-                            "expected polang.integer type");
+                            "expected polang.integer or typevar type");
   }
   auto attr = IntegerAttr::get(
-      mlir::IntegerType::get(parser.getContext(), intType.getWidth()), value);
+      mlir::IntegerType::get(parser.getContext(), width), value);
   result.addAttribute("value", attr);
   result.addTypes(resultType);
   return success();
@@ -423,15 +425,16 @@ ParseResult ConstantFloatOp::parse(OpAsmParser& parser,
   }
 
   // Create the FloatAttr with the appropriate type
-  auto floatType = dyn_cast<polang::FloatType>(resultType);
-  if (!floatType) {
-    return parser.emitError(parser.getNameLoc(), "expected polang.float type");
-  }
-  mlir::Type attrType;
-  if (floatType.getWidth() == 32) {
-    attrType = Float32Type::get(parser.getContext());
-  } else {
-    attrType = Float64Type::get(parser.getContext());
+  mlir::Type attrType = Float64Type::get(parser.getContext()); // Default for type vars
+  if (auto floatType = dyn_cast<polang::FloatType>(resultType)) {
+    if (floatType.getWidth() == 32) {
+      attrType = Float32Type::get(parser.getContext());
+    } else {
+      attrType = Float64Type::get(parser.getContext());
+    }
+  } else if (!isa<TypeVarType>(resultType)) {
+    return parser.emitError(parser.getNameLoc(),
+                            "expected polang.float or typevar type");
   }
   auto attr = FloatAttr::get(attrType, value);
   result.addAttribute("value", attr);

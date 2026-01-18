@@ -68,15 +68,6 @@ Polang supports a variety of numeric types with explicit width and signedness, p
 |------|-------------|------|-----------|-----------|
 | `bool` | Boolean | 1-bit | `!polang.bool` | `i1` |
 
-### Legacy Type Aliases
-
-For compatibility, the following aliases are supported:
-
-| Alias | Maps To |
-|-------|---------|
-| `int` | `i64` |
-| `double` | `f64` |
-
 ### Type Constants
 
 Type names are defined as compile-time constants in `parser/include/parser/polang_types.hpp`:
@@ -98,10 +89,6 @@ struct TypeNames {
   // Floating-point
   static constexpr const char* F32 = "f32";
   static constexpr const char* F64 = "f64";
-
-  // Legacy aliases
-  static constexpr const char* INT = "int";     // alias for i64
-  static constexpr const char* DOUBLE = "double"; // alias for f64
 
   // Other types
   static constexpr const char* BOOL = "bool";
