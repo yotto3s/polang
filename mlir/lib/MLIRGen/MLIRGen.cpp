@@ -291,10 +291,12 @@ public:
     }
 
     // Get the element type
-    Type elemType = getPolangType(getReferentType(lookupType(node.lhs->name).value_or(TypeNames::I64)));
+    Type elemType = getPolangType(
+        getReferentType(lookupType(node.lhs->name).value_or(TypeNames::I64)));
 
     // Store through the mutable reference
-    auto storeOp = builder.create<MutRefStoreOp>(loc(), elemType, value, *refValue);
+    auto storeOp =
+        builder.create<MutRefStoreOp>(loc(), elemType, value, *refValue);
 
     // Assignment expression returns the assigned value
     result = storeOp.getResult();
@@ -302,6 +304,24 @@ public:
   }
 
   void visit(const NRefExpression& node) override {
+    // Check for `ref *x` pattern where x is a mutable reference
+    // In this case, we skip the dereference and directly convert the mutable
+    // reference to an immutable reference, preserving the original storage.
+    if (auto* derefExpr =
+            dynamic_cast<const NDerefExpression*>(node.expr.get())) {
+      derefExpr->ref->accept(*this);
+      if (isMutableRefType(resultType)) {
+        // Skip the dereference - directly convert mut ref to immutable ref
+        Value mutRef = result;
+        std::string elemTypeName = getReferentType(resultType);
+        Type elemType = getPolangType(elemTypeName);
+        Type refType = RefType::get(builder.getContext(), elemType);
+        result = builder.create<RefCreateOp>(loc(), refType, mutRef);
+        resultType = makeImmutableRefType(elemTypeName);
+        return;
+      }
+    }
+
     // Evaluate the inner expression
     node.expr->accept(*this);
     if (!result) {
@@ -322,12 +342,14 @@ public:
       resultType = makeImmutableRefType(getReferentType(innerType));
     } else {
       // The inner value is a plain value; create an immutable reference to it
-      // First create a mutable reference to the value, then convert to immutable
+      // First create a mutable reference to the value, then convert to
+      // immutable
       Type innerMLIRType = innerValue.getType();
 
       // Create a mutable reference from the value
       Type mutRefType = MutRefType::get(builder.getContext(), innerMLIRType);
-      auto mutRef = builder.create<MutRefCreateOp>(loc(), mutRefType, innerValue);
+      auto mutRef =
+          builder.create<MutRefCreateOp>(loc(), mutRefType, innerValue);
 
       // Convert the mutable reference to an immutable reference
       Type refType = RefType::get(builder.getContext(), innerMLIRType);
@@ -463,18 +485,21 @@ public:
         baseTypeName = getReferentType(baseTypeName);
       }
 
-      // Mutable: Create a mutable reference using the resolved type from type checker
+      // Mutable: Create a mutable reference using the resolved type from type
+      // checker
       Type polangType = getPolangType(baseTypeName);
       Type mutRefType = MutRefType::get(builder.getContext(), polangType);
 
       if (initValue) {
         // If initializing from an existing mutable reference, copy it
-        if (isMutableRefType(typeName) && mlir::isa<MutRefType>(initValue.getType())) {
+        if (isMutableRefType(typeName) &&
+            mlir::isa<MutRefType>(initValue.getType())) {
           // Copying a mutable reference
           mutableRefTable[varName] = initValue;
         } else {
           // Create new mutable reference with initial value
-          auto mutRefOp = builder.create<MutRefCreateOp>(loc(), mutRefType, initValue);
+          auto mutRefOp =
+              builder.create<MutRefCreateOp>(loc(), mutRefType, initValue);
           mutableRefTable[varName] = mutRefOp.getResult();
         }
       } else {
@@ -501,13 +526,23 @@ public:
       typeTable[varName] = typeName;
     }
 
-    // For mutable declarations, clear result since the type (mut T) doesn't match
-    // what most callers expect (T). For immutable declarations, keep the value.
+    // For mutable declarations, clear result since the type (mut T) doesn't
+    // match what most callers expect (T). For immutable declarations, keep the
+    // value.
     if (node.isMutable) {
       result = nullptr;
     } else {
-      result = initValue;
-      resultType = typeName;
+      // For immutable reference types, dereference to match type checker behavior
+      // (type checker strips reference types from inferredType for declarations)
+      if (isImmutableRefType(typeName)) {
+        std::string elemTypeName = getReferentType(typeName);
+        Type elemType = getPolangType(elemTypeName);
+        result = builder.create<RefDerefOp>(loc(), elemType, initValue);
+        resultType = elemTypeName;
+      } else {
+        result = initValue;
+        resultType = typeName;
+      }
     }
   }
 
@@ -729,11 +764,12 @@ private:
   }
 
   // Symbol tables
-  std::map<std::string, Value> symbolTable;      // Mutable variable allocas (old style)
-  std::map<std::string, Value> mutableRefTable;  // Mutable reference values
-  std::map<std::string, Value> argValues;        // Function arguments
-  std::map<std::string, Value> immutableValues;  // Immutable variable SSA values
-  std::map<std::string, std::string> typeTable;  // Variable types
+  std::map<std::string, Value>
+      symbolTable; // Mutable variable allocas (old style)
+  std::map<std::string, Value> mutableRefTable; // Mutable reference values
+  std::map<std::string, Value> argValues;       // Function arguments
+  std::map<std::string, Value> immutableValues; // Immutable variable SSA values
+  std::map<std::string, std::string> typeTable; // Variable types
   std::map<std::string, Type>
       typeVarTable; // Variable types as MLIR types (for type vars)
   std::map<std::string, std::vector<std::string>> functionCaptures;
@@ -981,9 +1017,8 @@ private:
       } else if (inferredType == TypeNames::BOOL) {
         defaultVal = builder.create<ConstantBoolOp>(loc(), false);
       } else {
-        // Default to i64 for integer types
-        auto intTy = polang::IntegerType::get(builder.getContext(), 64,
-                                              Signedness::Signed);
+        // Use the inferred type for integer types (preserves signedness)
+        Type intTy = getPolangType(inferredType);
         defaultVal = builder.create<ConstantIntegerOp>(loc(), intTy, 0);
       }
       builder.create<ReturnOp>(loc(), defaultVal);
