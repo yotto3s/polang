@@ -254,6 +254,31 @@ bool MLIRCodeGenContext::runCode(int64_t& result) {
   return true;
 }
 
+namespace {
+
+/// Convert a Polang type to its string representation
+std::string typeToString(Type type) {
+  if (auto intType = dyn_cast<polang::IntegerType>(type)) {
+    std::string prefix = intType.isSigned() ? "i" : "u";
+    return prefix + std::to_string(intType.getWidth());
+  }
+  if (auto floatType = dyn_cast<polang::FloatType>(type)) {
+    return "f" + std::to_string(floatType.getWidth());
+  }
+  if (isa<polang::BoolType>(type)) {
+    return "bool";
+  }
+  if (auto refType = dyn_cast<polang::RefType>(type)) {
+    return "ref " + typeToString(refType.getElementType());
+  }
+  if (auto mutRefType = dyn_cast<polang::MutRefType>(type)) {
+    return "mut " + typeToString(mutRefType.getElementType());
+  }
+  return "unknown";
+}
+
+} // namespace
+
 std::string MLIRCodeGenContext::getResolvedReturnType() const {
   if (!module || !*module) {
     return "unknown";
@@ -270,19 +295,7 @@ std::string MLIRCodeGenContext::getResolvedReturnType() const {
     return "void";
   }
 
-  Type returnType = funcType.getResult(0);
-  if (auto intType = dyn_cast<polang::IntegerType>(returnType)) {
-    std::string prefix = intType.isSigned() ? "i" : "u";
-    return prefix + std::to_string(intType.getWidth());
-  }
-  if (auto floatType = dyn_cast<polang::FloatType>(returnType)) {
-    return "f" + std::to_string(floatType.getWidth());
-  }
-  if (isa<polang::BoolType>(returnType)) {
-    return "bool";
-  }
-
-  return "unknown";
+  return typeToString(funcType.getResult(0));
 }
 
 } // namespace polang
