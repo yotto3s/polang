@@ -1,5 +1,5 @@
 ; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
 
 ; Test that casting from bool is rejected
-; CHECK: error:{{.*}}operand{{.*}}must be Polang numeric type
+; CHECK: error: 'polang.cast' op operand #0 must be Polang numeric type or type variable, but got '!polang.bool'
 true as i32

@@ -35,7 +35,7 @@ void TypeVarType::print(AsmPrinter& printer) const {
 }
 
 Type TypeVarType::parse(AsmParser& parser) {
-  uint64_t id;
+  uint64_t id = 0;
   TypeVarKind kind = TypeVarKind::Any;
 
   if (parser.parseLess() || parser.parseInteger(id)) {
