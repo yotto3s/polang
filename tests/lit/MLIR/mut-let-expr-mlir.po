@@ -1,0 +1,9 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test MLIR for mutable in let-expressions
+; CHECK: {{.*}}polang.func @__polang_entry() -> !polang.integer<64, signed>{{.*}}
+; CHECK: {{.*}}polang.constant.integer{{.*}}
+; CHECK: {{.*}}polang.mutref.create{{.*}}
+; CHECK: {{.*}}polang.mutref.deref{{.*}}
+; CHECK: {{.*}}polang.return{{.*}}
+let x = mut 5 in *x

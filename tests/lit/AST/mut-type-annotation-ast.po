@@ -1,0 +1,7 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test AST for type-annotated mutable variable
+; CHECK:      NBlock
+; CHECK-NEXT: `-NVariableDeclaration 'x' mut : i64
+; CHECK-NEXT:   `-NInteger 5
+let x: i64 = mut 5

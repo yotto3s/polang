@@ -1,0 +1,12 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test AST for mutable in let-expression
+; CHECK:      NBlock
+; CHECK-NEXT: `-NExpressionStatement
+; CHECK-NEXT:   `-NLetExpression
+; CHECK-NEXT:     |-NVariableDeclaration 'x' mut
+; CHECK-NEXT:     | `-NInteger 5
+; CHECK-NEXT:     `-body:
+; CHECK-NEXT:       `-NDerefExpression
+; CHECK-NEXT:         `-NIdentifier 'x'
+let x = mut 5 in *x

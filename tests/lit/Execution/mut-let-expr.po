@@ -1,0 +1,5 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test mutable variables in let-expressions
+; CHECK: 15 : i64
+let x = mut 5 and y = mut 10 in *x + *y

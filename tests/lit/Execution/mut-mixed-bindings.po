@@ -1,0 +1,5 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test mixed mutable/immutable bindings
+; CHECK: 15 : i64
+let x = mut 5 and y = 10 in *x + y

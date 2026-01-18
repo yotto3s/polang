@@ -1,0 +1,5 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test multiple mutable bindings in let-expression
+; CHECK: 6 : i64
+let a = mut 1 and b = mut 2 and c = mut 3 in *a + *b + *c
