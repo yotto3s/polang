@@ -344,7 +344,13 @@ public:
       // The inner value is a plain value; create an immutable reference to it
       // First create a mutable reference to the value, then convert to
       // immutable
-      Type innerMLIRType = innerValue.getType();
+      Type innerMLIRType = getPolangType(innerType);
+
+      // Cast the value to the resolved type if needed (e.g., TypeVarType to
+      // i32)
+      if (innerValue.getType() != innerMLIRType) {
+        innerValue = builder.create<CastOp>(loc(), innerMLIRType, innerValue);
+      }
 
       // Create a mutable reference from the value
       Type mutRefType = MutRefType::get(builder.getContext(), innerMLIRType);

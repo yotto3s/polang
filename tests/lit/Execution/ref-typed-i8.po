@@ -1,0 +1,7 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test creating immutable reference to i8 typed variable
+; CHECK: 5 : i8
+let x:i8 = 5
+let y = ref x
+*y
