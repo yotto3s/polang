@@ -124,15 +124,15 @@ TEST(TypeCheckTest, LetExpressionTypeMismatch) {
 }
 
 TEST(TypeCheckTest, AssignmentTypeMismatch) {
-  EXPECT_TRUE(hasTypeError("let mut x = 1\nx <- 2.0"));
+  EXPECT_TRUE(hasTypeError("let x = mut 1\nx <- 2.0"));
 }
 
 // ============== Mutability Tests ==============
 
 TEST(TypeCheckTest, MutableVariableReassignment) {
   // Mutable variable can be reassigned
-  EXPECT_TRUE(hasNoTypeError("let mut x = 1\nx <- 2\nx"));
-  EXPECT_TRUE(hasNoTypeError("let mut x: i64 = 1\nx <- 2\nx"));
+  EXPECT_TRUE(hasNoTypeError("let x = mut 1\nx <- 2\nx"));
+  EXPECT_TRUE(hasNoTypeError("let x: i64 = mut 1\nx <- 2\nx"));
 }
 
 TEST(TypeCheckTest, ImmutableVariableReassignment) {
@@ -143,42 +143,42 @@ TEST(TypeCheckTest, ImmutableVariableReassignment) {
 
 TEST(TypeCheckTest, MutableInLetExpression) {
   // Mutable binding in let expression
-  EXPECT_TRUE(hasNoTypeError("let mut x = 1 in x <- 2"));
-  EXPECT_TRUE(hasNoTypeError("let mut x = 1 and y = 2 in x <- 10"));
+  EXPECT_TRUE(hasNoTypeError("let x = mut 1 in x <- 2"));
+  EXPECT_TRUE(hasNoTypeError("let x = mut 1 and y = 2 in x <- 10"));
 }
 
 TEST(TypeCheckTest, ImmutableInLetExpression) {
   // Immutable binding in let expression cannot be reassigned
   EXPECT_TRUE(hasTypeError("let x = 1 in x <- 2"));
-  EXPECT_TRUE(hasTypeError("let x = 1 and mut y = 2 in x <- 10"));
+  EXPECT_TRUE(hasTypeError("let x = 1 and y = mut 2 in x <- 10"));
 }
 
 TEST(TypeCheckTest, MultipleReassignments) {
   // Multiple reassignments of the same mutable variable
-  EXPECT_TRUE(hasNoTypeError("let mut x = 1\nx <- 2\nx <- 3\nx"));
+  EXPECT_TRUE(hasNoTypeError("let x = mut 1\nx <- 2\nx <- 3\nx"));
 }
 
 TEST(TypeCheckTest, MutableDoubleType) {
   // Mutable double variable
-  EXPECT_TRUE(hasNoTypeError("let mut x: f64 = 1.0\nx <- 2.5\nx"));
-  EXPECT_TRUE(hasTypeError("let mut x: f64 = 1.0\nx <- 2")); // int to double
+  EXPECT_TRUE(hasNoTypeError("let x: f64 = mut 1.0\nx <- 2.5\nx"));
+  EXPECT_TRUE(hasTypeError("let x: f64 = mut 1.0\nx <- 2")); // int to double
 }
 
 TEST(TypeCheckTest, MutableBoolType) {
   // Mutable bool variable
-  EXPECT_TRUE(hasNoTypeError("let mut flag: bool = true\nflag <- false\nflag"));
+  EXPECT_TRUE(hasNoTypeError("let flag: bool = mut true\nflag <- false\nflag"));
 }
 
 TEST(TypeCheckTest, MixedMutabilityInLetExpression) {
   // Mix of mutable and immutable bindings
-  EXPECT_TRUE(hasNoTypeError("let x = 1 and mut y = 2 in y <- 10"));
-  EXPECT_TRUE(hasNoTypeError("let mut a = 1 and b = 2 in a <- b"));
+  EXPECT_TRUE(hasNoTypeError("let x = 1 and y = mut 2 in y <- 10"));
+  EXPECT_TRUE(hasNoTypeError("let a = mut 1 and b = 2 in a <- b"));
 }
 
 TEST(TypeCheckTest, NestedLetWithMutability) {
   // Nested let expressions with mutable bindings
-  EXPECT_TRUE(hasNoTypeError("let mut x = 1 in let y = x in y"));
-  EXPECT_TRUE(hasNoTypeError("let x = 1 in let mut y = x in y <- 2"));
+  EXPECT_TRUE(hasNoTypeError("let x = mut 1 in let y = x in y"));
+  EXPECT_TRUE(hasNoTypeError("let x = 1 in let y = mut x in y <- 2"));
 }
 
 TEST(TypeCheckTest, ImmutableReassignmentErrorMessage) {
@@ -387,7 +387,7 @@ TEST(TypeCheckTest, ClosureInLetExpression) {
 
 TEST(TypeCheckTest, ClosureCapturesMutableVariable) {
   // Function can capture mutable variable (requires explicit dereference)
-  EXPECT_TRUE(hasNoTypeError("let mut x = 10\nlet f() = (*x) + 1\nf()"));
+  EXPECT_TRUE(hasNoTypeError("let x = mut 10\nlet f() = (*x) + 1\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureTypeMismatch) {
@@ -438,13 +438,13 @@ TEST(TypeCheckTest, ClosureCaptureFromOuterNotSibling) {
 
 TEST(TypeCheckTest, ClosureWithAssignment) {
   // Assignment inside closure - captures mutable variable
-  EXPECT_TRUE(hasNoTypeError("let mut x = 10\nlet f() = x <- 20\nf()"));
+  EXPECT_TRUE(hasNoTypeError("let x = mut 10\nlet f() = x <- 20\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithAssignmentAndCapture) {
   // Assignment RHS captures another variable
   EXPECT_TRUE(
-      hasNoTypeError("let y = 5\nlet mut x = 10\nlet f() = x <- y\nf()"));
+      hasNoTypeError("let y = 5\nlet x = mut 10\nlet f() = x <- y\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithLetExpression) {
@@ -507,5 +507,5 @@ TEST(TypeCheckTest, ClosureDoesNotCaptureLocalLetBinding) {
 TEST(TypeCheckTest, ClosureWithMutableAssignmentCapture) {
   // Capture mutable variable via assignment LHS (requires explicit dereference)
   EXPECT_TRUE(hasNoTypeError(
-      "let mut counter = 0\nlet inc() = counter <- (*counter) + 1\ninc()"));
+      "let counter = mut 0\nlet inc() = counter <- (*counter) + 1\ninc()"));
 }

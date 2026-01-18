@@ -3,6 +3,6 @@
 ; Test mutable variable assignment and dereference
 ; REPL only prints the last expression result
 ; CHECK: 20 : i64
-let mut x = 10
+let x = mut 10
 x <- 20
 (*x)

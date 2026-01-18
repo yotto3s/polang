@@ -51,7 +51,7 @@ TEST(ParserTest, VariableWithIdentifierExpression) {
 // ============== Mutable Variable Declaration Tests ==============
 
 TEST(ParserTest, MutableVariableDeclaration) {
-  auto block = parseOrFail("let mut x = 5");
+  auto block = parseOrFail("let x = mut 5");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 
@@ -66,7 +66,7 @@ TEST(ParserTest, MutableVariableDeclaration) {
 }
 
 TEST(ParserTest, MutableTypedVariableDeclaration) {
-  auto block = parseOrFail("let mut counter : int = 0");
+  auto block = parseOrFail("let counter : int = mut 0");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 

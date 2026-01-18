@@ -89,7 +89,7 @@ TEST(ASTPrinterTest, PrintVariableDeclaration) {
 }
 
 TEST(ASTPrinterTest, PrintMutableVariable) {
-  auto block = parseOrFail("let mut y = 10");
+  auto block = parseOrFail("let y = mut 10");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);

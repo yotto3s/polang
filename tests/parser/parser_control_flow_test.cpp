@@ -193,7 +193,7 @@ TEST(ParserTest, NestedLetExpression) {
 }
 
 TEST(ParserTest, LetExpressionMutableBinding) {
-  auto block = parseOrFail("let mut x = 1 in x");
+  auto block = parseOrFail("let x = mut 1 in x");
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
@@ -206,7 +206,7 @@ TEST(ParserTest, LetExpressionMutableBinding) {
 }
 
 TEST(ParserTest, LetExpressionMixedMutability) {
-  auto block = parseOrFail("let x = 1 and mut y = 2 in x + y");
+  auto block = parseOrFail("let x = 1 and y = mut 2 in x + y");
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
@@ -224,7 +224,7 @@ TEST(ParserTest, LetExpressionMixedMutability) {
 }
 
 TEST(ParserTest, LetExpressionMutableWithTypeAnnotation) {
-  auto block = parseOrFail("let mut counter : int = 0 in counter");
+  auto block = parseOrFail("let counter : int = mut 0 in counter");
   ASSERT_NE(block, nullptr);
 
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());

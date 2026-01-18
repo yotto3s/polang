@@ -8,6 +8,6 @@
 ; CHECK: {{.*}}polang.mutref.store{{.*}}
 ; CHECK: {{.*}}polang.mutref.deref{{.*}}
 ; CHECK: {{.*}}polang.return{{.*}}
-let mut x = 10
+let x = mut 10
 x <- 20
 (*x)

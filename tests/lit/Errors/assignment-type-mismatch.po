@@ -2,5 +2,5 @@
 
 ; Test assignment type mismatch (assigning wrong type to mutable variable)
 ; CHECK: {{.*}}Cannot assign f64 to variable 'x' of type i64{{.*}}
-let mut x: i64 = 1
+let x: i64 = mut 1
 x <- 3.14

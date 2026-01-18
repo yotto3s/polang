@@ -321,7 +321,7 @@ Arithmetic operations work with any integer or float type of the same width and 
 | `polang.load` | Load from mutable variable | `%1 = polang.load %0 : memref<i64> -> !polang.integer<64, signed>` |
 | `polang.store` | Store to mutable variable | `polang.store %val, %0 : !polang.integer<64, signed>, memref<i64>` |
 
-**Note:** Immutable variables (declared with `let`) are optimized to use SSA values directly without memory allocation. Only mutable variables (declared with `let mut`) use the alloca/load/store pattern.
+**Note:** Immutable variables (declared with `let`) are optimized to use SSA values directly without memory allocation. Only mutable variables (declared with `let x = mut value`) use the alloca/load/store pattern.
 
 ## Lowering Stages
 
@@ -361,12 +361,12 @@ module {
 
 #### Mutable Variable Handling
 
-Mutable variables (declared with `let mut`) require memory allocation since their values can change:
+Mutable variables (declared with `let x = mut value`) require memory allocation since their values can change:
 
 **Example (mutable variable):**
 
 ```polang
-let mut x = 10
+let x = mut 10
 x <- 20
 x
 ```

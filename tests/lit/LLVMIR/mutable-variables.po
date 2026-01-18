@@ -8,6 +8,6 @@
 ; CHECK: {{.*}}load i64{{.*}}
 ; CHECK: {{.*}}ret i64 %{{[0-9]+}}
 ; CHECK: }
-let mut x = 10
+let x = mut 10
 x <- 20
 (*x)

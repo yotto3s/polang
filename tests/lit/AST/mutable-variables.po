@@ -4,4 +4,4 @@
 ; CHECK:      NBlock
 ; CHECK-NEXT: `-NVariableDeclaration 'x' mut
 ; CHECK-NEXT:   `-NInteger 10
-let mut x = 10
+let x = mut 10

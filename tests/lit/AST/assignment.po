@@ -8,5 +8,5 @@
 ; CHECK-NEXT:   `-NAssignment
 ; CHECK-NEXT:     |-NIdentifier 'x'
 ; CHECK-NEXT:     `-NInteger 20
-let mut x = 10
+let x = mut 10
 x <- 20

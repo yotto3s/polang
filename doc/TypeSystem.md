@@ -114,7 +114,7 @@ Polang supports two kinds of reference types for working with memory locations:
 
 ### Mutable References (`mut T`)
 
-Mutable references allow both reading and writing. Variables declared with `let mut` have mutable reference type.
+Mutable references allow both reading and writing. Variables declared with `let x = mut value` have mutable reference type.
 
 | Syntax | Description | MLIR Type |
 |--------|-------------|-----------|
@@ -123,7 +123,7 @@ Mutable references allow both reading and writing. Variables declared with `let 
 | `mut bool` | Mutable reference to bool | `!polang.mutref<!polang.bool>` |
 
 **Semantics:**
-- Created implicitly by `let mut x = v` where `v : T` → `x : mut T`
+- Created implicitly by `let x = mut v` where `v : T` → `x : mut T`
 - Copying a mutable reference copies the reference, not the value
 - Write via `x <- v` (requires `x : mut T`)
 - Read via `*x` (dereference)
@@ -167,7 +167,7 @@ std::string makeImmutableRefType(const std::string& base); // add "ref "
 
 | Expression | Input Type | Result Type |
 |------------|------------|-------------|
-| `let mut x = v` | `v : T` | `x : mut T` |
+| `let x = mut v` | `v : T` | `x : mut T` |
 | `let y = x` | `x : mut T` | `y : mut T` |
 | `ref e` | `e : T` | `ref T` |
 | `*x` | `x : mut T` or `x : ref T` | `T` |

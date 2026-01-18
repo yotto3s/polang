@@ -130,8 +130,9 @@ yy::parser::symbol_type yylex();
    - ident TLPAREN (function call vs expr + (expr))
    - ident TDOT (qualified name vs expr DOT)
    - TMUL expr (unary deref vs binary multiplication)
+   - TMUT expr in var_decl/let_binding with binary operators
 */
-%expect 4
+%expect 6
 
 %start program
 
@@ -159,13 +160,13 @@ var_decl : TLET ident TEQUAL expr {
              /* let x : type = expr (immutable) */
              $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move($6), false);
            }
-         | TLET TMUT ident TEQUAL expr {
-             /* let mut x = expr (mutable, type to be inferred) */
-             $$ = std::make_unique<NVariableDeclaration>(std::move($3), std::move($5), true);
+         | TLET ident TEQUAL TMUT expr {
+             /* let x = mut expr (mutable, type to be inferred) */
+             $$ = std::make_unique<NVariableDeclaration>(std::move($2), std::move($5), true);
            }
-         | TLET TMUT ident TCOLON type_spec TEQUAL expr {
-             /* let mut x : type = expr (mutable) */
-             $$ = std::make_unique<NVariableDeclaration>(std::move($5), std::move($3), std::move($7), true);
+         | TLET ident TCOLON type_spec TEQUAL TMUT expr {
+             /* let x : type = mut expr (mutable) */
+             $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move($7), true);
            }
          ;
 
@@ -297,6 +298,9 @@ type_spec : ident { $$ = std::move($1); }
           | TREF ident {
               $$ = std::make_unique<NIdentifier>("ref " + $2->name);
             }
+          | TMUT ident {
+              $$ = std::make_unique<NIdentifier>("mut " + $2->name);
+            }
           ;
 
 numeric : TINTEGER { $$ = std::make_unique<NInteger>(atol($1.c_str())); }
@@ -412,15 +416,15 @@ let_binding : ident TEQUAL expr {
                 $$ = std::make_unique<NLetBinding>(
                     std::make_unique<NVariableDeclaration>(std::move($3), std::move($1), std::move($5), false));
               }
-            | TMUT ident TEQUAL expr {
-                /* mut x = expr (mutable, type to be inferred) */
+            | ident TEQUAL TMUT expr {
+                /* x = mut expr (mutable, type to be inferred) */
                 $$ = std::make_unique<NLetBinding>(
-                    std::make_unique<NVariableDeclaration>(std::move($2), std::move($4), true));
+                    std::make_unique<NVariableDeclaration>(std::move($1), std::move($4), true));
               }
-            | TMUT ident TCOLON type_spec TEQUAL expr {
-                /* mut x : type = expr (mutable) */
+            | ident TCOLON type_spec TEQUAL TMUT expr {
+                /* x : type = mut expr (mutable) */
                 $$ = std::make_unique<NLetBinding>(
-                    std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move($6), true));
+                    std::make_unique<NVariableDeclaration>(std::move($3), std::move($1), std::move($6), true));
               }
             | ident func_decl_args TCOLON type_spec TEQUAL expr {
                 /* f(x: int): int = expr */

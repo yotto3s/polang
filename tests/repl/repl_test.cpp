@@ -77,7 +77,7 @@ TEST(ReplIntegration, MultipleFunctionsPersist) {
 
 TEST(ReplIntegration, VariableReassignmentPersists) {
   // Reassign variable and verify new value persists (explicit dereference required)
-  const auto result = runRepl("let mut x = 1\nx <- 100\n(*x)");
+  const auto result = runRepl("let x = mut 1\nx <- 100\n(*x)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("100 : i64"));
 }
@@ -115,7 +115,7 @@ TEST(ReplIntegration, MultipleCapturedVariables) {
 
 TEST(ReplIntegration, ClosureWithMutableCapture) {
   // Explicit dereference required for mutable variable values
-  const auto result = runRepl("let mut x = 10\nlet f() = (*x) + 1\nf()");
+  const auto result = runRepl("let x = mut 10\nlet f() = (*x) + 1\nf()");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("11 : i64"));
 }
@@ -123,7 +123,7 @@ TEST(ReplIntegration, ClosureWithMutableCapture) {
 TEST(ReplIntegration, ClosureCaptureByValue) {
   // Capture is by reference, so mutation after function definition
   // should be visible when calling (explicit dereference required)
-  const auto result = runRepl("let mut x = 10\nlet f() = (*x) + 1\nx <- 20\nf()");
+  const auto result = runRepl("let x = mut 10\nlet f() = (*x) + 1\nx <- 20\nf()");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("21 : i64"));
 }

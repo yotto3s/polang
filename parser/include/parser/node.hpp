@@ -228,7 +228,7 @@ public:
   std::unique_ptr<NIdentifier> type;  // nullptr when type should be inferred
   std::unique_ptr<NIdentifier> id;
   std::unique_ptr<NExpression> assignmentExpr;
-  bool isMutable;  // true for 'let mut', false for 'let'
+  bool isMutable;  // true for 'let x = mut ...', false for 'let'
   // Constructor for inferred type (no annotation)
   NVariableDeclaration(std::unique_ptr<NIdentifier> id,
                        std::unique_ptr<NExpression> assignmentExpr,

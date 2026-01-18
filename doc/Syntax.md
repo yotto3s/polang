@@ -119,17 +119,17 @@ let <identifier> : <type> = <expression>
 
 ### Mutable Variables
 
-To declare a mutable variable that can be reassigned, use `let mut`:
+To declare a mutable variable that can be reassigned, use `let x = mut value`:
 
 ```
-let mut x = 5       ; mutable, type inferred as int
-let mut y : int = 10  ; mutable, explicit type annotation
+let x = mut 5       ; mutable, type inferred as int
+let y : int = mut 10  ; mutable, explicit type annotation
 ```
 
 **Syntax:**
 ```
-let mut <identifier> = <expression>
-let mut <identifier> : <type> = <expression>
+let <identifier> = mut <expression>
+let <identifier> : <type> = mut <expression>
 ```
 
 ### Variable Reassignment
@@ -137,7 +137,7 @@ let mut <identifier> : <type> = <expression>
 Only mutable variables can be reassigned using the `<-` operator:
 
 ```
-let mut x = 5
+let x = mut 5
 x <- 10             ; OK: x is mutable
 
 let y = 5
@@ -149,12 +149,12 @@ y <- 10             ; ERROR: cannot reassign immutable variable
 The assignment operator `<-` returns the assigned value, making it an expression:
 
 ```
-let mut x = 0
+let x = mut 0
 x <- 10             ; evaluates to 10
 
 ; Chained assignment (right-associative)
-let mut a = 0
-let mut b = 0
+let a = mut 0
+let b = mut 0
 a <- b <- 5         ; assigns 5 to both a and b, evaluates to 5
 ```
 
@@ -166,10 +166,10 @@ Polang supports reference types for working with mutable and immutable memory lo
 
 ### Mutable References (`mut T`)
 
-Variables declared with `let mut` have mutable reference type. A mutable reference allows both reading and writing the underlying value.
+Variables declared with `let x = mut value` have mutable reference type. A mutable reference allows both reading and writing the underlying value.
 
 ```
-let mut x = 10       ; x has type 'mut i64' (mutable reference)
+let x = mut 10       ; x has type 'mut i64' (mutable reference)
 x <- 20              ; write through mutable reference
 *x                   ; read value through dereference (20)
 ```
@@ -186,7 +186,7 @@ mut bool             ; mutable reference to bool
 When you assign a mutable reference to a new variable, the reference is copied (both point to the same location):
 
 ```
-let mut x = 10       ; x is mut i64
+let x = mut 10       ; x is mut i64
 let r = x            ; r is also mut i64, points to same location
 r <- 20              ; writes through r
 *x                   ; reads 20 (x and r share the location)
@@ -197,7 +197,7 @@ r <- 20              ; writes through r
 To copy the underlying value (not the reference), use the dereference operator `*`:
 
 ```
-let mut x = 10       ; x is mut i64
+let x = mut 10       ; x is mut i64
 let v = *x           ; v is i64 (the value 10, not a reference)
 x <- 20              ; modify x
 v                    ; still 10 (v holds a copy of the value)
@@ -208,7 +208,7 @@ v                    ; still 10 (v holds a copy of the value)
 Immutable references provide read-only access to a memory location. Create them using the `ref` keyword on a value:
 
 ```
-let mut x = 10       ; x is mut i64
+let x = mut 10       ; x is mut i64
 let r = ref *x       ; r is ref i64 (immutable reference to x's location)
 *r                   ; read value (10)
 x <- 20              ; write through mutable reference
@@ -228,7 +228,7 @@ ref bool             ; immutable reference to bool
 The `*` operator dereferences a reference to access the underlying value:
 
 ```
-let mut x = 10
+let x = mut 10
 *x                   ; read value from mutable reference (10)
 
 let r = ref *x
@@ -237,7 +237,7 @@ let r = ref *x
 
 ### Reference Type Rules
 
-1. `let mut x = v` where `v : T` → `x` has type `mut T`
+1. `let x = mut v` where `v : T` → `x` has type `mut T`
 2. `let y = x` where `x : mut T` → `y` has type `mut T` (reference copy)
 3. `ref e` where `e : T` → result type is `ref T`
 4. `*x` where `x : mut T` or `x : ref T` → result type is `T`
@@ -247,24 +247,24 @@ let r = ref *x
 
 ```
 ; Basic mutable variable
-let mut counter = 0
+let counter = mut 0
 counter <- counter + 1
 *counter              ; 1
 
 ; Reference aliasing
-let mut a = 10
+let a = mut 10
 let b = a            ; b is a copy of the reference
 b <- 20
 *a                   ; 20 (a and b refer to same location)
 
 ; Value extraction
-let mut x = 100
+let x = mut 100
 let copy = *x        ; copy holds the value 100
 x <- 200
 copy                 ; still 100
 
 ; Immutable reference
-let mut data = 42
+let data = mut 42
 let reader = ref *data
 *reader              ; 42
 data <- 99
@@ -841,15 +841,15 @@ let larger = max(10, 20)
 ### Mutable Variables
 
 ```
-let mut counter = 0
+let counter = mut 0
 counter <- counter + 1
 counter <- counter + 1
 counter <- counter + 1
 ; counter is now 3
 
 ; Chained assignment
-let mut x = 0
-let mut y = 0
+let x = mut 0
+let y = mut 0
 x <- y <- 10
 ; both x and y are 10
 ```

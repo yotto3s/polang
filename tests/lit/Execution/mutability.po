@@ -3,7 +3,7 @@
 ; Test mutable variables with explicit dereference
 ; REPL only prints the last expression result
 ; CHECK: 23 : i64
-let mut x = 10
+let x = mut 10
 x <- 20
 let y = 3
 *x + y

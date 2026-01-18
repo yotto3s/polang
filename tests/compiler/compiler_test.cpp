@@ -78,7 +78,7 @@ TEST(CompilerIntegration, ModuleDefinition) {
 
 TEST(CompilerIntegration, VariableReassignment) {
   // Explicit dereference required for mutable variable values
-  const auto result = runCompiler("let mut x = 5\nx <- 10\n(*x)");
+  const auto result = runCompiler("let x = mut 5\nx <- 10\n(*x)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("store"));
 }

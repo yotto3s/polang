@@ -141,7 +141,7 @@ def Polang_MutRefType : Polang_Type<"MutRef", "mutref"> {
   let summary = "Mutable reference type";
   let description = [{
     A mutable reference type that allows both reading and writing.
-    Created when declaring mutable variables with 'let mut'.
+    Created when declaring mutable variables with 'let x = mut value'.
     The element type is the type of the referenced value.
 
     Examples:
