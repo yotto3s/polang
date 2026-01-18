@@ -95,7 +95,7 @@ yy::parser::symbol_type yylex();
 %token TAS "as"
 
 // Nonterminal types with smart pointers
-%type <std::unique_ptr<NIdentifier>> ident
+%type <std::unique_ptr<NIdentifier>> ident type_spec
 %type <std::unique_ptr<NExpression>> numeric expr boolean
 %type <std::unique_ptr<NBlock>> program stmts
 %type <std::unique_ptr<NStatement>> stmt var_decl func_decl module_decl import_stmt
@@ -155,7 +155,7 @@ var_decl : TLET ident TEQUAL expr {
              /* let x = expr (immutable, type to be inferred) */
              $$ = std::make_unique<NVariableDeclaration>(std::move($2), std::move($4), false);
            }
-         | TLET ident TCOLON ident TEQUAL expr {
+         | TLET ident TCOLON type_spec TEQUAL expr {
              /* let x : type = expr (immutable) */
              $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move($6), false);
            }
@@ -163,13 +163,13 @@ var_decl : TLET ident TEQUAL expr {
              /* let mut x = expr (mutable, type to be inferred) */
              $$ = std::make_unique<NVariableDeclaration>(std::move($3), std::move($5), true);
            }
-         | TLET TMUT ident TCOLON ident TEQUAL expr {
+         | TLET TMUT ident TCOLON type_spec TEQUAL expr {
              /* let mut x : type = expr (mutable) */
              $$ = std::make_unique<NVariableDeclaration>(std::move($5), std::move($3), std::move($7), true);
            }
          ;
 
-func_decl : TLET ident func_decl_args TCOLON ident TEQUAL expr {
+func_decl : TLET ident func_decl_args TCOLON type_spec TEQUAL expr {
               /* let fname (x : type) ... : rettype = expr */
               auto body = std::make_unique<NBlock>();
               body->statements.push_back(std::make_unique<NExpressionStatement>(std::move($7)));
@@ -205,7 +205,7 @@ func_param_list : func_param {
               }
             ;
 
-func_param : ident TCOLON ident {
+func_param : ident TCOLON type_spec {
                /* x : type (explicit type annotation) */
                $$ = std::make_unique<NVariableDeclaration>(std::move($3), std::move($1), nullptr);
              }
@@ -292,6 +292,12 @@ import_items : ident {
 
 ident : TIDENTIFIER { $$ = std::make_unique<NIdentifier>($1); }
       ;
+
+type_spec : ident { $$ = std::move($1); }
+          | TREF ident {
+              $$ = std::make_unique<NIdentifier>("ref " + $2->name);
+            }
+          ;
 
 numeric : TINTEGER { $$ = std::make_unique<NInteger>(atol($1.c_str())); }
         | TDOUBLE { $$ = std::make_unique<NDouble>(atof($1.c_str())); }
@@ -401,7 +407,7 @@ let_binding : ident TEQUAL expr {
                 $$ = std::make_unique<NLetBinding>(
                     std::make_unique<NVariableDeclaration>(std::move($1), std::move($3), false));
               }
-            | ident TCOLON ident TEQUAL expr {
+            | ident TCOLON type_spec TEQUAL expr {
                 /* x : type = expr (immutable) */
                 $$ = std::make_unique<NLetBinding>(
                     std::make_unique<NVariableDeclaration>(std::move($3), std::move($1), std::move($5), false));
@@ -411,12 +417,12 @@ let_binding : ident TEQUAL expr {
                 $$ = std::make_unique<NLetBinding>(
                     std::make_unique<NVariableDeclaration>(std::move($2), std::move($4), true));
               }
-            | TMUT ident TCOLON ident TEQUAL expr {
+            | TMUT ident TCOLON type_spec TEQUAL expr {
                 /* mut x : type = expr (mutable) */
                 $$ = std::make_unique<NLetBinding>(
                     std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move($6), true));
               }
-            | ident func_decl_args TCOLON ident TEQUAL expr {
+            | ident func_decl_args TCOLON type_spec TEQUAL expr {
                 /* f(x: int): int = expr */
                 auto body = std::make_unique<NBlock>();
                 body->statements.push_back(std::make_unique<NExpressionStatement>(std::move($6)));

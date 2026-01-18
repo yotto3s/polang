@@ -1,0 +1,6 @@
+; RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+
+; Test: ref i64 annotation with ref i32 value
+; CHECK: Type error: Variable 'y' declared as ref i64 but initialized with ref i32{{.*}}
+let x: i32 = 10
+let y: ref i64 = ref x

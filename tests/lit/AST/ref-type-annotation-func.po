@@ -1,0 +1,15 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test function declarations with ref type annotations
+; CHECK:      NBlock
+; CHECK-NEXT: |-NFunctionDeclaration 'getValue' (r: ref i64) -> i64
+; CHECK-NEXT: | `-NBlock
+; CHECK-NEXT: |   `-NExpressionStatement
+; CHECK-NEXT: |     `-NDerefExpression
+; CHECK-NEXT: |       `-NIdentifier 'r'
+; CHECK-NEXT: `-NFunctionDeclaration 'getRef' (r: ref i64) -> ref i64
+; CHECK-NEXT:   `-NBlock
+; CHECK-NEXT:     `-NExpressionStatement
+; CHECK-NEXT:       `-NIdentifier 'r'
+let getValue(r: ref i64): i64 = *r
+let getRef(r: ref i64): ref i64 = r

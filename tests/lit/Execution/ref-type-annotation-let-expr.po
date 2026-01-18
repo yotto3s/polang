@@ -1,0 +1,6 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test let expression with ref type annotation
+; CHECK: 25 : i64
+let x = 25
+let y: ref i64 = ref x in *y

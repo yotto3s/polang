@@ -1,0 +1,5 @@
+; RUN: %polang_repl %s | %FileCheck %s
+; CHECK: 10 : i64
+let x = 10
+let y: ref i64 = ref x
+*y

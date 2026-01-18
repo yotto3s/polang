@@ -1,0 +1,5 @@
+; RUN: %polang_repl %s | %FileCheck %s
+; CHECK: 42 : i32
+let x: i32 = 42
+let y: ref i32 = ref x
+*y

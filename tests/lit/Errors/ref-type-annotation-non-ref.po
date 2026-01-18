@@ -1,0 +1,6 @@
+; RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+
+; Test: ref type annotation with non-ref value (currently fails at MLIR level)
+; CHECK: error{{.*}}
+let x = 10
+let y: ref i64 = x

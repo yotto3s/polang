@@ -1,0 +1,7 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test function parameter with ref i32 type annotation
+; CHECK: 42 : i32
+let getValue(r: ref i32): i32 = *r
+let x: i32 = 42
+getValue(ref x)

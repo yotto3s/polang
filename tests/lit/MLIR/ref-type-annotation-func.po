@@ -1,0 +1,6 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test function with ref type annotations
+; CHECK: {{.*}}polang.func @getValue(%arg0: !polang.ref<!polang.integer<64, signed>>) -> !polang.integer<64, signed>{{.*}}
+; CHECK: {{.*}}polang.ref.deref %arg0 : !polang.ref<!polang.integer<64, signed>> -> !polang.integer<64, signed>
+let getValue(r: ref i64): i64 = *r
