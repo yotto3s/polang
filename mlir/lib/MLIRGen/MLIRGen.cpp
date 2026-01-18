@@ -307,7 +307,7 @@ public:
     // Check for `ref *x` pattern where x is a mutable reference
     // In this case, we skip the dereference and directly convert the mutable
     // reference to an immutable reference, preserving the original storage.
-    if (auto* derefExpr =
+    if (const auto* derefExpr =
             dynamic_cast<const NDerefExpression*>(node.expr.get())) {
       derefExpr->ref->accept(*this);
       if (isMutableRefType(resultType)) {
@@ -532,8 +532,9 @@ public:
     if (node.isMutable) {
       result = nullptr;
     } else {
-      // For immutable reference types, dereference to match type checker behavior
-      // (type checker strips reference types from inferredType for declarations)
+      // For immutable reference types, dereference to match type checker
+      // behavior (type checker strips reference types from inferredType for
+      // declarations)
       if (isImmutableRefType(typeName)) {
         std::string elemTypeName = getReferentType(typeName);
         Type elemType = getPolangType(elemTypeName);

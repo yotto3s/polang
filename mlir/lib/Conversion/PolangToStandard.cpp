@@ -53,7 +53,7 @@ public:
     // Handle type variables that weren't resolved - apply defaults based on
     // kind
     addConversion([](TypeVarType type) -> Type {
-      auto ctx = type.getContext();
+      auto* ctx = type.getContext();
       switch (type.getKind()) {
       case TypeVarKind::Integer:
         // Default integer type variables to i64
