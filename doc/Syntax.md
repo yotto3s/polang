@@ -370,6 +370,7 @@ Expressions can be:
 - **Identifiers**: `x`, `myVar`
 - **Binary operations**: `a + b`, `x * y`
 - **Comparisons**: `a == b`, `x < y` (return bool)
+- **Type conversions**: `x as i32`, `3.14 as i64`
 - **Function calls**: `add(1, 2)`
 - **Reassignments**: `x <- 5` (for mutable variables only)
 - **Parenthesized**: `(a + b) * c`
@@ -398,6 +399,23 @@ Expressions can be:
 | `>`      | Greater than             | `a > b`   |
 | `>=`     | Greater than or equal    | `a >= b`  |
 
+### Type Conversion Operator
+
+| Operator | Description                    | Example        | Returns          |
+|----------|--------------------------------|----------------|------------------|
+| `as`     | Explicit type conversion       | `x as i32`     | Converted value  |
+
+The `as` operator converts a value from one numeric type to another. Only numeric-to-numeric conversions are allowed; boolean conversions are not permitted.
+
+```
+let a: i64 = 1000
+let b: i32 = a as i32           ; narrow i64 to i32
+let c: f64 = a as f64           ; convert integer to float
+let d: i32 = 3.7 as i32         ; convert float to integer (truncates to 3)
+```
+
+See [Type Conversions](TypeSystem.md#type-conversions) for detailed conversion semantics.
+
 ### Reassignment Operator
 
 | Operator | Description                           | Example   | Returns        |
@@ -412,10 +430,12 @@ The reassignment operator returns the assigned value, allowing chained assignmen
 
 From highest to lowest:
 
-1. `*`, `/` (multiplication, division)
-2. `+`, `-` (addition, subtraction)
-3. `==`, `!=`, `<`, `<=`, `>`, `>=` (comparisons)
-4. `<-` (reassignment, right-associative)
+1. Unary `-`, `!` (negation, logical not)
+2. `as` (type conversion)
+3. `*`, `/` (multiplication, division)
+4. `+`, `-` (addition, subtraction)
+5. `==`, `!=`, `<`, `<=`, `>`, `>=` (comparisons)
+6. `<-` (reassignment, right-associative)
 
 Parentheses can be used to override precedence:
 
@@ -604,6 +624,7 @@ expression  ::= identifier "<-" expression
               | numeric
               | boolean
               | expression binop expression
+              | expression "as" type
               | "(" expression ")"
               | "if" expression "then" expression "else" expression
               | "let" let_bindings "in" expression
@@ -703,4 +724,25 @@ let mut x = 0
 let mut y = 0
 x <- y <- 10
 ; both x and y are 10
+```
+
+### Type Conversions
+
+```
+; Integer narrowing (truncates)
+let big: i64 = 1000
+let small: i8 = big as i8        ; small = -24 (1000 mod 256, interpreted as signed)
+
+; Integer to float
+let n: i32 = 42
+let f: f64 = n as f64            ; f = 42.0
+
+; Float to integer (truncates toward zero, saturates at bounds)
+let pi: f64 = 3.14159
+let rounded: i32 = pi as i32     ; rounded = 3
+
+; Mixed arithmetic with conversions
+let a: i32 = 10
+let b: i64 = 20
+let sum: i64 = a as i64 + b      ; convert a to i64 before adding
 ```

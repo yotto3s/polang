@@ -6,6 +6,12 @@ This document describes the Polang type system, including type inference and pol
 
 - [Overview](#overview)
 - [Primitive Types](#primitive-types)
+- [Type Conversions](#type-conversions)
+  - [Conversion Syntax](#conversion-syntax)
+  - [Allowed Conversions](#allowed-conversions)
+  - [Conversion Semantics](#conversion-semantics)
+  - [Literal Type Inference](#literal-type-inference)
+  - [Boolean Conversions](#boolean-conversions)
 - [Type Inference](#type-inference)
   - [Local Type Inference](#local-type-inference)
   - [If-Expression Type Inference](#if-expression-type-inference)
@@ -25,7 +31,7 @@ Polang uses a Hindley-Milner style type system with:
 - **Static typing**: All types are determined at compile time
 - **Type inference**: Types can be inferred from context, reducing annotation burden
 - **Polymorphic functions**: Functions can work with multiple types via type variables
-- **No implicit conversions**: Types must match exactly (e.g., `int` and `double` are distinct)
+- **Explicit conversions only**: No implicit type coercions; use `as` for numeric conversions
 
 The type system is implemented in two phases:
 
@@ -113,6 +119,213 @@ When type inference encounters a numeric literal without explicit type context, 
 - **Float literals** → `f64` (64-bit double precision)
 
 This means `42` has type `i64` and `3.14` has type `f64` by default.
+
+## Type Conversions
+
+Polang supports explicit type conversions between numeric types using the `as` keyword. All conversions must be explicit; there are no implicit type coercions.
+
+### Conversion Syntax
+
+The `as` keyword converts a value from one numeric type to another:
+
+```polang
+expression as TargetType
+```
+
+**Examples:**
+
+```polang
+let a: i32 = 1000
+let b: i64 = a as i64       ; widen i32 to i64
+let c: i8 = a as i8         ; narrow i32 to i8 (truncates)
+let d: f64 = a as f64       ; convert integer to float
+let e: i32 = 3.14 as i32    ; convert float to integer (truncates toward zero)
+```
+
+### Operator Precedence
+
+The `as` operator has higher precedence than arithmetic operators but lower precedence than unary operators:
+
+| Precedence | Operators |
+|------------|-----------|
+| Highest | Parentheses, function calls |
+| | Unary `-`, `!` |
+| | **`as` (type conversion)** |
+| | `*`, `/`, `%` |
+| | `+`, `-` |
+| | `<`, `>`, `<=`, `>=`, `==`, `!=` |
+| | `&&` |
+| Lowest | `\|\|` |
+
+**Precedence examples:**
+
+```polang
+a + b as i32        ; means: a + (b as i32)
+-x as i32           ; means: (-x) as i32
+a * b as f64 + c    ; means: (a * (b as f64)) + c
+(a + b) as i32      ; parentheses override precedence
+```
+
+### Allowed Conversions
+
+Only numeric-to-numeric conversions are permitted:
+
+| From Type | To Type | Allowed |
+|-----------|---------|---------|
+| Any integer (`i8`-`i64`, `u8`-`u64`) | Any integer | ✓ |
+| Any integer | Any float (`f32`, `f64`) | ✓ |
+| Any float | Any integer | ✓ |
+| Any float | Any float | ✓ |
+| `bool` | Any type | ✗ |
+| Any type | `bool` | ✗ |
+
+**Type error examples:**
+
+```polang
+let x: i32 = true as i32    ; Error: cannot convert bool to i32
+let b: bool = 1 as bool     ; Error: cannot convert i32 to bool
+```
+
+### Conversion Semantics
+
+#### Integer Widening
+
+Converting to a larger integer type preserves the value exactly:
+
+| Conversion | Operation | Example |
+|------------|-----------|---------|
+| Signed → Larger signed | Sign-extend | `(-1i8) as i64` → `-1i64` |
+| Unsigned → Larger unsigned | Zero-extend | `255u8 as u64` → `255u64` |
+| Unsigned → Larger signed | Zero-extend | `255u8 as i64` → `255i64` |
+| Signed → Larger unsigned | Sign-extend then reinterpret | `(-1i8) as u64` → `18446744073709551615u64` |
+
+#### Integer Narrowing
+
+Converting to a smaller integer type truncates the value, keeping only the low-order bits (wrap-around behavior):
+
+```polang
+let a: i32 = 256
+let b: i8 = a as i8          ; b = 0 (256 mod 256)
+
+let c: i32 = 257
+let d: i8 = c as i8          ; d = 1 (257 mod 256)
+
+let e: i32 = -1
+let f: u8 = e as u8          ; f = 255 (bit pattern preserved)
+```
+
+#### Sign Reinterpretation
+
+Converting between signed and unsigned types of the same width reinterprets the bit pattern:
+
+```polang
+let a: i32 = -1
+let b: u32 = a as u32        ; b = 4294967295 (same bits, different interpretation)
+
+let c: u32 = 4294967295
+let d: i32 = c as i32        ; d = -1
+```
+
+#### Float Widening
+
+Converting `f32` to `f64` is always exact with no precision loss:
+
+```polang
+let a: f32 = 3.14
+let b: f64 = a as f64        ; exact conversion
+```
+
+#### Float Narrowing
+
+Converting `f64` to `f32` rounds to the nearest representable value (IEEE 754 round-to-nearest, ties-to-even):
+
+```polang
+let a: f64 = 3.141592653589793
+let b: f32 = a as f32        ; rounded to f32 precision
+```
+
+Very large `f64` values may overflow to `±infinity` when converted to `f32`.
+
+#### Integer to Float
+
+Integer values are converted to the nearest representable floating-point value:
+
+```polang
+let a: i64 = 42
+let b: f64 = a as f64        ; b = 42.0
+
+let c: i64 = 9007199254740993   ; larger than f64 can represent exactly
+let d: f64 = c as f64           ; may lose precision
+```
+
+Note: `f64` has 53 bits of mantissa precision, so `i64` values larger than 2^53 may not be exactly representable.
+
+#### Float to Integer
+
+Float-to-integer conversion uses **saturating truncation toward zero**:
+
+1. **Truncation**: The fractional part is discarded, rounding toward zero
+2. **Saturation**: Values outside the target range are clamped to the minimum or maximum
+3. **NaN handling**: `NaN` converts to `0`
+
+```polang
+; Truncation toward zero
+let a: i32 = 3.7 as i32      ; a = 3
+let b: i32 = -3.7 as i32     ; b = -3
+
+; Saturation at bounds
+let c: i8 = 1000.0 as i8     ; c = 127 (i8 max)
+let d: i8 = -1000.0 as i8    ; d = -128 (i8 min)
+let e: u8 = -1.0 as u8       ; e = 0 (u8 min, since negative)
+let f: u8 = 1000.0 as u8     ; f = 255 (u8 max)
+
+; Infinity handling
+let g: i32 = (1.0 / 0.0) as i32   ; g = 2147483647 (i32 max)
+let h: i32 = (-1.0 / 0.0) as i32  ; h = -2147483648 (i32 min)
+
+; NaN handling
+let i: i32 = (0.0 / 0.0) as i32   ; i = 0
+```
+
+### Literal Type Inference
+
+Numeric literals adapt to their declared type context when the value fits:
+
+```polang
+let a: i8 = 42               ; OK: 42 fits in i8, literal is i8
+let b: i16 = 1000            ; OK: 1000 fits in i16, literal is i16
+let c: f32 = 3.14            ; OK: literal becomes f32
+let d: u8 = 200              ; OK: 200 fits in u8
+```
+
+**Compile-time error** if the literal value doesn't fit in the target type:
+
+```polang
+let x: i8 = 1000             ; Error: 1000 doesn't fit in i8 (-128 to 127)
+let y: u8 = 256              ; Error: 256 doesn't fit in u8 (0 to 255)
+let z: u8 = -1               ; Error: -1 doesn't fit in u8 (unsigned)
+```
+
+When no type context is available, literals default to `i64` (integers) or `f64` (floats):
+
+```polang
+let a = 42                   ; a: i64
+let b = 3.14                 ; b: f64
+```
+
+### Boolean Conversions
+
+Boolean values cannot be converted to or from numeric types using `as`. Use explicit expressions instead:
+
+```polang
+; Instead of: x as bool (not allowed)
+let is_nonzero: bool = x != 0
+
+; Instead of: b as i32 (not allowed)
+let int_value: i32 = if b then 1 else 0
+```
+
+This design ensures that boolean semantics are always explicit in the code.
 
 ## Type Inference
 
