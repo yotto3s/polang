@@ -1,0 +1,6 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test mutable variable with non-i64 type annotation
+; CHECK: 5 : i32
+let x: i32 = mut 5
+(*x)

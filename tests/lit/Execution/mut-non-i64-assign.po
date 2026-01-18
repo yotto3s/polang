@@ -1,0 +1,9 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test mutable variable with non-i64 type annotation and assignment
+; The assigned value must have matching type (use typed let binding)
+; CHECK: 200 : i32
+let x: i32 = mut 100
+let v: i32 = 200
+x <- v
+(*x)

@@ -638,6 +638,38 @@ struct StoreOpLowering : public OpConversionPattern<StoreOp> {
 // Reference Operations Lowering
 //===----------------------------------------------------------------------===//
 
+/// Cast a value to match the target type if needed.
+/// Returns the original value if types already match.
+static Value castToType(Value value, Type targetType, Location loc,
+                        ConversionPatternRewriter& rewriter) {
+  Type valueType = value.getType();
+  if (valueType == targetType) {
+    return value;
+  }
+
+  // Integer to integer cast
+  if (isa<mlir::IntegerType>(valueType) && isa<mlir::IntegerType>(targetType)) {
+    auto srcWidth = valueType.getIntOrFloatBitWidth();
+    auto dstWidth = targetType.getIntOrFloatBitWidth();
+    if (srcWidth < dstWidth) {
+      return rewriter.create<arith::ExtSIOp>(loc, targetType, value);
+    }
+    return rewriter.create<arith::TruncIOp>(loc, targetType, value);
+  }
+
+  // Float to float cast
+  if (isa<mlir::FloatType>(valueType) && isa<mlir::FloatType>(targetType)) {
+    auto srcWidth = valueType.getIntOrFloatBitWidth();
+    auto dstWidth = targetType.getIntOrFloatBitWidth();
+    if (srcWidth < dstWidth) {
+      return rewriter.create<arith::ExtFOp>(loc, targetType, value);
+    }
+    return rewriter.create<arith::TruncFOp>(loc, targetType, value);
+  }
+
+  return value; // No conversion needed/possible
+}
+
 struct MutRefCreateOpLowering : public OpConversionPattern<MutRefCreateOp> {
   using OpConversionPattern<MutRefCreateOp>::OpConversionPattern;
 
@@ -654,9 +686,11 @@ struct MutRefCreateOpLowering : public OpConversionPattern<MutRefCreateOp> {
     // Allocate memory
     auto alloca = rewriter.create<memref::AllocaOp>(op.getLoc(), memRefType);
 
-    // Store the initial value
-    rewriter.create<memref::StoreOp>(op.getLoc(), adaptor.getInitialValue(),
-                                     alloca);
+    // Store the initial value (cast if needed)
+    Type elemType = memRefType.getElementType();
+    Value initValue =
+        castToType(adaptor.getInitialValue(), elemType, op.getLoc(), rewriter);
+    rewriter.create<memref::StoreOp>(op.getLoc(), initValue, alloca);
 
     // Replace the op with the allocated memref
     rewriter.replaceOp(op, alloca.getResult());
@@ -682,11 +716,14 @@ struct MutRefStoreOpLowering : public OpConversionPattern<MutRefStoreOp> {
   LogicalResult
   matchAndRewrite(MutRefStoreOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
-    // Store through mutable reference is just memref.store
-    rewriter.create<memref::StoreOp>(op.getLoc(), adaptor.getValue(),
-                                     adaptor.getRef());
+    // Get the memref element type and cast value if needed
+    auto memRefType = cast<MemRefType>(adaptor.getRef().getType());
+    Type elemType = memRefType.getElementType();
+    Value storeValue =
+        castToType(adaptor.getValue(), elemType, op.getLoc(), rewriter);
+    rewriter.create<memref::StoreOp>(op.getLoc(), storeValue, adaptor.getRef());
     // The store operation returns the stored value
-    rewriter.replaceOp(op, adaptor.getValue());
+    rewriter.replaceOp(op, storeValue);
     return success();
   }
 };
