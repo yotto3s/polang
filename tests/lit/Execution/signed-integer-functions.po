@@ -1,0 +1,18 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test functions with signed integer type annotations (i64)
+; Note: Integer literals default to i64, so we test i64 functions here
+
+; Function with explicit i64 type
+let add_i64(a: i64, b: i64): i64 = a + b
+
+; Test arithmetic with i64
+let r1 = add_i64(10000, 20000)
+
+; Test nested calls
+let mul_i64(a: i64, b: i64): i64 = a * b
+let r2 = mul_i64(add_i64(5, 5), 100)
+
+; Final result
+; CHECK: 30000 : i64
+add_i64(10000, 20000)

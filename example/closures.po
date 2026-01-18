@@ -2,14 +2,14 @@
 
 ; Simple closure: function captures 'base' from outer scope
 let base = 10
-let add_base(x: int): int = x + base
+let add_base(x: i64): i64 = x + base
 let result1 = add_base(5)    ; 15
 
 ; Multiple captures: function captures a, b, c
 let a = 1
 let b = 2
 let c = 3
-let sum_all(): int = a + b + c
+let sum_all(): i64 = a + b + c
 let result2 = sum_all()       ; 6
 
 ; Final result

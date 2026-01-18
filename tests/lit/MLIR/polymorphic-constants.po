@@ -1,0 +1,21 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test that polymorphic functions with integer constants have correct type variable kinds.
+; This verifies that ConstantIntegerOp correctly handles type variables.
+
+; Define a polymorphic function that returns an integer constant
+; The constant should have an Integer-kind type variable
+; CHECK: {{.*}}polang.func @get_zero(%{{.*}}: !polang.typevar<{{[0-9]+}}>){{.*}}
+; CHECK: {{.*}}polang.constant.integer 0 : !polang.typevar<{{[0-9]+}}, integer>{{.*}}
+
+let get_zero(x) = 0
+
+; Define a polymorphic function that returns a float constant
+; The constant should have a Float-kind type variable
+; CHECK: {{.*}}polang.func @get_pi(%{{.*}}: !polang.typevar<{{[0-9]+}}>){{.*}}
+; CHECK: {{.*}}polang.constant.float {{.*}} : !polang.typevar<{{[0-9]+}}, float>{{.*}}
+
+let get_pi(x) = 3.14
+
+; Call sites to trigger monomorphization
+get_zero(1)

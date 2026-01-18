@@ -1,5 +1,5 @@
 ; RUN: %polang_repl %s | %FileCheck %s
-; CHECK: 120 : int
+; CHECK: 120 : i64
 
 ; Test recursive polymorphic function execution.
 ; Factorial function with polymorphic parameter type inference.

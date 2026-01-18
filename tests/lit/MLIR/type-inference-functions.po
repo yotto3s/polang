@@ -3,17 +3,17 @@
 ; Test function return type inference
 
 ; Function returning int (inferred from body)
-; CHECK: {{.*}}polang.func @double_it(%{{.*}}: !polang.int) -> !polang.int{{.*}}
-let double_it(x: int) = x * 2
+; CHECK: {{.*}}polang.func @double_it(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+let double_it(x: i64) = x * 2
 
 ; Function returning double (inferred from body)
-; CHECK: {{.*}}polang.func @half(%{{.*}}: !polang.double) -> !polang.double{{.*}}
-let half(x: double) = x / 2.0
+; CHECK: {{.*}}polang.func @half(%{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}}
+let half(x: f64) = x / 2.0
 
 ; Function returning bool (inferred from comparison)
-; CHECK: {{.*}}polang.func @is_positive(%{{.*}}: !polang.int) -> !polang.bool{{.*}}
-let is_positive(x: int) = x > 0
+; CHECK: {{.*}}polang.func @is_positive(%{{.*}}: !polang.integer<64, signed>) -> !polang.bool{{.*}}
+let is_positive(x: i64) = x > 0
 
 ; Explicit return type should match
-; CHECK: {{.*}}polang.func @identity(%{{.*}}: !polang.int) -> !polang.int{{.*}}
-let identity(x: int): int = x
+; CHECK: {{.*}}polang.func @identity(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+let identity(x: i64): i64 = x

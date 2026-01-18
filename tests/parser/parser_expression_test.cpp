@@ -53,7 +53,7 @@ TEST(ParserTest, AdditionExpression) {
 
   auto* binOp = dynamic_cast<const NBinaryOperator*>(exprStmt->expression.get());
   ASSERT_NE(binOp, nullptr);
-  EXPECT_EQ(binOp->op, TPLUS);
+  EXPECT_EQ(binOp->op, token::TPLUS);
 
   auto* lhs = dynamic_cast<const NInteger*>(binOp->lhs.get());
   auto* rhs = dynamic_cast<const NInteger*>(binOp->rhs.get());
@@ -70,7 +70,7 @@ TEST(ParserTest, SubtractionExpression) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
   auto* binOp = dynamic_cast<const NBinaryOperator*>(exprStmt->expression.get());
   ASSERT_NE(binOp, nullptr);
-  EXPECT_EQ(binOp->op, TMINUS);
+  EXPECT_EQ(binOp->op, token::TMINUS);
 }
 
 TEST(ParserTest, MultiplicationExpression) {
@@ -80,7 +80,7 @@ TEST(ParserTest, MultiplicationExpression) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
   auto* binOp = dynamic_cast<const NBinaryOperator*>(exprStmt->expression.get());
   ASSERT_NE(binOp, nullptr);
-  EXPECT_EQ(binOp->op, TMUL);
+  EXPECT_EQ(binOp->op, token::TMUL);
 }
 
 TEST(ParserTest, DivisionExpression) {
@@ -90,7 +90,7 @@ TEST(ParserTest, DivisionExpression) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
   auto* binOp = dynamic_cast<const NBinaryOperator*>(exprStmt->expression.get());
   ASSERT_NE(binOp, nullptr);
-  EXPECT_EQ(binOp->op, TDIV);
+  EXPECT_EQ(binOp->op, token::TDIV);
 }
 
 // ============== Operator Precedence Tests ==============
@@ -103,7 +103,7 @@ TEST(ParserTest, MulHigherThanAdd) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
   auto* addOp = dynamic_cast<const NBinaryOperator*>(exprStmt->expression.get());
   ASSERT_NE(addOp, nullptr);
-  EXPECT_EQ(addOp->op, TPLUS);
+  EXPECT_EQ(addOp->op, token::TPLUS);
 
   // LHS should be 1
   auto* lhs = dynamic_cast<const NInteger*>(addOp->lhs.get());
@@ -113,7 +113,7 @@ TEST(ParserTest, MulHigherThanAdd) {
   // RHS should be 2 * 3
   auto* mulOp = dynamic_cast<const NBinaryOperator*>(addOp->rhs.get());
   ASSERT_NE(mulOp, nullptr);
-  EXPECT_EQ(mulOp->op, TMUL);
+  EXPECT_EQ(mulOp->op, token::TMUL);
 }
 
 TEST(ParserTest, ParenthesesOverridePrecedence) {
@@ -124,12 +124,12 @@ TEST(ParserTest, ParenthesesOverridePrecedence) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
   auto* mulOp = dynamic_cast<const NBinaryOperator*>(exprStmt->expression.get());
   ASSERT_NE(mulOp, nullptr);
-  EXPECT_EQ(mulOp->op, TMUL);
+  EXPECT_EQ(mulOp->op, token::TMUL);
 
   // LHS should be 1 + 2
   auto* addOp = dynamic_cast<const NBinaryOperator*>(mulOp->lhs.get());
   ASSERT_NE(addOp, nullptr);
-  EXPECT_EQ(addOp->op, TPLUS);
+  EXPECT_EQ(addOp->op, token::TPLUS);
 }
 
 // ============== Comparison Operator Tests ==============
@@ -141,7 +141,7 @@ TEST(ParserTest, EqualComparison) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
   auto* binOp = dynamic_cast<const NBinaryOperator*>(exprStmt->expression.get());
   ASSERT_NE(binOp, nullptr);
-  EXPECT_EQ(binOp->op, TCEQ);
+  EXPECT_EQ(binOp->op, token::TCEQ);
 }
 
 TEST(ParserTest, NotEqualComparison) {
@@ -151,7 +151,7 @@ TEST(ParserTest, NotEqualComparison) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
   auto* binOp = dynamic_cast<const NBinaryOperator*>(exprStmt->expression.get());
   ASSERT_NE(binOp, nullptr);
-  EXPECT_EQ(binOp->op, TCNE);
+  EXPECT_EQ(binOp->op, token::TCNE);
 }
 
 TEST(ParserTest, LessThanComparison) {
@@ -161,7 +161,7 @@ TEST(ParserTest, LessThanComparison) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
   auto* binOp = dynamic_cast<const NBinaryOperator*>(exprStmt->expression.get());
   ASSERT_NE(binOp, nullptr);
-  EXPECT_EQ(binOp->op, TCLT);
+  EXPECT_EQ(binOp->op, token::TCLT);
 }
 
 TEST(ParserTest, GreaterThanComparison) {
@@ -171,7 +171,7 @@ TEST(ParserTest, GreaterThanComparison) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
   auto* binOp = dynamic_cast<const NBinaryOperator*>(exprStmt->expression.get());
   ASSERT_NE(binOp, nullptr);
-  EXPECT_EQ(binOp->op, TCGT);
+  EXPECT_EQ(binOp->op, token::TCGT);
 }
 
 // ============== Function Call Tests ==============
@@ -240,7 +240,7 @@ TEST(ParserTest, AssignmentWithExpression) {
 
   auto* binOp = dynamic_cast<const NBinaryOperator*>(assign->rhs.get());
   ASSERT_NE(binOp, nullptr);
-  EXPECT_EQ(binOp->op, TPLUS);
+  EXPECT_EQ(binOp->op, token::TPLUS);
 }
 
 TEST(ParserTest, ChainedAssignment) {
@@ -268,7 +268,7 @@ TEST(ParserTest, ComplexArithmeticExpression) {
   // Top level should be division
   auto* divOp = dynamic_cast<const NBinaryOperator*>(exprStmt->expression.get());
   ASSERT_NE(divOp, nullptr);
-  EXPECT_EQ(divOp->op, TDIV);
+  EXPECT_EQ(divOp->op, token::TDIV);
 }
 
 TEST(ParserTest, FunctionCallInExpression) {
@@ -278,7 +278,7 @@ TEST(ParserTest, FunctionCallInExpression) {
   auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
   auto* addOp = dynamic_cast<const NBinaryOperator*>(exprStmt->expression.get());
   ASSERT_NE(addOp, nullptr);
-  EXPECT_EQ(addOp->op, TPLUS);
+  EXPECT_EQ(addOp->op, token::TPLUS);
 
   auto* lhs = dynamic_cast<const NMethodCall*>(addOp->lhs.get());
   ASSERT_NE(lhs, nullptr);

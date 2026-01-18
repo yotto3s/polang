@@ -151,6 +151,16 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
+class NCastExpression : public NExpression {
+public:
+  std::unique_ptr<NExpression> expression;
+  std::unique_ptr<NIdentifier> targetType;
+  NCastExpression(std::unique_ptr<NExpression> expr,
+                  std::unique_ptr<NIdentifier> type)
+      : expression(std::move(expr)), targetType(std::move(type)) {}
+  void accept(Visitor &visitor) const override;
+};
+
 class NAssignment : public NExpression {
 public:
   std::unique_ptr<NIdentifier> lhs;

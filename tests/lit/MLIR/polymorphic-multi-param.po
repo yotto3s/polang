@@ -3,7 +3,7 @@
 ; Test polymorphic function with multiple untyped params in binary op.
 ; After monomorphization, should have specialized version for int.
 
-; CHECK: {{.*}}polang.func @add$int_int(%{{.*}}: !polang.int, %{{.*}}: !polang.int) -> !polang.int{{.*}}
+; CHECK: {{.*}}polang.func @add$i64_i64(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 
 let add(x, y) = x + y
 add(1, 2)

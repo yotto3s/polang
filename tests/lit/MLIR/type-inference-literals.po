@@ -3,11 +3,11 @@
 ; Test type inference from literal values
 
 ; Integer literal infers int type
-; CHECK: {{.*}}polang.constant.int 42 : !polang.int{{.*}}
+; CHECK: {{.*}}polang.constant.integer 42 : !polang.integer<64, signed>{{.*}}
 let a = 42
 
 ; Double literal infers double type
-; CHECK: {{.*}}polang.constant.double 3.140000e+00 : !polang.double{{.*}}
+; CHECK: {{.*}}polang.constant.float 3.140000e+00 : !polang.float<64>{{.*}}
 let b = 3.14
 
 ; Boolean literal infers bool type

@@ -7,6 +7,6 @@
 
 module Math (add, PI)
   let PI = 3.14
-  let add(x: int, y: int): int = x + y
+  let add(x: i64, y: i64): i64 = x + y
 endmodule
 from Math import add, PI

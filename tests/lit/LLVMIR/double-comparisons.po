@@ -5,18 +5,18 @@
 ; CHECK-NEXT:   %{{[0-9]+}} = fcmp olt double %{{[0-9]+}}, %{{[0-9]+}}
 ; CHECK-NEXT:   ret i1 %{{[0-9]+}}
 ; CHECK-NEXT: }
-let dcmp_lt(a: double, b: double): bool = a < b
+let dcmp_lt(a: f64, b: f64): bool = a < b
 
 ; Test double greater-than comparison
 ; CHECK:      define i1 @dcmp_gt(double %{{[0-9]+}}, double %{{[0-9]+}}) {
 ; CHECK-NEXT:   %{{[0-9]+}} = fcmp ogt double %{{[0-9]+}}, %{{[0-9]+}}
 ; CHECK-NEXT:   ret i1 %{{[0-9]+}}
 ; CHECK-NEXT: }
-let dcmp_gt(a: double, b: double): bool = a > b
+let dcmp_gt(a: f64, b: f64): bool = a > b
 
 ; Test double equality comparison
 ; CHECK:      define i1 @dcmp_eq(double %{{[0-9]+}}, double %{{[0-9]+}}) {
 ; CHECK-NEXT:   %{{[0-9]+}} = fcmp oeq double %{{[0-9]+}}, %{{[0-9]+}}
 ; CHECK-NEXT:   ret i1 %{{[0-9]+}}
 ; CHECK-NEXT: }
-let dcmp_eq(a: double, b: double): bool = a == b
+let dcmp_eq(a: f64, b: f64): bool = a == b

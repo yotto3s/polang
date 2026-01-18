@@ -1,0 +1,5 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test integer to float conversion
+; CHECK: 42{{.*}} : f64
+42 as f64

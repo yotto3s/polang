@@ -2,10 +2,10 @@
 
 ; Test method call
 ; CHECK:      NBlock
-; CHECK-NEXT: |-NFunctionDeclaration 'add' (a: int, b: int) -> int
+; CHECK-NEXT: |-NFunctionDeclaration 'add' (a: i64, b: i64) -> i64
 ; CHECK:      {{^}}`-NExpressionStatement
 ; CHECK-NEXT:  `-NMethodCall 'add'
 ; CHECK-NEXT:    |-NInteger 1
 ; CHECK-NEXT:    `-NInteger 2
-let add(a: int, b: int): int = a + b
+let add(a: i64, b: i64): i64 = a + b
 add(1, 2)

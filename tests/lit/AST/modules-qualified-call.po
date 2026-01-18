@@ -9,6 +9,6 @@
 ; CHECK-NEXT:     `-NInteger 2
 
 module Math (add)
-  let add(x: int, y: int): int = x + y
+  let add(x: i64, y: i64): i64 = x + y
 endmodule
 Math.add(1, 2)

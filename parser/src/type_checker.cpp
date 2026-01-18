@@ -51,6 +51,10 @@ public:
     node.rhs->accept(*this);
   }
 
+  void visit(const NCastExpression& node) override {
+    node.expression->accept(*this);
+  }
+
   void visit(const NAssignment& node) override {
     if (localNames.find(node.lhs->name) == localNames.end()) {
       referencedNonLocals.insert(node.lhs->name);
@@ -116,7 +120,7 @@ private:
   std::set<std::string> referencedNonLocals;
 };
 
-TypeChecker::TypeChecker() : inferredType(TypeNames::INT) {}
+TypeChecker::TypeChecker() : inferredType(TypeNames::I64) {}
 
 std::string TypeChecker::mangledName(const std::string& name) const {
   if (modulePath.empty()) {
@@ -150,11 +154,9 @@ void TypeChecker::reportError(const std::string& message) {
   }
 }
 
-void TypeChecker::visit(const NInteger& node) { inferredType = TypeNames::INT; }
+void TypeChecker::visit(const NInteger& node) { inferredType = TypeNames::I64; }
 
-void TypeChecker::visit(const NDouble& node) {
-  inferredType = TypeNames::DOUBLE;
-}
+void TypeChecker::visit(const NDouble& node) { inferredType = TypeNames::F64; }
 
 void TypeChecker::visit(const NBoolean& node) {
   inferredType = TypeNames::BOOL;
@@ -215,7 +217,7 @@ void TypeChecker::visit(const NMethodCall& node) {
   if (functionReturnTypes.find(funcName) != functionReturnTypes.end()) {
     inferredType = functionReturnTypes[funcName];
   } else {
-    inferredType = TypeNames::INT;
+    inferredType = TypeNames::I64;
   }
 }
 
@@ -251,6 +253,14 @@ void TypeChecker::visit(const NBinaryOperator& node) {
     }
     inferredType = TypeNames::BOOL;
   }
+}
+
+void TypeChecker::visit(const NCastExpression& node) {
+  // Visit the inner expression to collect any free variables and check types
+  node.expression->accept(*this);
+  // The result type is the target type of the cast
+  // Type validation (numeric-only) is handled by MLIR CastOp verifier
+  inferredType = node.targetType->name;
 }
 
 void TypeChecker::visit(const NAssignment& node) {

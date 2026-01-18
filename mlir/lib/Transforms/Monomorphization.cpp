@@ -54,23 +54,30 @@ bool isPolymorphicFunction(FuncOp func) {
                       [](Type result) { return isTypeVar(result); });
 }
 
+/// Get a type string for mangling
+std::string getTypeString(Type type) {
+  if (auto intType = dyn_cast<polang::IntegerType>(type)) {
+    return (intType.isSigned() ? "i" : "u") +
+           std::to_string(intType.getWidth());
+  }
+  if (auto floatType = dyn_cast<polang::FloatType>(type)) {
+    return "f" + std::to_string(floatType.getWidth());
+  }
+  if (isa<BoolType>(type)) {
+    return "bool";
+  }
+  return "unknown";
+}
+
 /// Generate a mangled name for a specialized function
-/// Example: identity -> identity$int, identity$int_bool
+/// Example: identity -> identity$i64, identity$i64_bool
 std::string getMangledName(StringRef baseName, ArrayRef<Type> argTypes) {
   std::string result = baseName.str() + "$";
   for (size_t i = 0; i < argTypes.size(); ++i) {
     if (i > 0) {
       result += "_";
     }
-    if (isa<IntType>(argTypes[i])) {
-      result += "int";
-    } else if (isa<DoubleType>(argTypes[i])) {
-      result += "double";
-    } else if (isa<BoolType>(argTypes[i])) {
-      result += "bool";
-    } else {
-      result += "unknown";
-    }
+    result += getTypeString(argTypes[i]);
   }
   return result;
 }
@@ -79,26 +86,10 @@ std::string getMangledName(StringRef baseName, ArrayRef<Type> argTypes) {
 std::string getSignatureKey(ArrayRef<Type> argTypes, Type returnType) {
   std::string key;
   for (Type t : argTypes) {
-    if (isa<IntType>(t)) {
-      key += "i";
-    } else if (isa<DoubleType>(t)) {
-      key += "d";
-    } else if (isa<BoolType>(t)) {
-      key += "b";
-    } else {
-      key += "?";
-    }
+    key += getTypeString(t) + ",";
   }
   key += "->";
-  if (isa<IntType>(returnType)) {
-    key += "i";
-  } else if (isa<DoubleType>(returnType)) {
-    key += "d";
-  } else if (isa<BoolType>(returnType)) {
-    key += "b";
-  } else {
-    key += "?";
-  }
+  key += getTypeString(returnType);
   return key;
 }
 

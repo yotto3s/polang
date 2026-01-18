@@ -1,0 +1,14 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test unsigned comparison operators
+let lt_u64(a: u64, b: u64): bool = a < b
+let gt_u64(a: u64, b: u64): bool = a > b
+
+let btoi(b: bool): i64 = if b then 1 else 0
+
+; For unsigned: 0 < 100 should be true, 100 > 0 should be true
+; Cast literals to u64 since integer literals default to i64
+let result = btoi(lt_u64(0 as u64, 100 as u64)) + btoi(gt_u64(100 as u64, 0 as u64))
+
+; CHECK: 2 : i64
+result

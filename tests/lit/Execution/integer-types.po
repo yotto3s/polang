@@ -1,0 +1,12 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test default integer type (i64)
+; Integer literals default to i64
+
+; Test various integer operations - last result is what gets printed
+let a = 50 + 50
+let big = 1000000 * 1000000
+
+; Final expression tests negative numbers, which prints
+; CHECK: -42 : i64
+0 - 42

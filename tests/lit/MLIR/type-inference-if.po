@@ -3,11 +3,11 @@
 ; Test if expression type inference
 
 ; If expression with int branches infers int
-; CHECK: {{.*}}polang.if %{{[0-9]+}} : !polang.bool -> !polang.int{{.*}}
+; CHECK: {{.*}}polang.if %{{[0-9]+}} : !polang.bool -> !polang.integer<64, signed>{{.*}}
 let a = if true then 1 else 2
 
 ; If expression with double branches infers double
-; CHECK: {{.*}}polang.if %{{[0-9]+}} : !polang.bool -> !polang.double{{.*}}
+; CHECK: {{.*}}polang.if %{{[0-9]+}} : !polang.bool -> !polang.float<64>{{.*}}
 let b = if false then 1.0 else 2.0
 
 ; If expression with bool branches infers bool

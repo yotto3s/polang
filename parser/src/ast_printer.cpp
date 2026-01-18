@@ -93,6 +93,16 @@ void ASTPrinter::visit(const NBinaryOperator& node) {
   }
 }
 
+void ASTPrinter::visit(const NCastExpression& node) {
+  printPrefix();
+  out << "NCastExpression -> " << node.targetType->name << "\n";
+
+  {
+    DepthScope scope(*this, false);
+    node.expression->accept(*this);
+  }
+}
+
 void ASTPrinter::visit(const NAssignment& node) {
   printPrefix();
   out << "NAssignment\n";

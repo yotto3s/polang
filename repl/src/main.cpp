@@ -27,14 +27,16 @@ static void printResult(const EvalResult& result) {
     return;
   }
 
-  if (result.type == "double") {
+  // Float types: f32, f64
+  if (result.type == "f64" || result.type == "f32") {
     double d = 0;
     std::memcpy(&d, &result.rawValue, sizeof(double));
-    std::cout << d << " : double\n";
+    std::cout << d << " : " << result.type << "\n";
   } else if (result.type == "bool") {
     std::cout << (result.rawValue != 0 ? "true" : "false") << " : bool\n";
-  } else if (result.type == "int") {
-    std::cout << result.rawValue << " : int\n";
+  } else {
+    // Integer types: i8, i16, i32, i64, u8, u16, u32, u64
+    std::cout << result.rawValue << " : " << result.type << "\n";
   }
 }
 

@@ -1,5 +1,5 @@
 ; RUN: %polang_repl %s | %FileCheck %s
-; CHECK: 3.14 : double
+; CHECK: 3.14 : f64
 
 module Math (PI)
   let PI = 3.14

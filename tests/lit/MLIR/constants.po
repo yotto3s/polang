@@ -2,9 +2,9 @@
 
 ; Test constant generation
 ; CHECK:      module {
-; CHECK-NEXT:   polang.func @__polang_entry() -> !polang.int {
-; CHECK-NEXT:     %{{[0-9]+}} = polang.constant.int 42 : !polang.int
-; CHECK-NEXT:     polang.return %{{[0-9]+}} : !polang.int
+; CHECK-NEXT:   polang.func @__polang_entry() -> !polang.integer<64, signed> {
+; CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 42 : !polang.integer<64, signed>
+; CHECK-NEXT:     polang.return %{{[0-9]+}} : !polang.integer<64, signed>
 ; CHECK-NEXT:   }
 ; CHECK-NEXT: }
 42

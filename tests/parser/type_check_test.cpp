@@ -41,20 +41,20 @@ TEST(TypeCheckTest, IntegerArithmetic) {
 }
 
 TEST(TypeCheckTest, DoubleArithmetic) {
-  EXPECT_TRUE(hasNoTypeError("let x : double = 1.0 + 2.0"));
-  EXPECT_TRUE(hasNoTypeError("let x : double = 1.0 - 2.0"));
-  EXPECT_TRUE(hasNoTypeError("let x : double = 1.0 * 2.0"));
-  EXPECT_TRUE(hasNoTypeError("let x : double = 1.0 / 2.0"));
+  EXPECT_TRUE(hasNoTypeError("let x : f64 = 1.0 + 2.0"));
+  EXPECT_TRUE(hasNoTypeError("let x : f64 = 1.0 - 2.0"));
+  EXPECT_TRUE(hasNoTypeError("let x : f64 = 1.0 * 2.0"));
+  EXPECT_TRUE(hasNoTypeError("let x : f64 = 1.0 / 2.0"));
 }
 
 TEST(TypeCheckTest, VariableUsage) {
   EXPECT_TRUE(hasNoTypeError("let x = 1\nlet y = x + 1"));
-  EXPECT_TRUE(hasNoTypeError("let x : double = 1.0\nlet y : double = x + 2.0"));
+  EXPECT_TRUE(hasNoTypeError("let x : f64 = 1.0\nlet y : f64 = x + 2.0"));
 }
 
 TEST(TypeCheckTest, FunctionDeclaration) {
-  EXPECT_TRUE(hasNoTypeError("let add(x: int, y: int): int = x + y"));
-  EXPECT_TRUE(hasNoTypeError("let mul(a: double, b: double): double = a * b"));
+  EXPECT_TRUE(hasNoTypeError("let add(x: i64, y: i64): i64 = x + y"));
+  EXPECT_TRUE(hasNoTypeError("let mul(a: f64, b: f64): f64 = a * b"));
 }
 
 TEST(TypeCheckTest, LetExpression) {
@@ -74,7 +74,7 @@ TEST(TypeCheckTest, Comparison) {
   EXPECT_TRUE(hasNoTypeError("let x : bool = 1 < 2"));
   EXPECT_TRUE(hasNoTypeError("let x : bool = 1 == 2"));
   EXPECT_TRUE(hasNoTypeError(
-      "let x : double = 1.0\nlet y : double = 2.0\nlet z : bool = x < y"));
+      "let x : f64 = 1.0\nlet y : f64 = 2.0\nlet z : bool = x < y"));
   // Using comparison in if condition (returns bool)
   EXPECT_TRUE(hasNoTypeError("if 1 < 2 then 3 else 4"));
 }
@@ -94,13 +94,13 @@ TEST(TypeCheckTest, MixedComparisonTypes) {
 }
 
 TEST(TypeCheckTest, VariableTypeMismatch) {
-  EXPECT_TRUE(hasTypeError("let x : int = 1.0"));
-  EXPECT_TRUE(hasTypeError("let x : double = 1"));
+  EXPECT_TRUE(hasTypeError("let x : i64 = 1.0"));
+  EXPECT_TRUE(hasTypeError("let x : f64 = 1"));
 }
 
 TEST(TypeCheckTest, FunctionReturnTypeMismatch) {
-  EXPECT_TRUE(hasTypeError("let f(x: int): double = x"));
-  EXPECT_TRUE(hasTypeError("let f(x: double): int = x"));
+  EXPECT_TRUE(hasTypeError("let f(x: i64): f64 = x"));
+  EXPECT_TRUE(hasTypeError("let f(x: f64): i64 = x"));
 }
 
 TEST(TypeCheckTest, IfBranchTypeMismatch) {
@@ -120,7 +120,7 @@ TEST(TypeCheckTest, UndeclaredVariable) {
 
 TEST(TypeCheckTest, LetExpressionTypeMismatch) {
   EXPECT_TRUE(hasTypeError("let x = 1 in x + 2.0"));
-  EXPECT_TRUE(hasTypeError("let x : int = 1 and y : double = 2.0 in x + y"));
+  EXPECT_TRUE(hasTypeError("let x : i64 = 1 and y : f64 = 2.0 in x + y"));
 }
 
 TEST(TypeCheckTest, AssignmentTypeMismatch) {
@@ -132,13 +132,13 @@ TEST(TypeCheckTest, AssignmentTypeMismatch) {
 TEST(TypeCheckTest, MutableVariableReassignment) {
   // Mutable variable can be reassigned
   EXPECT_TRUE(hasNoTypeError("let mut x = 1\nx <- 2\nx"));
-  EXPECT_TRUE(hasNoTypeError("let mut x: int = 1\nx <- 2\nx"));
+  EXPECT_TRUE(hasNoTypeError("let mut x: i64 = 1\nx <- 2\nx"));
 }
 
 TEST(TypeCheckTest, ImmutableVariableReassignment) {
   // Immutable variable cannot be reassigned
   EXPECT_TRUE(hasTypeError("let x = 1\nx <- 2"));
-  EXPECT_TRUE(hasTypeError("let x: int = 1\nx <- 2"));
+  EXPECT_TRUE(hasTypeError("let x: i64 = 1\nx <- 2"));
 }
 
 TEST(TypeCheckTest, MutableInLetExpression) {
@@ -160,8 +160,8 @@ TEST(TypeCheckTest, MultipleReassignments) {
 
 TEST(TypeCheckTest, MutableDoubleType) {
   // Mutable double variable
-  EXPECT_TRUE(hasNoTypeError("let mut x: double = 1.0\nx <- 2.5\nx"));
-  EXPECT_TRUE(hasTypeError("let mut x: double = 1.0\nx <- 2")); // int to double
+  EXPECT_TRUE(hasNoTypeError("let mut x: f64 = 1.0\nx <- 2.5\nx"));
+  EXPECT_TRUE(hasTypeError("let mut x: f64 = 1.0\nx <- 2")); // int to double
 }
 
 TEST(TypeCheckTest, MutableBoolType) {
@@ -200,20 +200,20 @@ TEST(TypeCheckTest, ErrorMessageContainsOperator) {
 TEST(TypeCheckTest, ErrorMessageContainsTypes) {
   auto errors = checkTypes("let x = 1 + 2.0");
   ASSERT_FALSE(errors.empty());
-  EXPECT_TRUE(errors[0].message.find("int") != std::string::npos);
-  EXPECT_TRUE(errors[0].message.find("double") != std::string::npos);
+  EXPECT_TRUE(errors[0].message.find("i64") != std::string::npos);
+  EXPECT_TRUE(errors[0].message.find("f64") != std::string::npos);
 }
 
 // ============== Type Inference Tests ==============
 
 TEST(TypeCheckTest, InferIntFromLiteral) {
   // let x = 42 should infer int
-  EXPECT_TRUE(hasNoTypeError("let x = 42\nlet y: int = x"));
+  EXPECT_TRUE(hasNoTypeError("let x = 42\nlet y: i64 = x"));
 }
 
 TEST(TypeCheckTest, InferDoubleFromLiteral) {
   // let x = 3.14 should infer double
-  EXPECT_TRUE(hasNoTypeError("let x = 3.14\nlet y: double = x"));
+  EXPECT_TRUE(hasNoTypeError("let x = 3.14\nlet y: f64 = x"));
 }
 
 TEST(TypeCheckTest, InferBoolFromLiteral) {
@@ -223,7 +223,7 @@ TEST(TypeCheckTest, InferBoolFromLiteral) {
 
 TEST(TypeCheckTest, InferFromExpression) {
   // let x = 1 + 2 should infer int
-  EXPECT_TRUE(hasNoTypeError("let x = 1 + 2\nlet y: int = x"));
+  EXPECT_TRUE(hasNoTypeError("let x = 1 + 2\nlet y: i64 = x"));
 }
 
 TEST(TypeCheckTest, InferFromComparison) {
@@ -232,24 +232,24 @@ TEST(TypeCheckTest, InferFromComparison) {
 }
 
 TEST(TypeCheckTest, InferFunctionReturnType) {
-  // let f(x: int) = x + 1 should infer int return type
-  EXPECT_TRUE(hasNoTypeError("let f(x: int) = x + 1\nlet y: int = f(5)"));
+  // let f(x: i64) = x + 1 should infer int return type
+  EXPECT_TRUE(hasNoTypeError("let f(x: i64) = x + 1\nlet y: i64 = f(5)"));
 }
 
 TEST(TypeCheckTest, InferFunctionReturnTypeDouble) {
-  // let f(x: double) = x + 1.0 should infer double return type
+  // let f(x: f64) = x + 1.0 should infer double return type
   EXPECT_TRUE(
-      hasNoTypeError("let f(x: double) = x + 1.0\nlet y: double = f(5.0)"));
+      hasNoTypeError("let f(x: f64) = x + 1.0\nlet y: f64 = f(5.0)"));
 }
 
 TEST(TypeCheckTest, NoImplicitConversionIntToDouble) {
-  // let x: double = 42 should be error (no coercion)
-  EXPECT_TRUE(hasTypeError("let x: double = 42"));
+  // let x: f64 = 42 should be error (no coercion)
+  EXPECT_TRUE(hasTypeError("let x: f64 = 42"));
 }
 
 TEST(TypeCheckTest, NoImplicitConversionDoubleToInt) {
-  // let x: int = 42.0 should be error (no coercion)
-  EXPECT_TRUE(hasTypeError("let x: int = 42.0"));
+  // let x: i64 = 42.0 should be error (no coercion)
+  EXPECT_TRUE(hasTypeError("let x: i64 = 42.0"));
 }
 
 TEST(TypeCheckTest, LetExpressionInferInt) {
@@ -276,72 +276,72 @@ TEST(TypeCheckTest, InferredVariableUsedWithWrongType) {
 
 TEST(TypeCheckTest, FunctionCallCorrectTypes) {
   // Correct argument types should pass
-  EXPECT_TRUE(hasNoTypeError("let f(x: int) = x + 1\nf(5)"));
-  EXPECT_TRUE(hasNoTypeError("let f(x: double) = x + 1.0\nf(5.0)"));
-  EXPECT_TRUE(hasNoTypeError("let f(x: int, y: int) = x + y\nf(1, 2)"));
+  EXPECT_TRUE(hasNoTypeError("let f(x: i64) = x + 1\nf(5)"));
+  EXPECT_TRUE(hasNoTypeError("let f(x: f64) = x + 1.0\nf(5.0)"));
+  EXPECT_TRUE(hasNoTypeError("let f(x: i64, y: i64) = x + y\nf(1, 2)"));
 }
 
 TEST(TypeCheckTest, FunctionCallWrongArgType) {
   // Passing double to int parameter should fail
-  EXPECT_TRUE(hasTypeError("let f(x: int) = x + 1\nf(3.5)"));
+  EXPECT_TRUE(hasTypeError("let f(x: i64) = x + 1\nf(3.5)"));
   // Passing int to double parameter should fail
-  EXPECT_TRUE(hasTypeError("let f(x: double) = x + 1.0\nf(3)"));
+  EXPECT_TRUE(hasTypeError("let f(x: f64) = x + 1.0\nf(3)"));
 }
 
 TEST(TypeCheckTest, FunctionCallWrongArgCount) {
   // Too few arguments
-  EXPECT_TRUE(hasTypeError("let f(x: int, y: int) = x + y\nf(1)"));
+  EXPECT_TRUE(hasTypeError("let f(x: i64, y: i64) = x + y\nf(1)"));
   // Too many arguments
-  EXPECT_TRUE(hasTypeError("let f(x: int) = x + 1\nf(1, 2)"));
+  EXPECT_TRUE(hasTypeError("let f(x: i64) = x + 1\nf(1, 2)"));
 }
 
 TEST(TypeCheckTest, FunctionCallMultipleArgsTypeMismatch) {
   // Second argument has wrong type
-  EXPECT_TRUE(hasTypeError("let f(x: int, y: int) = x + y\nf(1, 2.0)"));
+  EXPECT_TRUE(hasTypeError("let f(x: i64, y: i64) = x + y\nf(1, 2.0)"));
   // First argument has wrong type
-  EXPECT_TRUE(hasTypeError("let f(x: int, y: int) = x + y\nf(1.0, 2)"));
+  EXPECT_TRUE(hasTypeError("let f(x: i64, y: i64) = x + y\nf(1.0, 2)"));
 }
 
 TEST(TypeCheckTest, FunctionCallErrorMessage) {
-  auto errors = checkTypes("let f(x: int) = x + 1\nf(3.5)");
+  auto errors = checkTypes("let f(x: i64) = x + 1\nf(3.5)");
   ASSERT_FALSE(errors.empty());
-  EXPECT_TRUE(errors[0].message.find("int") != std::string::npos);
-  EXPECT_TRUE(errors[0].message.find("double") != std::string::npos);
+  EXPECT_TRUE(errors[0].message.find("i64") != std::string::npos);
+  EXPECT_TRUE(errors[0].message.find("f64") != std::string::npos);
 }
 
 // ============== Function in Let Expression Type Checking Tests ==============
 
 TEST(TypeCheckTest, LetExpressionWithFunction) {
   // Function declared in let expression should be type-checked
-  EXPECT_TRUE(hasNoTypeError("let f(x: int): int = x + 1 in f(5)"));
-  EXPECT_TRUE(hasNoTypeError("let f(x: double): double = x + 1.0 in f(5.0)"));
+  EXPECT_TRUE(hasNoTypeError("let f(x: i64): i64 = x + 1 in f(5)"));
+  EXPECT_TRUE(hasNoTypeError("let f(x: f64): f64 = x + 1.0 in f(5.0)"));
 }
 
 TEST(TypeCheckTest, LetExpressionWithFunctionInferredReturnType) {
   // Return type should be inferred from function body
-  EXPECT_TRUE(hasNoTypeError("let f(x: int) = x * 2 in f(5)"));
+  EXPECT_TRUE(hasNoTypeError("let f(x: i64) = x * 2 in f(5)"));
 }
 
 TEST(TypeCheckTest, LetExpressionWithFunctionWrongArgType) {
   // Passing wrong type to function in let expression should fail
-  EXPECT_TRUE(hasTypeError("let f(x: int): int = x + 1 in f(5.0)"));
+  EXPECT_TRUE(hasTypeError("let f(x: i64): i64 = x + 1 in f(5.0)"));
 }
 
 TEST(TypeCheckTest, LetExpressionWithFunctionReturnTypeMismatch) {
   // Function return type doesn't match body
-  EXPECT_TRUE(hasTypeError("let f(x: int): double = x + 1 in f(5)"));
+  EXPECT_TRUE(hasTypeError("let f(x: i64): f64 = x + 1 in f(5)"));
 }
 
 TEST(TypeCheckTest, LetExpressionMultipleFunctions) {
   // Multiple functions in let expression
   EXPECT_TRUE(hasNoTypeError(
-      "let square(n: int): int = n * n and cube(n: int): int = n * n * n in "
+      "let square(n: i64): i64 = n * n and cube(n: i64): i64 = n * n * n in "
       "square(2) + cube(2)"));
 }
 
 TEST(TypeCheckTest, LetExpressionMixedBindingsTypes) {
   // Variable and function in same let expression
-  EXPECT_TRUE(hasNoTypeError("let x = 10 and f(y: int): int = y * 2 in f(x)"));
+  EXPECT_TRUE(hasNoTypeError("let x = 10 and f(y: i64): i64 = y * 2 in f(x)"));
 }
 
 // ============== Let Expression Parallel Binding Tests ==============
@@ -372,7 +372,7 @@ TEST(TypeCheckTest, SimpleClosure) {
 TEST(TypeCheckTest, ClosureWithParameter) {
   // Function with parameter can also capture
   EXPECT_TRUE(hasNoTypeError(
-      "let multiplier = 3\nlet scale(n: int) = n * multiplier\nscale(5)"));
+      "let multiplier = 3\nlet scale(n: i64) = n * multiplier\nscale(5)"));
 }
 
 TEST(TypeCheckTest, MultipleCapturedVariables) {
@@ -392,7 +392,7 @@ TEST(TypeCheckTest, ClosureCapturesMutableVariable) {
 
 TEST(TypeCheckTest, ClosureTypeMismatch) {
   // Captured variable type must be compatible with usage
-  EXPECT_TRUE(hasTypeError("let x = 10\nlet f(): double = x + 1.0\nf()"));
+  EXPECT_TRUE(hasTypeError("let x = 10\nlet f(): f64 = x + 1.0\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureUndeclaredCapture) {
@@ -414,7 +414,7 @@ TEST(TypeCheckTest, ClosureCapturesBoolType) {
 TEST(TypeCheckTest, ClosureWithParamsAndCaptures) {
   // Function uses both parameters and captured variables
   EXPECT_TRUE(
-      hasNoTypeError("let base = 100\nlet add(x: int) = x + base\nadd(5)"));
+      hasNoTypeError("let base = 100\nlet add(x: i64) = x + base\nadd(5)"));
 }
 
 TEST(TypeCheckTest, NestedLetWithClosure) {
@@ -456,7 +456,7 @@ TEST(TypeCheckTest, ClosureWithLetExpression) {
 TEST(TypeCheckTest, ClosureWithLetExpressionFunction) {
   // Let expression with function binding inside closure
   EXPECT_TRUE(hasNoTypeError(
-      "let outer = 10\nlet f() = let g(x: int) = x in g(outer)\nf()"));
+      "let outer = 10\nlet f() = let g(x: i64) = x in g(outer)\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithLetExpressionCaptureInInit) {
@@ -491,7 +491,7 @@ TEST(TypeCheckTest, ClosureWithIfBranchCapture) {
 TEST(TypeCheckTest, ClosureWithMethodCallArgs) {
   // Method call arguments capture variables
   EXPECT_TRUE(hasNoTypeError(
-      "let x = 5\nlet add(a: int, b: int) = a + b\nlet f() = add(x, x)\nf()"));
+      "let x = 5\nlet add(a: i64, b: i64) = a + b\nlet f() = add(x, x)\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithNestedBlocks) {

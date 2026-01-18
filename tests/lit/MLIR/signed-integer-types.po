@@ -1,0 +1,22 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test MLIR representation of signed integer types (i8, i16, i32, i64)
+
+; Function with i8 parameters
+; CHECK: {{.*}}polang.func @add_i8(%{{.*}}: !polang.integer<8, signed>, %{{.*}}: !polang.integer<8, signed>) -> !polang.integer<8, signed>{{.*}}
+let add_i8(a: i8, b: i8): i8 = a + b
+
+; Function with i16 parameters
+; CHECK: {{.*}}polang.func @add_i16(%{{.*}}: !polang.integer<16, signed>, %{{.*}}: !polang.integer<16, signed>) -> !polang.integer<16, signed>{{.*}}
+let add_i16(a: i16, b: i16): i16 = a + b
+
+; Function with i32 parameters
+; CHECK: {{.*}}polang.func @add_i32(%{{.*}}: !polang.integer<32, signed>, %{{.*}}: !polang.integer<32, signed>) -> !polang.integer<32, signed>{{.*}}
+let add_i32(a: i32, b: i32): i32 = a + b
+
+; Function with i64 parameters
+; CHECK: {{.*}}polang.func @add_i64(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+let add_i64(a: i64, b: i64): i64 = a + b
+
+; Default expression
+42

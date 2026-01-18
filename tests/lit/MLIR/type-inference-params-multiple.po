@@ -6,20 +6,20 @@
 ; Polymorphic template function
 ; CHECK: {{.*}}polang.func @add3(%{{.*}}: !polang.typevar{{.*}}, %{{.*}}: !polang.typevar{{.*}}, %{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
 ; Monomorphized version
-; CHECK: {{.*}}polang.func @add3$int_int_int(%{{.*}}: !polang.int, %{{.*}}: !polang.int, %{{.*}}: !polang.int) -> !polang.int{{.*}}
+; CHECK: {{.*}}polang.func @add3$i64_i64_i64(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 let add3(a, b, c) = (a + 0) + (b + 0) + (c + 0)
 
 ; Polymorphic template function
 ; CHECK: {{.*}}polang.func @scale3(%{{.*}}: !polang.typevar{{.*}}, %{{.*}}: !polang.typevar{{.*}}, %{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
 ; Monomorphized version
-; CHECK: {{.*}}polang.func @scale3$double_double_double(%{{.*}}: !polang.double, %{{.*}}: !polang.double, %{{.*}}: !polang.double) -> !polang.double{{.*}}
+; CHECK: {{.*}}polang.func @scale3$f64_f64_f64(%{{.*}}: !polang.float<64>, %{{.*}}: !polang.float<64>, %{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}}
 let scale3(a, b, c) = (a * 1.0) + (b * 1.0) + (c * 1.0)
 
 ; Partially typed function (x is int, y is typevar)
-; CHECK: {{.*}}polang.func @add_typed(%{{.*}}: !polang.int, %{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
+; CHECK: {{.*}}polang.func @add_typed(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
 ; Monomorphized version
-; CHECK: {{.*}}polang.func @add_typed$int_int(%{{.*}}: !polang.int, %{{.*}}: !polang.int) -> !polang.int{{.*}}
-let add_typed(x: int, y) = x + y
+; CHECK: {{.*}}polang.func @add_typed$i64_i64(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+let add_typed(x: i64, y) = x + y
 
 ; Call functions to create monomorphized versions
 add3(1, 2, 3)

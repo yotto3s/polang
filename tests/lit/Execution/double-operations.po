@@ -1,5 +1,5 @@
 ; RUN: %polang_repl %s | %FileCheck %s
 
 ; Test double arithmetic and output format
-; CHECK: 6 : double
+; CHECK: 6 : f64
 3.14 + 2.86

@@ -7,10 +7,11 @@
 ; CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.typevar{{.*}}) -> !polang.bool{{.*}}
 
 ; Monomorphized version for int parameter
-; CHECK: {{.*}}polang.func @is_zero$int(%{{.*}}: !polang.int) -> !polang.bool{{.*}}
+; CHECK: {{.*}}polang.func @is_zero$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.bool{{.*}}
 
 ; Verify comparison operation exists in monomorphized version
-; CHECK: {{.*}}polang.cmp eq{{.*}}!polang.int, !polang.int{{.*}}
+; (the second operand may still be a type variable from the cloned body)
+; CHECK: {{.*}}polang.cmp eq{{.*}}!polang.integer<64, signed>{{.*}}
 
 let is_zero(x) = x == 0
 is_zero(5)

@@ -1,0 +1,5 @@
+; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+
+; Test that casting to bool is rejected
+; CHECK: error: 'polang.cast' op result #0 must be Polang numeric type or type variable, but got '!polang.bool'
+42 as bool
