@@ -256,6 +256,93 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
 // Cast Lowering
 //===----------------------------------------------------------------------===//
 
+/// Lower integer to integer cast.
+void lowerIntToIntCast(CastOp op, Value input, Type inputType, Type resultType,
+                       Type origInputType,
+                       ConversionPatternRewriter& rewriter) {
+  auto inputIntType = cast<mlir::IntegerType>(inputType);
+  auto resultIntType = cast<mlir::IntegerType>(resultType);
+  unsigned inputWidth = inputIntType.getWidth();
+  unsigned resultWidth = resultIntType.getWidth();
+
+  if (inputWidth < resultWidth) {
+    // Widening - check signedness of original input type
+    bool isSigned = true; // Default to signed
+    if (auto polangInt = dyn_cast<polang::IntegerType>(origInputType)) {
+      isSigned = !polangInt.isUnsigned();
+    }
+    if (isSigned) {
+      rewriter.replaceOpWithNewOp<arith::ExtSIOp>(op, resultType, input);
+    } else {
+      rewriter.replaceOpWithNewOp<arith::ExtUIOp>(op, resultType, input);
+    }
+  } else if (inputWidth > resultWidth) {
+    // Narrowing - truncate
+    rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, resultType, input);
+  } else {
+    // Same width - just replace
+    rewriter.replaceOp(op, input);
+  }
+}
+
+/// Lower float to float cast.
+void lowerFloatToFloatCast(CastOp op, Value input, Type inputType,
+                           Type resultType,
+                           ConversionPatternRewriter& rewriter) {
+  unsigned inputWidth = inputType.getIntOrFloatBitWidth();
+  unsigned resultWidth = resultType.getIntOrFloatBitWidth();
+
+  if (inputWidth < resultWidth) {
+    rewriter.replaceOpWithNewOp<arith::ExtFOp>(op, resultType, input);
+  } else if (inputWidth > resultWidth) {
+    rewriter.replaceOpWithNewOp<arith::TruncFOp>(op, resultType, input);
+  } else {
+    // Same width - just replace
+    rewriter.replaceOp(op, input);
+  }
+}
+
+/// Lower integer to float cast.
+void lowerIntToFloatCast(CastOp op, Value input, Type resultType,
+                         Type origInputType,
+                         ConversionPatternRewriter& rewriter) {
+  bool isSigned = true; // Default to signed
+  if (auto polangInt = dyn_cast<polang::IntegerType>(origInputType)) {
+    isSigned = !polangInt.isUnsigned();
+  }
+  if (isSigned) {
+    rewriter.replaceOpWithNewOp<arith::SIToFPOp>(op, resultType, input);
+  } else {
+    rewriter.replaceOpWithNewOp<arith::UIToFPOp>(op, resultType, input);
+  }
+}
+
+/// Lower float to integer cast using saturating intrinsics.
+void lowerFloatToIntCast(CastOp op, Value input, Type inputType,
+                         Type resultType, Type origResultType, Location loc,
+                         ConversionPatternRewriter& rewriter) {
+  // llvm.fptosi.sat / llvm.fptoui.sat clamp values to representable range
+  bool isSigned = true; // Default to signed
+  if (auto polangInt = dyn_cast<polang::IntegerType>(origResultType)) {
+    isSigned = !polangInt.isUnsigned();
+  }
+
+  // Build intrinsic name: llvm.fptosi.sat.i<N>.f<M> or
+  // llvm.fptoui.sat.i<N>.f<M>
+  auto intType = cast<mlir::IntegerType>(resultType);
+  unsigned intWidth = intType.getWidth();
+  unsigned floatWidth = inputType.getIntOrFloatBitWidth();
+
+  std::string intrinsicName =
+      isSigned ? "llvm.fptosi.sat.i" : "llvm.fptoui.sat.i";
+  intrinsicName += std::to_string(intWidth) + ".f" + std::to_string(floatWidth);
+
+  auto intrinsicAttr = rewriter.getStringAttr(intrinsicName);
+  auto callOp = rewriter.create<LLVM::CallIntrinsicOp>(
+      loc, resultType, intrinsicAttr, ValueRange{input});
+  rewriter.replaceOp(op, callOp.getResults());
+}
+
 struct CastOpLowering : public OpConversionPattern<CastOp> {
   using OpConversionPattern<CastOp>::OpConversionPattern;
 
@@ -273,87 +360,20 @@ struct CastOpLowering : public OpConversionPattern<CastOp> {
     Type origInputType = op.getInput().getType();
     Type origResultType = op.getResult().getType();
 
-    Location loc = op.getLoc();
-    (void)loc; // Used in some branches
-
     // Determine if types are integer or float
     const bool inputIsInt = isa<mlir::IntegerType>(inputType);
     const bool resultIsInt = isa<mlir::IntegerType>(resultType);
 
     if (inputIsInt && resultIsInt) {
-      // Integer to integer conversion
-      auto inputIntType = cast<mlir::IntegerType>(inputType);
-      auto resultIntType = cast<mlir::IntegerType>(resultType);
-      unsigned inputWidth = inputIntType.getWidth();
-      unsigned resultWidth = resultIntType.getWidth();
-
-      if (inputWidth < resultWidth) {
-        // Widening - check signedness of original input type
-        bool isSigned = true; // Default to signed
-        if (auto polangInt = dyn_cast<polang::IntegerType>(origInputType)) {
-          isSigned = !polangInt.isUnsigned();
-        }
-        if (isSigned) {
-          rewriter.replaceOpWithNewOp<arith::ExtSIOp>(op, resultType, input);
-        } else {
-          rewriter.replaceOpWithNewOp<arith::ExtUIOp>(op, resultType, input);
-        }
-      } else if (inputWidth > resultWidth) {
-        // Narrowing - truncate
-        rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, resultType, input);
-      } else {
-        // Same width - just replace
-        rewriter.replaceOp(op, input);
-      }
+      lowerIntToIntCast(op, input, inputType, resultType, origInputType,
+                        rewriter);
     } else if (!inputIsInt && !resultIsInt) {
-      // Float to float conversion
-      unsigned inputWidth = inputType.getIntOrFloatBitWidth();
-      unsigned resultWidth = resultType.getIntOrFloatBitWidth();
-
-      if (inputWidth < resultWidth) {
-        // Widening
-        rewriter.replaceOpWithNewOp<arith::ExtFOp>(op, resultType, input);
-      } else if (inputWidth > resultWidth) {
-        // Narrowing
-        rewriter.replaceOpWithNewOp<arith::TruncFOp>(op, resultType, input);
-      } else {
-        // Same width - just replace
-        rewriter.replaceOp(op, input);
-      }
+      lowerFloatToFloatCast(op, input, inputType, resultType, rewriter);
     } else if (inputIsInt && !resultIsInt) {
-      // Integer to float
-      bool isSigned = true; // Default to signed
-      if (auto polangInt = dyn_cast<polang::IntegerType>(origInputType)) {
-        isSigned = !polangInt.isUnsigned();
-      }
-      if (isSigned) {
-        rewriter.replaceOpWithNewOp<arith::SIToFPOp>(op, resultType, input);
-      } else {
-        rewriter.replaceOpWithNewOp<arith::UIToFPOp>(op, resultType, input);
-      }
+      lowerIntToFloatCast(op, input, resultType, origInputType, rewriter);
     } else {
-      // Float to integer conversion using saturating intrinsics
-      // llvm.fptosi.sat / llvm.fptoui.sat clamp values to representable range
-      bool isSigned = true; // Default to signed
-      if (auto polangInt = dyn_cast<polang::IntegerType>(origResultType)) {
-        isSigned = !polangInt.isUnsigned();
-      }
-
-      // Build intrinsic name: llvm.fptosi.sat.i<N>.f<M> or
-      // llvm.fptoui.sat.i<N>.f<M>
-      auto intType = cast<mlir::IntegerType>(resultType);
-      unsigned intWidth = intType.getWidth();
-      unsigned floatWidth = inputType.getIntOrFloatBitWidth();
-
-      std::string intrinsicName =
-          isSigned ? "llvm.fptosi.sat.i" : "llvm.fptoui.sat.i";
-      intrinsicName +=
-          std::to_string(intWidth) + ".f" + std::to_string(floatWidth);
-
-      auto intrinsicAttr = rewriter.getStringAttr(intrinsicName);
-      auto callOp = rewriter.create<LLVM::CallIntrinsicOp>(
-          loc, resultType, intrinsicAttr, ValueRange{input});
-      rewriter.replaceOp(op, callOp.getResults());
+      lowerFloatToIntCast(op, input, inputType, resultType, origResultType,
+                          op.getLoc(), rewriter);
     }
     return success();
   }
@@ -362,6 +382,48 @@ struct CastOpLowering : public OpConversionPattern<CastOp> {
 //===----------------------------------------------------------------------===//
 // Comparison Lowering
 //===----------------------------------------------------------------------===//
+
+/// Convert a Polang comparison predicate to an MLIR floating-point predicate.
+[[nodiscard]] arith::CmpFPredicate
+convertToFloatPredicate(CmpPredicate pred) noexcept {
+  switch (pred) {
+  case CmpPredicate::eq:
+    return arith::CmpFPredicate::OEQ;
+  case CmpPredicate::ne:
+    return arith::CmpFPredicate::ONE;
+  case CmpPredicate::lt:
+    return arith::CmpFPredicate::OLT;
+  case CmpPredicate::le:
+    return arith::CmpFPredicate::OLE;
+  case CmpPredicate::gt:
+    return arith::CmpFPredicate::OGT;
+  case CmpPredicate::ge:
+    return arith::CmpFPredicate::OGE;
+  }
+  llvm_unreachable("Unknown CmpPredicate");
+}
+
+/// Convert a Polang comparison predicate to an MLIR integer predicate.
+/// \param pred The Polang comparison predicate.
+/// \param isUnsigned Whether the integer type is unsigned.
+[[nodiscard]] arith::CmpIPredicate
+convertToIntPredicate(CmpPredicate pred, bool isUnsigned) noexcept {
+  switch (pred) {
+  case CmpPredicate::eq:
+    return arith::CmpIPredicate::eq;
+  case CmpPredicate::ne:
+    return arith::CmpIPredicate::ne;
+  case CmpPredicate::lt:
+    return isUnsigned ? arith::CmpIPredicate::ult : arith::CmpIPredicate::slt;
+  case CmpPredicate::le:
+    return isUnsigned ? arith::CmpIPredicate::ule : arith::CmpIPredicate::sle;
+  case CmpPredicate::gt:
+    return isUnsigned ? arith::CmpIPredicate::ugt : arith::CmpIPredicate::sgt;
+  case CmpPredicate::ge:
+    return isUnsigned ? arith::CmpIPredicate::uge : arith::CmpIPredicate::sge;
+  }
+  llvm_unreachable("Unknown CmpPredicate");
+}
 
 struct CmpOpLowering : public OpConversionPattern<CmpOp> {
   using OpConversionPattern<CmpOp>::OpConversionPattern;
@@ -376,105 +438,20 @@ struct CmpOpLowering : public OpConversionPattern<CmpOp> {
     auto origType = op.getLhs().getType();
 
     if (isa<polang::FloatType>(origType)) {
-      // Float comparison
-      arith::CmpFPredicate pred = arith::CmpFPredicate::OEQ;
-      switch (op.getPredicate()) {
-      case CmpPredicate::eq:
-        pred = arith::CmpFPredicate::OEQ;
-        break;
-      case CmpPredicate::ne:
-        pred = arith::CmpFPredicate::ONE;
-        break;
-      case CmpPredicate::lt:
-        pred = arith::CmpFPredicate::OLT;
-        break;
-      case CmpPredicate::le:
-        pred = arith::CmpFPredicate::OLE;
-        break;
-      case CmpPredicate::gt:
-        pred = arith::CmpFPredicate::OGT;
-        break;
-      case CmpPredicate::ge:
-        pred = arith::CmpFPredicate::OGE;
-        break;
-      }
+      auto pred = convertToFloatPredicate(op.getPredicate());
       rewriter.replaceOpWithNewOp<arith::CmpFOp>(op, pred, lhs, rhs);
     } else if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
-      // Integer comparison - choose signed or unsigned predicate
-      bool isUnsigned = intType.isUnsigned();
-      arith::CmpIPredicate pred = arith::CmpIPredicate::eq;
-      switch (op.getPredicate()) {
-      case CmpPredicate::eq:
-        pred = arith::CmpIPredicate::eq;
-        break;
-      case CmpPredicate::ne:
-        pred = arith::CmpIPredicate::ne;
-        break;
-      case CmpPredicate::lt:
-        pred =
-            isUnsigned ? arith::CmpIPredicate::ult : arith::CmpIPredicate::slt;
-        break;
-      case CmpPredicate::le:
-        pred =
-            isUnsigned ? arith::CmpIPredicate::ule : arith::CmpIPredicate::sle;
-        break;
-      case CmpPredicate::gt:
-        pred =
-            isUnsigned ? arith::CmpIPredicate::ugt : arith::CmpIPredicate::sgt;
-        break;
-      case CmpPredicate::ge:
-        pred =
-            isUnsigned ? arith::CmpIPredicate::uge : arith::CmpIPredicate::sge;
-        break;
-      }
+      auto pred =
+          convertToIntPredicate(op.getPredicate(), intType.isUnsigned());
       rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, pred, lhs, rhs);
     } else if (isa<mlir::IntegerType>(lhs.getType())) {
       // Fallback for already converted types - assume signed
-      arith::CmpIPredicate pred = arith::CmpIPredicate::eq;
-      switch (op.getPredicate()) {
-      case CmpPredicate::eq:
-        pred = arith::CmpIPredicate::eq;
-        break;
-      case CmpPredicate::ne:
-        pred = arith::CmpIPredicate::ne;
-        break;
-      case CmpPredicate::lt:
-        pred = arith::CmpIPredicate::slt;
-        break;
-      case CmpPredicate::le:
-        pred = arith::CmpIPredicate::sle;
-        break;
-      case CmpPredicate::gt:
-        pred = arith::CmpIPredicate::sgt;
-        break;
-      case CmpPredicate::ge:
-        pred = arith::CmpIPredicate::sge;
-        break;
-      }
+      auto pred =
+          convertToIntPredicate(op.getPredicate(), /*isUnsigned=*/false);
       rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, pred, lhs, rhs);
     } else {
       // Fallback to float comparison
-      arith::CmpFPredicate pred = arith::CmpFPredicate::OEQ;
-      switch (op.getPredicate()) {
-      case CmpPredicate::eq:
-        pred = arith::CmpFPredicate::OEQ;
-        break;
-      case CmpPredicate::ne:
-        pred = arith::CmpFPredicate::ONE;
-        break;
-      case CmpPredicate::lt:
-        pred = arith::CmpFPredicate::OLT;
-        break;
-      case CmpPredicate::le:
-        pred = arith::CmpFPredicate::OLE;
-        break;
-      case CmpPredicate::gt:
-        pred = arith::CmpFPredicate::OGT;
-        break;
-      case CmpPredicate::ge:
-        pred = arith::CmpFPredicate::OGE;
-        break;
-      }
+      auto pred = convertToFloatPredicate(op.getPredicate());
       rewriter.replaceOpWithNewOp<arith::CmpFOp>(op, pred, lhs, rhs);
     }
     return success();

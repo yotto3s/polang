@@ -2,6 +2,7 @@
 #define POLANG_TYPE_CHECKER_HPP
 
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <utility>
@@ -11,6 +12,7 @@
 
 class Node;
 class NBlock;
+struct NLetBinding;
 
 struct TypeCheckError {
   std::string message;
@@ -88,6 +90,44 @@ private:
   [[nodiscard]] std::set<std::string>
   collectFreeVariables(const NBlock& block,
                        const std::set<std::string>& localNames) const;
+
+  // Helper methods for NLetExpression type checking
+  void collectSiblingVarTypes(
+      const std::vector<std::unique_ptr<NLetBinding>>& bindings,
+      std::map<std::string, std::string>& siblingTypes,
+      std::map<std::string, bool>& siblingMutability);
+
+  void typeCheckLetBindings(
+      const std::vector<std::unique_ptr<NLetBinding>>& bindings,
+      const std::map<std::string, std::string>& siblingTypes,
+      const std::map<std::string, bool>& siblingMutability,
+      const std::map<std::string, std::string>& savedLocals,
+      const std::map<std::string, bool>& savedMutability,
+      std::vector<std::string>& bindingTypes,
+      std::vector<bool>& bindingMutability,
+      std::vector<std::vector<std::string>>& funcParams);
+
+  void addLetBindingsToScope(
+      const std::vector<std::unique_ptr<NLetBinding>>& bindings,
+      const std::vector<std::string>& bindingTypes,
+      const std::vector<bool>& bindingMutability,
+      const std::vector<std::vector<std::string>>& funcParams);
+
+  // Helper methods for NVariableDeclaration type checking
+  void typeCheckVarDeclNoInit(NVariableDeclaration& node,
+                              const std::string& varName);
+  void typeCheckVarDeclInferType(NVariableDeclaration& node,
+                                 const std::string& varName,
+                                 const std::string& exprType);
+  void typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
+                                      const std::string& varName,
+                                      const std::string& exprType);
+
+  // Helper methods for NImportStatement type checking
+  void handleModuleImport(const NImportStatement& node);
+  void handleModuleAliasImport(const NImportStatement& node);
+  void handleItemsImport(const NImportStatement& node);
+  void handleWildcardImport(const NImportStatement& node);
 };
 
 #endif // POLANG_TYPE_CHECKER_HPP
