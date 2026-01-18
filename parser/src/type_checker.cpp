@@ -10,6 +10,7 @@
 #include <iostream>
 #include <set>
 
+using polang::areTypesCompatible;
 using polang::ErrorReporter;
 using polang::ErrorSeverity;
 using polang::getReferentType;
@@ -21,6 +22,7 @@ using polang::isReferenceType;
 using polang::makeImmutableRefType;
 using polang::makeMutableRefType;
 using polang::operatorToString;
+using polang::resolveGenericToDefault;
 using polang::TypeNames;
 
 /// FreeVariableCollector - A visitor that identifies free variables in an
@@ -164,9 +166,13 @@ void TypeChecker::reportError(const std::string& message) {
   }
 }
 
-void TypeChecker::visit(const NInteger& node) { inferredType = TypeNames::I64; }
+void TypeChecker::visit(const NInteger& node) {
+  inferredType = TypeNames::GENERIC_INT;
+}
 
-void TypeChecker::visit(const NDouble& node) { inferredType = TypeNames::F64; }
+void TypeChecker::visit(const NDouble& node) {
+  inferredType = TypeNames::GENERIC_FLOAT;
+}
 
 void TypeChecker::visit(const NBoolean& node) {
   inferredType = TypeNames::BOOL;
@@ -215,10 +221,10 @@ void TypeChecker::visit(const NMethodCall& node) {
             paramTypes[i] != TypeNames::UNKNOWN &&
             argTypes[i] != TypeNames::TYPEVAR &&
             paramTypes[i] != TypeNames::TYPEVAR &&
-            argTypes[i] != paramTypes[i]) {
+            !areTypesCompatible(argTypes[i], paramTypes[i])) {
           reportError("Function '" + funcName + "' argument " +
                       std::to_string(i + 1) + " expects " + paramTypes[i] +
-                      ", got " + argTypes[i]);
+                      ", got " + resolveGenericToDefault(argTypes[i]));
         }
       }
     }
@@ -247,19 +253,24 @@ void TypeChecker::visit(const NBinaryOperator& node) {
   const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
 
   if (isArithmeticOperator(node.op)) {
-    if (!lhsIsTypevar && !rhsIsTypevar && lhsType != rhsType) {
+    if (!lhsIsTypevar && !rhsIsTypevar &&
+        !areTypesCompatible(lhsType, rhsType)) {
       reportError("Type mismatch in '" + operatorToString(node.op) +
-                  "': " + lhsType + " and " + rhsType);
+                  "': " + resolveGenericToDefault(lhsType) + " and " +
+                  resolveGenericToDefault(rhsType));
     }
     if (lhsIsTypevar && !rhsIsTypevar) {
       inferredType = rhsType;
     } else {
-      inferredType = lhsType;
+      // Resolve generic type using the other operand as context
+      inferredType = polang::resolveGenericType(lhsType, rhsType);
     }
   } else if (isComparisonOperator(node.op)) {
-    if (!lhsIsTypevar && !rhsIsTypevar && lhsType != rhsType) {
-      reportError("Type mismatch in comparison: " + lhsType + " and " +
-                  rhsType);
+    if (!lhsIsTypevar && !rhsIsTypevar &&
+        !areTypesCompatible(lhsType, rhsType)) {
+      reportError(
+          "Type mismatch in comparison: " + resolveGenericToDefault(lhsType) +
+          " and " + resolveGenericToDefault(rhsType));
     }
     inferredType = TypeNames::BOOL;
   }
@@ -301,9 +312,11 @@ void TypeChecker::visit(const NAssignment& node) {
   const std::string rhsType = inferredType;
 
   if (rhsType != TypeNames::UNKNOWN && rhsType != TypeNames::TYPEVAR &&
-      referentType != TypeNames::TYPEVAR && rhsType != referentType) {
-    reportError("Cannot assign " + rhsType + " to variable '" + node.lhs->name +
-                "' of type " + referentType);
+      referentType != TypeNames::TYPEVAR &&
+      !areTypesCompatible(rhsType, referentType)) {
+    reportError("Cannot assign " + resolveGenericToDefault(rhsType) +
+                " to variable '" + node.lhs->name + "' of type " +
+                referentType);
   }
 
   inferredType = referentType;
@@ -374,16 +387,18 @@ void TypeChecker::visit(const NIfExpression& node) {
 
   if (thenType != TypeNames::UNKNOWN && elseType != TypeNames::UNKNOWN &&
       thenType != TypeNames::TYPEVAR && elseType != TypeNames::TYPEVAR &&
-      thenType != elseType) {
-    reportError("If branches have different types: " + thenType + " and " +
-                elseType);
+      !areTypesCompatible(thenType, elseType)) {
+    reportError("If branches have different types: " +
+                resolveGenericToDefault(thenType) + " and " +
+                resolveGenericToDefault(elseType));
   }
 
   if (thenType == TypeNames::TYPEVAR && elseType != TypeNames::TYPEVAR &&
       elseType != TypeNames::UNKNOWN) {
     inferredType = elseType;
   } else {
-    inferredType = thenType;
+    // Resolve generic type using the other branch as context
+    inferredType = polang::resolveGenericType(thenType, elseType);
   }
 }
 
@@ -488,15 +503,18 @@ void TypeChecker::typeCheckLetBindings(
 
       if (func->type == nullptr) {
         if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR) {
-          mutableFunc.type = std::make_unique<NIdentifier>(bodyType);
+          // Resolve generic types to defaults for function return type
+          std::string resolvedBodyType = resolveGenericToDefault(bodyType);
+          mutableFunc.type = std::make_unique<NIdentifier>(resolvedBodyType);
         } else {
           mutableFunc.type = std::make_unique<NIdentifier>(TypeNames::TYPEVAR);
         }
       } else if (bodyType != TypeNames::UNKNOWN &&
                  bodyType != TypeNames::TYPEVAR &&
-                 bodyType != func->type->name) {
+                 !areTypesCompatible(bodyType, func->type->name)) {
         reportError("Function '" + func->id->name + "' declared to return " +
-                    func->type->name + " but body has type " + bodyType);
+                    func->type->name + " but body has type " +
+                    resolveGenericToDefault(bodyType));
       }
 
       bindingTypes.emplace_back(TypeNames::FUNCTION);
@@ -544,17 +562,20 @@ void TypeChecker::typeCheckLetBindings(
       }
 
       if (var->type == nullptr) {
-        mutableVar.type = std::make_unique<NIdentifier>(exprType);
-        std::string varType = exprType;
+        // Resolve generic types to defaults for inferred declarations
+        std::string resolvedType = resolveGenericToDefault(exprType);
+        mutableVar.type = std::make_unique<NIdentifier>(resolvedType);
+        std::string varType = resolvedType;
         if (var->isMutable) {
           varType = makeMutableRefType(varType);
         }
         bindingTypes.push_back(varType);
         bindingMutability.push_back(var->isMutable);
       } else {
-        if (exprType != var->type->name) {
+        if (!areTypesCompatible(exprType, var->type->name)) {
           reportError("Variable '" + var->id->name + "' declared as " +
-                      var->type->name + " but initialized with " + exprType);
+                      var->type->name + " but initialized with " +
+                      resolveGenericToDefault(exprType));
         }
         std::string varType = var->type->name;
         if (var->isMutable) {
@@ -644,34 +665,42 @@ void TypeChecker::typeCheckVarDeclNoInit(NVariableDeclaration& node,
 void TypeChecker::typeCheckVarDeclInferType(NVariableDeclaration& node,
                                             const std::string& varName,
                                             const std::string& exprType) {
-  std::string baseType = exprType;
-  if (isReferenceType(exprType)) {
-    if (node.isMutable && !isMutableRefType(exprType)) {
-      baseType = getReferentType(exprType);
+  // Resolve generic types to their defaults for inferred declarations
+  std::string resolvedType = resolveGenericToDefault(exprType);
+
+  std::string baseType = resolvedType;
+  if (isReferenceType(resolvedType)) {
+    if (node.isMutable && !isMutableRefType(resolvedType)) {
+      baseType = getReferentType(resolvedType);
     }
   }
 
   std::string varType;
+  std::string nodeType =
+      resolvedType; // The type to set on the AST node (base type)
   if (node.isMutable) {
-    if (isMutableRefType(exprType)) {
-      varType = exprType;
-    } else if (isImmutableRefType(exprType)) {
+    if (isMutableRefType(resolvedType)) {
+      varType = resolvedType;
+      nodeType = getReferentType(resolvedType);
+    } else if (isImmutableRefType(resolvedType)) {
       reportError("Cannot initialize mutable variable '" + node.id->name +
                   "' with immutable reference");
       inferredType = TypeNames::UNKNOWN;
       return;
     } else {
-      varType = makeMutableRefType(exprType);
+      varType = makeMutableRefType(resolvedType);
+      nodeType = resolvedType;
     }
   } else {
-    varType = exprType;
+    varType = resolvedType;
+    nodeType = resolvedType;
   }
 
-  node.type = std::make_unique<NIdentifier>(varType);
+  node.type = std::make_unique<NIdentifier>(nodeType);
   localTypes[varName] = varType;
   localMutability[varName] = node.isMutable;
-  inferredType =
-      isReferenceType(exprType) ? getReferentType(exprType) : exprType;
+  inferredType = isReferenceType(resolvedType) ? getReferentType(resolvedType)
+                                               : resolvedType;
 }
 
 void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
@@ -689,10 +718,10 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
     actualType = getReferentType(actualType);
   }
 
-  if (actualType != expectedType && actualType != TypeNames::TYPEVAR &&
-      expectedType != TypeNames::TYPEVAR) {
+  if (!areTypesCompatible(actualType, expectedType) &&
+      actualType != TypeNames::TYPEVAR && expectedType != TypeNames::TYPEVAR) {
     reportError("Variable '" + node.id->name + "' declared as " + declType +
-                " but initialized with " + exprType +
+                " but initialized with " + resolveGenericToDefault(exprType) +
                 " (no implicit conversion)");
   }
 
@@ -703,8 +732,10 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
 
   localTypes[varName] = varType;
   localMutability[varName] = node.isMutable;
+  // Use declared type for inferred type (not generic literal type)
+  // Strip reference types to match typeCheckVarDeclInferType behavior
   inferredType =
-      isReferenceType(exprType) ? getReferentType(exprType) : exprType;
+      isReferenceType(declType) ? getReferentType(declType) : declType;
 }
 
 void TypeChecker::visit(const NVariableDeclaration& node) {
@@ -790,8 +821,10 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
 
   if (node.type == nullptr) {
     if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR) {
-      mutableNode.type = std::make_unique<NIdentifier>(bodyType);
-      functionReturnTypes[funcName] = bodyType;
+      // Resolve generic types to defaults for function return type
+      std::string resolvedBodyType = resolveGenericToDefault(bodyType);
+      mutableNode.type = std::make_unique<NIdentifier>(resolvedBodyType);
+      functionReturnTypes[funcName] = resolvedBodyType;
     } else {
       mutableNode.type = std::make_unique<NIdentifier>(TypeNames::TYPEVAR);
       functionReturnTypes[funcName] = TypeNames::TYPEVAR;
@@ -800,9 +833,10 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
     const std::string declReturnType = node.type->name;
 
     if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR &&
-        bodyType != declReturnType) {
+        !areTypesCompatible(bodyType, declReturnType)) {
       reportError("Function '" + node.id->name + "' declared to return " +
-                  declReturnType + " but body has type " + bodyType +
+                  declReturnType + " but body has type " +
+                  resolveGenericToDefault(bodyType) +
                   " (no implicit conversion)");
     }
 
