@@ -33,7 +33,7 @@ TEST(ParserTest, IfExpressionWithComparison) {
 
   auto* cond = dynamic_cast<const NBinaryOperator*>(ifExpr->condition.get());
   ASSERT_NE(cond, nullptr);
-  EXPECT_EQ(cond->op, TCGT);
+  EXPECT_EQ(cond->op, token::TCGT);
 }
 
 TEST(ParserTest, NestedIfExpression) {
@@ -110,7 +110,7 @@ TEST(ParserTest, SimpleLetExpression) {
 
   auto* bodyExpr = dynamic_cast<const NBinaryOperator*>(letExpr->body.get());
   ASSERT_NE(bodyExpr, nullptr);
-  EXPECT_EQ(bodyExpr->op, TPLUS);
+  EXPECT_EQ(bodyExpr->op, token::TPLUS);
 }
 
 TEST(ParserTest, LetExpressionMultipleBindings) {
@@ -296,7 +296,7 @@ TEST(ParserTest, LetExpressionWithComplexInitializer) {
   auto* addOp =
       dynamic_cast<NBinaryOperator*>(letExpr->bindings[0]->var->assignmentExpr.get());
   ASSERT_NE(addOp, nullptr);
-  EXPECT_EQ(addOp->op, TPLUS);
+  EXPECT_EQ(addOp->op, token::TPLUS);
 }
 
 TEST(ParserTest, LetExpressionThreeBindings) {

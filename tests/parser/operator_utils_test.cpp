@@ -3,51 +3,54 @@
 // clang-format off
 #include "parser/operator_utils.hpp"
 #include "parser/node.hpp"
-#include "parser.hpp" // Must be after node.hpp for bison union types
+#include "parser.hpp" // Must be after node.hpp for bison types
 // clang-format on
 
 using namespace polang;
 
+// Token type shorthand
+using token = yy::parser::token;
+
 // ============== operatorToString Tests ==============
 
 TEST(OperatorUtilsTest, OperatorToStringPlus) {
-  EXPECT_EQ(operatorToString(TPLUS), "+");
+  EXPECT_EQ(operatorToString(token::TPLUS), "+");
 }
 
 TEST(OperatorUtilsTest, OperatorToStringMinus) {
-  EXPECT_EQ(operatorToString(TMINUS), "-");
+  EXPECT_EQ(operatorToString(token::TMINUS), "-");
 }
 
 TEST(OperatorUtilsTest, OperatorToStringMul) {
-  EXPECT_EQ(operatorToString(TMUL), "*");
+  EXPECT_EQ(operatorToString(token::TMUL), "*");
 }
 
 TEST(OperatorUtilsTest, OperatorToStringDiv) {
-  EXPECT_EQ(operatorToString(TDIV), "/");
+  EXPECT_EQ(operatorToString(token::TDIV), "/");
 }
 
 TEST(OperatorUtilsTest, OperatorToStringEqual) {
-  EXPECT_EQ(operatorToString(TCEQ), "==");
+  EXPECT_EQ(operatorToString(token::TCEQ), "==");
 }
 
 TEST(OperatorUtilsTest, OperatorToStringNotEqual) {
-  EXPECT_EQ(operatorToString(TCNE), "!=");
+  EXPECT_EQ(operatorToString(token::TCNE), "!=");
 }
 
 TEST(OperatorUtilsTest, OperatorToStringLessThan) {
-  EXPECT_EQ(operatorToString(TCLT), "<");
+  EXPECT_EQ(operatorToString(token::TCLT), "<");
 }
 
 TEST(OperatorUtilsTest, OperatorToStringLessEqual) {
-  EXPECT_EQ(operatorToString(TCLE), "<=");
+  EXPECT_EQ(operatorToString(token::TCLE), "<=");
 }
 
 TEST(OperatorUtilsTest, OperatorToStringGreaterThan) {
-  EXPECT_EQ(operatorToString(TCGT), ">");
+  EXPECT_EQ(operatorToString(token::TCGT), ">");
 }
 
 TEST(OperatorUtilsTest, OperatorToStringGreaterEqual) {
-  EXPECT_EQ(operatorToString(TCGE), ">=");
+  EXPECT_EQ(operatorToString(token::TCGE), ">=");
 }
 
 TEST(OperatorUtilsTest, OperatorToStringUnknown) {
@@ -59,29 +62,29 @@ TEST(OperatorUtilsTest, OperatorToStringUnknown) {
 // ============== isArithmeticOperator Tests ==============
 
 TEST(OperatorUtilsTest, IsArithmeticOperatorPlus) {
-  EXPECT_TRUE(isArithmeticOperator(TPLUS));
+  EXPECT_TRUE(isArithmeticOperator(token::TPLUS));
 }
 
 TEST(OperatorUtilsTest, IsArithmeticOperatorMinus) {
-  EXPECT_TRUE(isArithmeticOperator(TMINUS));
+  EXPECT_TRUE(isArithmeticOperator(token::TMINUS));
 }
 
 TEST(OperatorUtilsTest, IsArithmeticOperatorMul) {
-  EXPECT_TRUE(isArithmeticOperator(TMUL));
+  EXPECT_TRUE(isArithmeticOperator(token::TMUL));
 }
 
 TEST(OperatorUtilsTest, IsArithmeticOperatorDiv) {
-  EXPECT_TRUE(isArithmeticOperator(TDIV));
+  EXPECT_TRUE(isArithmeticOperator(token::TDIV));
 }
 
 TEST(OperatorUtilsTest, IsArithmeticOperatorComparison) {
   // Comparison operators are not arithmetic
-  EXPECT_FALSE(isArithmeticOperator(TCEQ));
-  EXPECT_FALSE(isArithmeticOperator(TCNE));
-  EXPECT_FALSE(isArithmeticOperator(TCLT));
-  EXPECT_FALSE(isArithmeticOperator(TCLE));
-  EXPECT_FALSE(isArithmeticOperator(TCGT));
-  EXPECT_FALSE(isArithmeticOperator(TCGE));
+  EXPECT_FALSE(isArithmeticOperator(token::TCEQ));
+  EXPECT_FALSE(isArithmeticOperator(token::TCNE));
+  EXPECT_FALSE(isArithmeticOperator(token::TCLT));
+  EXPECT_FALSE(isArithmeticOperator(token::TCLE));
+  EXPECT_FALSE(isArithmeticOperator(token::TCGT));
+  EXPECT_FALSE(isArithmeticOperator(token::TCGE));
 }
 
 TEST(OperatorUtilsTest, IsArithmeticOperatorUnknown) {
@@ -92,35 +95,35 @@ TEST(OperatorUtilsTest, IsArithmeticOperatorUnknown) {
 // ============== isComparisonOperator Tests ==============
 
 TEST(OperatorUtilsTest, IsComparisonOperatorEqual) {
-  EXPECT_TRUE(isComparisonOperator(TCEQ));
+  EXPECT_TRUE(isComparisonOperator(token::TCEQ));
 }
 
 TEST(OperatorUtilsTest, IsComparisonOperatorNotEqual) {
-  EXPECT_TRUE(isComparisonOperator(TCNE));
+  EXPECT_TRUE(isComparisonOperator(token::TCNE));
 }
 
 TEST(OperatorUtilsTest, IsComparisonOperatorLessThan) {
-  EXPECT_TRUE(isComparisonOperator(TCLT));
+  EXPECT_TRUE(isComparisonOperator(token::TCLT));
 }
 
 TEST(OperatorUtilsTest, IsComparisonOperatorLessEqual) {
-  EXPECT_TRUE(isComparisonOperator(TCLE));
+  EXPECT_TRUE(isComparisonOperator(token::TCLE));
 }
 
 TEST(OperatorUtilsTest, IsComparisonOperatorGreaterThan) {
-  EXPECT_TRUE(isComparisonOperator(TCGT));
+  EXPECT_TRUE(isComparisonOperator(token::TCGT));
 }
 
 TEST(OperatorUtilsTest, IsComparisonOperatorGreaterEqual) {
-  EXPECT_TRUE(isComparisonOperator(TCGE));
+  EXPECT_TRUE(isComparisonOperator(token::TCGE));
 }
 
 TEST(OperatorUtilsTest, IsComparisonOperatorArithmetic) {
   // Arithmetic operators are not comparison
-  EXPECT_FALSE(isComparisonOperator(TPLUS));
-  EXPECT_FALSE(isComparisonOperator(TMINUS));
-  EXPECT_FALSE(isComparisonOperator(TMUL));
-  EXPECT_FALSE(isComparisonOperator(TDIV));
+  EXPECT_FALSE(isComparisonOperator(token::TPLUS));
+  EXPECT_FALSE(isComparisonOperator(token::TMINUS));
+  EXPECT_FALSE(isComparisonOperator(token::TMUL));
+  EXPECT_FALSE(isComparisonOperator(token::TDIV));
 }
 
 TEST(OperatorUtilsTest, IsComparisonOperatorUnknown) {
@@ -132,8 +135,10 @@ TEST(OperatorUtilsTest, IsComparisonOperatorUnknown) {
 
 TEST(OperatorUtilsTest, ArithmeticAndComparisonMutuallyExclusive) {
   // No operator should be both arithmetic and comparison
-  const int operators[] = {TPLUS, TMINUS, TMUL, TDIV, TCEQ,
-                           TCNE,  TCLT,   TCLE, TCGT, TCGE};
+  const int operators[] = {token::TPLUS,  token::TMINUS, token::TMUL,
+                           token::TDIV,   token::TCEQ,   token::TCNE,
+                           token::TCLT,   token::TCLE,   token::TCGT,
+                           token::TCGE};
 
   for (int op : operators) {
     bool isArith = isArithmeticOperator(op);

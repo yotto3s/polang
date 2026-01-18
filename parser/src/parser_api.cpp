@@ -1,4 +1,5 @@
 #include "parser/parser_api.hpp"
+#include "parser.hpp"
 #include "parser/node.hpp"
 #include "parser/type_checker.hpp"
 
@@ -14,15 +15,15 @@ extern YY_BUFFER_STATE yy_scan_string(const char* str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 extern void polang_reset_lexer_location();
 
-// Bison parser function and result
-extern int yyparse();
+// Global AST root (defined in parser.cpp, generated from parser.y)
 extern std::unique_ptr<NBlock> programBlock;
 
 std::unique_ptr<NBlock> polang_parse(const std::string& source) {
   polang_reset_lexer_location();
   programBlock = nullptr; // Reset before parsing
   const YY_BUFFER_STATE buffer = yy_scan_string(source.c_str());
-  const int parseResult = yyparse();
+  yy::parser parser;
+  const int parseResult = parser.parse();
   yy_delete_buffer(buffer);
   // Return nullptr if parsing failed
   if (parseResult != 0) {

@@ -219,36 +219,36 @@ public:
     // Arithmetic operations - use LHS type as result type
     // This allows type variables since the verifier uses typesAreCompatible()
     Type arithResultTy = lhs.getType();
-    if (node.op == TPLUS) {
+    if (node.op == yy::parser::token::TPLUS) {
       result = builder.create<AddOp>(loc(), arithResultTy, lhs, rhs);
       resultType = lhsType;
-    } else if (node.op == TMINUS) {
+    } else if (node.op == yy::parser::token::TMINUS) {
       result = builder.create<SubOp>(loc(), arithResultTy, lhs, rhs);
       resultType = lhsType;
-    } else if (node.op == TMUL) {
+    } else if (node.op == yy::parser::token::TMUL) {
       result = builder.create<MulOp>(loc(), arithResultTy, lhs, rhs);
       resultType = lhsType;
-    } else if (node.op == TDIV) {
+    } else if (node.op == yy::parser::token::TDIV) {
       result = builder.create<DivOp>(loc(), arithResultTy, lhs, rhs);
       resultType = lhsType;
     }
     // Comparison operations
-    else if (node.op == TCEQ) {
+    else if (node.op == yy::parser::token::TCEQ) {
       result = builder.create<CmpOp>(loc(), CmpPredicate::eq, lhs, rhs);
       resultType = TypeNames::BOOL;
-    } else if (node.op == TCNE) {
+    } else if (node.op == yy::parser::token::TCNE) {
       result = builder.create<CmpOp>(loc(), CmpPredicate::ne, lhs, rhs);
       resultType = TypeNames::BOOL;
-    } else if (node.op == TCLT) {
+    } else if (node.op == yy::parser::token::TCLT) {
       result = builder.create<CmpOp>(loc(), CmpPredicate::lt, lhs, rhs);
       resultType = TypeNames::BOOL;
-    } else if (node.op == TCLE) {
+    } else if (node.op == yy::parser::token::TCLE) {
       result = builder.create<CmpOp>(loc(), CmpPredicate::le, lhs, rhs);
       resultType = TypeNames::BOOL;
-    } else if (node.op == TCGT) {
+    } else if (node.op == yy::parser::token::TCGT) {
       result = builder.create<CmpOp>(loc(), CmpPredicate::gt, lhs, rhs);
       resultType = TypeNames::BOOL;
-    } else if (node.op == TCGE) {
+    } else if (node.op == yy::parser::token::TCGE) {
       result = builder.create<CmpOp>(loc(), CmpPredicate::ge, lhs, rhs);
       resultType = TypeNames::BOOL;
     } else {
