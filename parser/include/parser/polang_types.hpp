@@ -145,8 +145,8 @@ isGenericFloatType(const std::string& typeName) noexcept {
 
 /// Check if two types are compatible for assignment/operations.
 /// Generic types are compatible with their concrete counterparts.
-[[nodiscard]] inline bool
-areTypesCompatible(const std::string& t1, const std::string& t2) noexcept {
+[[nodiscard]] inline bool areTypesCompatible(const std::string& t1,
+                                             const std::string& t2) noexcept {
   // Exact match
   if (t1 == t2) {
     return true;

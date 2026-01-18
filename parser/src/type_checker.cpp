@@ -152,9 +152,7 @@ void TypeChecker::reportError(const std::string& message) {
 
 void TypeChecker::visit(const NInteger& node) { inferredType = TypeNames::I64; }
 
-void TypeChecker::visit(const NDouble& node) {
-  inferredType = TypeNames::F64;
-}
+void TypeChecker::visit(const NDouble& node) { inferredType = TypeNames::F64; }
 
 void TypeChecker::visit(const NBoolean& node) {
   inferredType = TypeNames::BOOL;

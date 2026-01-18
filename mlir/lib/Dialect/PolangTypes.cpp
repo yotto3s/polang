@@ -51,7 +51,8 @@ Type TypeVarType::parse(AsmParser& parser) {
     auto maybeKind = symbolizeTypeVarKind(kindStr);
     if (!maybeKind) {
       parser.emitError(parser.getCurrentLocation(),
-                       "invalid type variable kind: ") << kindStr;
+                       "invalid type variable kind: ")
+          << kindStr;
       return {};
     }
     kind = *maybeKind;

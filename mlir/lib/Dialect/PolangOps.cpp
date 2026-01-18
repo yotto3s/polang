@@ -344,7 +344,7 @@ void ConstantIntegerOp::print(OpAsmPrinter& p) {
 }
 
 ParseResult ConstantIntegerOp::parse(OpAsmParser& parser,
-                                      OperationState& result) {
+                                     OperationState& result) {
   APInt value;
   Type resultType;
 
@@ -358,7 +358,8 @@ ParseResult ConstantIntegerOp::parse(OpAsmParser& parser,
   // Create the IntegerAttr with the appropriate bit width
   auto intType = dyn_cast<polang::IntegerType>(resultType);
   if (!intType) {
-    return parser.emitError(parser.getNameLoc(), "expected polang.integer type");
+    return parser.emitError(parser.getNameLoc(),
+                            "expected polang.integer type");
   }
   auto attr = IntegerAttr::get(
       mlir::IntegerType::get(parser.getContext(), intType.getWidth()), value);
@@ -380,7 +381,8 @@ void ConstantFloatOp::print(OpAsmPrinter& p) {
   p.printType(getResult().getType());
 }
 
-ParseResult ConstantFloatOp::parse(OpAsmParser& parser, OperationState& result) {
+ParseResult ConstantFloatOp::parse(OpAsmParser& parser,
+                                   OperationState& result) {
   double value;
   Type resultType;
 

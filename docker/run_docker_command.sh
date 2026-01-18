@@ -10,7 +10,7 @@ SCRIPT_DIR=$(dirname "$0")
 # Check if the container is running
 if [ "$(docker inspect -f '{{.State.Running}}' "${CONTAINER_NAME}" 2>/dev/null)" = "true" ]; then
     # Execute the remaining arguments as a command inside the container
-    docker exec -i "${CONTAINER_NAME}" "$@"
+    docker exec -it "${CONTAINER_NAME}" "$@"
 else
     echo "Error: Container '${CONTAINER_NAME}' is not running."
     exit 1

@@ -696,29 +696,37 @@ private:
   Type getPolangType(const std::string& typeName) {
     // Signed integers
     if (typeName == TypeNames::I8) {
-      return polang::IntegerType::get(builder.getContext(), 8, Signedness::Signed);
+      return polang::IntegerType::get(builder.getContext(), 8,
+                                      Signedness::Signed);
     }
     if (typeName == TypeNames::I16) {
-      return polang::IntegerType::get(builder.getContext(), 16, Signedness::Signed);
+      return polang::IntegerType::get(builder.getContext(), 16,
+                                      Signedness::Signed);
     }
     if (typeName == TypeNames::I32) {
-      return polang::IntegerType::get(builder.getContext(), 32, Signedness::Signed);
+      return polang::IntegerType::get(builder.getContext(), 32,
+                                      Signedness::Signed);
     }
     if (typeName == TypeNames::I64) {
-      return polang::IntegerType::get(builder.getContext(), 64, Signedness::Signed);
+      return polang::IntegerType::get(builder.getContext(), 64,
+                                      Signedness::Signed);
     }
     // Unsigned integers
     if (typeName == TypeNames::U8) {
-      return polang::IntegerType::get(builder.getContext(), 8, Signedness::Unsigned);
+      return polang::IntegerType::get(builder.getContext(), 8,
+                                      Signedness::Unsigned);
     }
     if (typeName == TypeNames::U16) {
-      return polang::IntegerType::get(builder.getContext(), 16, Signedness::Unsigned);
+      return polang::IntegerType::get(builder.getContext(), 16,
+                                      Signedness::Unsigned);
     }
     if (typeName == TypeNames::U32) {
-      return polang::IntegerType::get(builder.getContext(), 32, Signedness::Unsigned);
+      return polang::IntegerType::get(builder.getContext(), 32,
+                                      Signedness::Unsigned);
     }
     if (typeName == TypeNames::U64) {
-      return polang::IntegerType::get(builder.getContext(), 64, Signedness::Unsigned);
+      return polang::IntegerType::get(builder.getContext(), 64,
+                                      Signedness::Unsigned);
     }
     // Floats
     if (typeName == TypeNames::F32) {
@@ -743,7 +751,8 @@ private:
       return freshTypeVar(TypeVarKind::Float);
     }
     // Default to i64
-    return polang::IntegerType::get(builder.getContext(), 64, Signedness::Signed);
+    return polang::IntegerType::get(builder.getContext(), 64,
+                                    Signedness::Signed);
   }
 
   Type getTypeForName(const std::string& name) {
@@ -757,7 +766,8 @@ private:
     if (it != typeTable.end()) {
       return getPolangType(it->second);
     }
-    return polang::IntegerType::get(builder.getContext(), 64, Signedness::Signed);
+    return polang::IntegerType::get(builder.getContext(), 64,
+                                    Signedness::Signed);
   }
 
   Type convertPolangType(Type polangType) {
@@ -802,13 +812,15 @@ private:
       // Create default value matching the return type
       Value defaultVal;
       if (isFloatType(inferredType)) {
-        auto floatTy = polang::FloatType::get(builder.getContext(), getFloatWidth(inferredType));
+        auto floatTy = polang::FloatType::get(builder.getContext(),
+                                              getFloatWidth(inferredType));
         defaultVal = builder.create<ConstantFloatOp>(loc(), floatTy, 0.0);
       } else if (inferredType == TypeNames::BOOL) {
         defaultVal = builder.create<ConstantBoolOp>(loc(), false);
       } else {
         // Default to i64 for integer types
-        auto intTy = polang::IntegerType::get(builder.getContext(), 64, Signedness::Signed);
+        auto intTy = polang::IntegerType::get(builder.getContext(), 64,
+                                              Signedness::Signed);
         defaultVal = builder.create<ConstantIntegerOp>(loc(), intTy, 0);
       }
       builder.create<ReturnOp>(loc(), defaultVal);

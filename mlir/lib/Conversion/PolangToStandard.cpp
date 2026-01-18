@@ -50,7 +50,8 @@ public:
     addConversion([](BoolType type) {
       return mlir::IntegerType::get(type.getContext(), 1);
     });
-    // Handle type variables that weren't resolved - apply defaults based on kind
+    // Handle type variables that weren't resolved - apply defaults based on
+    // kind
     addConversion([](TypeVarType type) -> Type {
       auto ctx = type.getContext();
       switch (type.getKind()) {
@@ -286,16 +287,20 @@ struct CmpOpLowering : public OpConversionPattern<CmpOp> {
         pred = arith::CmpIPredicate::ne;
         break;
       case CmpPredicate::lt:
-        pred = isUnsigned ? arith::CmpIPredicate::ult : arith::CmpIPredicate::slt;
+        pred =
+            isUnsigned ? arith::CmpIPredicate::ult : arith::CmpIPredicate::slt;
         break;
       case CmpPredicate::le:
-        pred = isUnsigned ? arith::CmpIPredicate::ule : arith::CmpIPredicate::sle;
+        pred =
+            isUnsigned ? arith::CmpIPredicate::ule : arith::CmpIPredicate::sle;
         break;
       case CmpPredicate::gt:
-        pred = isUnsigned ? arith::CmpIPredicate::ugt : arith::CmpIPredicate::sgt;
+        pred =
+            isUnsigned ? arith::CmpIPredicate::ugt : arith::CmpIPredicate::sgt;
         break;
       case CmpPredicate::ge:
-        pred = isUnsigned ? arith::CmpIPredicate::uge : arith::CmpIPredicate::sge;
+        pred =
+            isUnsigned ? arith::CmpIPredicate::uge : arith::CmpIPredicate::sge;
         break;
       }
       rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, pred, lhs, rhs);
