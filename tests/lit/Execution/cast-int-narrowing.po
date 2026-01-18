@@ -1,0 +1,6 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test integer narrowing (i64 -> i8)
+; 300 as i8 should truncate to 44 (300 mod 256)
+; CHECK: 44 : i8
+300 as i8

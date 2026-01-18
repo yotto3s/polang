@@ -308,6 +308,35 @@ LogicalResult DivOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// CastOp verifier
+//===----------------------------------------------------------------------===//
+
+LogicalResult CastOp::verify() {
+  Type inputType = getInput().getType();
+  Type resultType = getResult().getType();
+
+  // Allow type variables - they will be resolved by type inference pass
+  if (isa<TypeVarType>(inputType) || isa<TypeVarType>(resultType)) {
+    return success();
+  }
+
+  // Both types must be numeric (not bool)
+  bool inputIsNumeric =
+      isa<polang::IntegerType>(inputType) || isa<polang::FloatType>(inputType);
+  bool resultIsNumeric = isa<polang::IntegerType>(resultType) ||
+                         isa<polang::FloatType>(resultType);
+
+  if (!inputIsNumeric) {
+    return emitOpError("input type must be numeric, got ") << inputType;
+  }
+  if (!resultIsNumeric) {
+    return emitOpError("result type must be numeric, got ") << resultType;
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // Comparison operation verifier
 //===----------------------------------------------------------------------===//
 

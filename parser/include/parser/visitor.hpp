@@ -9,6 +9,7 @@ class NIdentifier;
 class NQualifiedName;
 class NMethodCall;
 class NBinaryOperator;
+class NCastExpression;
 class NAssignment;
 class NBlock;
 class NIfExpression;
@@ -76,6 +77,7 @@ public:
   virtual void visit(const NQualifiedName& node) = 0;
   virtual void visit(const NMethodCall& node) = 0;
   virtual void visit(const NBinaryOperator& node) = 0;
+  virtual void visit(const NCastExpression& node) = 0;
   virtual void visit(const NAssignment& node) = 0;
   virtual void visit(const NBlock& node) = 0;
   virtual void visit(const NIfExpression& node) = 0;

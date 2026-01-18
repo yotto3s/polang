@@ -15,6 +15,8 @@ void NMethodCall::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NBinaryOperator::accept(Visitor& visitor) const { visitor.visit(*this); }
 
+void NCastExpression::accept(Visitor& visitor) const { visitor.visit(*this); }
+
 void NAssignment::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NBlock::accept(Visitor& visitor) const { visitor.visit(*this); }

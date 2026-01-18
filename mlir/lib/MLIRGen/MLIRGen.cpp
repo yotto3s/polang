@@ -257,6 +257,22 @@ public:
     }
   }
 
+  void visit(const NCastExpression& node) override {
+    // Evaluate the expression to cast
+    node.expression->accept(*this);
+    if (!result) {
+      return;
+    }
+    Value inputValue = result;
+
+    // Get the target type
+    Type targetType = getPolangType(node.targetType->name);
+
+    // Create the cast operation
+    result = builder.create<CastOp>(loc(), targetType, inputValue);
+    resultType = node.targetType->name;
+  }
+
   void visit(const NAssignment& node) override {
     // Evaluate RHS
     node.rhs->accept(*this);

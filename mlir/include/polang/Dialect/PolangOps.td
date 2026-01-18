@@ -223,6 +223,36 @@ def Polang_DivOp : Polang_ArithOp<"div"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Type conversion operations
+//===----------------------------------------------------------------------===//
+
+def Polang_CastOp : Polang_Op<"cast", [Pure]> {
+  let summary = "Explicit type conversion";
+  let description = [{
+    Converts a numeric value from one type to another.
+
+    Supported conversions:
+    - Integer to integer (widening/narrowing)
+    - Float to float (widening/narrowing)
+    - Integer to float
+    - Float to integer (saturating)
+
+    Example:
+    ```mlir
+    %0 = polang.cast %x : !polang.integer<32, signed> -> !polang.integer<64, signed>
+    %1 = polang.cast %f : !polang.float<64> -> !polang.integer<32, signed>
+    ```
+  }];
+
+  let arguments = (ins Polang_AnyNumericOrVar:$input);
+  let results = (outs Polang_AnyNumericOrVar:$result);
+
+  let assemblyFormat = "$input `:` type($input) `->` type($result) attr-dict";
+
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Comparison operations
 //===----------------------------------------------------------------------===//
 

@@ -1,0 +1,5 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test float to integer conversion (truncates toward zero)
+; CHECK: 3 : i64
+3.7 as i64

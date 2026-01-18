@@ -1,0 +1,8 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test cast operation MLIR generation
+; CHECK:        polang.func @__polang_entry() -> !polang.integer<32, signed> {
+; CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 42 : !polang.integer<64, signed>
+; CHECK-NEXT:     %{{[0-9]+}} = polang.cast %{{[0-9]+}} : !polang.integer<64, signed> -> !polang.integer<32, signed>
+; CHECK-NEXT:     polang.return %{{[0-9]+}} : !polang.integer<32, signed>
+42 as i32

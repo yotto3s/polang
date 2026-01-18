@@ -1,0 +1,8 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test cast expression AST
+; CHECK:      NBlock
+; CHECK-NEXT: `-NExpressionStatement
+; CHECK-NEXT:   `-NCastExpression -> i32
+; CHECK-NEXT:     `-NInteger 42
+42 as i32

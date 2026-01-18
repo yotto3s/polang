@@ -80,6 +80,7 @@ std::unique_ptr<T> wrap(T* ptr) {
 %nonassoc COMPARISON TCEQ TCNE TCLT TCLE TCGT TCGE
 %left TPLUS TMINUS
 %left TMUL TDIV
+%left TAS
 %left TDOT
 
 /* Expected conflicts:
@@ -327,6 +328,7 @@ expr : ident TLARROW expr { $$ = new NAssignment(wrap($<ident>1), wrap($3)); }
      | expr TMINUS expr { $$ = new NBinaryOperator(wrap($1), TMINUS, wrap($3)); }
      | expr TMUL expr { $$ = new NBinaryOperator(wrap($1), TMUL, wrap($3)); }
      | expr TDIV expr { $$ = new NBinaryOperator(wrap($1), TDIV, wrap($3)); }
+     | expr TAS ident { $$ = new NCastExpression(wrap($1), wrap($3)); }
      | TLPAREN expr TRPAREN { $$ = $2; }
      | TIF expr TTHEN expr TELSE expr { $$ = new NIfExpression(wrap($2), wrap($4), wrap($6)); }
      | TLET let_bindings TIN expr {

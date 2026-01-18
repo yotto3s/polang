@@ -51,6 +51,10 @@ public:
     node.rhs->accept(*this);
   }
 
+  void visit(const NCastExpression& node) override {
+    node.expression->accept(*this);
+  }
+
   void visit(const NAssignment& node) override {
     if (localNames.find(node.lhs->name) == localNames.end()) {
       referencedNonLocals.insert(node.lhs->name);
@@ -249,6 +253,14 @@ void TypeChecker::visit(const NBinaryOperator& node) {
     }
     inferredType = TypeNames::BOOL;
   }
+}
+
+void TypeChecker::visit(const NCastExpression& node) {
+  // Visit the inner expression to collect any free variables and check types
+  node.expression->accept(*this);
+  // The result type is the target type of the cast
+  // Type validation (numeric-only) is handled by MLIR CastOp verifier
+  inferredType = node.targetType->name;
 }
 
 void TypeChecker::visit(const NAssignment& node) {

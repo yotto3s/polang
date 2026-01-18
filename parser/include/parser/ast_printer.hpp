@@ -20,6 +20,7 @@ public:
   void visit(const NQualifiedName& node) override;
   void visit(const NMethodCall& node) override;
   void visit(const NBinaryOperator& node) override;
+  void visit(const NCastExpression& node) override;
   void visit(const NAssignment& node) override;
   void visit(const NBlock& node) override;
   void visit(const NIfExpression& node) override;
