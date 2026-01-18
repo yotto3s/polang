@@ -37,7 +37,7 @@ void polang_reset_lexer_location() {
 %%
 
 [ \t]+                  { /* skip spaces and tabs */ }
-\n                      { yycolumn = 1; /* reset column on newline */ }
+\n                      { yycolumn = 1; /* newline resets column */ }
 ;[^\n]*                 { /* skip single-line comments */ }
 "let"                   { return yy::parser::make_TLET(LOC); }
 "fun"                   { return yy::parser::make_TFUN(LOC); }
@@ -49,6 +49,7 @@ void polang_reset_lexer_location() {
 "true"                  { return yy::parser::make_TTRUE(LOC); }
 "false"                 { return yy::parser::make_TFALSE(LOC); }
 "mut"                   { return yy::parser::make_TMUT(LOC); }
+"ref"                   { return yy::parser::make_TREF(LOC); }
 "module"                { return yy::parser::make_TMODULE(LOC); }
 "endmodule"             { return yy::parser::make_TENDMODULE(LOC); }
 "import"                { return yy::parser::make_TIMPORT(LOC); }

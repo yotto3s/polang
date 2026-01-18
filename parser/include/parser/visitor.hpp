@@ -11,6 +11,8 @@ class NMethodCall;
 class NBinaryOperator;
 class NCastExpression;
 class NAssignment;
+class NRefExpression;
+class NDerefExpression;
 class NBlock;
 class NIfExpression;
 class NLetExpression;
@@ -79,6 +81,8 @@ public:
   virtual void visit(const NBinaryOperator& node) = 0;
   virtual void visit(const NCastExpression& node) = 0;
   virtual void visit(const NAssignment& node) = 0;
+  virtual void visit(const NRefExpression& node) = 0;
+  virtual void visit(const NDerefExpression& node) = 0;
   virtual void visit(const NBlock& node) = 0;
   virtual void visit(const NIfExpression& node) = 0;
   virtual void visit(const NLetExpression& node) = 0;

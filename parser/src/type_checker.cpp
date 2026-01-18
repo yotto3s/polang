@@ -12,8 +12,14 @@
 
 using polang::ErrorReporter;
 using polang::ErrorSeverity;
+using polang::getReferentType;
 using polang::isArithmeticOperator;
 using polang::isComparisonOperator;
+using polang::isImmutableRefType;
+using polang::isMutableRefType;
+using polang::isReferenceType;
+using polang::makeImmutableRefType;
+using polang::makeMutableRefType;
 using polang::operatorToString;
 using polang::TypeNames;
 
@@ -61,6 +67,10 @@ public:
     }
     node.rhs->accept(*this);
   }
+
+  void visit(const NRefExpression& node) override { node.expr->accept(*this); }
+
+  void visit(const NDerefExpression& node) override { node.ref->accept(*this); }
 
   void visit(const NBlock& node) override {
     for (const auto& stmt : node.statements) {
@@ -270,24 +280,75 @@ void TypeChecker::visit(const NAssignment& node) {
     return;
   }
 
-  if (!localMutability[node.lhs->name]) {
-    reportError("Cannot reassign immutable variable: " + node.lhs->name);
+  const std::string varType = localTypes[node.lhs->name];
+
+  // Check if it's a mutable reference type
+  if (!isMutableRefType(varType)) {
+    if (isImmutableRefType(varType)) {
+      reportError("Cannot assign through immutable reference: " +
+                  node.lhs->name);
+    } else {
+      reportError("Cannot reassign immutable variable: " + node.lhs->name);
+    }
     inferredType = TypeNames::UNKNOWN;
     return;
   }
 
-  const std::string varType = localTypes[node.lhs->name];
+  // Get the underlying type for the mutable reference
+  const std::string referentType = getReferentType(varType);
 
   node.rhs->accept(*this);
   const std::string rhsType = inferredType;
 
   if (rhsType != TypeNames::UNKNOWN && rhsType != TypeNames::TYPEVAR &&
-      varType != TypeNames::TYPEVAR && rhsType != varType) {
+      referentType != TypeNames::TYPEVAR && rhsType != referentType) {
     reportError("Cannot assign " + rhsType + " to variable '" + node.lhs->name +
-                "' of type " + varType);
+                "' of type " + referentType);
   }
 
-  inferredType = varType;
+  inferredType = referentType;
+}
+
+void TypeChecker::visit(const NRefExpression& node) {
+  // Evaluate the inner expression
+  node.expr->accept(*this);
+  const std::string exprType = inferredType;
+
+  if (exprType == TypeNames::UNKNOWN) {
+    inferredType = TypeNames::UNKNOWN;
+    return;
+  }
+
+  // Create an immutable reference type
+  // If the inner expression is a mutable reference, create ref to same location
+  // If it's a value, create ref to that value
+  std::string baseType = exprType;
+  if (isMutableRefType(exprType)) {
+    // ref of mut T → ref T (pointing to same storage)
+    baseType = getReferentType(exprType);
+  }
+  inferredType = makeImmutableRefType(baseType);
+}
+
+void TypeChecker::visit(const NDerefExpression& node) {
+  // Evaluate the reference expression
+  node.ref->accept(*this);
+  const std::string refType = inferredType;
+
+  if (refType == TypeNames::UNKNOWN) {
+    inferredType = TypeNames::UNKNOWN;
+    return;
+  }
+
+  // Check that we're dereferencing a reference type
+  if (!isReferenceType(refType)) {
+    reportError("Cannot dereference non-reference type: " + refType);
+    inferredType = TypeNames::UNKNOWN;
+    return;
+  }
+
+  // Get the underlying type
+  inferredType = getReferentType(refType);
 }
 
 void TypeChecker::visit(const NBlock& node) {
@@ -339,12 +400,20 @@ void TypeChecker::visit(const NLetExpression& node) {
     if (!binding->isFunction) {
       const auto& var = binding->var;
       if (var->type != nullptr) {
-        siblingVarTypes[var->id->name] = var->type->name;
+        std::string varType = var->type->name;
+        if (var->isMutable) {
+          varType = makeMutableRefType(varType);
+        }
+        siblingVarTypes[var->id->name] = varType;
         siblingVarMutability[var->id->name] = var->isMutable;
       } else if (var->assignmentExpr != nullptr) {
         var->assignmentExpr->accept(*this);
         if (inferredType != TypeNames::UNKNOWN) {
-          siblingVarTypes[var->id->name] = inferredType;
+          std::string varType = inferredType;
+          if (var->isMutable) {
+            varType = makeMutableRefType(varType);
+          }
+          siblingVarTypes[var->id->name] = varType;
           siblingVarMutability[var->id->name] = var->isMutable;
         }
       }
@@ -446,7 +515,11 @@ void TypeChecker::visit(const NLetExpression& node) {
           bindingTypes.emplace_back(TypeNames::UNKNOWN);
           bindingMutability.push_back(var->isMutable);
         } else {
-          bindingTypes.emplace_back(var->type->name);
+          std::string varType = var->type->name;
+          if (var->isMutable) {
+            varType = makeMutableRefType(varType);
+          }
+          bindingTypes.emplace_back(varType);
           bindingMutability.push_back(var->isMutable);
         }
         continue;
@@ -457,7 +530,11 @@ void TypeChecker::visit(const NLetExpression& node) {
 
       if (exprType == TypeNames::UNKNOWN) {
         if (var->type != nullptr) {
-          bindingTypes.emplace_back(var->type->name);
+          std::string varType = var->type->name;
+          if (var->isMutable) {
+            varType = makeMutableRefType(varType);
+          }
+          bindingTypes.emplace_back(varType);
           bindingMutability.push_back(var->isMutable);
         } else {
           bindingTypes.emplace_back(TypeNames::UNKNOWN);
@@ -468,14 +545,22 @@ void TypeChecker::visit(const NLetExpression& node) {
 
       if (var->type == nullptr) {
         mutableVar.type = std::make_unique<NIdentifier>(exprType);
-        bindingTypes.push_back(exprType);
+        std::string varType = exprType;
+        if (var->isMutable) {
+          varType = makeMutableRefType(varType);
+        }
+        bindingTypes.push_back(varType);
         bindingMutability.push_back(var->isMutable);
       } else {
         if (exprType != var->type->name) {
           reportError("Variable '" + var->id->name + "' declared as " +
                       var->type->name + " but initialized with " + exprType);
         }
-        bindingTypes.push_back(var->type->name);
+        std::string varType = var->type->name;
+        if (var->isMutable) {
+          varType = makeMutableRefType(varType);
+        }
+        bindingTypes.push_back(varType);
         bindingMutability.push_back(var->isMutable);
       }
     }
@@ -521,41 +606,117 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
       inferredType = TypeNames::UNKNOWN;
       return;
     }
-    localTypes[varName] = node.type->name;
+    std::string baseType = node.type->name;
+    std::string varType = baseType;
+    // Mutable variables have mutable reference type
+    if (node.isMutable) {
+      varType = makeMutableRefType(baseType);
+    }
+    localTypes[varName] = varType;
     localMutability[varName] = node.isMutable;
-    inferredType = node.type->name;
+    // Declaration is a statement - use the base type for function return
+    inferredType = baseType;
     return;
   }
 
   node.assignmentExpr->accept(*this);
-  const std::string exprType = inferredType;
+  std::string exprType = inferredType;
 
   if (exprType == TypeNames::UNKNOWN) {
     if (node.type != nullptr) {
-      localTypes[varName] = node.type->name;
+      std::string baseType = node.type->name;
+      std::string varType = baseType;
+      if (node.isMutable) {
+        varType = makeMutableRefType(baseType);
+      }
+      localTypes[varName] = varType;
       localMutability[varName] = node.isMutable;
-      inferredType = node.type->name;
+      // Declaration is a statement - use the base type for function return
+      inferredType = baseType;
     }
     return;
   }
 
   if (node.type == nullptr) {
-    mutableNode.type = std::make_unique<NIdentifier>(exprType);
-    localTypes[varName] = exprType;
+    // Infer type from the expression
+    // If the expression is a mutable reference and we're not mutable,
+    // we copy the reference (same type)
+    // If mutable and expression is a value type, wrap it
+    std::string baseType = exprType;
+    if (isReferenceType(exprType)) {
+      // If initializing from a reference, the base type is the underlying type
+      // For mutable variables, they become references to that value
+      // For immutable variables, they copy the reference type
+      if (node.isMutable && !isMutableRefType(exprType)) {
+        // Can't create a mutable variable from an immutable reference
+        // The value is extracted and a new mutable ref is created
+        baseType = getReferentType(exprType);
+      }
+    }
+
+    std::string varType;
+    if (node.isMutable) {
+      // Mutable variables always have mutable reference type
+      if (isMutableRefType(exprType)) {
+        // Copying a mutable reference - keep as mutable reference
+        varType = exprType;
+      } else if (isImmutableRefType(exprType)) {
+        // Can't copy immutable reference to mutable variable
+        reportError("Cannot initialize mutable variable '" + node.id->name +
+                    "' with immutable reference");
+        inferredType = TypeNames::UNKNOWN;
+        return;
+      } else {
+        // Value type - wrap in mutable reference
+        varType = makeMutableRefType(exprType);
+      }
+    } else {
+      // Immutable variable - just use the expression type as-is
+      varType = exprType;
+    }
+
+    mutableNode.type = std::make_unique<NIdentifier>(varType);
+    localTypes[varName] = varType;
     localMutability[varName] = node.isMutable;
-    inferredType = exprType;
+    // Declaration is a statement, not an expression - use underlying type
+    // so function return type matches the default return value
+    // Strip reference types for inferredType
+    inferredType =
+        isReferenceType(exprType) ? getReferentType(exprType) : exprType;
   } else {
     const std::string declType = node.type->name;
 
-    if (exprType != declType) {
+    // For type checking, compare the underlying types
+    std::string expectedType = declType;
+    std::string actualType = exprType;
+
+    // Strip reference wrappers for comparison
+    if (isReferenceType(expectedType)) {
+      expectedType = getReferentType(expectedType);
+    }
+    if (isReferenceType(actualType)) {
+      actualType = getReferentType(actualType);
+    }
+
+    if (actualType != expectedType && actualType != TypeNames::TYPEVAR &&
+        expectedType != TypeNames::TYPEVAR) {
       reportError("Variable '" + node.id->name + "' declared as " + declType +
                   " but initialized with " + exprType +
                   " (no implicit conversion)");
     }
 
-    localTypes[varName] = declType;
+    std::string varType = declType;
+    if (node.isMutable && !isMutableRefType(declType)) {
+      varType = makeMutableRefType(declType);
+    }
+
+    localTypes[varName] = varType;
     localMutability[varName] = node.isMutable;
-    inferredType = declType;
+    // Declaration is a statement, not an expression - use underlying type
+    // so function return type matches the default return value
+    // Strip reference types for inferredType
+    inferredType =
+        isReferenceType(exprType) ? getReferentType(exprType) : exprType;
   }
 }
 

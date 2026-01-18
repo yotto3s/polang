@@ -170,6 +170,22 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
+class NRefExpression : public NExpression {
+public:
+  std::unique_ptr<NExpression> expr;
+  explicit NRefExpression(std::unique_ptr<NExpression> expr)
+      : expr(std::move(expr)) {}
+  void accept(Visitor &visitor) const override;
+};
+
+class NDerefExpression : public NExpression {
+public:
+  std::unique_ptr<NExpression> ref;
+  explicit NDerefExpression(std::unique_ptr<NExpression> ref)
+      : ref(std::move(ref)) {}
+  void accept(Visitor &visitor) const override;
+};
+
 class NBlock : public NExpression {
 public:
   StatementList statements;

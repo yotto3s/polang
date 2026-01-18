@@ -117,6 +117,26 @@ void ASTPrinter::visit(const NAssignment& node) {
   }
 }
 
+void ASTPrinter::visit(const NRefExpression& node) {
+  printPrefix();
+  out << "NRefExpression\n";
+
+  {
+    DepthScope scope(*this, false);
+    node.expr->accept(*this);
+  }
+}
+
+void ASTPrinter::visit(const NDerefExpression& node) {
+  printPrefix();
+  out << "NDerefExpression\n";
+
+  {
+    DepthScope scope(*this, false);
+    node.ref->accept(*this);
+  }
+}
+
 void ASTPrinter::visit(const NBlock& node) {
   printPrefix();
   out << "NBlock\n";

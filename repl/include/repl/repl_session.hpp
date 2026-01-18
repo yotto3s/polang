@@ -2,7 +2,10 @@
 #define POLANG_REPL_SESSION_HPP
 
 #include <cstdint>
+#include <memory>
 #include <string>
+
+class NBlock;
 
 // Result of evaluating an expression
 struct EvalResult {
@@ -41,8 +44,8 @@ public:
 private:
   bool initialized = false;
 
-  // Accumulated source code from previous successful evaluations
-  std::string accumulatedCode;
+  // Accumulated AST from previous successful evaluations
+  std::unique_ptr<NBlock> accumulatedAst;
 };
 
 #endif // POLANG_REPL_SESSION_HPP

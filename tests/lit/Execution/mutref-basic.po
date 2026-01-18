@@ -1,0 +1,6 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test basic mutable variable with explicit dereference
+; CHECK: 10 : i64
+let mut x = 10
+(*x)

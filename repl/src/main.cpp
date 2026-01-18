@@ -78,20 +78,34 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  // File mode: read file, evaluate, and exit
+  // File mode: read file, evaluate line by line, and exit
   if (argc > 1) {
     std::ifstream file(argv[1]);
     if (!file.is_open()) {
       std::cerr << "Error: Cannot open file: " << argv[1] << "\n";
       return 1;
     }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    const std::string content = buffer.str();
 
-    const EvalResult result = session.evaluate(content);
-    printResult(result);
-    return result.success ? 0 : 1;
+    // Evaluate each line separately to avoid parser ambiguity
+    // (e.g., `10\n*x` should be two statements, not `10 * x`)
+    EvalResult lastResult = EvalResult::ok();
+    while (true) {
+      const std::string input = readInput(file, false);
+      if (file.eof() && input.empty()) {
+        break;
+      }
+      if (input.empty()) {
+        continue;
+      }
+
+      lastResult = session.evaluate(input);
+      if (!lastResult.success) {
+        return 1;
+      }
+    }
+
+    printResult(lastResult);
+    return 0;
   }
 
   // Determine if running interactively (stdin is a terminal)

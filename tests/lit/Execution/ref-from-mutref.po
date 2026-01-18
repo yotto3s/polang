@@ -1,0 +1,10 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test that `ref *x` creates an immutable reference to x's storage,
+; not a copy of the value. When x is updated, dereferencing the
+; immutable reference should see the new value.
+; CHECK: 20 : i64
+let mut x = 10
+let y = ref *x
+x <- 20
+*y

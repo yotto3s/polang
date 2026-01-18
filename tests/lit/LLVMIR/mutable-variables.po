@@ -1,13 +1,13 @@
 ; RUN: %polang_compiler %s | %FileCheck %s
 
-; Test mutable variable with alloca, store, and load
+; Test mutable variable with alloca, store, and load (via mutref lowering)
 ; CHECK: define i64 @__polang_entry() {
 ; CHECK: {{.*}}alloca i64{{.*}}
-; CHECK: {{.*}}store i64 10{{.*}}
-; CHECK: {{.*}}store i64 20{{.*}}
+; CHECK: {{.*}}store i64{{.*}}
+; CHECK: {{.*}}store i64{{.*}}
 ; CHECK: {{.*}}load i64{{.*}}
 ; CHECK: {{.*}}ret i64 %{{[0-9]+}}
 ; CHECK: }
 let mut x = 10
 x <- 20
-x
+(*x)

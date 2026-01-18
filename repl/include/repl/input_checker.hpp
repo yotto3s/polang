@@ -24,6 +24,14 @@ public:
         continue;
       }
 
+      // Skip comments (semicolon to end of line)
+      if (input[i] == ';') {
+        while (i < input.size() && input[i] != '\n') {
+          ++i;
+        }
+        continue;
+      }
+
       // Track parentheses
       if (input[i] == '(') {
         ++parenDepth;
