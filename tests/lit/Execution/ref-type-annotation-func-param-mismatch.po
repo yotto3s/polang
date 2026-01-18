@@ -1,0 +1,9 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test: function ref parameter type propagates to resolve argument variable
+; With deferred type inference, x (initially generic {int}) gets resolved to i32
+; based on the function parameter type ref i32
+; CHECK: 10 : i32
+let getValue(r: ref i32): i32 = *r
+let x = 10
+getValue(ref x)

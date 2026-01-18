@@ -1,0 +1,7 @@
+; RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+; Test: conflicting type constraints for same variable
+; First use (y) resolves x to i32, second use (z) conflicts with i64
+; CHECK: Type error: Variable 'z' declared as ref i64 but initialized with ref i32 (no implicit conversion)
+let x = 10
+let y: ref i32 = ref x
+let z: ref i64 = ref x

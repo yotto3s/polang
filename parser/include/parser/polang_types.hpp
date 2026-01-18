@@ -162,6 +162,23 @@ isGenericFloatType(const std::string& typeName) noexcept {
   return isGenericIntegerType(typeName) || isGenericFloatType(typeName);
 }
 
+/// Check if a type contains a generic type (including reference types).
+/// For example, "ref {int}" and "mut {int}" contain generic types.
+[[nodiscard]] inline bool
+containsGenericType(const std::string& typeName) noexcept {
+  if (isGenericType(typeName)) {
+    return true;
+  }
+  // Check if it's a reference type with a generic referent
+  if (typeName.rfind(TypeNames::MUT_PREFIX, 0) == 0) {
+    return containsGenericType(typeName.substr(4)); // Skip "mut "
+  }
+  if (typeName.rfind(TypeNames::REF_PREFIX, 0) == 0) {
+    return containsGenericType(typeName.substr(4)); // Skip "ref "
+  }
+  return false;
+}
+
 /// Check if two types are compatible for assignment/operations.
 /// Generic types are compatible with their concrete counterparts.
 [[nodiscard]] inline bool areTypesCompatible(const std::string& t1,
@@ -226,6 +243,26 @@ resolveGenericToDefault(const std::string& type) noexcept {
   }
   if (isGenericFloatType(type)) {
     return TypeNames::F64;
+  }
+  return type;
+}
+
+/// Resolve all generic types within a type to their defaults.
+/// Handles reference types containing generic types.
+/// For example, "ref {int}" becomes "ref i64".
+[[nodiscard]] inline std::string
+resolveAllGenericsToDefault(const std::string& type) noexcept {
+  if (isGenericType(type)) {
+    return resolveGenericToDefault(type);
+  }
+  // Handle reference types
+  if (type.rfind(TypeNames::MUT_PREFIX, 0) == 0) {
+    return std::string(TypeNames::MUT_PREFIX) +
+           resolveAllGenericsToDefault(type.substr(4));
+  }
+  if (type.rfind(TypeNames::REF_PREFIX, 0) == 0) {
+    return std::string(TypeNames::REF_PREFIX) +
+           resolveAllGenericsToDefault(type.substr(4));
   }
   return type;
 }

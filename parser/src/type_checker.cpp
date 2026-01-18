@@ -16,7 +16,12 @@ using polang::ErrorSeverity;
 using polang::getReferentType;
 using polang::isArithmeticOperator;
 using polang::isComparisonOperator;
+using polang::containsGenericType;
+using polang::isFloatType;
+using polang::isGenericType;
 using polang::isImmutableRefType;
+using polang::isIntegerType;
+using polang::resolveAllGenericsToDefault;
 using polang::isMutableRefType;
 using polang::isReferenceType;
 using polang::makeImmutableRefType;
@@ -216,6 +221,21 @@ void TypeChecker::visit(const NMethodCall& node) {
                   std::to_string(paramTypes.size()) + " argument(s), got " +
                   std::to_string(argTypes.size()));
     } else {
+      // Propagate concrete types from function parameters to arguments that
+      // might be resolvable (in unresolvedGenerics)
+      for (std::size_t i = 0; i < argTypes.size(); ++i) {
+        if (!isGenericType(paramTypes[i]) &&
+            paramTypes[i] != TypeNames::UNKNOWN &&
+            paramTypes[i] != TypeNames::TYPEVAR) {
+          // Try to propagate - if the argument source is in unresolvedGenerics,
+          // it will be resolved; otherwise nothing happens
+          propagateTypeToSource(node.arguments[i].get(), paramTypes[i]);
+          // Re-evaluate the argument type after propagation
+          node.arguments[i]->accept(*this);
+          argTypes[i] = inferredType;
+        }
+      }
+
       for (std::size_t i = 0; i < argTypes.size(); ++i) {
         if (argTypes[i] != TypeNames::UNKNOWN &&
             paramTypes[i] != TypeNames::UNKNOWN &&
@@ -365,9 +385,20 @@ void TypeChecker::visit(const NDerefExpression& node) {
 }
 
 void TypeChecker::visit(const NBlock& node) {
+  // Save tracking maps for nested scope handling
+  const auto savedUnresolvedGenerics = unresolvedGenerics;
+  const auto savedVarDeclNodes = varDeclNodes;
+
   for (const auto& stmt : node.statements) {
     stmt->accept(*this);
   }
+
+  // Resolve any remaining generic types to defaults at end of block
+  resolveRemainingGenerics();
+
+  // Restore tracking maps for outer scope
+  unresolvedGenerics = savedUnresolvedGenerics;
+  varDeclNodes = savedVarDeclNodes;
 }
 
 void TypeChecker::visit(const NIfExpression& node) {
@@ -665,8 +696,20 @@ void TypeChecker::typeCheckVarDeclNoInit(NVariableDeclaration& node,
 void TypeChecker::typeCheckVarDeclInferType(NVariableDeclaration& node,
                                             const std::string& varName,
                                             const std::string& exprType) {
-  // Resolve generic types to their defaults for inferred declarations
-  std::string resolvedType = resolveGenericToDefault(exprType);
+  // For deferred type inference: resolve to default but track for potential re-resolution
+  std::string resolvedType = resolveAllGenericsToDefault(exprType);
+
+  // Track types containing generics for later resolution
+  // This includes direct generic types like {int} and reference types like ref {int}
+  if (containsGenericType(exprType)) {
+    // Store the base generic type for tracking
+    std::string baseGeneric = exprType;
+    if (isReferenceType(exprType)) {
+      baseGeneric = getReferentType(exprType);
+    }
+    unresolvedGenerics[varName] = baseGeneric;
+    varDeclNodes[varName] = &node;
+  }
 
   std::string baseType = resolvedType;
   if (isReferenceType(resolvedType)) {
@@ -696,6 +739,7 @@ void TypeChecker::typeCheckVarDeclInferType(NVariableDeclaration& node,
     nodeType = resolvedType;
   }
 
+  // Always set node.type so MLIR has valid types
   node.type = std::make_unique<NIdentifier>(nodeType);
   localTypes[varName] = varType;
   localMutability[varName] = node.isMutable;
@@ -716,6 +760,20 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
   }
   if (isReferenceType(actualType)) {
     actualType = getReferentType(actualType);
+  }
+
+  // If actual type could be re-resolved (source is in unresolvedGenerics) and expected
+  // is concrete, propagate back. We check by trying to propagate - if the source variable
+  // is in unresolvedGenerics, it will be resolved; otherwise nothing happens.
+  if (!isGenericType(expectedType) && expectedType != TypeNames::TYPEVAR) {
+    // Try to propagate the concrete type back to the source
+    propagateTypeToSource(node.assignmentExpr.get(), expectedType);
+    // Re-evaluate the expression type after propagation
+    node.assignmentExpr->accept(*this);
+    actualType = inferredType;
+    if (isReferenceType(actualType)) {
+      actualType = getReferentType(actualType);
+    }
   }
 
   if (!areTypesCompatible(actualType, expectedType) &&
@@ -764,7 +822,31 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
     return;
   }
 
-  if (node.type == nullptr) {
+  // Check if this is an inferred type case:
+  // 1. No type annotation (node.type == nullptr), OR
+  // 2. Type was set by previous type checker run but expression is still generic
+  //    (indicates the variable can be re-resolved based on context)
+  bool needsInference = node.type == nullptr;
+  if (!needsInference && containsGenericType(exprType)) {
+    // Check if the current node type matches what we'd get from default resolution
+    std::string baseExprType = exprType;
+    if (isReferenceType(exprType)) {
+      baseExprType = getReferentType(exprType);
+    }
+    std::string defaultType = resolveGenericToDefault(baseExprType);
+    std::string nodeTypeName = node.type->name;
+    if (isReferenceType(nodeTypeName)) {
+      nodeTypeName = getReferentType(nodeTypeName);
+    }
+    if (nodeTypeName == defaultType) {
+      // Type was set to default by previous run, allow re-resolution
+      needsInference = true;
+      // Clear the type so it can be re-resolved
+      mutableNode.type = nullptr;
+    }
+  }
+
+  if (needsInference) {
     typeCheckVarDeclInferType(mutableNode, varName, exprType);
   } else {
     typeCheckVarDeclWithAnnotation(mutableNode, varName, exprType);
@@ -956,4 +1038,109 @@ std::set<std::string> TypeChecker::collectFreeVariables(
   FreeVariableCollector collector(localNames);
   block.accept(collector);
   return collector.getReferencedNonLocals();
+}
+
+void TypeChecker::propagateTypeToSource(const NExpression* expr,
+                                        const std::string& targetType) {
+  if (expr == nullptr) {
+    return;
+  }
+
+  // Handle NRefExpression: propagate to inner expression
+  // If target is a ref type, extract the referent type
+  if (const auto* refExpr = dynamic_cast<const NRefExpression*>(expr)) {
+    std::string innerTargetType = targetType;
+    if (isReferenceType(targetType)) {
+      innerTargetType = getReferentType(targetType);
+    }
+    propagateTypeToSource(refExpr->expr.get(), innerTargetType);
+    return;
+  }
+
+  // Handle NDerefExpression: propagate through dereference
+  if (const auto* derefExpr = dynamic_cast<const NDerefExpression*>(expr)) {
+    propagateTypeToSource(derefExpr->ref.get(), targetType);
+    return;
+  }
+
+  // Handle NIdentifier: resolve the variable's generic type
+  if (const auto* ident = dynamic_cast<const NIdentifier*>(expr)) {
+    resolveGenericVariable(ident->name, targetType);
+    return;
+  }
+
+  // For other expression types (literals, etc.), no propagation needed
+}
+
+void TypeChecker::resolveGenericVariable(const std::string& varName,
+                                         const std::string& concreteType) {
+  // Find variable in unresolvedGenerics
+  auto it = unresolvedGenerics.find(varName);
+  if (it == unresolvedGenerics.end()) {
+    // Variable is not tracked as having a generic type - nothing to do
+    return;
+  }
+
+  const std::string& genericType = it->second;
+
+  // Check compatibility between generic and concrete type
+  if (!areTypesCompatible(genericType, concreteType)) {
+    reportError("Type conflict for variable '" + varName + "': cannot resolve " +
+                genericType + " to " + concreteType);
+    return;
+  }
+
+  // Update localTypes with concrete type
+  std::string newLocalType = concreteType;
+  auto localIt = localTypes.find(varName);
+  if (localIt != localTypes.end()) {
+    // Preserve reference wrapper if present
+    if (isMutableRefType(localIt->second)) {
+      newLocalType = makeMutableRefType(concreteType);
+    } else if (isImmutableRefType(localIt->second)) {
+      newLocalType = makeImmutableRefType(concreteType);
+    }
+    localTypes[varName] = newLocalType;
+  }
+
+  // Update AST node type via varDeclNodes
+  auto nodeIt = varDeclNodes.find(varName);
+  if (nodeIt != varDeclNodes.end() && nodeIt->second != nullptr) {
+    // For the AST node, compute the appropriate type
+    // For mutable variables: use the base type (without mut wrapper)
+    // For immutable variables with reference types: use the full type
+    std::string nodeType = concreteType;
+    if (isMutableRefType(newLocalType)) {
+      // Mutable variable: node.type is the base type (not mut-wrapped)
+      nodeType = concreteType;
+    } else if (isImmutableRefType(newLocalType)) {
+      // Immutable ref variable: node.type includes the ref wrapper
+      nodeType = newLocalType;
+    }
+    nodeIt->second->type = std::make_unique<NIdentifier>(nodeType);
+  }
+
+  // Remove from unresolvedGenerics
+  unresolvedGenerics.erase(it);
+  varDeclNodes.erase(varName);
+}
+
+void TypeChecker::resolveRemainingGenerics() {
+  // Since we now always set node.type to defaults immediately,
+  // this function mainly handles updating localTypes when variables
+  // weren't resolved by context propagation
+  for (auto& entry : unresolvedGenerics) {
+    const std::string& varName = entry.first;
+
+    // Update localTypes with resolved type
+    auto localIt = localTypes.find(varName);
+    if (localIt != localTypes.end()) {
+      // Resolve all generics in the type, including those in reference types
+      localTypes[varName] = resolveAllGenericsToDefault(localIt->second);
+    }
+  }
+
+  // Clear tracking maps
+  unresolvedGenerics.clear();
+  varDeclNodes.clear();
 }

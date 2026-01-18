@@ -12,6 +12,7 @@
 
 class Node;
 class NBlock;
+class NExpression;
 struct NLetBinding;
 
 struct TypeCheckError {
@@ -128,6 +129,20 @@ private:
   void handleModuleAliasImport(const NImportStatement& node);
   void handleItemsImport(const NImportStatement& node);
   void handleWildcardImport(const NImportStatement& node);
+
+  // Deferred type inference for generic types
+  // Variables with unresolved generic types (name -> generic type)
+  std::map<std::string, std::string> unresolvedGenerics;
+
+  // Track AST nodes for updating types later (name -> node pointer)
+  std::map<std::string, NVariableDeclaration*> varDeclNodes;
+
+  // Helper methods for deferred type resolution
+  void resolveGenericVariable(const std::string& varName,
+                              const std::string& concreteType);
+  void propagateTypeToSource(const NExpression* expr,
+                             const std::string& targetType);
+  void resolveRemainingGenerics();
 };
 
 #endif // POLANG_TYPE_CHECKER_HPP
