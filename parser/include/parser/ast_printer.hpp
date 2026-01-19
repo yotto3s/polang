@@ -13,6 +13,9 @@ public:
 
   void print(const NBlock& root);
 
+  void visit(const NNamedType& node) override;
+  void visit(const NRefType& node) override;
+  void visit(const NMutRefType& node) override;
   void visit(const NInteger& node) override;
   void visit(const NDouble& node) override;
   void visit(const NBoolean& node) override;

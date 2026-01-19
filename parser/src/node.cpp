@@ -9,6 +9,12 @@ void NBoolean::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NIdentifier::accept(Visitor& visitor) const { visitor.visit(*this); }
 
+void NNamedType::accept(Visitor& visitor) const { visitor.visit(*this); }
+
+void NRefType::accept(Visitor& visitor) const { visitor.visit(*this); }
+
+void NMutRefType::accept(Visitor& visitor) const { visitor.visit(*this); }
+
 void NQualifiedName::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NMethodCall::accept(Visitor& visitor) const { visitor.visit(*this); }

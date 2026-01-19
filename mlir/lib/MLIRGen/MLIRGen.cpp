@@ -49,7 +49,7 @@ namespace {
 /// 2. Assignment expression is NMutRefExpression (for inferred types)
 [[nodiscard]] bool isVarDeclMutable(const NVariableDeclaration& decl) {
   // Check type annotation first
-  if (decl.type != nullptr && isMutableRefType(decl.type->name)) {
+  if (decl.type != nullptr && isMutableRefType(decl.type->getTypeName())) {
     return true;
   }
   // Check if assignment expression is NMutRefExpression
@@ -80,9 +80,9 @@ public:
   }
 
   /// Get a Polang type from annotation, or a fresh type variable if none
-  Type getTypeOrFresh(const NIdentifier* typeAnnotation) {
+  Type getTypeOrFresh(const NTypeSpec* typeAnnotation) {
     if (typeAnnotation != nullptr) {
-      return getPolangType(typeAnnotation->name);
+      return getPolangType(typeAnnotation->getTypeName());
     }
     // No annotation - always emit type variable for polymorphic inference
     return freshTypeVar();
@@ -109,7 +109,21 @@ public:
     return module;
   }
 
-  // Visitor interface implementations
+  // Type Specification Visitor implementations
+  void visit(const NNamedType& /*node*/) override {
+    // Type specifications are not directly visited during MLIR generation
+    // They are accessed via getTypeName() when processing declarations
+  }
+
+  void visit(const NRefType& /*node*/) override {
+    // Type specifications are not directly visited during MLIR generation
+  }
+
+  void visit(const NMutRefType& /*node*/) override {
+    // Type specifications are not directly visited during MLIR generation
+  }
+
+  // Expression Visitor implementations
   void visit(const NInteger& node) override {
     // Create type variable constrained to integer types
     auto type = freshTypeVar(TypeVarKind::Integer);
@@ -295,11 +309,11 @@ public:
     const Value inputValue = result;
 
     // Get the target type
-    Type targetType = getPolangType(node.targetType->name);
+    Type targetType = getPolangType(node.targetType->getTypeName());
 
     // Create the cast operation
     result = builder.create<CastOp>(loc(), targetType, inputValue);
-    resultType = node.targetType->name;
+    resultType = node.targetType->getTypeName();
   }
 
   void visit(const NAssignment& node) override {
@@ -529,7 +543,7 @@ public:
 
     // Determine the type - prefer type annotation from type checker
     std::string typeName =
-        node.type != nullptr ? node.type->name : TypeNames::I64;
+        node.type != nullptr ? node.type->getTypeName() : TypeNames::I64;
     Value initValue = nullptr;
     if (node.assignmentExpr != nullptr) {
       // Evaluate the assignment expression
@@ -659,7 +673,7 @@ public:
     // Return type - use type variable if not specified
     Type returnType = getTypeOrFresh(node.type.get());
     if (node.type != nullptr) {
-      functionReturnTypes[funcName] = node.type->name;
+      functionReturnTypes[funcName] = node.type->getTypeName();
     }
     functionReturnMLIRTypes[funcName] = returnType;
 
@@ -691,7 +705,7 @@ public:
       argValues[arg->id->name] = entryBlock->getArgument(argIdx);
       typeVarTable[arg->id->name] = argMLIRTypes[i];
       if (arg->type != nullptr) {
-        typeTable[arg->id->name] = arg->type->name;
+        typeTable[arg->id->name] = arg->type->getTypeName();
       }
       ++argIdx;
     }
@@ -702,7 +716,7 @@ public:
       argValues[capture.id->name] = entryBlock->getArgument(argIdx);
       typeVarTable[capture.id->name] = captureMLIRTypes[i];
       if (capture.type != nullptr) {
-        typeTable[capture.id->name] = capture.type->name;
+        typeTable[capture.id->name] = capture.type->getTypeName();
       }
       ++argIdx;
     }

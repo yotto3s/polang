@@ -36,7 +36,7 @@ namespace {
 /// 2. Assignment expression is NMutRefExpression (for inferred types)
 [[nodiscard]] bool isVarDeclMutable(const NVariableDeclaration& decl) {
   // Check type annotation first
-  if (decl.type != nullptr && isMutableRefType(decl.type->name)) {
+  if (decl.type != nullptr && isMutableRefType(decl.type->getTypeName())) {
     return true;
   }
   // Check if assignment expression is NMutRefExpression
@@ -47,6 +47,19 @@ namespace {
     }
   }
   return false;
+}
+
+/// Helper to create an appropriate NTypeSpec from a type name string
+[[nodiscard]] std::unique_ptr<NTypeSpec>
+makeTypeSpec(const std::string& typeName) {
+  if (isMutableRefType(typeName)) {
+    return std::make_unique<NMutRefType>(
+        makeTypeSpec(getReferentType(typeName)));
+  }
+  if (isImmutableRefType(typeName)) {
+    return std::make_unique<NRefType>(makeTypeSpec(getReferentType(typeName)));
+  }
+  return std::make_unique<NNamedType>(typeName);
 }
 } // namespace
 
@@ -61,6 +74,9 @@ public:
     return referencedNonLocals;
   }
 
+  void visit(const NNamedType& node) override {}
+  void visit(const NRefType& node) override {}
+  void visit(const NMutRefType& node) override {}
   void visit(const NInteger& node) override {}
   void visit(const NDouble& node) override {}
   void visit(const NBoolean& node) override {}
@@ -162,6 +178,21 @@ private:
 };
 
 TypeChecker::TypeChecker() : inferredType(TypeNames::I64) {}
+
+void TypeChecker::visit(const NNamedType& node) {
+  // Named types just set inferredType to their name
+  inferredType = node.name;
+}
+
+void TypeChecker::visit(const NRefType& node) {
+  // Reference types set inferredType to the full type name
+  inferredType = node.getTypeName();
+}
+
+void TypeChecker::visit(const NMutRefType& node) {
+  // Mutable reference types set inferredType to the full type name
+  inferredType = node.getTypeName();
+}
 
 std::string TypeChecker::mangledName(const std::string& name) const {
   if (modulePath.empty()) {
@@ -324,7 +355,7 @@ void TypeChecker::visit(const NCastExpression& node) {
   node.expression->accept(*this);
   // The result type is the target type of the cast
   // Type validation (numeric-only) is handled by MLIR CastOp verifier
-  inferredType = node.targetType->name;
+  inferredType = node.targetType->getTypeName();
 }
 
 void TypeChecker::visit(const NAssignment& node) {
@@ -464,7 +495,7 @@ void TypeChecker::collectSiblingVarTypes(
       const auto& var = binding->var;
       const bool isMutable = isVarDeclMutable(*var);
       if (var->type != nullptr) {
-        std::string varType = var->type->name;
+        std::string varType = var->type->getTypeName();
         if (isMutable && !isMutableRefType(varType)) {
           varType = makeMutableRefType(varType);
         }
@@ -502,12 +533,12 @@ void TypeChecker::typeCheckLetBindings(
         paramNames.insert(arg->id->name);
         if (arg->type == nullptr) {
           auto& mutableArg = const_cast<NVariableDeclaration&>(*arg);
-          mutableArg.type = std::make_unique<NIdentifier>(TypeNames::TYPEVAR);
+          mutableArg.type = makeTypeSpec(TypeNames::TYPEVAR);
           localTypes[arg->id->name] = TypeNames::TYPEVAR;
           paramTypes.emplace_back(TypeNames::TYPEVAR);
         } else {
-          localTypes[arg->id->name] = arg->type->name;
-          paramTypes.emplace_back(arg->type->name);
+          localTypes[arg->id->name] = arg->type->getTypeName();
+          paramTypes.emplace_back(arg->type->getTypeName());
         }
       }
 
@@ -532,8 +563,7 @@ void TypeChecker::typeCheckLetBindings(
         if (found) {
           // Mutability is now encoded in the type (e.g., "mut i64")
           mutableFunc.captures.emplace_back(
-              std::make_unique<NIdentifier>(varType),
-              std::make_unique<NIdentifier>(varName));
+              makeTypeSpec(varType), std::make_unique<NIdentifier>(varName));
 
           localTypes[varName] = varType;
         }
@@ -546,15 +576,15 @@ void TypeChecker::typeCheckLetBindings(
         if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR) {
           // Resolve generic types to defaults for function return type
           std::string resolvedBodyType = resolveGenericToDefault(bodyType);
-          mutableFunc.type = std::make_unique<NIdentifier>(resolvedBodyType);
+          mutableFunc.type = makeTypeSpec(resolvedBodyType);
         } else {
-          mutableFunc.type = std::make_unique<NIdentifier>(TypeNames::TYPEVAR);
+          mutableFunc.type = makeTypeSpec(TypeNames::TYPEVAR);
         }
       } else if (bodyType != TypeNames::UNKNOWN &&
                  bodyType != TypeNames::TYPEVAR &&
-                 !areTypesCompatible(bodyType, func->type->name)) {
+                 !areTypesCompatible(bodyType, func->type->getTypeName())) {
         reportError("Function '" + func->id->name + "' declared to return " +
-                    func->type->name + " but body has type " +
+                    func->type->getTypeName() + " but body has type " +
                     resolveGenericToDefault(bodyType));
       }
 
@@ -572,7 +602,7 @@ void TypeChecker::typeCheckLetBindings(
                       "' must have type annotation or initializer");
           bindingTypes.emplace_back(TypeNames::UNKNOWN);
         } else {
-          std::string varType = var->type->name;
+          std::string varType = var->type->getTypeName();
           if (isMutable && !isMutableRefType(varType)) {
             varType = makeMutableRefType(varType);
           }
@@ -586,7 +616,7 @@ void TypeChecker::typeCheckLetBindings(
 
       if (exprType == TypeNames::UNKNOWN) {
         if (var->type != nullptr) {
-          std::string varType = var->type->name;
+          std::string varType = var->type->getTypeName();
           if (isMutable && !isMutableRefType(varType)) {
             varType = makeMutableRefType(varType);
           }
@@ -600,7 +630,7 @@ void TypeChecker::typeCheckLetBindings(
       if (var->type == nullptr) {
         // Resolve generic types to defaults for inferred declarations
         std::string resolvedType = resolveGenericToDefault(exprType);
-        mutableVar.type = std::make_unique<NIdentifier>(resolvedType);
+        mutableVar.type = makeTypeSpec(resolvedType);
         std::string varType = resolvedType;
         if (isMutable) {
           varType = makeMutableRefType(varType);
@@ -608,16 +638,16 @@ void TypeChecker::typeCheckLetBindings(
         bindingTypes.push_back(varType);
       } else {
         // Extract base type from type annotation (strip mut prefix if present)
-        std::string declaredType = var->type->name;
+        std::string declaredType = var->type->getTypeName();
         if (isMutableRefType(declaredType)) {
           declaredType = getReferentType(declaredType);
         }
         if (!areTypesCompatible(exprType, declaredType)) {
           reportError("Variable '" + var->id->name + "' declared as " +
-                      var->type->name + " but initialized with " +
+                      var->type->getTypeName() + " but initialized with " +
                       resolveGenericToDefault(exprType));
         }
-        std::string varType = var->type->name;
+        std::string varType = var->type->getTypeName();
         // Only apply makeMutableRefType if type doesn't already have mut prefix
         if (isMutable && !isMutableRefType(varType)) {
           varType = makeMutableRefType(varType);
@@ -638,8 +668,9 @@ void TypeChecker::addLetBindingsToScope(
     if (binding->isFunction) {
       const auto& func = binding->func;
       functionParamTypes[func->id->name] = funcParams[funcIdx++];
-      functionReturnTypes[func->id->name] =
-          func->type != nullptr ? func->type->name : TypeNames::TYPEVAR;
+      functionReturnTypes[func->id->name] = func->type != nullptr
+                                                ? func->type->getTypeName()
+                                                : TypeNames::TYPEVAR;
     } else {
       localTypes[binding->var->id->name] = bindingTypes[i];
     }
@@ -685,7 +716,7 @@ void TypeChecker::typeCheckVarDeclNoInit(NVariableDeclaration& node,
     return;
   }
   const bool isMutable = isVarDeclMutable(node);
-  std::string baseType = node.type->name;
+  std::string baseType = node.type->getTypeName();
   std::string varType = baseType;
   if (isMutable && !isMutableRefType(varType)) {
     varType = makeMutableRefType(baseType);
@@ -747,7 +778,7 @@ void TypeChecker::typeCheckVarDeclInferType(NVariableDeclaration& node,
   }
 
   // Always set node.type so MLIR has valid types
-  node.type = std::make_unique<NIdentifier>(nodeType);
+  node.type = makeTypeSpec(nodeType);
   localTypes[varName] = varType;
   inferredType = isReferenceType(resolvedType) ? getReferentType(resolvedType)
                                                : resolvedType;
@@ -756,7 +787,7 @@ void TypeChecker::typeCheckVarDeclInferType(NVariableDeclaration& node,
 void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
                                                  const std::string& varName,
                                                  const std::string& exprType) {
-  const std::string declType = node.type->name;
+  const std::string declType = node.type->getTypeName();
 
   std::string expectedType = declType;
   std::string actualType = exprType;
@@ -818,7 +849,7 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
 
   if (exprType == TypeNames::UNKNOWN) {
     if (node.type != nullptr) {
-      std::string baseType = node.type->name;
+      std::string baseType = node.type->getTypeName();
       std::string varType = baseType;
       if (isMutable && !isMutableRefType(varType)) {
         varType = makeMutableRefType(baseType);
@@ -845,7 +876,7 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
       baseExprType = getReferentType(exprType);
     }
     std::string defaultType = resolveGenericToDefault(baseExprType);
-    std::string nodeTypeName = node.type->name;
+    std::string nodeTypeName = node.type->getTypeName();
     if (isReferenceType(nodeTypeName)) {
       nodeTypeName = getReferentType(nodeTypeName);
     }
@@ -877,12 +908,12 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
     paramNames.insert(arg->id->name);
     if (arg->type == nullptr) {
       auto& mutableArg = const_cast<NVariableDeclaration&>(*arg);
-      mutableArg.type = std::make_unique<NIdentifier>(TypeNames::TYPEVAR);
+      mutableArg.type = makeTypeSpec(TypeNames::TYPEVAR);
       localTypes[arg->id->name] = TypeNames::TYPEVAR;
       paramTypes.emplace_back(TypeNames::TYPEVAR);
     } else {
-      localTypes[arg->id->name] = arg->type->name;
-      paramTypes.emplace_back(arg->type->name);
+      localTypes[arg->id->name] = arg->type->getTypeName();
+      paramTypes.emplace_back(arg->type->getTypeName());
     }
   }
 
@@ -894,9 +925,8 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
     const auto typeIt = savedLocals.find(varName);
     if (typeIt != savedLocals.end()) {
       // Mutability is now encoded in the type (e.g., "mut i64")
-      mutableNode.captures.emplace_back(
-          std::make_unique<NIdentifier>(typeIt->second),
-          std::make_unique<NIdentifier>(varName));
+      mutableNode.captures.emplace_back(makeTypeSpec(typeIt->second),
+                                        std::make_unique<NIdentifier>(varName));
 
       localTypes[varName] = typeIt->second;
     }
@@ -911,14 +941,14 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
     if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR) {
       // Resolve generic types to defaults for function return type
       std::string resolvedBodyType = resolveGenericToDefault(bodyType);
-      mutableNode.type = std::make_unique<NIdentifier>(resolvedBodyType);
+      mutableNode.type = makeTypeSpec(resolvedBodyType);
       functionReturnTypes[funcName] = resolvedBodyType;
     } else {
-      mutableNode.type = std::make_unique<NIdentifier>(TypeNames::TYPEVAR);
+      mutableNode.type = makeTypeSpec(TypeNames::TYPEVAR);
       functionReturnTypes[funcName] = TypeNames::TYPEVAR;
     }
   } else {
-    const std::string declReturnType = node.type->name;
+    const std::string declReturnType = node.type->getTypeName();
 
     if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR &&
         !areTypesCompatible(bodyType, declReturnType)) {
@@ -932,7 +962,7 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   }
 
   localTypes = savedLocals;
-  inferredType = node.type != nullptr ? node.type->name : bodyType;
+  inferredType = node.type != nullptr ? node.type->getTypeName() : bodyType;
 }
 
 void TypeChecker::visit(const NModuleDeclaration& node) {
@@ -1133,7 +1163,7 @@ void TypeChecker::resolveGenericVariable(const std::string& varName,
       // Immutable ref variable: node.type includes the ref wrapper
       nodeType = newLocalType;
     }
-    nodeIt->second->type = std::make_unique<NIdentifier>(nodeType);
+    nodeIt->second->type = makeTypeSpec(nodeType);
   }
 
   // Remove from unresolvedGenerics

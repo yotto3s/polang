@@ -21,6 +21,7 @@ class NBlock;
 class NExpression;
 class NStatement;
 class NIdentifier;
+class NTypeSpec;
 class NQualifiedName;
 class NVariableDeclaration;
 class NFunctionDeclaration;
@@ -95,7 +96,8 @@ yy::parser::symbol_type yylex();
 %token TAS "as"
 
 // Nonterminal types with smart pointers
-%type <std::unique_ptr<NIdentifier>> ident type_spec
+%type <std::unique_ptr<NIdentifier>> ident
+%type <std::unique_ptr<NTypeSpec>> type_spec
 %type <std::unique_ptr<NExpression>> numeric expr boolean
 %type <std::unique_ptr<NBlock>> program stmts
 %type <std::unique_ptr<NStatement>> stmt var_decl func_decl module_decl import_stmt
@@ -296,12 +298,14 @@ import_items : ident {
 ident : TIDENTIFIER { $$ = std::make_unique<NIdentifier>($1); }
       ;
 
-type_spec : ident { $$ = std::move($1); }
-          | TREF ident {
-              $$ = std::make_unique<NIdentifier>("ref " + $2->name);
+type_spec : ident {
+              $$ = std::make_unique<NNamedType>($1->name);
             }
-          | TMUT ident {
-              $$ = std::make_unique<NIdentifier>("mut " + $2->name);
+          | TREF type_spec {
+              $$ = std::make_unique<NRefType>(std::move($2));
+            }
+          | TMUT type_spec {
+              $$ = std::make_unique<NMutRefType>(std::move($2));
             }
           ;
 
@@ -367,7 +371,7 @@ expr : ident TLARROW expr { $$ = std::make_unique<NAssignment>(std::move($1), st
      | expr TDIV expr {
          $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TDIV, std::move($3));
        }
-     | expr TAS ident {
+     | expr TAS type_spec {
          $$ = std::make_unique<NCastExpression>(std::move($1), std::move($3));
        }
      | TLPAREN expr TRPAREN { $$ = std::move($2); }

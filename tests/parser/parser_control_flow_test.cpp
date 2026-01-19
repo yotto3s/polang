@@ -149,7 +149,7 @@ TEST(ParserTest, LetExpressionWithTypeAnnotation) {
   ASSERT_FALSE(letExpr->bindings[0]->isFunction);
   EXPECT_EQ(letExpr->bindings[0]->var->id->name, "x");
   ASSERT_NE(letExpr->bindings[0]->var->type, nullptr);
-  EXPECT_EQ(letExpr->bindings[0]->var->type->name, "int");
+  EXPECT_EQ(letExpr->bindings[0]->var->type->getTypeName(), "int");
 }
 
 TEST(ParserTest, LetExpressionMixedTypeAnnotations) {
@@ -164,13 +164,13 @@ TEST(ParserTest, LetExpressionMixedTypeAnnotations) {
 
   ASSERT_FALSE(letExpr->bindings[0]->isFunction);
   ASSERT_NE(letExpr->bindings[0]->var->type, nullptr);
-  EXPECT_EQ(letExpr->bindings[0]->var->type->name, "int");
+  EXPECT_EQ(letExpr->bindings[0]->var->type->getTypeName(), "int");
   ASSERT_FALSE(letExpr->bindings[1]->isFunction);
   EXPECT_EQ(letExpr->bindings[1]->var->type,
             nullptr); // type inferred, not yet set
   ASSERT_FALSE(letExpr->bindings[2]->isFunction);
   ASSERT_NE(letExpr->bindings[2]->var->type, nullptr);
-  EXPECT_EQ(letExpr->bindings[2]->var->type->name, "double");
+  EXPECT_EQ(letExpr->bindings[2]->var->type->getTypeName(), "double");
 }
 
 TEST(ParserTest, NestedLetExpression) {
@@ -240,7 +240,7 @@ TEST(ParserTest, LetExpressionMutableWithTypeAnnotation) {
   ASSERT_FALSE(letExpr->bindings[0]->isFunction);
   EXPECT_EQ(letExpr->bindings[0]->var->id->name, "counter");
   ASSERT_NE(letExpr->bindings[0]->var->type, nullptr);
-  EXPECT_EQ(letExpr->bindings[0]->var->type->name, "int");
+  EXPECT_EQ(letExpr->bindings[0]->var->type->getTypeName(), "int");
   // Mutability is indicated by NMutRefExpression wrapping the value
   auto* mutRefExpr = dynamic_cast<NMutRefExpression*>(letExpr->bindings[0]->var->assignmentExpr.get());
   ASSERT_NE(mutRefExpr, nullptr);
@@ -340,7 +340,7 @@ TEST(ParserTest, LetExpressionWithFunction) {
   ASSERT_NE(func, nullptr);
   EXPECT_EQ(func->id->name, "f");
   ASSERT_NE(func->type, nullptr);
-  EXPECT_EQ(func->type->name, "int");
+  EXPECT_EQ(func->type->getTypeName(), "int");
   ASSERT_EQ(func->arguments.size(), 1);
   EXPECT_EQ(func->arguments[0]->id->name, "x");
 

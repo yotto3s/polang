@@ -6,6 +6,9 @@ class NInteger;
 class NDouble;
 class NBoolean;
 class NIdentifier;
+class NNamedType;
+class NRefType;
+class NMutRefType;
 class NQualifiedName;
 class NMethodCall;
 class NBinaryOperator;
@@ -70,6 +73,13 @@ class NImportStatement;
 class Visitor {
 public:
   virtual ~Visitor() noexcept = default;
+
+  /// @name Type Specification Visitors
+  /// @{
+  virtual void visit(const NNamedType& node) = 0;
+  virtual void visit(const NRefType& node) = 0;
+  virtual void visit(const NMutRefType& node) = 0;
+  /// @}
 
   /// @name Expression Visitors
   /// @{
