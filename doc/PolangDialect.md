@@ -242,23 +242,7 @@ Allocates stack memory for a mutable variable.
 %0 = polang.alloca "x", mutable : !polang.integer<64, signed> -> memref<!polang.integer<64, signed>>
 ```
 
-**Note:** Immutable variables (`let`) are optimized to use SSA values directly without allocation.
-
-#### `polang.load`
-
-Loads a value from a memory location.
-
-```mlir
-%0 = polang.load %ref : memref<i64> -> !polang.integer<64, signed>
-```
-
-#### `polang.store`
-
-Stores a value to a memory location. The verifier ensures the target is mutable.
-
-```mlir
-polang.store %value, %ref : !polang.integer<64, signed>, memref<i64>
-```
+**Note:** Immutable variables are optimized to use SSA values directly without allocation.
 
 ### Reference Operations
 

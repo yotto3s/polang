@@ -94,7 +94,9 @@ TEST(ASTPrinterTest, PrintMutableVariable) {
   ASTPrinter printer(out);
   printer.print(*block);
 
-  EXPECT_NE(out.str().find("NVariableDeclaration 'y' mut"), std::string::npos);
+  // Mutability is indicated by NMutRefExpression, not a "mut" flag in output
+  EXPECT_NE(out.str().find("NVariableDeclaration 'y'"), std::string::npos);
+  EXPECT_NE(out.str().find("NMutRefExpression"), std::string::npos);
 }
 
 TEST(ASTPrinterTest, PrintTypedVariable) {

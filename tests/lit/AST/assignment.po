@@ -2,7 +2,7 @@
 
 ; Test assignment expression
 ; CHECK:      NBlock
-; CHECK-NEXT: |-NVariableDeclaration 'x' mut
+; CHECK-NEXT: |-NVariableDeclaration 'x'
 ; CHECK-NEXT: | `-NMutRefExpression
 ; CHECK-NEXT: |   `-NInteger 10
 ; CHECK-NEXT: `-NExpressionStatement

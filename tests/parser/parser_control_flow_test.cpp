@@ -202,7 +202,9 @@ TEST(ParserTest, LetExpressionMutableBinding) {
   ASSERT_EQ(letExpr->bindings.size(), 1);
   ASSERT_FALSE(letExpr->bindings[0]->isFunction);
   EXPECT_EQ(letExpr->bindings[0]->var->id->name, "x");
-  EXPECT_TRUE(letExpr->bindings[0]->var->isMutable);
+  // Mutability is indicated by NMutRefExpression wrapping the value
+  auto* mutRefExpr = dynamic_cast<NMutRefExpression*>(letExpr->bindings[0]->var->assignmentExpr.get());
+  ASSERT_NE(mutRefExpr, nullptr);
 }
 
 TEST(ParserTest, LetExpressionMixedMutability) {
@@ -216,11 +218,15 @@ TEST(ParserTest, LetExpressionMixedMutability) {
 
   ASSERT_FALSE(letExpr->bindings[0]->isFunction);
   EXPECT_EQ(letExpr->bindings[0]->var->id->name, "x");
-  EXPECT_FALSE(letExpr->bindings[0]->var->isMutable);
+  // First binding is immutable (no NMutRefExpression)
+  auto* mutRefExpr0 = dynamic_cast<NMutRefExpression*>(letExpr->bindings[0]->var->assignmentExpr.get());
+  EXPECT_EQ(mutRefExpr0, nullptr);
 
   ASSERT_FALSE(letExpr->bindings[1]->isFunction);
   EXPECT_EQ(letExpr->bindings[1]->var->id->name, "y");
-  EXPECT_TRUE(letExpr->bindings[1]->var->isMutable);
+  // Second binding is mutable (has NMutRefExpression)
+  auto* mutRefExpr1 = dynamic_cast<NMutRefExpression*>(letExpr->bindings[1]->var->assignmentExpr.get());
+  ASSERT_NE(mutRefExpr1, nullptr);
 }
 
 TEST(ParserTest, LetExpressionMutableWithTypeAnnotation) {
@@ -233,9 +239,11 @@ TEST(ParserTest, LetExpressionMutableWithTypeAnnotation) {
   ASSERT_EQ(letExpr->bindings.size(), 1);
   ASSERT_FALSE(letExpr->bindings[0]->isFunction);
   EXPECT_EQ(letExpr->bindings[0]->var->id->name, "counter");
-  EXPECT_TRUE(letExpr->bindings[0]->var->isMutable);
   ASSERT_NE(letExpr->bindings[0]->var->type, nullptr);
   EXPECT_EQ(letExpr->bindings[0]->var->type->name, "int");
+  // Mutability is indicated by NMutRefExpression wrapping the value
+  auto* mutRefExpr = dynamic_cast<NMutRefExpression*>(letExpr->bindings[0]->var->assignmentExpr.get());
+  ASSERT_NE(mutRefExpr, nullptr);
 }
 
 TEST(ParserTest, LetExpressionInVariableDeclaration) {

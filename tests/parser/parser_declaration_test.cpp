@@ -58,9 +58,8 @@ TEST(ParserTest, MutableVariableDeclaration) {
   auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
   ASSERT_NE(varDecl, nullptr);
   EXPECT_EQ(varDecl->id->name, "x");
-  EXPECT_TRUE(varDecl->isMutable);
 
-  // The expression is wrapped in NMutRefExpression by the parser
+  // Mutability is indicated by NMutRefExpression wrapping the value
   auto* mutRefExpr = dynamic_cast<NMutRefExpression*>(varDecl->assignmentExpr.get());
   ASSERT_NE(mutRefExpr, nullptr);
   auto* intExpr = dynamic_cast<NInteger*>(mutRefExpr->expr.get());
@@ -76,9 +75,11 @@ TEST(ParserTest, MutableTypedVariableDeclaration) {
   auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
   ASSERT_NE(varDecl, nullptr);
   EXPECT_EQ(varDecl->id->name, "counter");
-  EXPECT_TRUE(varDecl->isMutable);
   ASSERT_NE(varDecl->type, nullptr);
   EXPECT_EQ(varDecl->type->name, "int");
+  // Mutability is indicated by NMutRefExpression wrapping the value
+  auto* mutRefExpr = dynamic_cast<NMutRefExpression*>(varDecl->assignmentExpr.get());
+  ASSERT_NE(mutRefExpr, nullptr);
 }
 
 TEST(ParserTest, ImmutableVariableDeclaration) {
@@ -87,7 +88,9 @@ TEST(ParserTest, ImmutableVariableDeclaration) {
 
   auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
   ASSERT_NE(varDecl, nullptr);
-  EXPECT_FALSE(varDecl->isMutable);
+  // Immutable declarations do NOT use NMutRefExpression
+  auto* mutRefExpr = dynamic_cast<NMutRefExpression*>(varDecl->assignmentExpr.get());
+  EXPECT_EQ(mutRefExpr, nullptr);
 }
 
 // ============== Function Declaration Tests ==============

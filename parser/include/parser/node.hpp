@@ -72,13 +72,12 @@ public:
 };
 
 // Capture entry for closures (owns its type and id via unique_ptr)
+// Mutability is derived from the type annotation (e.g., "mut i64" prefix)
 struct CaptureEntry {
   std::unique_ptr<NIdentifier> type;
   std::unique_ptr<NIdentifier> id;
-  bool isMutable;
-  CaptureEntry(std::unique_ptr<NIdentifier> type, std::unique_ptr<NIdentifier> id,
-               bool isMutable)
-      : type(std::move(type)), id(std::move(id)), isMutable(isMutable) {}
+  CaptureEntry(std::unique_ptr<NIdentifier> type, std::unique_ptr<NIdentifier> id)
+      : type(std::move(type)), id(std::move(id)) {}
 };
 
 // Qualified name for module access: Math.add, Math.Internal.helper
@@ -236,20 +235,18 @@ public:
   std::unique_ptr<NIdentifier> type;  // nullptr when type should be inferred
   std::unique_ptr<NIdentifier> id;
   std::unique_ptr<NExpression> assignmentExpr;
-  bool isMutable;  // true for 'let x = mut ...', false for 'let'
+  // Mutability is derived from type annotation (e.g., "mut i64" prefix)
+  // or from NMutRefExpression in assignmentExpr
   // Constructor for inferred type (no annotation)
   NVariableDeclaration(std::unique_ptr<NIdentifier> id,
-                       std::unique_ptr<NExpression> assignmentExpr,
-                       bool isMutable = false)
-      : type(nullptr), id(std::move(id)), assignmentExpr(std::move(assignmentExpr)),
-        isMutable(isMutable) {}
+                       std::unique_ptr<NExpression> assignmentExpr)
+      : type(nullptr), id(std::move(id)), assignmentExpr(std::move(assignmentExpr)) {}
   // Constructor for explicit type annotation
   NVariableDeclaration(std::unique_ptr<NIdentifier> type,
                        std::unique_ptr<NIdentifier> id,
-                       std::unique_ptr<NExpression> assignmentExpr,
-                       bool isMutable = false)
+                       std::unique_ptr<NExpression> assignmentExpr)
       : type(std::move(type)), id(std::move(id)),
-        assignmentExpr(std::move(assignmentExpr)), isMutable(isMutable) {}
+        assignmentExpr(std::move(assignmentExpr)) {}
   void accept(Visitor &visitor) const override;
 };
 

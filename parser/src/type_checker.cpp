@@ -30,6 +30,26 @@ using polang::resolveAllGenericsToDefault;
 using polang::resolveGenericToDefault;
 using polang::TypeNames;
 
+namespace {
+/// Check if a variable declaration is mutable based on:
+/// 1. Type annotation has "mut " prefix, OR
+/// 2. Assignment expression is NMutRefExpression (for inferred types)
+[[nodiscard]] bool isVarDeclMutable(const NVariableDeclaration& decl) {
+  // Check type annotation first
+  if (decl.type != nullptr && isMutableRefType(decl.type->name)) {
+    return true;
+  }
+  // Check if assignment expression is NMutRefExpression
+  if (decl.assignmentExpr != nullptr) {
+    if (dynamic_cast<const NMutRefExpression*>(decl.assignmentExpr.get()) !=
+        nullptr) {
+      return true;
+    }
+  }
+  return false;
+}
+} // namespace
+
 /// FreeVariableCollector - A visitor that identifies free variables in an
 /// expression or block.
 class FreeVariableCollector : public Visitor {
@@ -442,9 +462,10 @@ void TypeChecker::collectSiblingVarTypes(
   for (const auto& binding : bindings) {
     if (!binding->isFunction) {
       const auto& var = binding->var;
+      const bool isMutable = isVarDeclMutable(*var);
       if (var->type != nullptr) {
         std::string varType = var->type->name;
-        if (var->isMutable && !isMutableRefType(varType)) {
+        if (isMutable && !isMutableRefType(varType)) {
           varType = makeMutableRefType(varType);
         }
         siblingTypes[var->id->name] = varType;
@@ -452,7 +473,7 @@ void TypeChecker::collectSiblingVarTypes(
         var->assignmentExpr->accept(*this);
         if (inferredType != TypeNames::UNKNOWN) {
           std::string varType = inferredType;
-          if (var->isMutable) {
+          if (isMutable) {
             varType = makeMutableRefType(varType);
           }
           siblingTypes[var->id->name] = varType;
@@ -498,23 +519,21 @@ void TypeChecker::typeCheckLetBindings(
       mutableFunc.captures.clear();
       for (const auto& varName : freeVars) {
         std::string varType;
-        bool isMutable = false;
         bool found = false;
 
         if (savedLocals.find(varName) != savedLocals.end()) {
           varType = savedLocals.at(varName);
-          isMutable = isMutableRefType(varType);
           found = true;
         } else if (siblingTypes.find(varName) != siblingTypes.end()) {
           varType = siblingTypes.at(varName);
-          isMutable = isMutableRefType(varType);
           found = true;
         }
 
         if (found) {
+          // Mutability is now encoded in the type (e.g., "mut i64")
           mutableFunc.captures.emplace_back(
               std::make_unique<NIdentifier>(varType),
-              std::make_unique<NIdentifier>(varName), isMutable);
+              std::make_unique<NIdentifier>(varName));
 
           localTypes[varName] = varType;
         }
@@ -545,6 +564,7 @@ void TypeChecker::typeCheckLetBindings(
     } else {
       const auto& var = binding->var;
       auto& mutableVar = const_cast<NVariableDeclaration&>(*var);
+      const bool isMutable = isVarDeclMutable(*var);
 
       if (var->assignmentExpr == nullptr) {
         if (var->type == nullptr) {
@@ -553,7 +573,7 @@ void TypeChecker::typeCheckLetBindings(
           bindingTypes.emplace_back(TypeNames::UNKNOWN);
         } else {
           std::string varType = var->type->name;
-          if (var->isMutable && !isMutableRefType(varType)) {
+          if (isMutable && !isMutableRefType(varType)) {
             varType = makeMutableRefType(varType);
           }
           bindingTypes.emplace_back(varType);
@@ -567,7 +587,7 @@ void TypeChecker::typeCheckLetBindings(
       if (exprType == TypeNames::UNKNOWN) {
         if (var->type != nullptr) {
           std::string varType = var->type->name;
-          if (var->isMutable && !isMutableRefType(varType)) {
+          if (isMutable && !isMutableRefType(varType)) {
             varType = makeMutableRefType(varType);
           }
           bindingTypes.emplace_back(varType);
@@ -582,7 +602,7 @@ void TypeChecker::typeCheckLetBindings(
         std::string resolvedType = resolveGenericToDefault(exprType);
         mutableVar.type = std::make_unique<NIdentifier>(resolvedType);
         std::string varType = resolvedType;
-        if (var->isMutable) {
+        if (isMutable) {
           varType = makeMutableRefType(varType);
         }
         bindingTypes.push_back(varType);
@@ -599,7 +619,7 @@ void TypeChecker::typeCheckLetBindings(
         }
         std::string varType = var->type->name;
         // Only apply makeMutableRefType if type doesn't already have mut prefix
-        if (var->isMutable && !isMutableRefType(varType)) {
+        if (isMutable && !isMutableRefType(varType)) {
           varType = makeMutableRefType(varType);
         }
         bindingTypes.push_back(varType);
@@ -664,9 +684,10 @@ void TypeChecker::typeCheckVarDeclNoInit(NVariableDeclaration& node,
     inferredType = TypeNames::UNKNOWN;
     return;
   }
+  const bool isMutable = isVarDeclMutable(node);
   std::string baseType = node.type->name;
   std::string varType = baseType;
-  if (node.isMutable && !isMutableRefType(varType)) {
+  if (isMutable && !isMutableRefType(varType)) {
     varType = makeMutableRefType(baseType);
   }
   localTypes[varName] = varType;
@@ -695,9 +716,11 @@ void TypeChecker::typeCheckVarDeclInferType(NVariableDeclaration& node,
     varDeclNodes[varName] = &node;
   }
 
+  const bool isMutable = isVarDeclMutable(node);
+
   std::string baseType = resolvedType;
   if (isReferenceType(resolvedType)) {
-    if (node.isMutable && !isMutableRefType(resolvedType)) {
+    if (isMutable && !isMutableRefType(resolvedType)) {
       baseType = getReferentType(resolvedType);
     }
   }
@@ -705,7 +728,7 @@ void TypeChecker::typeCheckVarDeclInferType(NVariableDeclaration& node,
   std::string varType;
   std::string nodeType =
       resolvedType; // The type to set on the AST node (base type)
-  if (node.isMutable) {
+  if (isMutable) {
     if (isMutableRefType(resolvedType)) {
       varType = resolvedType;
       nodeType = getReferentType(resolvedType);
@@ -767,8 +790,9 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
                 " (no implicit conversion)");
   }
 
+  const bool isMutable = isVarDeclMutable(node);
   std::string varType = declType;
-  if (node.isMutable && !isMutableRefType(declType)) {
+  if (isMutable && !isMutableRefType(declType)) {
     varType = makeMutableRefType(declType);
   }
 
@@ -782,6 +806,7 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
 void TypeChecker::visit(const NVariableDeclaration& node) {
   auto& mutableNode = const_cast<NVariableDeclaration&>(node);
   const std::string varName = mangledName(node.id->name);
+  const bool isMutable = isVarDeclMutable(node);
 
   if (node.assignmentExpr == nullptr) {
     typeCheckVarDeclNoInit(mutableNode, varName);
@@ -795,7 +820,7 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
     if (node.type != nullptr) {
       std::string baseType = node.type->name;
       std::string varType = baseType;
-      if (node.isMutable && !isMutableRefType(varType)) {
+      if (isMutable && !isMutableRefType(varType)) {
         varType = makeMutableRefType(baseType);
       }
       localTypes[varName] = varType;
@@ -868,10 +893,10 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   for (const auto& varName : freeVars) {
     const auto typeIt = savedLocals.find(varName);
     if (typeIt != savedLocals.end()) {
-      const bool isMutable = isMutableRefType(typeIt->second);
+      // Mutability is now encoded in the type (e.g., "mut i64")
       mutableNode.captures.emplace_back(
           std::make_unique<NIdentifier>(typeIt->second),
-          std::make_unique<NIdentifier>(varName), isMutable);
+          std::make_unique<NIdentifier>(varName));
 
       localTypes[varName] = typeIt->second;
     }

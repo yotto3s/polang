@@ -4,7 +4,7 @@
 ; CHECK:      NBlock
 ; CHECK-NEXT: `-NExpressionStatement
 ; CHECK-NEXT:   `-NLetExpression
-; CHECK-NEXT:     |-NVariableDeclaration 'x' mut
+; CHECK-NEXT:     |-NVariableDeclaration 'x'
 ; CHECK-NEXT:     | `-NMutRefExpression
 ; CHECK-NEXT:     |   `-NInteger 5
 ; CHECK-NEXT:     `-body:

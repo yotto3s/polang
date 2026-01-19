@@ -44,6 +44,24 @@ using namespace polang;
 
 namespace {
 
+/// Check if a variable declaration is mutable based on:
+/// 1. Type annotation has "mut " prefix, OR
+/// 2. Assignment expression is NMutRefExpression (for inferred types)
+[[nodiscard]] bool isVarDeclMutable(const NVariableDeclaration& decl) {
+  // Check type annotation first
+  if (decl.type != nullptr && isMutableRefType(decl.type->name)) {
+    return true;
+  }
+  // Check if assignment expression is NMutRefExpression
+  if (decl.assignmentExpr != nullptr) {
+    if (dynamic_cast<const NMutRefExpression*>(decl.assignmentExpr.get()) !=
+        nullptr) {
+      return true;
+    }
+  }
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // MLIRGenVisitor - Generates MLIR from Polang AST
 //===----------------------------------------------------------------------===//
@@ -506,6 +524,8 @@ public:
   void visit(const NVariableDeclaration& node) override {
     // Get mangled variable name (includes module path)
     const std::string varName = mangledName(node.id->name);
+    // Derive mutability from type annotation or NMutRefExpression
+    const bool isMutable = isVarDeclMutable(node);
 
     // Determine the type - prefer type annotation from type checker
     std::string typeName =
@@ -523,7 +543,7 @@ public:
       }
     }
 
-    if (node.isMutable) {
+    if (isMutable) {
       // Get the base type (strip mut prefix if present for type storage)
       std::string baseTypeName = typeName;
       if (isMutableRefType(baseTypeName)) {
@@ -562,7 +582,7 @@ public:
         Type llvmType = convertPolangType(polangType);
         auto memRefType = MemRefType::get({}, llvmType);
         auto alloca = builder.create<AllocaOp>(loc(), memRefType, varName,
-                                               polangType, node.isMutable);
+                                               polangType, isMutable);
         mutableRefTable[varName] = alloca;
       }
 
@@ -586,7 +606,7 @@ public:
     // For mutable declarations, clear result since the type (mut T) doesn't
     // match what most callers expect (T). For immutable declarations, keep the
     // value.
-    if (node.isMutable) {
+    if (isMutable) {
       result = nullptr;
     } else {
       // For immutable reference types, dereference to match type checker
