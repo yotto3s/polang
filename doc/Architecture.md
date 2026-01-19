@@ -14,6 +14,7 @@ polang/
 ├── doc/                        # Documentation
 │   ├── Syntax.md               # Language syntax reference
 │   ├── TypeSystem.md           # Type system documentation
+│   ├── PolangDialect.md        # MLIR dialect operations and types
 │   ├── Architecture.md         # This file
 │   ├── Building.md             # Build instructions
 │   ├── Development.md          # Development guidelines
@@ -198,7 +199,9 @@ Source Code (.po)
 
 ## Polang MLIR Dialect
 
-The Polang dialect is a custom MLIR dialect that closely mirrors the language semantics. This provides:
+The Polang dialect is a custom MLIR dialect that closely mirrors the language semantics. For detailed documentation of all operations, types, and passes, see [PolangDialect.md](PolangDialect.md).
+
+This provides:
 
 - **Extensibility**: Easy to add new language features
 - **Optimization opportunities**: Custom passes can operate on high-level operations
@@ -650,7 +653,8 @@ mlir/
 
 ## Related Documentation
 
-- `doc/Syntax.md` - Language syntax reference
-- `doc/TypeSystem.md` - Type system and inference
-- `doc/Building.md` - Build instructions
-- `doc/Testing.md` - Test infrastructure and CI/CD
+- [Syntax.md](Syntax.md) - Language syntax reference
+- [TypeSystem.md](TypeSystem.md) - Type system and inference
+- [PolangDialect.md](PolangDialect.md) - MLIR dialect operations and types
+- [Building.md](Building.md) - Build instructions
+- [Testing.md](Testing.md) - Test infrastructure and CI/CD

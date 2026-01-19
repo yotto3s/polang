@@ -402,10 +402,12 @@ The parser's type checker (`parser/src/type_checker.cpp`) focuses on **error det
 
 | Responsibility | Description |
 |----------------|-------------|
-| Error detection | Undefined variables, immutable reassignment, arity mismatch |
+| Error detection | Undefined variables, arity mismatch |
 | Type validation | Validates explicit type annotations match usage |
 | Capture analysis | Identifies free variables for closures via `FreeVariableCollector` |
 | Type variable setup | Marks untyped parameters as `typevar` for MLIR inference |
+
+**Note:** Mutability validation (preventing assignment to immutable variables) is handled by the MLIR verifier in `polang.store` and `polang.ref.store` operations.
 
 **Example:**
 
