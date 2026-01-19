@@ -823,8 +823,6 @@ private:
   }
 
   // Symbol tables
-  std::map<std::string, Value>
-      symbolTable; // Mutable variable allocas (old style)
   std::map<std::string, Value> mutableRefTable; // Mutable reference values
   std::map<std::string, Value> argValues;       // Function arguments
   std::map<std::string, Value> immutableValues; // Immutable variable SSA values
@@ -844,14 +842,12 @@ private:
   class SymbolTableScope {
   public:
     SymbolTableScope(MLIRGenVisitor& visitor, bool clearAllTables = false)
-        : visitor(visitor), savedSymbolTable(visitor.symbolTable),
-          savedMutableRefTable(visitor.mutableRefTable),
+        : visitor(visitor), savedMutableRefTable(visitor.mutableRefTable),
           savedTypeTable(visitor.typeTable),
           savedTypeVarTable(visitor.typeVarTable),
           savedArgValues(visitor.argValues),
           savedImmutableValues(visitor.immutableValues) {
       if (clearAllTables) {
-        visitor.symbolTable.clear();
         visitor.mutableRefTable.clear();
         visitor.typeTable.clear();
         visitor.typeVarTable.clear();
@@ -863,7 +859,6 @@ private:
     // NOLINTNEXTLINE(modernize-use-equals-default) - destructor restores saved
     // state
     ~SymbolTableScope() {
-      visitor.symbolTable = savedSymbolTable;
       visitor.mutableRefTable = savedMutableRefTable;
       visitor.typeTable = savedTypeTable;
       visitor.typeVarTable = savedTypeVarTable;
@@ -873,7 +868,6 @@ private:
 
   private:
     MLIRGenVisitor& visitor;
-    std::map<std::string, Value> savedSymbolTable;
     std::map<std::string, Value> savedMutableRefTable;
     std::map<std::string, std::string> savedTypeTable;
     std::map<std::string, Type> savedTypeVarTable;
@@ -886,18 +880,10 @@ private:
   /// Look up a mutable reference by name.
   /// Returns the reference value itself (not dereferenced).
   std::optional<Value> lookupMutableRef(const std::string& name) {
-    // Check mutable reference table
     auto refIt = mutableRefTable.find(name);
     if (refIt != mutableRefTable.end()) {
       return refIt->second;
     }
-
-    // Check old-style allocas (for backward compatibility)
-    auto it = symbolTable.find(name);
-    if (it != symbolTable.end()) {
-      return it->second;
-    }
-
     return std::nullopt;
   }
 
@@ -916,12 +902,6 @@ private:
     auto refIt = mutableRefTable.find(name);
     if (refIt != mutableRefTable.end()) {
       return refIt->second;
-    }
-
-    // Check old-style mutable variables (allocas, need load)
-    auto it = symbolTable.find(name);
-    if (it != symbolTable.end()) {
-      return builder.create<LoadOp>(loc(), getTypeForName(name), it->second);
     }
 
     // Check function arguments

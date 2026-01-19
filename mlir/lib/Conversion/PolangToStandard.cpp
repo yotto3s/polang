@@ -606,29 +606,6 @@ struct AllocaOpLowering : public OpConversionPattern<AllocaOp> {
   }
 };
 
-struct LoadOpLowering : public OpConversionPattern<LoadOp> {
-  using OpConversionPattern<LoadOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(LoadOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter& rewriter) const override {
-    rewriter.replaceOpWithNewOp<memref::LoadOp>(op, adaptor.getRef());
-    return success();
-  }
-};
-
-struct StoreOpLowering : public OpConversionPattern<StoreOp> {
-  using OpConversionPattern<StoreOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(StoreOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter& rewriter) const override {
-    rewriter.replaceOpWithNewOp<memref::StoreOp>(op, adaptor.getValue(),
-                                                 adaptor.getRef());
-    return success();
-  }
-};
-
 //===----------------------------------------------------------------------===//
 // Reference Operations Lowering
 //===----------------------------------------------------------------------===//
@@ -785,10 +762,9 @@ struct PolangToStandardPass
                  ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
                  MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
                  FuncOpLowering, CallOpLowering, ReturnOpLowering, IfOpLowering,
-                 YieldOpLowering, AllocaOpLowering, LoadOpLowering,
-                 StoreOpLowering, RefCreateOpLowering, RefDerefOpLowering,
-                 RefStoreOpLowering, PrintOpLowering>(typeConverter,
-                                                      &getContext());
+                 YieldOpLowering, AllocaOpLowering, RefCreateOpLowering,
+                 RefDerefOpLowering, RefStoreOpLowering, PrintOpLowering>(
+        typeConverter, &getContext());
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {

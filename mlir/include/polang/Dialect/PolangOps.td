@@ -509,41 +509,6 @@ def Polang_AllocaOp : Polang_Op<"alloca"> {
   let assemblyFormat = "$name (`,` `mutable` $isMutable^)? `:` $elementType `->` type($result) attr-dict";
 }
 
-def Polang_LoadOp : Polang_Op<"load", [Pure]> {
-  let summary = "Load value from memory";
-  let description = [{
-    Loads a value from a memory location.
-
-    Example:
-    ```mlir
-    %0 = polang.load %ref : memref<i64> -> !polang.integer<64, signed>
-    ```
-  }];
-
-  let arguments = (ins AnyType:$ref);
-  let results = (outs Polang_AnyTypeOrVar:$result);
-
-  let assemblyFormat = "$ref `:` type($ref) `->` type($result) attr-dict";
-}
-
-def Polang_StoreOp : Polang_Op<"store"> {
-  let summary = "Store value to memory";
-  let description = [{
-    Stores a value to a memory location.
-
-    Example:
-    ```mlir
-    polang.store %value, %ref : !polang.integer<64, signed>, memref<i64>
-    ```
-  }];
-
-  let arguments = (ins Polang_AnyTypeOrVar:$value, AnyType:$ref);
-
-  let assemblyFormat = "$value `,` $ref `:` type($value) `,` type($ref) attr-dict";
-
-  let hasVerifier = 1;
-}
-
 //===----------------------------------------------------------------------===//
 // Reference operations
 //===----------------------------------------------------------------------===//

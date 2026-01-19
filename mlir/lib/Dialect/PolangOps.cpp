@@ -203,21 +203,6 @@ LogicalResult ReturnOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// StoreOp verifier
-//===----------------------------------------------------------------------===//
-
-LogicalResult StoreOp::verify() {
-  // Check if the reference comes from an alloca
-  if (auto allocaOp = getRef().getDefiningOp<AllocaOp>()) {
-    if (!allocaOp.getIsMutable()) {
-      return emitOpError("cannot store to immutable variable '")
-             << allocaOp.getName() << "'";
-    }
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // CallOp verifier and SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
