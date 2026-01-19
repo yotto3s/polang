@@ -50,16 +50,17 @@ namespace {
 }
 
 /// Helper to create an appropriate NTypeSpec from a type name string
-[[nodiscard]] std::unique_ptr<NTypeSpec>
+[[nodiscard]] std::shared_ptr<const NTypeSpec>
 makeTypeSpec(const std::string& typeName) {
   if (isMutableRefType(typeName)) {
-    return std::make_unique<NMutRefType>(
+    return std::make_shared<const NMutRefType>(
         makeTypeSpec(getReferentType(typeName)));
   }
   if (isImmutableRefType(typeName)) {
-    return std::make_unique<NRefType>(makeTypeSpec(getReferentType(typeName)));
+    return std::make_shared<const NRefType>(
+        makeTypeSpec(getReferentType(typeName)));
   }
-  return std::make_unique<NNamedType>(typeName);
+  return std::make_shared<const NNamedType>(typeName);
 }
 } // namespace
 

@@ -79,9 +79,6 @@ class NTypeSpec : public Node {
 public:
   // Get the string representation of this type (for backwards compatibility)
   [[nodiscard]] virtual std::string getTypeName() const = 0;
-
-  // Clone this type spec (needed for storage in maps)
-  [[nodiscard]] virtual std::unique_ptr<NTypeSpec> clone() const = 0;
 };
 
 // Named type (base types like i64, f64, bool, typevar)
@@ -90,22 +87,16 @@ public:
   std::string name;
   explicit NNamedType(std::string name) : name(std::move(name)) {}
   [[nodiscard]] std::string getTypeName() const override { return name; }
-  [[nodiscard]] std::unique_ptr<NTypeSpec> clone() const override {
-    return std::make_unique<NNamedType>(name);
-  }
   void accept(Visitor &visitor) const override;
 };
 
 // Reference type: ref T
 class NRefType : public NTypeSpec {
 public:
-  std::unique_ptr<NTypeSpec> innerType;
-  explicit NRefType(std::unique_ptr<NTypeSpec> inner) : innerType(std::move(inner)) {}
+  std::shared_ptr<const NTypeSpec> innerType;
+  explicit NRefType(std::shared_ptr<const NTypeSpec> inner) : innerType(std::move(inner)) {}
   [[nodiscard]] std::string getTypeName() const override {
     return "ref " + innerType->getTypeName();
-  }
-  [[nodiscard]] std::unique_ptr<NTypeSpec> clone() const override {
-    return std::make_unique<NRefType>(innerType->clone());
   }
   void accept(Visitor &visitor) const override;
 };
@@ -113,23 +104,20 @@ public:
 // Mutable reference type: mut T
 class NMutRefType : public NTypeSpec {
 public:
-  std::unique_ptr<NTypeSpec> innerType;
-  explicit NMutRefType(std::unique_ptr<NTypeSpec> inner) : innerType(std::move(inner)) {}
+  std::shared_ptr<const NTypeSpec> innerType;
+  explicit NMutRefType(std::shared_ptr<const NTypeSpec> inner) : innerType(std::move(inner)) {}
   [[nodiscard]] std::string getTypeName() const override {
     return "mut " + innerType->getTypeName();
-  }
-  [[nodiscard]] std::unique_ptr<NTypeSpec> clone() const override {
-    return std::make_unique<NMutRefType>(innerType->clone());
   }
   void accept(Visitor &visitor) const override;
 };
 
-// Capture entry for closures (owns its type and id via unique_ptr)
+// Capture entry for closures (owns its type and id via shared_ptr/unique_ptr)
 // Mutability is derived from the type annotation (e.g., "mut i64" prefix)
 struct CaptureEntry {
-  std::unique_ptr<NTypeSpec> type;
+  std::shared_ptr<const NTypeSpec> type;
   std::unique_ptr<NIdentifier> id;
-  CaptureEntry(std::unique_ptr<NTypeSpec> type, std::unique_ptr<NIdentifier> id)
+  CaptureEntry(std::shared_ptr<const NTypeSpec> type, std::unique_ptr<NIdentifier> id)
       : type(std::move(type)), id(std::move(id)) {}
 };
 
@@ -206,9 +194,9 @@ public:
 class NCastExpression : public NExpression {
 public:
   std::unique_ptr<NExpression> expression;
-  std::unique_ptr<NTypeSpec> targetType;
+  std::shared_ptr<const NTypeSpec> targetType;
   NCastExpression(std::unique_ptr<NExpression> expr,
-                  std::unique_ptr<NTypeSpec> type)
+                  std::shared_ptr<const NTypeSpec> type)
       : expression(std::move(expr)), targetType(std::move(type)) {}
   void accept(Visitor &visitor) const override;
 };
@@ -285,7 +273,7 @@ public:
 
 class NVariableDeclaration : public NStatement {
 public:
-  std::unique_ptr<NTypeSpec> type;  // nullptr when type should be inferred
+  std::shared_ptr<const NTypeSpec> type;  // nullptr when type should be inferred
   std::unique_ptr<NIdentifier> id;
   std::unique_ptr<NExpression> assignmentExpr;
   // Mutability is derived from type annotation (e.g., "mut i64" prefix)
@@ -295,7 +283,7 @@ public:
                        std::unique_ptr<NExpression> assignmentExpr)
       : type(nullptr), id(std::move(id)), assignmentExpr(std::move(assignmentExpr)) {}
   // Constructor for explicit type annotation
-  NVariableDeclaration(std::unique_ptr<NTypeSpec> type,
+  NVariableDeclaration(std::shared_ptr<const NTypeSpec> type,
                        std::unique_ptr<NIdentifier> id,
                        std::unique_ptr<NExpression> assignmentExpr)
       : type(std::move(type)), id(std::move(id)),
@@ -305,7 +293,7 @@ public:
 
 class NFunctionDeclaration : public NStatement {
 public:
-  std::unique_ptr<NTypeSpec> type;  // nullptr when return type should be inferred
+  std::shared_ptr<const NTypeSpec> type;  // nullptr when return type should be inferred
   std::unique_ptr<NIdentifier> id;
   VariableList arguments;
   std::unique_ptr<NBlock> block;
@@ -316,7 +304,7 @@ public:
       : type(nullptr), id(std::move(id)), arguments(std::move(arguments)),
         block(std::move(block)) {}
   // Constructor for explicit return type
-  NFunctionDeclaration(std::unique_ptr<NTypeSpec> type,
+  NFunctionDeclaration(std::shared_ptr<const NTypeSpec> type,
                        std::unique_ptr<NIdentifier> id, VariableList arguments,
                        std::unique_ptr<NBlock> block)
       : type(std::move(type)), id(std::move(id)), arguments(std::move(arguments)),

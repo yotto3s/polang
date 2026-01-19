@@ -97,7 +97,7 @@ yy::parser::symbol_type yylex();
 
 // Nonterminal types with smart pointers
 %type <std::unique_ptr<NIdentifier>> ident
-%type <std::unique_ptr<NTypeSpec>> type_spec
+%type <std::shared_ptr<const NTypeSpec>> type_spec
 %type <std::unique_ptr<NExpression>> numeric expr boolean
 %type <std::unique_ptr<NBlock>> program stmts
 %type <std::unique_ptr<NStatement>> stmt var_decl func_decl module_decl import_stmt
@@ -299,13 +299,13 @@ ident : TIDENTIFIER { $$ = std::make_unique<NIdentifier>($1); }
       ;
 
 type_spec : ident {
-              $$ = std::make_unique<NNamedType>($1->name);
+              $$ = std::make_shared<const NNamedType>($1->name);
             }
           | TREF type_spec {
-              $$ = std::make_unique<NRefType>(std::move($2));
+              $$ = std::make_shared<const NRefType>(std::move($2));
             }
           | TMUT type_spec {
-              $$ = std::make_unique<NMutRefType>(std::move($2));
+              $$ = std::make_shared<const NMutRefType>(std::move($2));
             }
           ;
 
