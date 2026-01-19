@@ -296,7 +296,6 @@ The Polang dialect uses custom verifiers to catch type errors during compilation
 | `polang.if` | Condition must be bool, branches must yield same type |
 | `polang.return` | Return value type must match function signature |
 | `polang.call` | Function must exist, arity and argument types must match |
-| `polang.store` | Target must be from a mutable allocation |
 | `polang.ref.store` | Reference must be mutable (`!polang.ref<T, mutable>`) |
 
 **Type Compatibility:** Operations use a `typesAreCompatible()` helper that allows type variables during intermediate stages (before type inference resolves them).
@@ -393,9 +392,10 @@ Lowers Polang dialect operations to standard MLIR dialects (arith, func, scf, me
 | `polang.return` | `func.return` |
 | `polang.if` | `scf.if` |
 | `polang.yield` | `scf.yield` |
-| `polang.alloca` | `memref.alloca` |
-| `polang.load` | `memref.load` |
-| `polang.store` | `memref.store` |
+| `polang.ref.create` (mutable) | `memref.alloca` + `memref.store` |
+| `polang.ref.create` (immutable) | passthrough |
+| `polang.ref.deref` | `memref.load` |
+| `polang.ref.store` | `memref.store` |
 
 **Type Lowering:**
 

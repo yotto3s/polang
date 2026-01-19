@@ -222,7 +222,7 @@ The Polang dialect uses custom verifiers to catch type errors during compilation
 | `polang.if` | Verifies condition is `!polang.bool`, both branches yield same type |
 | `polang.return` | Verifies return value matches function signature |
 | `polang.call` | Verifies function exists, arity matches, and argument types match |
-| `polang.store` | Verifies target variable is mutable |
+| `polang.ref.store` | Verifies reference is mutable |
 
 Type variables are resolved by the type inference pass before lowering to standard dialects.
 
@@ -316,15 +316,15 @@ Arithmetic operations work with any integer or float type of the same width and 
 | `polang.if` | If-then-else expression | `%0 = polang.if %cond -> !polang.integer<64, signed> { ... } else { ... }` |
 | `polang.yield` | Yield value from region | `polang.yield %0 : !polang.integer<64, signed>` |
 
-#### Variables
+#### Reference Operations
 
 | Operation | Description | Example |
 |-----------|-------------|---------|
-| `polang.alloca` | Allocate mutable variable | `%0 = polang.alloca "x", mutable : !polang.integer<64, signed> -> memref<i64>` |
-| `polang.load` | Load from mutable variable | `%1 = polang.load %0 : memref<i64> -> !polang.integer<64, signed>` |
-| `polang.store` | Store to mutable variable | `polang.store %val, %0 : !polang.integer<64, signed>, memref<i64>` |
+| `polang.ref.create` | Create mutable/immutable reference | `%0 = polang.ref.create %val {is_mutable = true} : !polang.integer<64, signed> -> !polang.ref<!polang.integer<64, signed>, mutable>` |
+| `polang.ref.deref` | Read from reference | `%1 = polang.ref.deref %0 : !polang.ref<!polang.integer<64, signed>, mutable> -> !polang.integer<64, signed>` |
+| `polang.ref.store` | Write to mutable reference | `%1 = polang.ref.store %val, %0 : !polang.integer<64, signed>, !polang.ref<!polang.integer<64, signed>, mutable> -> !polang.integer<64, signed>` |
 
-**Note:** Immutable variables (declared with `let`) are optimized to use SSA values directly without memory allocation. Only mutable variables (declared with `let x = mut value`) use the alloca/load/store pattern.
+**Note:** Immutable variables (declared with `let`) are optimized to use SSA values directly without memory allocation. Only mutable variables (declared with `let x = mut value`) use reference operations.
 
 ## Lowering Stages
 
@@ -364,28 +364,27 @@ module {
 
 #### Mutable Variable Handling
 
-Mutable variables (declared with `let x = mut value`) require memory allocation since their values can change:
+Mutable variables (declared with `let x = mut value`) use reference operations since their values can change:
 
 **Example (mutable variable):**
 
 ```polang
 let x = mut 10
 x <- 20
-x
+*x
 ```
 
 Generates:
 
 ```mlir
 module {
-  polang.func @__polang_entry() -> !polang.int {
-    %0 = polang.constant.int 10 : !polang.int
-    %1 = polang.alloca "x", mutable : !polang.int -> memref<i64>
-    polang.store %0, %1 : !polang.int, memref<i64>
-    %2 = polang.constant.int 20 : !polang.int
-    polang.store %2, %1 : !polang.int, memref<i64>
-    %3 = polang.load %1 : memref<i64> -> !polang.int
-    polang.return %3 : !polang.int
+  polang.func @__polang_entry() -> !polang.integer<64, signed> {
+    %0 = polang.constant.integer 10 : !polang.integer<64, signed>
+    %1 = polang.ref.create %0 {is_mutable = true} : !polang.integer<64, signed> -> !polang.ref<!polang.integer<64, signed>, mutable>
+    %2 = polang.constant.integer 20 : !polang.integer<64, signed>
+    %3 = polang.ref.store %2, %1 : !polang.integer<64, signed>, !polang.ref<!polang.integer<64, signed>, mutable> -> !polang.integer<64, signed>
+    %4 = polang.ref.deref %1 : !polang.ref<!polang.integer<64, signed>, mutable> -> !polang.integer<64, signed>
+    polang.return %4 : !polang.integer<64, signed>
   }
 }
 ```
@@ -461,9 +460,10 @@ The `PolangToStandardPass` lowers Polang dialect operations to standard MLIR dia
 | `polang.return` | `func.return` |
 | `polang.if` | `scf.if` |
 | `polang.yield` | `scf.yield` |
-| `polang.alloca` | `memref.alloca` |
-| `polang.load` | `memref.load` |
-| `polang.store` | `memref.store` |
+| `polang.ref.create` (mutable) | `memref.alloca` + `memref.store` |
+| `polang.ref.create` (immutable) | passthrough |
+| `polang.ref.deref` | `memref.load` |
+| `polang.ref.store` | `memref.store` |
 
 **Type Conversions:**
 

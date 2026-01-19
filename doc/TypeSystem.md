@@ -176,14 +176,13 @@ std::string makeImmutableRefType(const std::string& base); // add "ref "
 
 ### MLIR Operations
 
-Reference types lower to the following MLIR operations:
+Reference types use the following MLIR operations:
 
 | Operation | Description | Lowers To |
 |-----------|-------------|-----------|
-| `polang.mutref.deref` | Read from mutable ref | `memref.load` |
-| `polang.mutref.store` | Write to mutable ref | `memref.store` |
-| `polang.ref.create` | Create immutable ref | passthrough |
-| `polang.ref.deref` | Read from immutable ref | `memref.load` |
+| `polang.ref.create` | Create reference (mutable or immutable) | `memref.alloca` (mutable) or passthrough (immutable) |
+| `polang.ref.deref` | Read from reference | `memref.load` |
+| `polang.ref.store` | Write to mutable reference | `memref.store` |
 
 ## Type Conversions
 
@@ -407,7 +406,7 @@ The parser's type checker (`parser/src/type_checker.cpp`) focuses on **error det
 | Capture analysis | Identifies free variables for closures via `FreeVariableCollector` |
 | Type variable setup | Marks untyped parameters as `typevar` for MLIR inference |
 
-**Note:** Mutability validation (preventing assignment to immutable variables) is handled by the MLIR verifier in `polang.store` and `polang.ref.store` operations.
+**Note:** Mutability validation (preventing assignment to immutable variables) is handled by the MLIR verifier in `polang.ref.store` operations.
 
 **Example:**
 
