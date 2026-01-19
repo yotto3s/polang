@@ -162,11 +162,13 @@ var_decl : TLET ident TEQUAL expr {
            }
          | TLET ident TEQUAL TMUT expr {
              /* let x = mut expr (mutable, type to be inferred) */
-             $$ = std::make_unique<NVariableDeclaration>(std::move($2), std::move($5), true);
+             $$ = std::make_unique<NVariableDeclaration>(std::move($2),
+                 std::make_unique<NMutRefExpression>(std::move($5)), true);
            }
          | TLET ident TCOLON type_spec TEQUAL TMUT expr {
              /* let x : type = mut expr (mutable) */
-             $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move($7), true);
+             $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2),
+                 std::make_unique<NMutRefExpression>(std::move($7)), true);
            }
          ;
 
@@ -419,12 +421,14 @@ let_binding : ident TEQUAL expr {
             | ident TEQUAL TMUT expr {
                 /* x = mut expr (mutable, type to be inferred) */
                 $$ = std::make_unique<NLetBinding>(
-                    std::make_unique<NVariableDeclaration>(std::move($1), std::move($4), true));
+                    std::make_unique<NVariableDeclaration>(std::move($1),
+                        std::make_unique<NMutRefExpression>(std::move($4)), true));
               }
             | ident TCOLON type_spec TEQUAL TMUT expr {
                 /* x : type = mut expr (mutable) */
                 $$ = std::make_unique<NLetBinding>(
-                    std::make_unique<NVariableDeclaration>(std::move($3), std::move($1), std::move($6), true));
+                    std::make_unique<NVariableDeclaration>(std::move($3), std::move($1),
+                        std::make_unique<NMutRefExpression>(std::move($6)), true));
               }
             | ident func_decl_args TCOLON type_spec TEQUAL expr {
                 /* f(x: int): int = expr */

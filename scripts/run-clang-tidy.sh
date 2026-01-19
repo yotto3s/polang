@@ -42,15 +42,16 @@ if [[ ! -f "$BUILD_DIR/compile_commands.json" ]]; then
 fi
 
 # Create filtered compile_commands.json (remove GCC-specific flags)
-FILTERED_COMPILE_COMMANDS=$(mktemp)
-trap "rm -f $FILTERED_COMPILE_COMMANDS" EXIT
+# Create a temp directory with proper structure for clang-tidy
+TEMP_BUILD_DIR=$(mktemp -d)
+trap "rm -rf $TEMP_BUILD_DIR" EXIT
 
 sed -e 's/-fno-lifetime-dse//g' \
     -e 's/-Wno-class-memaccess//g' \
     -e 's/-Wno-redundant-move//g' \
     -e 's/-Wno-pessimizing-move//g' \
     -e 's/-Wno-noexcept-type//g' \
-    "$BUILD_DIR/compile_commands.json" > "$FILTERED_COMPILE_COMMANDS"
+    "$BUILD_DIR/compile_commands.json" > "$TEMP_BUILD_DIR/compile_commands.json"
 
 # Default files if none specified
 if [[ ${#FILES[@]} -eq 0 ]]; then
@@ -65,7 +66,7 @@ fi
 # Run clang-tidy in parallel
 echo "Running clang-tidy on ${#FILES[@]} files..."
 printf '%s\n' "${FILES[@]}" | xargs -P"$(nproc)" -I{} \
-    clang-tidy -p "$(dirname "$FILTERED_COMPILE_COMMANDS")" $FIX_FLAG {} 2>&1 | \
+    clang-tidy -p "$TEMP_BUILD_DIR" $FIX_FLAG {} 2>&1 | \
     grep -v "warnings generated" | \
     grep -v "Suppressed" | \
     grep -v "Use -header-filter" || true

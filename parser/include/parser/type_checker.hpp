@@ -39,6 +39,7 @@ public:
   void visit(const NAssignment& node) override;
   void visit(const NRefExpression& node) override;
   void visit(const NDerefExpression& node) override;
+  void visit(const NMutRefExpression& node) override;
   void visit(const NBlock& node) override;
   void visit(const NIfExpression& node) override;
   void visit(const NLetExpression& node) override;
@@ -65,7 +66,6 @@ public:
 private:
   std::string inferredType;
   std::map<std::string, std::string> localTypes;
-  std::map<std::string, bool> localMutability;
   std::map<std::string, std::string> functionReturnTypes;
   std::map<std::string, std::vector<std::string>> functionParamTypes;
   std::vector<TypeCheckError> errors;
@@ -95,23 +95,18 @@ private:
   // Helper methods for NLetExpression type checking
   void collectSiblingVarTypes(
       const std::vector<std::unique_ptr<NLetBinding>>& bindings,
-      std::map<std::string, std::string>& siblingTypes,
-      std::map<std::string, bool>& siblingMutability);
+      std::map<std::string, std::string>& siblingTypes);
 
   void typeCheckLetBindings(
       const std::vector<std::unique_ptr<NLetBinding>>& bindings,
       const std::map<std::string, std::string>& siblingTypes,
-      const std::map<std::string, bool>& siblingMutability,
       const std::map<std::string, std::string>& savedLocals,
-      const std::map<std::string, bool>& savedMutability,
       std::vector<std::string>& bindingTypes,
-      std::vector<bool>& bindingMutability,
       std::vector<std::vector<std::string>>& funcParams);
 
   void addLetBindingsToScope(
       const std::vector<std::unique_ptr<NLetBinding>>& bindings,
       const std::vector<std::string>& bindingTypes,
-      const std::vector<bool>& bindingMutability,
       const std::vector<std::vector<std::string>>& funcParams);
 
   // Helper methods for NVariableDeclaration type checking

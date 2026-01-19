@@ -1,12 +1,12 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
-; Test mutable variable with mutref operations
+; Test mutable variable with unified ref operations
 ; CHECK: {{.*}}polang.func @__polang_entry() -> !polang.integer<64, signed>{{.*}}
 ; CHECK: {{.*}}polang.constant.integer{{.*}}
-; CHECK: {{.*}}polang.mutref.create{{.*}}
+; CHECK: {{.*}}polang.ref.create{{.*}}is_mutable = true{{.*}}
 ; CHECK: {{.*}}polang.constant.integer 20{{.*}}
-; CHECK: {{.*}}polang.mutref.store{{.*}}
-; CHECK: {{.*}}polang.mutref.deref{{.*}}
+; CHECK: {{.*}}polang.ref.store{{.*}}
+; CHECK: {{.*}}polang.ref.deref{{.*}}
 ; CHECK: {{.*}}polang.return{{.*}}
 let x = mut 10
 x <- 20

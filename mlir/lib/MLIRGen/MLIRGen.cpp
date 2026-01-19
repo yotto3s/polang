@@ -216,44 +216,55 @@ public:
     }
     Value rhs = result;
 
-    // Arithmetic operations - use LHS type as result type
-    // This allows type variables since the verifier uses typesAreCompatible()
+    // Use switch for cleaner operator dispatch
     Type arithResultTy = lhs.getType();
-    if (node.op == yy::parser::token::TPLUS) {
+    switch (node.op) {
+    // Arithmetic operations - use LHS type as result type
+    case yy::parser::token::TPLUS:
       result = builder.create<AddOp>(loc(), arithResultTy, lhs, rhs);
       resultType = lhsType;
-    } else if (node.op == yy::parser::token::TMINUS) {
+      break;
+    case yy::parser::token::TMINUS:
       result = builder.create<SubOp>(loc(), arithResultTy, lhs, rhs);
       resultType = lhsType;
-    } else if (node.op == yy::parser::token::TMUL) {
+      break;
+    case yy::parser::token::TMUL:
       result = builder.create<MulOp>(loc(), arithResultTy, lhs, rhs);
       resultType = lhsType;
-    } else if (node.op == yy::parser::token::TDIV) {
+      break;
+    case yy::parser::token::TDIV:
       result = builder.create<DivOp>(loc(), arithResultTy, lhs, rhs);
       resultType = lhsType;
-    }
-    // Comparison operations
-    else if (node.op == yy::parser::token::TCEQ) {
+      break;
+    // Comparison operations - result is always bool
+    case yy::parser::token::TCEQ:
       result = builder.create<CmpOp>(loc(), CmpPredicate::eq, lhs, rhs);
       resultType = TypeNames::BOOL;
-    } else if (node.op == yy::parser::token::TCNE) {
+      break;
+    case yy::parser::token::TCNE:
       result = builder.create<CmpOp>(loc(), CmpPredicate::ne, lhs, rhs);
       resultType = TypeNames::BOOL;
-    } else if (node.op == yy::parser::token::TCLT) {
+      break;
+    case yy::parser::token::TCLT:
       result = builder.create<CmpOp>(loc(), CmpPredicate::lt, lhs, rhs);
       resultType = TypeNames::BOOL;
-    } else if (node.op == yy::parser::token::TCLE) {
+      break;
+    case yy::parser::token::TCLE:
       result = builder.create<CmpOp>(loc(), CmpPredicate::le, lhs, rhs);
       resultType = TypeNames::BOOL;
-    } else if (node.op == yy::parser::token::TCGT) {
+      break;
+    case yy::parser::token::TCGT:
       result = builder.create<CmpOp>(loc(), CmpPredicate::gt, lhs, rhs);
       resultType = TypeNames::BOOL;
-    } else if (node.op == yy::parser::token::TCGE) {
+      break;
+    case yy::parser::token::TCGE:
       result = builder.create<CmpOp>(loc(), CmpPredicate::ge, lhs, rhs);
       resultType = TypeNames::BOOL;
-    } else {
+      break;
+    default:
       emitError(loc()) << "Unknown binary operator: " << node.op;
       result = nullptr;
+      break;
     }
   }
 
@@ -284,19 +295,40 @@ public:
 
     // Look up the mutable reference for the variable
     auto refValue = lookupMutableRef(node.lhs->name);
-    if (!refValue) {
-      emitError(loc()) << "Unknown variable in assignment: " << node.lhs->name;
-      result = nullptr;
-      return;
+    Value refForStore;
+    std::string varType;
+
+    if (refValue) {
+      // Found mutable reference
+      refForStore = *refValue;
+      varType = lookupType(node.lhs->name).value_or(TypeNames::I64);
+    } else {
+      // Check if it's an immutable value - create immutable ref for verifier
+      auto immIt = immutableValues.find(node.lhs->name);
+      if (immIt != immutableValues.end()) {
+        Value immVal = immIt->second;
+        varType = lookupType(node.lhs->name).value_or(TypeNames::I64);
+        Type elemType = getPolangType(varType);
+        // Create immutable reference - RefStoreOp verifier will catch this
+        Type immRefType =
+            RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
+        auto immRef = builder.create<RefCreateOp>(loc(), immRefType, immVal,
+                                                  /*is_mutable=*/false);
+        refForStore = immRef.getResult();
+      } else {
+        emitError(loc()) << "Unknown variable in assignment: "
+                         << node.lhs->name;
+        result = nullptr;
+        return;
+      }
     }
 
     // Get the element type
-    Type elemType = getPolangType(
-        getReferentType(lookupType(node.lhs->name).value_or(TypeNames::I64)));
+    Type elemType = getPolangType(getReferentType(varType));
 
-    // Store through the mutable reference
+    // Store through the reference (MLIR verifier will catch immutable stores)
     auto storeOp =
-        builder.create<MutRefStoreOp>(loc(), elemType, value, *refValue);
+        builder.create<RefStoreOp>(loc(), elemType, value, refForStore);
 
     // Assignment expression returns the assigned value
     result = storeOp.getResult();
@@ -315,7 +347,8 @@ public:
         Value mutRef = result;
         std::string elemTypeName = getReferentType(resultType);
         Type elemType = getPolangType(elemTypeName);
-        Type refType = RefType::get(builder.getContext(), elemType);
+        Type refType =
+            RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
         result = builder.create<RefCreateOp>(loc(), refType, mutRef);
         resultType = makeImmutableRefType(elemTypeName);
         return;
@@ -337,7 +370,8 @@ public:
     if (isMutableRefType(innerType)) {
       // Convert mut ref to immutable ref
       Type elemType = getPolangType(getReferentType(innerType));
-      Type refType = RefType::get(builder.getContext(), elemType);
+      Type refType =
+          RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
       result = builder.create<RefCreateOp>(loc(), refType, innerValue);
       resultType = makeImmutableRefType(getReferentType(innerType));
     } else {
@@ -353,12 +387,14 @@ public:
       }
 
       // Create a mutable reference from the value
-      Type mutRefType = MutRefType::get(builder.getContext(), innerMLIRType);
-      auto mutRef =
-          builder.create<MutRefCreateOp>(loc(), mutRefType, innerValue);
+      Type mutRefType =
+          RefType::get(builder.getContext(), innerMLIRType, /*isMutable=*/true);
+      auto mutRef = builder.create<RefCreateOp>(loc(), mutRefType, innerValue,
+                                                /*is_mutable=*/true);
 
       // Convert the mutable reference to an immutable reference
-      Type refType = RefType::get(builder.getContext(), innerMLIRType);
+      Type refType = RefType::get(builder.getContext(), innerMLIRType,
+                                  /*isMutable=*/false);
       result = builder.create<RefCreateOp>(loc(), refType, mutRef.getResult());
       resultType = makeImmutableRefType(innerType);
     }
@@ -373,13 +409,8 @@ public:
     Value refValue = result;
     std::string refType = resultType;
 
-    // Check if it's a reference type and dereference accordingly
-    if (isMutableRefType(refType)) {
-      std::string elemTypeName = getReferentType(refType);
-      Type elemType = getPolangType(elemTypeName);
-      result = builder.create<MutRefDerefOp>(loc(), elemType, refValue);
-      resultType = elemTypeName;
-    } else if (isImmutableRefType(refType)) {
+    // Check if it's a reference type (mutable or immutable)
+    if (isMutableRefType(refType) || isImmutableRefType(refType)) {
       std::string elemTypeName = getReferentType(refType);
       Type elemType = getPolangType(elemTypeName);
       result = builder.create<RefDerefOp>(loc(), elemType, refValue);
@@ -388,6 +419,14 @@ public:
       emitError(loc()) << "Cannot dereference non-reference type: " << refType;
       result = nullptr;
     }
+  }
+
+  void visit(const NMutRefExpression& node) override {
+    // Evaluate the inner expression and pass through the value
+    // The MutRefCreateOp is created by NVariableDeclaration when needed
+    // NMutRefExpression is purely for AST representation
+    node.expr->accept(*this);
+    // result and resultType are already set by visiting the inner expression
   }
 
   void visit(const NBlock& node) override {
@@ -494,18 +533,28 @@ public:
       // Mutable: Create a mutable reference using the resolved type from type
       // checker
       Type polangType = getPolangType(baseTypeName);
-      Type mutRefType = MutRefType::get(builder.getContext(), polangType);
+      Type mutRefType =
+          RefType::get(builder.getContext(), polangType, /*isMutable=*/true);
 
       if (initValue) {
-        // If initializing from an existing mutable reference, copy it
-        if (isMutableRefType(typeName) &&
-            mlir::isa<MutRefType>(initValue.getType())) {
-          // Copying a mutable reference
-          mutableRefTable[varName] = initValue;
+        // If initializing from an existing mutable reference, use it directly
+        if (auto refType = mlir::dyn_cast<RefType>(initValue.getType())) {
+          if (refType.isMutable()) {
+            // Value is already a mutable reference (e.g., from
+            // NMutRefExpression)
+            mutableRefTable[varName] = initValue;
+          } else {
+            // Create new mutable reference with initial value
+            auto mutRefOp =
+                builder.create<RefCreateOp>(loc(), mutRefType, initValue,
+                                            /*is_mutable=*/true);
+            mutableRefTable[varName] = mutRefOp.getResult();
+          }
         } else {
           // Create new mutable reference with initial value
           auto mutRefOp =
-              builder.create<MutRefCreateOp>(loc(), mutRefType, initValue);
+              builder.create<RefCreateOp>(loc(), mutRefType, initValue,
+                                          /*is_mutable=*/true);
           mutableRefTable[varName] = mutRefOp.getResult();
         }
       } else {
@@ -520,7 +569,9 @@ public:
       // Store the mutable reference type
       typeTable[varName] = makeMutableRefType(baseTypeName);
     } else {
-      // Immutable binding
+      // Immutable binding - store to appropriate table based on type
+      // NOLINTNEXTLINE(bugprone-branch-clone) - branches store to different
+      // maps
       if (isMutableRefType(typeName)) {
         // Copying a mutable reference to an immutable binding
         // Store in mutableRefTable so assignment through the reference works
@@ -639,7 +690,8 @@ public:
     // Generate function body
     node.block->accept(*this);
 
-    // Add return
+    // Add return - NOLINTNEXTLINE(bugprone-branch-clone) - different op
+    // signatures
     if (result) {
       builder.create<ReturnOp>(loc(), result);
     } else {
@@ -808,6 +860,8 @@ private:
       }
     }
 
+    // NOLINTNEXTLINE(modernize-use-equals-default) - destructor restores saved
+    // state
     ~SymbolTableScope() {
       visitor.symbolTable = savedSymbolTable;
       visitor.mutableRefTable = savedMutableRefTable;
@@ -893,12 +947,12 @@ private:
     if (isMutableRefType(typeName)) {
       std::string elemTypeName = getReferentType(typeName);
       Type elemType = getPolangType(elemTypeName);
-      return MutRefType::get(builder.getContext(), elemType);
+      return RefType::get(builder.getContext(), elemType, /*isMutable=*/true);
     }
     if (isImmutableRefType(typeName)) {
       std::string elemTypeName = getReferentType(typeName);
       Type elemType = getPolangType(elemTypeName);
-      return RefType::get(builder.getContext(), elemType);
+      return RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
     }
     // Signed integers
     if (typeName == TypeNames::I8) {
@@ -993,10 +1047,19 @@ private:
   }
 
   void generateMainFunction(const NBlock& block) {
-    // Get the inferred return type from the type checker (already ran in
-    // generate())
+    // Get the inferred return type from the type checker
     std::string inferredType = typeChecker.getInferredType();
-    Type returnType = getPolangType(inferredType);
+
+    // Use type checker's type if it's concrete, otherwise use type variable
+    Type returnType;
+    if (inferredType == TypeNames::UNKNOWN ||
+        inferredType == TypeNames::TYPEVAR || isGenericType(inferredType)) {
+      // Type is unknown or generic - use type variable for MLIR inference
+      returnType = freshTypeVar();
+    } else {
+      // Type checker found a concrete type - use it
+      returnType = getPolangType(inferredType);
+    }
 
     // Create entry function with dynamic return type
     auto funcType = builder.getFunctionType({}, {returnType});
@@ -1022,11 +1085,11 @@ private:
                                               getFloatWidth(inferredType));
         defaultVal = builder.create<ConstantFloatOp>(loc(), floatTy, 0.0);
       } else if (inferredType == TypeNames::BOOL) {
+        // NOLINTNEXTLINE(bugprone-branch-clone) - creates different op types
         defaultVal = builder.create<ConstantBoolOp>(loc(), false);
       } else {
-        // Use the inferred type for integer types (preserves signedness)
-        Type intTy = getPolangType(inferredType);
-        defaultVal = builder.create<ConstantIntegerOp>(loc(), intTy, 0);
+        // Use the return type (already resolved or type variable)
+        defaultVal = builder.create<ConstantIntegerOp>(loc(), returnType, 0);
       }
       builder.create<ReturnOp>(loc(), defaultVal);
     }

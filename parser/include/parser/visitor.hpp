@@ -13,6 +13,7 @@ class NCastExpression;
 class NAssignment;
 class NRefExpression;
 class NDerefExpression;
+class NMutRefExpression;
 class NBlock;
 class NIfExpression;
 class NLetExpression;
@@ -83,6 +84,7 @@ public:
   virtual void visit(const NAssignment& node) = 0;
   virtual void visit(const NRefExpression& node) = 0;
   virtual void visit(const NDerefExpression& node) = 0;
+  virtual void visit(const NMutRefExpression& node) = 0;
   virtual void visit(const NBlock& node) = 0;
   virtual void visit(const NIfExpression& node) = 0;
   virtual void visit(const NLetExpression& node) = 0;

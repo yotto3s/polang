@@ -348,6 +348,25 @@ LogicalResult CmpOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// RefStoreOp verifier
+//===----------------------------------------------------------------------===//
+
+LogicalResult RefStoreOp::verify() {
+  auto refType = mlir::dyn_cast<RefType>(getRef().getType());
+  if (!refType) {
+    // If it's a type variable, defer to type inference
+    if (mlir::isa<TypeVarType>(getRef().getType())) {
+      return success();
+    }
+    return emitOpError("reference operand must be a reference type");
+  }
+  if (!refType.isMutable()) {
+    return emitOpError("cannot store through immutable reference");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // InferTypeOpInterface implementations
 //===----------------------------------------------------------------------===//
 

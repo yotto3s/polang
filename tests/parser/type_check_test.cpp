@@ -136,9 +136,10 @@ TEST(TypeCheckTest, MutableVariableReassignment) {
 }
 
 TEST(TypeCheckTest, ImmutableVariableReassignment) {
-  // Immutable variable cannot be reassigned
-  EXPECT_TRUE(hasTypeError("let x = 1\nx <- 2"));
-  EXPECT_TRUE(hasTypeError("let x: i64 = 1\nx <- 2"));
+  // Immutable variable reassignment is no longer caught by AST type checker.
+  // It is now validated by MLIR verifier (RefStoreOp::verify()).
+  EXPECT_TRUE(hasNoTypeError("let x = 1\nx <- 2"));
+  EXPECT_TRUE(hasNoTypeError("let x: i64 = 1\nx <- 2"));
 }
 
 TEST(TypeCheckTest, MutableInLetExpression) {
@@ -148,9 +149,10 @@ TEST(TypeCheckTest, MutableInLetExpression) {
 }
 
 TEST(TypeCheckTest, ImmutableInLetExpression) {
-  // Immutable binding in let expression cannot be reassigned
-  EXPECT_TRUE(hasTypeError("let x = 1 in x <- 2"));
-  EXPECT_TRUE(hasTypeError("let x = 1 and y = mut 2 in x <- 10"));
+  // Immutable binding reassignment is no longer caught by AST type checker.
+  // It is now validated by MLIR verifier (RefStoreOp::verify()).
+  EXPECT_TRUE(hasNoTypeError("let x = 1 in x <- 2"));
+  EXPECT_TRUE(hasNoTypeError("let x = 1 and y = mut 2 in x <- 10"));
 }
 
 TEST(TypeCheckTest, MultipleReassignments) {
@@ -181,13 +183,9 @@ TEST(TypeCheckTest, NestedLetWithMutability) {
   EXPECT_TRUE(hasNoTypeError("let x = 1 in let y = mut x in y <- 2"));
 }
 
-TEST(TypeCheckTest, ImmutableReassignmentErrorMessage) {
-  // Error message should contain the variable name
-  auto errors = checkTypes("let x = 1\nx <- 2");
-  ASSERT_FALSE(errors.empty());
-  EXPECT_TRUE(errors[0].message.find("x") != std::string::npos);
-  EXPECT_TRUE(errors[0].message.find("immutable") != std::string::npos);
-}
+// Note: ImmutableReassignmentErrorMessage test removed.
+// Immutable reassignment errors are now caught by MLIR verifier,
+// not by the AST type checker.
 
 // ============== Error Message Tests ==============
 

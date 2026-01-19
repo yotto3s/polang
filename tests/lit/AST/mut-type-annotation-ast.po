@@ -2,6 +2,7 @@
 
 ; Test AST for type-annotated mutable variable
 ; CHECK:      NBlock
-; CHECK-NEXT: `-NVariableDeclaration 'x' mut : i64
-; CHECK-NEXT:   `-NInteger 5
-let x: i64 = mut 5
+; CHECK-NEXT: `-NVariableDeclaration 'x' : mut i64
+; CHECK-NEXT:   `-NMutRefExpression
+; CHECK-NEXT:     `-NInteger 5
+let x: mut i64 = mut 5

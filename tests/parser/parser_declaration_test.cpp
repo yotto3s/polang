@@ -60,7 +60,10 @@ TEST(ParserTest, MutableVariableDeclaration) {
   EXPECT_EQ(varDecl->id->name, "x");
   EXPECT_TRUE(varDecl->isMutable);
 
-  auto* intExpr = dynamic_cast<NInteger*>(varDecl->assignmentExpr.get());
+  // The expression is wrapped in NMutRefExpression by the parser
+  auto* mutRefExpr = dynamic_cast<NMutRefExpression*>(varDecl->assignmentExpr.get());
+  ASSERT_NE(mutRefExpr, nullptr);
+  auto* intExpr = dynamic_cast<NInteger*>(mutRefExpr->expr.get());
   ASSERT_NE(intExpr, nullptr);
   EXPECT_EQ(intExpr->value, 5);
 }

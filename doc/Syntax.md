@@ -122,14 +122,14 @@ let <identifier> : <type> = <expression>
 To declare a mutable variable that can be reassigned, use `let x = mut value`:
 
 ```
-let x = mut 5       ; mutable, type inferred as int
-let y : int = mut 10  ; mutable, explicit type annotation
+let x = mut 5           ; mutable, type inferred as i64
+let y : mut i64 = mut 10  ; mutable, explicit type annotation
 ```
 
 **Syntax:**
 ```
 let <identifier> = mut <expression>
-let <identifier> : <type> = mut <expression>
+let <identifier> : mut <type> = mut <expression>
 ```
 
 ### Variable Reassignment

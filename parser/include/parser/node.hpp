@@ -186,6 +186,14 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
+class NMutRefExpression : public NExpression {
+public:
+  std::unique_ptr<NExpression> expr;
+  explicit NMutRefExpression(std::unique_ptr<NExpression> expr)
+      : expr(std::move(expr)) {}
+  void accept(Visitor &visitor) const override;
+};
+
 class NBlock : public NExpression {
 public:
   StatementList statements;

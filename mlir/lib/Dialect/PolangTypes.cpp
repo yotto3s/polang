@@ -65,6 +65,41 @@ Type TypeVarType::parse(AsmParser& parser) {
   return TypeVarType::get(parser.getContext(), id, kind);
 }
 
+//===----------------------------------------------------------------------===//
+// RefType custom print/parse
+//===----------------------------------------------------------------------===//
+
+void RefType::print(AsmPrinter& printer) const {
+  printer << "<" << getElementType();
+  if (getIsMutable()) {
+    printer << ", mutable";
+  }
+  printer << ">";
+}
+
+Type RefType::parse(AsmParser& parser) {
+  Type elementType;
+  bool isMutable = false;
+
+  if (parser.parseLess() || parser.parseType(elementType)) {
+    return {};
+  }
+
+  // Check for optional 'mutable' keyword
+  if (succeeded(parser.parseOptionalComma())) {
+    if (parser.parseKeyword("mutable")) {
+      return {};
+    }
+    isMutable = true;
+  }
+
+  if (parser.parseGreater()) {
+    return {};
+  }
+
+  return RefType::get(parser.getContext(), elementType, isMutable);
+}
+
 void PolangDialect::registerTypes() {
   addTypes<
 #define GET_TYPEDEF_LIST

@@ -5,7 +5,8 @@
 ; CHECK-NEXT: `-NExpressionStatement
 ; CHECK-NEXT:   `-NLetExpression
 ; CHECK-NEXT:     |-NVariableDeclaration 'x' mut
-; CHECK-NEXT:     | `-NInteger 5
+; CHECK-NEXT:     | `-NMutRefExpression
+; CHECK-NEXT:     |   `-NInteger 5
 ; CHECK-NEXT:     `-body:
 ; CHECK-NEXT:       `-NDerefExpression
 ; CHECK-NEXT:         `-NIdentifier 'x'

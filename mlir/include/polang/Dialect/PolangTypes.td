@@ -137,38 +137,29 @@ def Polang_TypeVarType : Polang_Type<"TypeVar", "typevar"> {
 // Reference Types
 //===----------------------------------------------------------------------===//
 
-def Polang_MutRefType : Polang_Type<"MutRef", "mutref"> {
-  let summary = "Mutable reference type";
-  let description = [{
-    A mutable reference type that allows both reading and writing.
-    Created when declaring mutable variables with 'let x = mut value'.
-    The element type is the type of the referenced value.
-
-    Examples:
-    ```mlir
-    !polang.mutref<!polang.integer<64, signed>>  ; mut i64
-    !polang.mutref<!polang.float<64>>            ; mut f64
-    ```
-  }];
-  let parameters = (ins "mlir::Type":$elementType);
-  let assemblyFormat = "`<` $elementType `>`";
-}
-
 def Polang_RefType : Polang_Type<"Ref", "ref"> {
-  let summary = "Immutable reference type";
+  let summary = "Reference type (mutable or immutable)";
   let description = [{
-    An immutable reference type that allows only reading.
-    Created with 'ref expr' expressions.
-    The element type is the type of the referenced value.
+    A reference type that wraps a value. Can be mutable or immutable.
+    - Mutable: created with 'let x = mut value', allows reading and writing
+    - Immutable: created with 'ref expr', allows only reading
 
     Examples:
     ```mlir
-    !polang.ref<!polang.integer<64, signed>>  ; ref i64
-    !polang.ref<!polang.float<64>>            ; ref f64
+    !polang.ref<!polang.integer<64, signed>, mutable>   ; mutable ref i64
+    !polang.ref<!polang.integer<64, signed>>            ; immutable ref i64
     ```
   }];
-  let parameters = (ins "mlir::Type":$elementType);
-  let assemblyFormat = "`<` $elementType `>`";
+  let parameters = (ins
+    "mlir::Type":$elementType,
+    DefaultValuedParameter<"bool", "false">:$isMutable
+  );
+  let hasCustomAssemblyFormat = 1;
+
+  let extraClassDeclaration = [{
+    bool isMutable() const { return getIsMutable(); }
+    bool isImmutable() const { return !getIsMutable(); }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -188,7 +179,7 @@ def Polang_AnyNumericOrVar : AnyTypeOf<[
 
 def Polang_AnyTypeOrVar : AnyTypeOf<[
     Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_TypeVarType,
-    Polang_MutRefType, Polang_RefType
+    Polang_RefType
 ], "any Polang type or type variable">;
 
 // Bool or type variable (for if conditions before type inference)
@@ -206,19 +197,9 @@ def Polang_FloatOrTypeVar : AnyTypeOf<[
     Polang_FloatType, Polang_TypeVarType
 ], "float or type variable">;
 
-// Reference types (for reference operations)
-def Polang_AnyRefType : AnyTypeOf<[
-    Polang_MutRefType, Polang_RefType
-], "any reference type">;
-
-// Mutable reference or type variable
-def Polang_MutRefOrTypeVar : AnyTypeOf<[
-    Polang_MutRefType, Polang_TypeVarType
-], "mutable reference or type variable">;
-
-// Any reference or type variable
-def Polang_AnyRefOrTypeVar : AnyTypeOf<[
-    Polang_MutRefType, Polang_RefType, Polang_TypeVarType
-], "any reference type or type variable">;
+// Reference type or type variable
+def Polang_RefOrTypeVar : AnyTypeOf<[
+    Polang_RefType, Polang_TypeVarType
+], "reference type or type variable">;
 
 #endif // POLANG_TYPES_TD

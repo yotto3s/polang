@@ -137,6 +137,16 @@ void ASTPrinter::visit(const NDerefExpression& node) {
   }
 }
 
+void ASTPrinter::visit(const NMutRefExpression& node) {
+  printPrefix();
+  out << "NMutRefExpression\n";
+
+  {
+    DepthScope scope(*this, false);
+    node.expr->accept(*this);
+  }
+}
+
 void ASTPrinter::visit(const NBlock& node) {
   printPrefix();
   out << "NBlock\n";
@@ -218,7 +228,10 @@ void ASTPrinter::visit(const NExpressionStatement& node) {
 void ASTPrinter::visit(const NVariableDeclaration& node) {
   printPrefix();
   out << "NVariableDeclaration '" << node.id->name << "'";
-  if (node.isMutable) {
+  // Show 'mut' flag only if there's no type annotation with 'mut ' prefix
+  bool typeHasMut =
+      node.type != nullptr && node.type->name.substr(0, 4) == "mut ";
+  if (node.isMutable && !typeHasMut) {
     out << " mut";
   }
   if (node.type != nullptr) {

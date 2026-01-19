@@ -24,6 +24,7 @@ public:
   void visit(const NAssignment& node) override;
   void visit(const NRefExpression& node) override;
   void visit(const NDerefExpression& node) override;
+  void visit(const NMutRefExpression& node) override;
   void visit(const NBlock& node) override;
   void visit(const NIfExpression& node) override;
   void visit(const NLetExpression& node) override;

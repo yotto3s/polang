@@ -23,6 +23,8 @@ void NRefExpression::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NDerefExpression::accept(Visitor& visitor) const { visitor.visit(*this); }
 
+void NMutRefExpression::accept(Visitor& visitor) const { visitor.visit(*this); }
+
 void NBlock::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NIfExpression::accept(Visitor& visitor) const { visitor.visit(*this); }
