@@ -163,7 +163,8 @@ public:
     if (value) {
       result = *value;
       auto type = lookupType(node.name);
-      resultType = type ? type : std::make_shared<const NNamedType>(TypeNames::I64);
+      resultType =
+          type ? type : std::make_shared<const NNamedType>(TypeNames::I64);
       return;
     }
 
@@ -179,7 +180,8 @@ public:
     if (value) {
       result = *value;
       auto type = lookupType(mangled);
-      resultType = type ? type : std::make_shared<const NNamedType>(TypeNames::I64);
+      resultType =
+          type ? type : std::make_shared<const NNamedType>(TypeNames::I64);
       return;
     }
 
@@ -355,8 +357,8 @@ public:
       if (immIt != immutableValues.end()) {
         Value immVal = immIt->second;
         varType = lookupType(node.lhs->name);
-        Type elemType = varType != nullptr ? getPolangType(*varType)
-                                           : getDefaultType();
+        Type elemType =
+            varType != nullptr ? getPolangType(*varType) : getDefaultType();
         // Create immutable reference - RefStoreOp verifier will catch this
         Type immRefType =
             RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
@@ -399,9 +401,10 @@ public:
         Type refType =
             RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
         result = builder.create<RefCreateOp>(loc(), refType, mutRef);
-        resultType = innerType ? std::make_shared<const NRefType>(innerType)
-                               : std::make_shared<const NRefType>(
-                                     std::make_shared<const NNamedType>(TypeNames::I64));
+        resultType =
+            innerType ? std::make_shared<const NRefType>(innerType)
+                      : std::make_shared<const NRefType>(
+                            std::make_shared<const NNamedType>(TypeNames::I64));
         return;
       }
     }
@@ -421,14 +424,14 @@ public:
     if (isMutRef(innerType.get())) {
       // Convert mut ref to immutable ref
       auto inner = getInnerTypeSpec(innerType.get());
-      Type elemType =
-          inner ? getPolangType(*inner) : getDefaultType();
+      Type elemType = inner ? getPolangType(*inner) : getDefaultType();
       Type refType =
           RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
       result = builder.create<RefCreateOp>(loc(), refType, innerValue);
-      resultType = inner ? std::make_shared<const NRefType>(inner)
-                         : std::make_shared<const NRefType>(
-                               std::make_shared<const NNamedType>(TypeNames::I64));
+      resultType =
+          inner ? std::make_shared<const NRefType>(inner)
+                : std::make_shared<const NRefType>(
+                      std::make_shared<const NNamedType>(TypeNames::I64));
     } else {
       // The inner value is a plain value; create an immutable reference to it
       // First create a mutable reference to the value, then convert to
@@ -453,10 +456,9 @@ public:
                                   /*isMutable=*/false);
       result = builder.create<RefCreateOp>(loc(), refType, mutRef.getResult());
       resultType =
-          innerType
-              ? std::make_shared<const NRefType>(innerType)
-              : std::make_shared<const NRefType>(
-                    std::make_shared<const NNamedType>(TypeNames::I64));
+          innerType ? std::make_shared<const NRefType>(innerType)
+                    : std::make_shared<const NRefType>(
+                          std::make_shared<const NNamedType>(TypeNames::I64));
     }
   }
 
@@ -474,10 +476,9 @@ public:
       Type elemType = innerTypeSpec != nullptr ? getPolangType(*innerTypeSpec)
                                                : getDefaultType();
       result = builder.create<RefDerefOp>(loc(), elemType, refValue);
-      resultType =
-          innerTypeSpec != nullptr
-              ? innerTypeSpec
-              : std::make_shared<const NNamedType>(TypeNames::I64);
+      resultType = innerTypeSpec != nullptr
+                       ? innerTypeSpec
+                       : std::make_shared<const NNamedType>(TypeNames::I64);
     } else {
       emitError(loc()) << "Cannot dereference non-reference type: "
                        << (resultType ? resultType->getTypeName() : "unknown");
@@ -519,8 +520,8 @@ public:
     std::shared_ptr<const NTypeSpec> ifResultType = std::move(resultType);
 
     // Create if operation
-    Type resultTy = ifResultType ? getPolangType(*ifResultType)
-                                 : getDefaultType();
+    Type resultTy =
+        ifResultType ? getPolangType(*ifResultType) : getDefaultType();
     auto ifOp = builder.create<IfOp>(loc(), resultTy, condition);
 
     // Generate then region
@@ -641,8 +642,7 @@ public:
       }
 
       // Store the mutable reference type
-      typeTable[varName] =
-          std::make_shared<const NMutRefType>(baseType);
+      typeTable[varName] = std::make_shared<const NMutRefType>(baseType);
     } else {
       // Immutable binding - store to appropriate table based on type
       // NOLINTNEXTLINE(bugprone-branch-clone) - branches store to different
@@ -669,13 +669,12 @@ public:
       // declarations)
       if (isImmutRef(typeSpec.get())) {
         auto innerType = getInnerTypeSpec(typeSpec.get());
-        Type elemType = innerType != nullptr ? getPolangType(*innerType)
-                                             : getDefaultType();
+        Type elemType =
+            innerType != nullptr ? getPolangType(*innerType) : getDefaultType();
         result = builder.create<RefDerefOp>(loc(), elemType, initValue);
-        resultType =
-            innerType != nullptr
-                ? innerType
-                : std::make_shared<const NNamedType>(TypeNames::I64);
+        resultType = innerType != nullptr
+                         ? innerType
+                         : std::make_shared<const NNamedType>(TypeNames::I64);
       } else {
         result = initValue;
         resultType = typeSpec;
@@ -995,8 +994,8 @@ private:
 
   /// Look up a variable's type by name.
   /// Returns nullptr if not found.
-  [[nodiscard]] std::shared_ptr<const NTypeSpec> lookupType(
-      const std::string& name) {
+  [[nodiscard]] std::shared_ptr<const NTypeSpec>
+  lookupType(const std::string& name) {
     auto it = typeTable.find(name);
     if (it != typeTable.end()) {
       return it->second;
@@ -1136,8 +1135,8 @@ private:
 
   /// Get the inner type spec from a reference type.
   /// Returns nullptr if not a reference type.
-  [[nodiscard]] static std::shared_ptr<const NTypeSpec> getInnerTypeSpec(
-      const NTypeSpec* typeSpec) {
+  [[nodiscard]] static std::shared_ptr<const NTypeSpec>
+  getInnerTypeSpec(const NTypeSpec* typeSpec) {
     if (const auto* mutRef = dynamic_cast<const NMutRefType*>(typeSpec)) {
       return mutRef->innerType;
     }
