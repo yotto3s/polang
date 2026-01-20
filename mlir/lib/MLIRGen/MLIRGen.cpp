@@ -405,29 +405,6 @@ public:
   }
 
   void visit(const NRefExpression& node) override {
-    // Check for `ref *x` pattern where x is a mutable reference
-    // In this case, we skip the dereference and directly convert the mutable
-    // reference to an immutable reference, preserving the original storage.
-    if (const auto* derefExpr =
-            dynamic_cast<const NDerefExpression*>(node.expr.get())) {
-      derefExpr->ref->accept(*this);
-      if (isMutRef(resultType.get())) {
-        // Skip the dereference - directly convert mut ref to immutable ref
-        Value mutRef = result;
-        auto innerType = getInnerTypeSpec(resultType.get());
-        Type elemType =
-            innerType ? getPolangType(*innerType) : getDefaultType();
-        Type refType =
-            RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
-        result = builder.create<RefCreateOp>(loc(node.loc), refType, mutRef);
-        resultType =
-            innerType ? std::make_shared<const NRefType>(innerType)
-                      : std::make_shared<const NRefType>(
-                            std::make_shared<const NNamedType>(TypeNames::I64));
-        return;
-      }
-    }
-
     // Evaluate the inner expression
     node.expr->accept(*this);
     if (!result) {
