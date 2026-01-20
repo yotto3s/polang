@@ -97,7 +97,11 @@ public:
   /// Get a Polang type from annotation, or a fresh type variable if none
   Type getTypeOrFresh(const NTypeSpec* typeAnnotation) {
     if (typeAnnotation != nullptr) {
-      return getPolangType(*typeAnnotation);
+      Type ty = getPolangType(*typeAnnotation);
+      if (!ty) {
+        return nullptr; // Propagate error
+      }
+      return ty;
     }
     // No annotation - always emit type variable for polymorphic inference
     return freshTypeVar();
@@ -115,6 +119,11 @@ public:
 
     // Generate the main function that wraps the top-level code
     generateMainFunction(block);
+
+    // Check if any errors occurred during MLIR generation
+    if (hasMLIRGenErrors) {
+      return nullptr;
+    }
 
     // Skip module verification since type variables may be present.
     // Type inference pass will resolve them and verification will happen later.
@@ -238,6 +247,10 @@ public:
       auto funcRetTypeIt = functionReturnTypes.find(funcName);
       if (funcRetTypeIt != functionReturnTypes.end()) {
         resultTy = getPolangType(*funcRetTypeIt->second);
+        if (!resultTy) {
+          result = nullptr;
+          return;
+        }
         resultType = funcRetTypeIt->second;
       } else {
         // Function not found - generate fresh type var for unknown function
@@ -327,6 +340,10 @@ public:
 
     // Get the target type
     Type targetType = getPolangType(*node.targetType);
+    if (!targetType) {
+      result = nullptr;
+      return;
+    }
 
     // Create the cast operation
     result = builder.create<CastOp>(loc(), targetType, inputValue);
@@ -608,6 +625,10 @@ public:
       // Mutable: Create a mutable reference using the resolved type from type
       // checker
       Type polangType = getPolangType(*baseType);
+      if (!polangType) {
+        result = nullptr;
+        return;
+      }
       Type mutRefType =
           RefType::get(builder.getContext(), polangType, /*isMutable=*/true);
 
@@ -880,6 +901,9 @@ private:
   // Type variable counter for generating fresh type variables
   uint64_t nextTypeVarId = 0;
 
+  // Track whether any errors occurred during MLIR generation
+  bool hasMLIRGenErrors = false;
+
   // Current result value and type
   Value result;
   std::shared_ptr<const NTypeSpec> resultType;
@@ -1020,9 +1044,13 @@ private:
           dynamic_cast<const NMutRefType*>(mutRef->innerType.get()) !=
               nullptr) {
         emitError(loc()) << "nested reference types not allowed";
+        hasMLIRGenErrors = true;
         return nullptr;
       }
       Type elemType = getPolangType(*mutRef->innerType);
+      if (!elemType) {
+        return nullptr;
+      }
       return RefType::get(builder.getContext(), elemType, /*isMutable=*/true);
     }
 
@@ -1032,9 +1060,13 @@ private:
       if (dynamic_cast<const NRefType*>(ref->innerType.get()) != nullptr ||
           dynamic_cast<const NMutRefType*>(ref->innerType.get()) != nullptr) {
         emitError(loc()) << "nested reference types not allowed";
+        hasMLIRGenErrors = true;
         return nullptr;
       }
       Type elemType = getPolangType(*ref->innerType);
+      if (!elemType) {
+        return nullptr;
+      }
       return RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
     }
 
@@ -1190,6 +1222,9 @@ private:
       // Type checker found a concrete type - use it
       auto typeSpec = makeTypeSpecFromString(inferredType);
       returnType = getPolangType(*typeSpec);
+      if (!returnType) {
+        return; // Stop generating if type error
+      }
     }
 
     // Create entry function with dynamic return type
