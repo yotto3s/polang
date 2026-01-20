@@ -205,15 +205,31 @@ v                    ; still 10 (v holds a copy of the value)
 
 ### Immutable References (`ref T`)
 
-Immutable references provide read-only access to a memory location. Create them using the `ref` keyword on a value:
+Immutable references provide read-only access to a memory location. Create them using the `ref` keyword.
+
+**`ref *x` - Copy semantics (value snapshot):**
+
+When you write `ref *x`, the value is dereferenced and copied to new storage. The immutable reference does NOT share storage with the original, so mutations to the original are not visible:
 
 ```
 let x = mut 10       ; x is mut i64
-let r = ref *x       ; r is ref i64 (immutable reference to x's location)
+let r = ref *x       ; r is ref i64 (copy of x's value)
+*r                   ; read value (10)
+x <- 20              ; write through mutable reference
+*r                   ; still 10 (r has its own copy)
+; r <- 30            ; ERROR: cannot write through immutable reference
+```
+
+**`ref x` - Shared storage (alias):**
+
+When you write `ref x` (without dereference), the immutable reference shares storage with the mutable reference. Mutations through the original are visible:
+
+```
+let x = mut 10       ; x is mut i64
+let r = ref x        ; r is ref i64 (shares storage with x)
 *r                   ; read value (10)
 x <- 20              ; write through mutable reference
 *r                   ; reads 20 (r sees the update)
-; r <- 30            ; ERROR: cannot write through immutable reference
 ```
 
 **Type Annotations:**
@@ -263,12 +279,19 @@ let copy = *x        ; copy holds the value 100
 x <- 200
 copy                 ; still 100
 
-; Immutable reference
+; Immutable reference (copy with ref *x)
 let data = mut 42
 let reader = ref *data
 *reader              ; 42
 data <- 99
-*reader              ; 99 (sees the mutation)
+*reader              ; still 42 (reader has its own copy)
+
+; Immutable reference (shared storage with ref x)
+let data2 = mut 42
+let reader2 = ref data2
+*reader2             ; 42
+data2 <- 99
+*reader2             ; 99 (sees the mutation)
 ```
 
 ## Functions
