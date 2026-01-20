@@ -50,6 +50,10 @@ std::unique_ptr<NBlock> programBlock;
 
 // Forward declaration of lexer function
 yy::parser::symbol_type yylex();
+
+// Macro to set source location on a node
+#define SET_LOC(node, bisonLoc) \
+  do { if (node) (node)->setLocation((bisonLoc).begin.line, (bisonLoc).begin.column); } while(0)
 }
 
 // Tokens with string values
@@ -143,7 +147,7 @@ yy::parser::symbol_type yylex();
 program : stmts { programBlock = std::move($1); }
         ;
 
-stmts : %empty { $$ = std::make_unique<NBlock>(); }
+stmts : %empty { $$ = std::make_unique<NBlock>(); SET_LOC($$, @$); }
       | stmts stmt { $1->statements.push_back(std::move($2)); $$ = std::move($1); }
       ;
 
@@ -151,40 +155,54 @@ stmt : var_decl { $$ = std::move($1); }
      | func_decl { $$ = std::move($1); }
      | module_decl { $$ = std::move($1); }
      | import_stmt { $$ = std::move($1); }
-     | expr { $$ = std::make_unique<NExpressionStatement>(std::move($1)); }
+     | expr { $$ = std::make_unique<NExpressionStatement>(std::move($1)); SET_LOC($$, @$); }
      ;
 
 var_decl : TLET ident TEQUAL expr {
              /* let x = expr (immutable, type to be inferred) */
              $$ = std::make_unique<NVariableDeclaration>(std::move($2), std::move($4));
+             SET_LOC($$, @$);
            }
          | TLET ident TCOLON type_spec TEQUAL expr {
              /* let x : type = expr (immutable) */
              $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move($6));
+             SET_LOC($$, @$);
            }
          | TLET ident TEQUAL TMUT expr {
              /* let x = mut expr (mutable, type to be inferred from NMutRefExpression) */
-             $$ = std::make_unique<NVariableDeclaration>(std::move($2),
-                 std::make_unique<NMutRefExpression>(std::move($5)));
+             auto mutRef = std::make_unique<NMutRefExpression>(std::move($5));
+             SET_LOC(mutRef, @4);
+             $$ = std::make_unique<NVariableDeclaration>(std::move($2), std::move(mutRef));
+             SET_LOC($$, @$);
            }
          | TLET ident TCOLON type_spec TEQUAL TMUT expr {
              /* let x : type = mut expr (mutable) */
-             $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2),
-                 std::make_unique<NMutRefExpression>(std::move($7)));
+             auto mutRef = std::make_unique<NMutRefExpression>(std::move($7));
+             SET_LOC(mutRef, @6);
+             $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move(mutRef));
+             SET_LOC($$, @$);
            }
          ;
 
 func_decl : TLET ident func_decl_args TCOLON type_spec TEQUAL expr {
               /* let fname (x : type) ... : rettype = expr */
               auto body = std::make_unique<NBlock>();
-              body->statements.push_back(std::make_unique<NExpressionStatement>(std::move($7)));
+              SET_LOC(body, @7);
+              auto exprStmt = std::make_unique<NExpressionStatement>(std::move($7));
+              SET_LOC(exprStmt, @7);
+              body->statements.push_back(std::move(exprStmt));
               $$ = std::make_unique<NFunctionDeclaration>(std::move($5), std::move($2), std::move($3), std::move(body));
+              SET_LOC($$, @$);
             }
           | TLET ident func_decl_args TEQUAL expr {
               /* let fname (x : type) ... = expr (return type to be inferred) */
               auto body = std::make_unique<NBlock>();
-              body->statements.push_back(std::make_unique<NExpressionStatement>(std::move($5)));
+              SET_LOC(body, @5);
+              auto exprStmt = std::make_unique<NExpressionStatement>(std::move($5));
+              SET_LOC(exprStmt, @5);
+              body->statements.push_back(std::move(exprStmt));
               $$ = std::make_unique<NFunctionDeclaration>(std::move($2), std::move($3), std::move(body));
+              SET_LOC($$, @$);
             }
           ;
 
@@ -213,10 +231,12 @@ func_param_list : func_param {
 func_param : ident TCOLON type_spec {
                /* x : type (explicit type annotation) */
                $$ = std::make_unique<NVariableDeclaration>(std::move($3), std::move($1), nullptr);
+               SET_LOC($$, @$);
              }
            | ident {
                /* x (type to be inferred) */
                $$ = std::make_unique<NVariableDeclaration>(std::move($1), nullptr);
+               SET_LOC($$, @$);
              }
            ;
 
@@ -224,10 +244,12 @@ func_param : ident TCOLON type_spec {
 module_decl : TMODULE ident TLPAREN ident_list TRPAREN module_body TENDMODULE {
                 /* module Name (export1, export2, ...) ... endmodule */
                 $$ = std::make_unique<NModuleDeclaration>(std::move($2), std::move($4), std::move($6));
+                SET_LOC($$, @$);
               }
             | TMODULE ident module_body TENDMODULE {
                 /* module Name ... endmodule (no exports, all private) */
                 $$ = std::make_unique<NModuleDeclaration>(std::move($2), std::move($3));
+                SET_LOC($$, @$);
               }
             ;
 
@@ -251,18 +273,22 @@ ident_list : ident {
 import_stmt : TIMPORT qualified_name {
                 /* import Math */
                 $$ = std::make_unique<NImportStatement>(std::move($2));
+                SET_LOC($$, @$);
               }
             | TIMPORT qualified_name TAS ident {
                 /* import Math as M */
                 $$ = std::make_unique<NImportStatement>(std::move($2), $4->name);
+                SET_LOC($$, @$);
               }
             | TFROM qualified_name TIMPORT import_items {
                 /* from Math import add, PI */
                 $$ = std::make_unique<NImportStatement>(std::move($2), std::move($4), false);
+                SET_LOC($$, @$);
               }
             | TFROM qualified_name TIMPORT TMUL {
                 /* from Math import * */
                 $$ = std::make_unique<NImportStatement>(std::move($2), ImportItemList(), true);
+                SET_LOC($$, @$);
               }
             ;
 
@@ -270,6 +296,7 @@ qualified_name : ident {
                    StringList parts;
                    parts.push_back($1->name);
                    $$ = std::make_unique<NQualifiedName>(std::move(parts));
+                   SET_LOC($$, @$);
                  }
                | qualified_name TDOT ident {
                    $1->parts.push_back($3->name);
@@ -295,7 +322,7 @@ import_items : ident {
                }
              ;
 
-ident : TIDENTIFIER { $$ = std::make_unique<NIdentifier>($1); }
+ident : TIDENTIFIER { $$ = std::make_unique<NIdentifier>($1); SET_LOC($$, @$); }
       ;
 
 type_spec : ident {
@@ -309,17 +336,18 @@ type_spec : ident {
             }
           ;
 
-numeric : TINTEGER { $$ = std::make_unique<NInteger>(atol($1.c_str())); }
-        | TDOUBLE { $$ = std::make_unique<NDouble>(atof($1.c_str())); }
+numeric : TINTEGER { $$ = std::make_unique<NInteger>(atol($1.c_str())); SET_LOC($$, @$); }
+        | TDOUBLE { $$ = std::make_unique<NDouble>(atof($1.c_str())); SET_LOC($$, @$); }
         ;
 
-boolean : TTRUE { $$ = std::make_unique<NBoolean>(true); }
-        | TFALSE { $$ = std::make_unique<NBoolean>(false); }
+boolean : TTRUE { $$ = std::make_unique<NBoolean>(true); SET_LOC($$, @$); }
+        | TFALSE { $$ = std::make_unique<NBoolean>(false); SET_LOC($$, @$); }
         ;
 
-expr : ident TLARROW expr { $$ = std::make_unique<NAssignment>(std::move($1), std::move($3)); }
+expr : ident TLARROW expr { $$ = std::make_unique<NAssignment>(std::move($1), std::move($3)); SET_LOC($$, @$); }
      | ident TLPAREN call_args TRPAREN {
          $$ = std::make_unique<NMethodCall>(std::move($1), std::move($3));
+         SET_LOC($$, @$);
        }
      | ident { $$ = std::move($1); }
      | ident TDOT ident TLPAREN call_args TRPAREN {
@@ -328,7 +356,9 @@ expr : ident TLARROW expr { $$ = std::make_unique<NAssignment>(std::move($1), st
          parts.push_back($1->name);
          parts.push_back($3->name);
          auto qname = std::make_unique<NQualifiedName>(std::move(parts));
+         SET_LOC(qname, @1);
          $$ = std::make_unique<NMethodCall>(std::move(qname), std::move($5));
+         SET_LOC($$, @$);
        }
      | ident TDOT ident TDOT ident TLPAREN call_args TRPAREN {
          /* Nested qualified function call: Math.Internal.helper(5) */
@@ -337,7 +367,9 @@ expr : ident TLARROW expr { $$ = std::make_unique<NAssignment>(std::move($1), st
          parts.push_back($3->name);
          parts.push_back($5->name);
          auto qname = std::make_unique<NQualifiedName>(std::move(parts));
+         SET_LOC(qname, @1);
          $$ = std::make_unique<NMethodCall>(std::move(qname), std::move($7));
+         SET_LOC($$, @$);
        }
      | ident TDOT ident {
          /* Qualified variable access: Math.PI */
@@ -345,6 +377,7 @@ expr : ident TLARROW expr { $$ = std::make_unique<NAssignment>(std::move($1), st
          parts.push_back($1->name);
          parts.push_back($3->name);
          $$ = std::make_unique<NQualifiedName>(std::move(parts));
+         SET_LOC($$, @$);
        }
      | ident TDOT ident TDOT ident {
          /* Nested qualified variable access: Math.Internal.PI */
@@ -353,41 +386,52 @@ expr : ident TLARROW expr { $$ = std::make_unique<NAssignment>(std::move($1), st
          parts.push_back($3->name);
          parts.push_back($5->name);
          $$ = std::make_unique<NQualifiedName>(std::move(parts));
+         SET_LOC($$, @$);
        }
      | numeric { $$ = std::move($1); }
      | boolean { $$ = std::move($1); }
      | expr comparison expr %prec COMPARISON {
          $$ = std::make_unique<NBinaryOperator>(std::move($1), $2, std::move($3));
+         SET_LOC($$, @$);
        }
      | expr TPLUS expr {
          $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TPLUS, std::move($3));
+         SET_LOC($$, @$);
        }
      | expr TMINUS expr {
          $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TMINUS, std::move($3));
+         SET_LOC($$, @$);
        }
      | expr TMUL expr {
          $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TMUL, std::move($3));
+         SET_LOC($$, @$);
        }
      | expr TDIV expr {
          $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TDIV, std::move($3));
+         SET_LOC($$, @$);
        }
      | expr TAS type_spec {
          $$ = std::make_unique<NCastExpression>(std::move($1), std::move($3));
+         SET_LOC($$, @$);
        }
      | TLPAREN expr TRPAREN { $$ = std::move($2); }
      | TIF expr TTHEN expr TELSE expr {
          $$ = std::make_unique<NIfExpression>(std::move($2), std::move($4), std::move($6));
+         SET_LOC($$, @$);
        }
      | TLET let_bindings TIN expr {
          $$ = std::make_unique<NLetExpression>(std::move($2), std::move($4));
+         SET_LOC($$, @$);
        }
      | TREF expr %prec TREF {
          /* ref expr - create immutable reference */
          $$ = std::make_unique<NRefExpression>(std::move($2));
+         SET_LOC($$, @$);
        }
      | TMUL expr %prec TDEREF {
          /* *expr - dereference a reference */
          $$ = std::make_unique<NDerefExpression>(std::move($2));
+         SET_LOC($$, @$);
        }
      ;
 
@@ -414,39 +458,53 @@ let_bindings : let_binding {
 
 let_binding : ident TEQUAL expr {
                 /* x = expr (immutable, type to be inferred) */
-                $$ = std::make_unique<NLetBinding>(
-                    std::make_unique<NVariableDeclaration>(std::move($1), std::move($3)));
+                auto varDecl = std::make_unique<NVariableDeclaration>(std::move($1), std::move($3));
+                SET_LOC(varDecl, @$);
+                $$ = std::make_unique<NLetBinding>(std::move(varDecl));
               }
             | ident TCOLON type_spec TEQUAL expr {
                 /* x : type = expr (immutable) */
-                $$ = std::make_unique<NLetBinding>(
-                    std::make_unique<NVariableDeclaration>(std::move($3), std::move($1), std::move($5)));
+                auto varDecl = std::make_unique<NVariableDeclaration>(std::move($3), std::move($1), std::move($5));
+                SET_LOC(varDecl, @$);
+                $$ = std::make_unique<NLetBinding>(std::move(varDecl));
               }
             | ident TEQUAL TMUT expr {
                 /* x = mut expr (mutable, type to be inferred from NMutRefExpression) */
-                $$ = std::make_unique<NLetBinding>(
-                    std::make_unique<NVariableDeclaration>(std::move($1),
-                        std::make_unique<NMutRefExpression>(std::move($4))));
+                auto mutRef = std::make_unique<NMutRefExpression>(std::move($4));
+                SET_LOC(mutRef, @3);
+                auto varDecl = std::make_unique<NVariableDeclaration>(std::move($1), std::move(mutRef));
+                SET_LOC(varDecl, @$);
+                $$ = std::make_unique<NLetBinding>(std::move(varDecl));
               }
             | ident TCOLON type_spec TEQUAL TMUT expr {
                 /* x : type = mut expr (mutable) */
-                $$ = std::make_unique<NLetBinding>(
-                    std::make_unique<NVariableDeclaration>(std::move($3), std::move($1),
-                        std::make_unique<NMutRefExpression>(std::move($6))));
+                auto mutRef = std::make_unique<NMutRefExpression>(std::move($6));
+                SET_LOC(mutRef, @5);
+                auto varDecl = std::make_unique<NVariableDeclaration>(std::move($3), std::move($1), std::move(mutRef));
+                SET_LOC(varDecl, @$);
+                $$ = std::make_unique<NLetBinding>(std::move(varDecl));
               }
             | ident func_decl_args TCOLON type_spec TEQUAL expr {
                 /* f(x: int): int = expr */
                 auto body = std::make_unique<NBlock>();
-                body->statements.push_back(std::make_unique<NExpressionStatement>(std::move($6)));
-                $$ = std::make_unique<NLetBinding>(
-                    std::make_unique<NFunctionDeclaration>(std::move($4), std::move($1), std::move($2), std::move(body)));
+                SET_LOC(body, @6);
+                auto exprStmt = std::make_unique<NExpressionStatement>(std::move($6));
+                SET_LOC(exprStmt, @6);
+                body->statements.push_back(std::move(exprStmt));
+                auto funcDecl = std::make_unique<NFunctionDeclaration>(std::move($4), std::move($1), std::move($2), std::move(body));
+                SET_LOC(funcDecl, @$);
+                $$ = std::make_unique<NLetBinding>(std::move(funcDecl));
               }
             | ident func_decl_args TEQUAL expr {
                 /* f(x: int) = expr (return type inferred) */
                 auto body = std::make_unique<NBlock>();
-                body->statements.push_back(std::make_unique<NExpressionStatement>(std::move($4)));
-                $$ = std::make_unique<NLetBinding>(
-                    std::make_unique<NFunctionDeclaration>(std::move($1), std::move($2), std::move(body)));
+                SET_LOC(body, @4);
+                auto exprStmt = std::make_unique<NExpressionStatement>(std::move($4));
+                SET_LOC(exprStmt, @4);
+                body->statements.push_back(std::move(exprStmt));
+                auto funcDecl = std::make_unique<NFunctionDeclaration>(std::move($1), std::move($2), std::move(body));
+                SET_LOC(funcDecl, @$);
+                $$ = std::make_unique<NLetBinding>(std::move(funcDecl));
               }
             ;
 

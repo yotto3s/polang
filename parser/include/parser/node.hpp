@@ -13,6 +13,15 @@ class NVariableDeclaration;
 class NFunctionDeclaration;
 class NIdentifier;
 
+// Source location information for error reporting
+struct SourceLocation {
+  int line = 0;
+  int column = 0;
+  SourceLocation() = default;
+  SourceLocation(int l, int c) : line(l), column(c) {}
+  [[nodiscard]] bool isValid() const { return line > 0; }
+};
+
 // Smart pointer type aliases for owning containers
 using StatementList = std::vector<std::unique_ptr<NStatement>>;
 using ExpressionList = std::vector<std::unique_ptr<NExpression>>;
@@ -35,8 +44,10 @@ using LetBindingList = std::vector<std::unique_ptr<NLetBinding>>;
 // clang-format off
 class Node {
 public:
+  SourceLocation loc;
   virtual ~Node() noexcept = default;
   virtual void accept(Visitor &visitor) const = 0;
+  void setLocation(int line, int column) { loc = SourceLocation(line, column); }
 };
 
 class NExpression : public Node {};

@@ -83,8 +83,9 @@ makeTypeSpecFromString(const std::string& typeName) {
 
 class MLIRGenVisitor : public Visitor {
 public:
-  MLIRGenVisitor(MLIRContext& context, bool /*emitTypeVars*/ = false)
-      : builder(&context) {
+  MLIRGenVisitor(MLIRContext& context, bool /*emitTypeVars*/ = false,
+                 const std::string& filename = "<source>")
+      : builder(&context), sourceFilename(filename) {
     // Create a new module
     module = ModuleOp::create(builder.getUnknownLoc());
   }
@@ -151,19 +152,19 @@ public:
   void visit(const NInteger& node) override {
     // Create type variable constrained to integer types
     auto type = freshTypeVar(TypeVarKind::Integer);
-    result = builder.create<ConstantIntegerOp>(loc(), type, node.value);
+    result = builder.create<ConstantIntegerOp>(loc(node.loc), type, node.value);
     resultType = std::make_shared<const NNamedType>(TypeNames::GENERIC_INT);
   }
 
   void visit(const NDouble& node) override {
     // Create type variable constrained to float types
     auto type = freshTypeVar(TypeVarKind::Float);
-    result = builder.create<ConstantFloatOp>(loc(), type, node.value);
+    result = builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
     resultType = std::make_shared<const NNamedType>(TypeNames::GENERIC_FLOAT);
   }
 
   void visit(const NBoolean& node) override {
-    result = builder.create<ConstantBoolOp>(loc(), node.value);
+    result = builder.create<ConstantBoolOp>(loc(node.loc), node.value);
     resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
   }
 
@@ -177,7 +178,7 @@ public:
       return;
     }
 
-    emitError(loc()) << "Unknown variable: " << node.name;
+    emitError(loc(node.loc)) << "Unknown variable: " << node.name;
     result = nullptr;
   }
 
@@ -194,7 +195,7 @@ public:
       return;
     }
 
-    emitError(loc()) << "Unknown qualified name: " << node.fullName();
+    emitError(loc(node.loc)) << "Unknown qualified name: " << node.fullName();
     result = nullptr;
   }
 
@@ -260,7 +261,7 @@ public:
     }
 
     auto callOp =
-        builder.create<CallOp>(loc(), funcName, TypeRange{resultTy}, args);
+        builder.create<CallOp>(loc(node.loc), funcName, TypeRange{resultTy}, args);
     result = callOp.getResult();
   }
 
@@ -283,48 +284,48 @@ public:
     switch (node.op) {
     // Arithmetic operations - use LHS type as result type
     case yy::parser::token::TPLUS:
-      result = builder.create<AddOp>(loc(), arithResultTy, lhs, rhs);
+      result = builder.create<AddOp>(loc(node.loc), arithResultTy, lhs, rhs);
       resultType = std::move(lhsType);
       break;
     case yy::parser::token::TMINUS:
-      result = builder.create<SubOp>(loc(), arithResultTy, lhs, rhs);
+      result = builder.create<SubOp>(loc(node.loc), arithResultTy, lhs, rhs);
       resultType = std::move(lhsType);
       break;
     case yy::parser::token::TMUL:
-      result = builder.create<MulOp>(loc(), arithResultTy, lhs, rhs);
+      result = builder.create<MulOp>(loc(node.loc), arithResultTy, lhs, rhs);
       resultType = std::move(lhsType);
       break;
     case yy::parser::token::TDIV:
-      result = builder.create<DivOp>(loc(), arithResultTy, lhs, rhs);
+      result = builder.create<DivOp>(loc(node.loc), arithResultTy, lhs, rhs);
       resultType = std::move(lhsType);
       break;
     // Comparison operations - result is always bool
     case yy::parser::token::TCEQ:
-      result = builder.create<CmpOp>(loc(), CmpPredicate::eq, lhs, rhs);
+      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::eq, lhs, rhs);
       resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
       break;
     case yy::parser::token::TCNE:
-      result = builder.create<CmpOp>(loc(), CmpPredicate::ne, lhs, rhs);
+      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::ne, lhs, rhs);
       resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
       break;
     case yy::parser::token::TCLT:
-      result = builder.create<CmpOp>(loc(), CmpPredicate::lt, lhs, rhs);
+      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::lt, lhs, rhs);
       resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
       break;
     case yy::parser::token::TCLE:
-      result = builder.create<CmpOp>(loc(), CmpPredicate::le, lhs, rhs);
+      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::le, lhs, rhs);
       resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
       break;
     case yy::parser::token::TCGT:
-      result = builder.create<CmpOp>(loc(), CmpPredicate::gt, lhs, rhs);
+      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::gt, lhs, rhs);
       resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
       break;
     case yy::parser::token::TCGE:
-      result = builder.create<CmpOp>(loc(), CmpPredicate::ge, lhs, rhs);
+      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::ge, lhs, rhs);
       resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
       break;
     default:
-      emitError(loc()) << "Unknown binary operator: " << node.op;
+      emitError(loc(node.loc)) << "Unknown binary operator: " << node.op;
       result = nullptr;
       break;
     }
@@ -346,7 +347,7 @@ public:
     }
 
     // Create the cast operation
-    result = builder.create<CastOp>(loc(), targetType, inputValue);
+    result = builder.create<CastOp>(loc(node.loc), targetType, inputValue);
     resultType = node.targetType;
   }
 
@@ -379,11 +380,11 @@ public:
         // Create immutable reference - RefStoreOp verifier will catch this
         Type immRefType =
             RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
-        auto immRef = builder.create<RefCreateOp>(loc(), immRefType, immVal,
+        auto immRef = builder.create<RefCreateOp>(loc(node.loc), immRefType, immVal,
                                                   /*is_mutable=*/false);
         refForStore = immRef.getResult();
       } else {
-        emitError(loc()) << "Unknown variable in assignment: "
+        emitError(loc(node.loc)) << "Unknown variable in assignment: "
                          << node.lhs->name;
         result = nullptr;
         return;
@@ -395,7 +396,7 @@ public:
 
     // Store through the reference (MLIR verifier will catch immutable stores)
     auto storeOp =
-        builder.create<RefStoreOp>(loc(), elemType, value, refForStore);
+        builder.create<RefStoreOp>(loc(node.loc), elemType, value, refForStore);
 
     // Assignment expression returns the assigned value
     result = storeOp.getResult();
@@ -417,7 +418,7 @@ public:
             innerType ? getPolangType(*innerType) : getDefaultType();
         Type refType =
             RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
-        result = builder.create<RefCreateOp>(loc(), refType, mutRef);
+        result = builder.create<RefCreateOp>(loc(node.loc), refType, mutRef);
         resultType =
             innerType ? std::make_shared<const NRefType>(innerType)
                       : std::make_shared<const NRefType>(
@@ -444,7 +445,7 @@ public:
       Type elemType = inner ? getPolangType(*inner) : getDefaultType();
       Type refType =
           RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
-      result = builder.create<RefCreateOp>(loc(), refType, innerValue);
+      result = builder.create<RefCreateOp>(loc(node.loc), refType, innerValue);
       resultType =
           inner ? std::make_shared<const NRefType>(inner)
                 : std::make_shared<const NRefType>(
@@ -459,19 +460,19 @@ public:
       // Cast the value to the resolved type if needed (e.g., TypeVarType to
       // i32)
       if (innerValue.getType() != innerMLIRType) {
-        innerValue = builder.create<CastOp>(loc(), innerMLIRType, innerValue);
+        innerValue = builder.create<CastOp>(loc(node.loc), innerMLIRType, innerValue);
       }
 
       // Create a mutable reference from the value
       Type mutRefType =
           RefType::get(builder.getContext(), innerMLIRType, /*isMutable=*/true);
-      auto mutRef = builder.create<RefCreateOp>(loc(), mutRefType, innerValue,
+      auto mutRef = builder.create<RefCreateOp>(loc(node.loc), mutRefType, innerValue,
                                                 /*is_mutable=*/true);
 
       // Convert the mutable reference to an immutable reference
       Type refType = RefType::get(builder.getContext(), innerMLIRType,
                                   /*isMutable=*/false);
-      result = builder.create<RefCreateOp>(loc(), refType, mutRef.getResult());
+      result = builder.create<RefCreateOp>(loc(node.loc), refType, mutRef.getResult());
       resultType =
           innerType ? std::make_shared<const NRefType>(innerType)
                     : std::make_shared<const NRefType>(
@@ -492,12 +493,12 @@ public:
       auto innerTypeSpec = getInnerTypeSpec(resultType.get());
       Type elemType = innerTypeSpec != nullptr ? getPolangType(*innerTypeSpec)
                                                : getDefaultType();
-      result = builder.create<RefDerefOp>(loc(), elemType, refValue);
+      result = builder.create<RefDerefOp>(loc(node.loc), elemType, refValue);
       resultType = innerTypeSpec != nullptr
                        ? innerTypeSpec
                        : std::make_shared<const NNamedType>(TypeNames::I64);
     } else {
-      emitError(loc()) << "Cannot dereference non-reference type: "
+      emitError(loc(node.loc)) << "Cannot dereference non-reference type: "
                        << (resultType ? resultType->getTypeName() : "unknown");
       result = nullptr;
     }
@@ -539,7 +540,7 @@ public:
     // Create if operation
     Type resultTy =
         ifResultType ? getPolangType(*ifResultType) : getDefaultType();
-    auto ifOp = builder.create<IfOp>(loc(), resultTy, condition);
+    auto ifOp = builder.create<IfOp>(loc(node.loc), resultTy, condition);
 
     // Generate then region
     {
@@ -547,7 +548,7 @@ public:
       builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
       node.thenExpr->accept(*this);
       if (result) {
-        builder.create<YieldOp>(loc(), result);
+        builder.create<YieldOp>(loc(node.thenExpr->loc), result);
       }
     }
 
@@ -557,7 +558,7 @@ public:
       builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
       node.elseExpr->accept(*this);
       if (result) {
-        builder.create<YieldOp>(loc(), result);
+        builder.create<YieldOp>(loc(node.elseExpr->loc), result);
       }
     }
 
@@ -642,14 +643,14 @@ public:
           } else {
             // Create new mutable reference with initial value
             auto mutRefOp =
-                builder.create<RefCreateOp>(loc(), mutRefType, initValue,
+                builder.create<RefCreateOp>(loc(node.loc), mutRefType, initValue,
                                             /*is_mutable=*/true);
             mutableRefTable[varName] = mutRefOp.getResult();
           }
         } else {
           // Create new mutable reference with initial value
           auto mutRefOp =
-              builder.create<RefCreateOp>(loc(), mutRefType, initValue,
+              builder.create<RefCreateOp>(loc(node.loc), mutRefType, initValue,
                                           /*is_mutable=*/true);
           mutableRefTable[varName] = mutRefOp.getResult();
         }
@@ -657,7 +658,7 @@ public:
         // Create uninitialized mutable reference - use default value
         Type llvmType = convertPolangType(polangType);
         auto memRefType = MemRefType::get({}, llvmType);
-        auto alloca = builder.create<AllocaOp>(loc(), memRefType, varName,
+        auto alloca = builder.create<AllocaOp>(loc(node.loc), memRefType, varName,
                                                polangType, isMutable);
         mutableRefTable[varName] = alloca;
       }
@@ -692,7 +693,7 @@ public:
         auto innerType = getInnerTypeSpec(typeSpec.get());
         Type elemType =
             innerType != nullptr ? getPolangType(*innerType) : getDefaultType();
-        result = builder.create<RefDerefOp>(loc(), elemType, initValue);
+        result = builder.create<RefDerefOp>(loc(node.loc), elemType, initValue);
         resultType = innerType != nullptr
                          ? innerType
                          : std::make_shared<const NNamedType>(TypeNames::I64);
@@ -753,7 +754,7 @@ public:
       captureRefs.push_back(name);
     }
 
-    auto funcOp = builder.create<FuncOp>(loc(), funcName, funcType,
+    auto funcOp = builder.create<FuncOp>(loc(node.loc), funcName, funcType,
                                          ArrayRef<StringRef>(captureRefs));
 
     // Create entry block with arguments
@@ -792,9 +793,9 @@ public:
     // Add return - NOLINTNEXTLINE(bugprone-branch-clone) - different op
     // signatures
     if (result) {
-      builder.create<ReturnOp>(loc(), result);
+      builder.create<ReturnOp>(loc(node.block->loc), result);
     } else {
-      builder.create<ReturnOp>(loc());
+      builder.create<ReturnOp>(loc(node.loc));
     }
 
     result = nullptr; // Function declarations don't produce a value
@@ -897,6 +898,7 @@ private:
   OpBuilder builder;
   ModuleOp module;
   TypeChecker typeChecker;
+  std::string sourceFilename;
 
   // Type variable counter for generating fresh type variables
   uint64_t nextTypeVarId = 0;
@@ -978,7 +980,14 @@ private:
     std::map<std::string, Value> savedImmutableValues;
   };
 
-  Location loc() { return builder.getUnknownLoc(); }
+  /// Create MLIR location from source location
+  Location loc(const SourceLocation& srcLoc) {
+    if (srcLoc.isValid()) {
+      return FileLineColLoc::get(builder.getContext(), sourceFilename,
+                                 srcLoc.line, srcLoc.column);
+    }
+    return builder.getUnknownLoc();
+  }
 
   /// Look up a mutable reference by name.
   /// Returns the reference value itself (not dereferenced).
@@ -1043,7 +1052,7 @@ private:
       if (dynamic_cast<const NRefType*>(mutRef->innerType.get()) != nullptr ||
           dynamic_cast<const NMutRefType*>(mutRef->innerType.get()) !=
               nullptr) {
-        emitError(loc()) << "nested reference types not allowed";
+        emitError(builder.getUnknownLoc()) << "nested reference types not allowed";
         hasMLIRGenErrors = true;
         return nullptr;
       }
@@ -1059,7 +1068,7 @@ private:
       // Reject nested reference types
       if (dynamic_cast<const NRefType*>(ref->innerType.get()) != nullptr ||
           dynamic_cast<const NMutRefType*>(ref->innerType.get()) != nullptr) {
-        emitError(loc()) << "nested reference types not allowed";
+        emitError(builder.getUnknownLoc()) << "nested reference types not allowed";
         hasMLIRGenErrors = true;
         return nullptr;
       }
@@ -1231,7 +1240,7 @@ private:
     auto funcType = builder.getFunctionType({}, {returnType});
 
     builder.setInsertionPointToEnd(module.getBody());
-    auto entryFunc = builder.create<FuncOp>(loc(), "__polang_entry", funcType);
+    auto entryFunc = builder.create<FuncOp>(loc(block.loc), "__polang_entry", funcType);
 
     // Create entry block
     Block* entryBlock = entryFunc.addEntryBlock();
@@ -1242,22 +1251,22 @@ private:
 
     // Return the last expression value, or default value of correct type
     if (result) {
-      builder.create<ReturnOp>(loc(), result);
+      builder.create<ReturnOp>(loc(block.loc), result);
     } else {
       // Create default value matching the return type
       Value defaultVal;
       if (isFloatType(inferredType)) {
         auto floatTy = polang::FloatType::get(builder.getContext(),
                                               getFloatWidth(inferredType));
-        defaultVal = builder.create<ConstantFloatOp>(loc(), floatTy, 0.0);
+        defaultVal = builder.create<ConstantFloatOp>(loc(block.loc), floatTy, 0.0);
       } else if (inferredType == TypeNames::BOOL) {
         // NOLINTNEXTLINE(bugprone-branch-clone) - creates different op types
-        defaultVal = builder.create<ConstantBoolOp>(loc(), false);
+        defaultVal = builder.create<ConstantBoolOp>(loc(block.loc), false);
       } else {
         // Use the return type (already resolved or type variable)
-        defaultVal = builder.create<ConstantIntegerOp>(loc(), returnType, 0);
+        defaultVal = builder.create<ConstantIntegerOp>(loc(block.loc), returnType, 0);
       }
-      builder.create<ReturnOp>(loc(), defaultVal);
+      builder.create<ReturnOp>(loc(block.loc), defaultVal);
     }
   }
 };

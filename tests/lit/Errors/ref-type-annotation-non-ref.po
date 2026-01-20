@@ -1,6 +1,6 @@
 ; RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
 
 ; Test: ref type annotation with non-ref value (currently fails at MLIR level)
-; CHECK: error{{.*}}
+; CHECK: loc("<source>":1:1): error: 'polang.ref.deref' op operand #0 must be reference type or type variable, but got '!polang.integer<64, signed>'
 let x = 10
 let y: ref i64 = x

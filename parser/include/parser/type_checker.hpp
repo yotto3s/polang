@@ -14,6 +14,7 @@ class Node;
 class NBlock;
 class NExpression;
 struct NLetBinding;
+struct SourceLocation;
 
 struct TypeCheckError {
   std::string message;
@@ -91,6 +92,7 @@ private:
   [[nodiscard]] std::string mangledName(const std::string& name) const;
 
   void reportError(const std::string& message);
+  void reportError(const std::string& message, const SourceLocation& loc);
 
   // Collect identifiers referenced in a block that are not locally defined
   [[nodiscard]] std::set<std::string>
