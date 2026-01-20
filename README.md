@@ -25,11 +25,11 @@ cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/l
 cmake --build build -j$(nproc)
 ```
 
-Or using the helper script:
+Or from outside the container:
 
 ```bash
-docker/run_docker_command.sh cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
-docker/run_docker_command.sh cmake --build build -j$(nproc)
+docker exec polang cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+docker exec polang cmake --build build -j$(nproc)
 ```
 
 ### Running

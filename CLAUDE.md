@@ -21,7 +21,7 @@ All commands should be run inside the Docker container:
 docker/docker_run.sh
 
 # Run any command inside the docker container
-docker/run_docker_command.sh <command> [options]
+docker exec polang <command> [options]
 ```
 
 ## Essential Commands
