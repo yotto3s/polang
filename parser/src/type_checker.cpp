@@ -289,8 +289,9 @@ void TypeChecker::visit(const NMethodCall& node) {
 
     if (argTypes.size() != paramTypes.size()) {
       reportError("Function '" + funcName + "' expects " +
-                  std::to_string(paramTypes.size()) + " argument(s), got " +
-                  std::to_string(argTypes.size()), node.loc);
+                      std::to_string(paramTypes.size()) + " argument(s), got " +
+                      std::to_string(argTypes.size()),
+                  node.loc);
     } else {
       // Propagate concrete types from function parameters to arguments that
       // might be resolvable (in unresolvedGenerics)
@@ -314,8 +315,9 @@ void TypeChecker::visit(const NMethodCall& node) {
             paramTypes[i] != TypeNames::TYPEVAR &&
             !areTypesCompatible(argTypes[i], paramTypes[i])) {
           reportError("Function '" + funcName + "' argument " +
-                      std::to_string(i + 1) + " expects " + paramTypes[i] +
-                      ", got " + resolveGenericToDefault(argTypes[i]), node.loc);
+                          std::to_string(i + 1) + " expects " + paramTypes[i] +
+                          ", got " + resolveGenericToDefault(argTypes[i]),
+                      node.loc);
         }
       }
     }
@@ -347,8 +349,9 @@ void TypeChecker::visit(const NBinaryOperator& node) {
     if (!lhsIsTypevar && !rhsIsTypevar &&
         !areTypesCompatible(lhsType, rhsType)) {
       reportError("Type mismatch in '" + operatorToString(node.op) +
-                  "': " + resolveGenericToDefault(lhsType) + " and " +
-                  resolveGenericToDefault(rhsType), node.loc);
+                      "': " + resolveGenericToDefault(lhsType) + " and " +
+                      resolveGenericToDefault(rhsType),
+                  node.loc);
     }
     if (lhsIsTypevar && !rhsIsTypevar) {
       inferredType = rhsType;
@@ -361,7 +364,8 @@ void TypeChecker::visit(const NBinaryOperator& node) {
         !areTypesCompatible(lhsType, rhsType)) {
       reportError(
           "Type mismatch in comparison: " + resolveGenericToDefault(lhsType) +
-          " and " + resolveGenericToDefault(rhsType), node.loc);
+              " and " + resolveGenericToDefault(rhsType),
+          node.loc);
     }
     inferredType = TypeNames::BOOL;
   }
@@ -398,8 +402,9 @@ void TypeChecker::visit(const NAssignment& node) {
       referentType != TypeNames::TYPEVAR &&
       !areTypesCompatible(rhsType, referentType)) {
     reportError("Cannot assign " + resolveGenericToDefault(rhsType) +
-                " to variable '" + node.lhs->name + "' of type " +
-                referentType, node.loc);
+                    " to variable '" + node.lhs->name + "' of type " +
+                    referentType,
+                node.loc);
   }
 
   inferredType = referentType;
@@ -491,8 +496,9 @@ void TypeChecker::visit(const NIfExpression& node) {
       thenType != TypeNames::TYPEVAR && elseType != TypeNames::TYPEVAR &&
       !areTypesCompatible(thenType, elseType)) {
     reportError("If branches have different types: " +
-                resolveGenericToDefault(thenType) + " and " +
-                resolveGenericToDefault(elseType), node.loc);
+                    resolveGenericToDefault(thenType) + " and " +
+                    resolveGenericToDefault(elseType),
+                node.loc);
   }
 
   if (thenType == TypeNames::TYPEVAR && elseType != TypeNames::TYPEVAR &&
@@ -601,8 +607,9 @@ void TypeChecker::typeCheckLetBindings(
                  bodyType != TypeNames::TYPEVAR &&
                  !areTypesCompatible(bodyType, func->type->getTypeName())) {
         reportError("Function '" + func->id->name + "' declared to return " +
-                    func->type->getTypeName() + " but body has type " +
-                    resolveGenericToDefault(bodyType), func->loc);
+                        func->type->getTypeName() + " but body has type " +
+                        resolveGenericToDefault(bodyType),
+                    func->loc);
       }
 
       bindingTypes.emplace_back(TypeNames::FUNCTION);
@@ -616,7 +623,8 @@ void TypeChecker::typeCheckLetBindings(
       if (var->assignmentExpr == nullptr) {
         if (var->type == nullptr) {
           reportError("Variable '" + var->id->name +
-                      "' must have type annotation or initializer", var->loc);
+                          "' must have type annotation or initializer",
+                      var->loc);
           bindingTypes.emplace_back(TypeNames::UNKNOWN);
         } else {
           std::string varType = var->type->getTypeName();
@@ -661,8 +669,9 @@ void TypeChecker::typeCheckLetBindings(
         }
         if (!areTypesCompatible(exprType, declaredType)) {
           reportError("Variable '" + var->id->name + "' declared as " +
-                      var->type->getTypeName() + " but initialized with " +
-                      resolveGenericToDefault(exprType), var->loc);
+                          var->type->getTypeName() + " but initialized with " +
+                          resolveGenericToDefault(exprType),
+                      var->loc);
         }
         std::string varType = var->type->getTypeName();
         // Only apply makeMutableRefType if type doesn't already have mut prefix
@@ -728,7 +737,8 @@ void TypeChecker::typeCheckVarDeclNoInit(NVariableDeclaration& node,
                                          const std::string& varName) {
   if (node.type == nullptr) {
     reportError("Variable '" + node.id->name +
-                "' must have type annotation or initializer", node.loc);
+                    "' must have type annotation or initializer",
+                node.loc);
     inferredType = TypeNames::UNKNOWN;
     return;
   }
@@ -782,7 +792,8 @@ void TypeChecker::typeCheckVarDeclInferType(NVariableDeclaration& node,
       nodeType = getReferentType(resolvedType);
     } else if (isImmutableRefType(resolvedType)) {
       reportError("Cannot initialize mutable variable '" + node.id->name +
-                  "' with immutable reference", node.loc);
+                      "' with immutable reference",
+                  node.loc);
       inferredType = TypeNames::UNKNOWN;
       return;
     } else {
@@ -834,8 +845,10 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
   if (!areTypesCompatible(actualType, expectedType) &&
       actualType != TypeNames::TYPEVAR && expectedType != TypeNames::TYPEVAR) {
     reportError("Variable '" + node.id->name + "' declared as " + declType +
-                " but initialized with " + resolveGenericToDefault(exprType) +
-                " (no implicit conversion)", node.loc);
+                    " but initialized with " +
+                    resolveGenericToDefault(exprType) +
+                    " (no implicit conversion)",
+                node.loc);
   }
 
   const bool isMutable = isVarDeclMutable(node);
@@ -970,9 +983,10 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
     if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR &&
         !areTypesCompatible(bodyType, declReturnType)) {
       reportError("Function '" + node.id->name + "' declared to return " +
-                  declReturnType + " but body has type " +
-                  resolveGenericToDefault(bodyType) +
-                  " (no implicit conversion)", node.loc);
+                      declReturnType + " but body has type " +
+                      resolveGenericToDefault(bodyType) +
+                      " (no implicit conversion)",
+                  node.loc);
     }
 
     functionReturnTypes[funcName] = declReturnType;
