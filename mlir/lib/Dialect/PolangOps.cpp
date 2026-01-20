@@ -352,6 +352,33 @@ LogicalResult RefStoreOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// RefCreateOp verifier
+//===----------------------------------------------------------------------===//
+
+LogicalResult RefCreateOp::verify() {
+  Type sourceType = getSource().getType();
+
+  // Skip validation for TypeVars - will be validated after type inference
+  if (mlir::isa<TypeVarType>(sourceType)) {
+    return success();
+  }
+
+  // If source is already a RefType, we're creating a nested reference
+  if (mlir::isa<RefType>(sourceType)) {
+    // This is allowed when creating an immutable ref from a mutable ref
+    // (is_mutable = false), but not when creating a new mutable ref
+    // from another ref (which would be ref ref T)
+    if (getIsMutable()) {
+      return emitOpError(
+                 "nested reference types not allowed: "
+                 "cannot create mutable reference from reference type: ")
+             << sourceType;
+    }
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // InferTypeOpInterface implementations
 //===----------------------------------------------------------------------===//
 

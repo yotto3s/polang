@@ -76,6 +76,20 @@ bool isPolymorphicFunction(FuncOp func) {
                       [](Type result) { return containsTypeVar(result); });
 }
 
+/// Check if a type contains nested references.
+/// Returns failure and emits an error if nested references are found.
+LogicalResult validateNoNestedRefs(Type type, Operation* op) {
+  if (auto refType = dyn_cast<RefType>(type)) {
+    if (isa<RefType>(refType.getElementType())) {
+      op->emitOpError("nested reference types not allowed: "
+                      "element type is already a reference: ")
+          << refType.getElementType();
+      return failure();
+    }
+  }
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // Substitution - Maps type variables to types
 //===----------------------------------------------------------------------===//
@@ -232,7 +246,12 @@ struct TypeInferencePass
     }
 
     // Phase 3: Apply substitution to resolve all types
-    applySubstitution(module, subst);
+    applySubstitution(module, subst, hadError);
+
+    if (hadError) {
+      signalPassFailure();
+      return;
+    }
   }
 
 private:
@@ -334,7 +353,8 @@ private:
     }
   }
 
-  void applySubstitution(ModuleOp module, const Substitution& subst) {
+  void applySubstitution(ModuleOp module, const Substitution& subst,
+                         bool& hadError) {
     // First, identify which functions are polymorphic (before any
     // modifications)
     llvm::StringSet<> polymorphicFuncs;
@@ -506,6 +526,13 @@ private:
       }
 
       Operation* newOp = builder.create(state);
+
+      // Validate that resolved types don't contain nested references
+      for (auto result : newOp->getResults()) {
+        if (failed(validateNoNestedRefs(result.getType(), newOp))) {
+          hadError = true;
+        }
+      }
 
       // Replace uses of old results with new results
       for (size_t i = 0; i < op->getNumResults(); ++i) {

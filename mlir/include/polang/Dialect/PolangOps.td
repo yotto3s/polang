@@ -537,6 +537,8 @@ def Polang_RefCreateOp : Polang_Op<"ref.create"> {
   let results = (outs Polang_RefOrTypeVar:$result);
 
   let assemblyFormat = "$source attr-dict `:` type($source) `->` type($result)";
+
+  let hasVerifier = 1;
 }
 
 def Polang_RefDerefOp : Polang_Op<"ref.deref", [Pure]> {
