@@ -108,6 +108,22 @@ if (ast) {
 }
 ```
 
+#### Source Location Tracking
+
+Every AST node carries source location information via the `SourceLocation` struct defined in `node.hpp`:
+
+```cpp
+struct SourceLocation {
+  int line = 0;
+  int column = 0;
+  SourceLocation() = default;
+  SourceLocation(int l, int c) : line(l), column(c) {}
+  [[nodiscard]] bool isValid() const { return line > 0; }
+};
+```
+
+Locations are populated during parsing using Bison's `@$` syntax, which tracks the position of grammar rules. This enables precise error messages with line and column information throughout the compilation pipeline.
+
 **Key modules:**
 
 | Module | Description |
@@ -148,6 +164,8 @@ Interactive read-eval-print loop with JIT execution.
 
 ## Compilation Pipeline
 
+Source locations are tracked throughout the pipeline, enabling precise error messages with line and column information.
+
 ```
 Source Code (.po)
        │
@@ -155,21 +173,21 @@ Source Code (.po)
 ┌─────────────────┐
 │  Lexer (Flex)   │  parser/src/lexer.l
 └────────┬────────┘
-         │ Tokens
+         │ Tokens (with positions)
          ▼
 ┌─────────────────┐
 │  Parser (Bison) │  parser/src/parser.y
 └────────┬────────┘
-         │ AST
+         │ AST (with SourceLocation on each node)
          ▼
 ┌─────────────────┐
 │  Type Checker   │  parser/src/type_checker.cpp
-└────────┬────────┘
+└────────┬────────┘  (reports errors with line:column)
          │ Typed AST
          ▼
 ┌─────────────────┐
 │   MLIRGen       │  mlir/lib/MLIRGen/MLIRGen.cpp
-└────────┬────────┘
+└────────┬────────┘  (uses FileLineColLoc for MLIR ops)
          │ Polang Dialect MLIR (with type variables)
          ▼
 ┌─────────────────┐
@@ -587,6 +605,7 @@ At the call site, the captured value is passed as an extra argument:
 |------|----------|-------------|
 | `NBlock` | `node.hpp` | Root AST node containing statements |
 | `std::unique_ptr<NBlock>` | `parser_api.hpp` | Owned pointer returned by `polang_parse()` |
+| `SourceLocation` | `node.hpp` | Source position (line/column) for error reporting |
 | `MLIRCodeGenContext` | `mlir_codegen.hpp` | MLIR code generation context |
 | `Visitor` | `visitor.hpp` | Base class for AST visitors |
 | `ErrorReporter` | `error_reporter.hpp` | Unified error reporting |

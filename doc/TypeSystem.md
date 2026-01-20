@@ -841,13 +841,35 @@ let unused(x) = x  ; Kept with polang.polymorphic attribute
 
 ## Error Handling
 
+Error messages include source location information (line and column) to help identify where problems occur.
+
+### Error Message Format
+
+Type checker errors use the format:
+```
+Type error: <message> at line <line>, column <column>
+```
+
+MLIR-level errors use MLIR's location format:
+```
+loc("<source>":line:column): error: <message>
+```
+
 ### Type Mismatch Errors
 
 When types cannot be unified, the compiler reports an error:
 
 ```polang
-let f(x: int) = x
-f(3.14)  ; Error: argument 1 expects int, got double
+let f(x: i64) = x
+f(3.14)  ; Type error: argument 1 expects i64, got f64 at line 2, column 1
+```
+
+### Undeclared Variable Errors
+
+References to undefined variables report the location of the reference:
+
+```polang
+x + 1  ; Type error: Undeclared variable: x at line 1, column 1
 ```
 
 ### Unresolved Type Variables

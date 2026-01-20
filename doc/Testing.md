@@ -86,6 +86,20 @@ Lit tests use FileCheck to verify compiler output:
 42
 ```
 
+**Error tests with source locations:**
+
+Error messages include line and column information. Error tests verify both the message and the location:
+
+```
+; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+
+; Test undefined variable error
+; CHECK: Type error: Undeclared variable: x at line 5, column 1
+x + 1
+```
+
+Note: The line number in the CHECK pattern must match the actual line in the test file where the error occurs.
+
 **Available substitutions:**
 
 | Substitution | Description |
