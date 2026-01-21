@@ -184,6 +184,17 @@ containsGenericType(const std::string& typeName) noexcept {
   return isGenericType(typeName);
 }
 
+namespace detail {
+/// Helper to check a symmetric type relationship.
+/// Returns true if predicate(a, b) || predicate(b, a).
+template <typename Predicate>
+[[nodiscard]] inline bool checkSymmetric(const std::string& t1,
+                                         const std::string& t2,
+                                         Predicate pred) noexcept {
+  return pred(t1, t2) || pred(t2, t1);
+}
+} // namespace detail
+
 /// Check if two types are compatible for assignment/operations.
 /// Generic types are compatible with their concrete counterparts.
 [[nodiscard]] inline bool areTypesCompatible(const std::string& t1,
@@ -192,28 +203,33 @@ containsGenericType(const std::string& typeName) noexcept {
   if (t1 == t2) {
     return true;
   }
+
   // Generic int is compatible with any concrete integer type
-  if (isGenericIntegerType(t1) && isIntegerType(t2)) {
+  if (detail::checkSymmetric(
+          t1, t2, [](const std::string& a, const std::string& b) {
+            return isGenericIntegerType(a) && isIntegerType(b);
+          })) {
     return true;
   }
-  if (isGenericIntegerType(t2) && isIntegerType(t1)) {
-    return true;
-  }
+
   // Generic float is compatible with any concrete float type
-  if (isGenericFloatType(t1) && isFloatType(t2)) {
+  if (detail::checkSymmetric(t1, t2,
+                             [](const std::string& a, const std::string& b) {
+                               return isGenericFloatType(a) && isFloatType(b);
+                             })) {
     return true;
   }
-  if (isGenericFloatType(t2) && isFloatType(t1)) {
-    return true;
-  }
-  // Two generic ints are compatible
+
+  // Two generic ints are compatible (symmetric by nature)
   if (isGenericIntegerType(t1) && isGenericIntegerType(t2)) {
     return true;
   }
-  // Two generic floats are compatible
+
+  // Two generic floats are compatible (symmetric by nature)
   if (isGenericFloatType(t1) && isGenericFloatType(t2)) {
     return true;
   }
+
   return false;
 }
 
