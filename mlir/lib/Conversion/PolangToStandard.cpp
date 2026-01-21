@@ -67,16 +67,6 @@ public:
       }
       llvm_unreachable("Unknown TypeVarKind");
     });
-    // Handle reference types (both mutable and immutable) - convert to memref
-    // The isMutable flag doesn't affect lowering - both become memref
-    // Mutability is enforced at the type checker level
-    addConversion([this](RefType type) -> Type {
-      Type elemType = convertType(type.getElementType());
-      if (!elemType) {
-        return nullptr;
-      }
-      return MemRefType::get({}, elemType);
-    });
   }
 };
 
@@ -607,109 +597,6 @@ struct AllocaOpLowering : public OpConversionPattern<AllocaOp> {
 };
 
 //===----------------------------------------------------------------------===//
-// Reference Operations Lowering
-//===----------------------------------------------------------------------===//
-
-/// Cast a value to match the target type if needed.
-/// Returns the original value if types already match.
-Value castToType(Value value, Type targetType, Location loc,
-                 ConversionPatternRewriter& rewriter) {
-  Type valueType = value.getType();
-  if (valueType == targetType) {
-    return value;
-  }
-
-  // Integer to integer cast
-  if (isa<mlir::IntegerType>(valueType) && isa<mlir::IntegerType>(targetType)) {
-    auto srcWidth = valueType.getIntOrFloatBitWidth();
-    auto dstWidth = targetType.getIntOrFloatBitWidth();
-    if (srcWidth < dstWidth) {
-      return rewriter.create<arith::ExtSIOp>(loc, targetType, value);
-    }
-    return rewriter.create<arith::TruncIOp>(loc, targetType, value);
-  }
-
-  // Float to float cast
-  if (isa<mlir::FloatType>(valueType) && isa<mlir::FloatType>(targetType)) {
-    auto srcWidth = valueType.getIntOrFloatBitWidth();
-    auto dstWidth = targetType.getIntOrFloatBitWidth();
-    if (srcWidth < dstWidth) {
-      return rewriter.create<arith::ExtFOp>(loc, targetType, value);
-    }
-    return rewriter.create<arith::TruncFOp>(loc, targetType, value);
-  }
-
-  return value; // No conversion needed/possible
-}
-
-struct RefCreateOpLowering : public OpConversionPattern<RefCreateOp> {
-  using OpConversionPattern<RefCreateOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(RefCreateOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter& rewriter) const override {
-    // Check if this is a mutable reference creation (needs allocation)
-    // or immutable reference creation (no-op, just passes through)
-    if (op.getIsMutable()) {
-      // Mutable reference creation: allocate memory and store initial value
-      auto resultType =
-          getTypeConverter()->convertType(op.getResult().getType());
-      if (!resultType) {
-        return failure();
-      }
-      auto memRefType = cast<MemRefType>(resultType);
-
-      // Allocate memory
-      auto alloca = rewriter.create<memref::AllocaOp>(op.getLoc(), memRefType);
-
-      // Store the initial value (cast if needed)
-      Type elemType = memRefType.getElementType();
-      Value initValue =
-          castToType(adaptor.getSource(), elemType, op.getLoc(), rewriter);
-      rewriter.create<memref::StoreOp>(op.getLoc(), initValue, alloca);
-
-      // Replace the op with the allocated memref
-      rewriter.replaceOp(op, alloca.getResult());
-    } else {
-      // Immutable reference creation from mutable reference: no-op at memref
-      // level. The immutability is enforced at the type checker level.
-      rewriter.replaceOp(op, adaptor.getSource());
-    }
-    return success();
-  }
-};
-
-struct RefStoreOpLowering : public OpConversionPattern<RefStoreOp> {
-  using OpConversionPattern<RefStoreOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(RefStoreOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter& rewriter) const override {
-    // Get the memref element type and cast value if needed
-    auto memRefType = cast<MemRefType>(adaptor.getRef().getType());
-    Type elemType = memRefType.getElementType();
-    Value storeValue =
-        castToType(adaptor.getValue(), elemType, op.getLoc(), rewriter);
-    rewriter.create<memref::StoreOp>(op.getLoc(), storeValue, adaptor.getRef());
-    // The store operation returns the stored value
-    rewriter.replaceOp(op, storeValue);
-    return success();
-  }
-};
-
-struct RefDerefOpLowering : public OpConversionPattern<RefDerefOp> {
-  using OpConversionPattern<RefDerefOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(RefDerefOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter& rewriter) const override {
-    // Dereference immutable reference is just a memref.load
-    rewriter.replaceOpWithNewOp<memref::LoadOp>(op, adaptor.getRef());
-    return success();
-  }
-};
-
-//===----------------------------------------------------------------------===//
 // Print Operation Lowering
 //===----------------------------------------------------------------------===//
 
@@ -762,8 +649,7 @@ struct PolangToStandardPass
                  ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
                  MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
                  FuncOpLowering, CallOpLowering, ReturnOpLowering, IfOpLowering,
-                 YieldOpLowering, AllocaOpLowering, RefCreateOpLowering,
-                 RefDerefOpLowering, RefStoreOpLowering, PrintOpLowering>(
+                 YieldOpLowering, AllocaOpLowering, PrintOpLowering>(
         typeConverter, &getContext());
 
     if (failed(applyPartialConversion(getOperation(), target,

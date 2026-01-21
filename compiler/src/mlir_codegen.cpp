@@ -268,12 +268,6 @@ std::string typeToString(Type type) {
   if (isa<polang::BoolType>(type)) {
     return "bool";
   }
-  if (auto refType = dyn_cast<polang::RefType>(type)) {
-    if (refType.isMutable()) {
-      return "mut " + typeToString(refType.getElementType());
-    }
-    return "ref " + typeToString(refType.getElementType());
-  }
   return "unknown";
 }
 

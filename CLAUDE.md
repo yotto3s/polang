@@ -95,7 +95,6 @@ When modifying code, update the relevant documentation:
 | `functions.po` | `25 : i64` |
 | `hello.po` | `7 : i64` |
 | `let_expressions.po` | `16 : i64` |
-| `mutability.po` | `23 : i64` |
 | `types.po` | `84 : i64` |
 | `variables.po` | `30 : i64` |
 

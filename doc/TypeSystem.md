@@ -6,7 +6,6 @@ This document describes the Polang type system, including type inference and pol
 
 - [Overview](#overview)
 - [Primitive Types](#primitive-types)
-- [Reference Types](#reference-types)
 - [Type Conversions](#type-conversions)
   - [Conversion Syntax](#conversion-syntax)
   - [Allowed Conversions](#allowed-conversions)
@@ -107,82 +106,6 @@ When type inference encounters a numeric literal without explicit type context, 
 - **Float literals** → `f64` (64-bit double precision)
 
 This means `42` has type `i64` and `3.14` has type `f64` by default.
-
-## Reference Types
-
-Polang supports two kinds of reference types for working with memory locations:
-
-### Mutable References (`mut T`)
-
-Mutable references allow both reading and writing. Variables declared with `let x = mut value` have mutable reference type.
-
-| Syntax | Description | MLIR Type |
-|--------|-------------|-----------|
-| `mut i64` | Mutable reference to i64 | `!polang.mutref<!polang.integer<64, signed>>` |
-| `mut f64` | Mutable reference to f64 | `!polang.mutref<!polang.float<64>>` |
-| `mut bool` | Mutable reference to bool | `!polang.mutref<!polang.bool>` |
-
-**Semantics:**
-- Created implicitly by `let x = mut v` where `v : T` → `x : mut T`
-- Copying a mutable reference copies the reference, not the value
-- Write via `x <- v` (requires `x : mut T`)
-- Read via `*x` (dereference)
-
-### Immutable References (`ref T`)
-
-Immutable references provide read-only access to a memory location.
-
-| Syntax | Description | MLIR Type |
-|--------|-------------|-----------|
-| `ref i64` | Immutable reference to i64 | `!polang.ref<!polang.integer<64, signed>>` |
-| `ref f64` | Immutable reference to f64 | `!polang.ref<!polang.float<64>>` |
-| `ref bool` | Immutable reference to bool | `!polang.ref<!polang.bool>` |
-
-**Semantics:**
-- Created by `ref e` where `e : T` → result : `ref T`
-- Read via `*r` (dereference)
-- Cannot write through immutable references (compile-time error)
-
-### Reference Type Representations
-
-Reference types are represented as string prefixes in the parser type system:
-
-```cpp
-// In polang_types.hpp
-static constexpr const char* MUT_PREFIX = "mut ";   // "mut i64"
-static constexpr const char* REF_PREFIX = "ref ";   // "ref i64"
-```
-
-Helper functions:
-```cpp
-bool isMutableRefType(const std::string& type);     // starts with "mut "
-bool isImmutableRefType(const std::string& type);   // starts with "ref "
-bool isReferenceType(const std::string& type);      // either of above
-std::string getReferentType(const std::string& refType);   // strip prefix
-std::string makeMutableRefType(const std::string& base);   // add "mut "
-std::string makeImmutableRefType(const std::string& base); // add "ref "
-```
-
-### Type Rules
-
-| Expression | Input Type | Result Type |
-|------------|------------|-------------|
-| `let x = mut v` | `v : T` | `x : mut T` |
-| `let y = x` | `x : mut T` | `y : mut T` |
-| `ref e` | `e : T` | `ref T` |
-| `*x` | `x : mut T` or `x : ref T` | `T` |
-| `x <- v` | `x : mut T`, `v : T` | `T` |
-| `x <- v` | `x : ref T` | **Error** |
-
-### MLIR Operations
-
-Reference types use the following MLIR operations:
-
-| Operation | Description | Lowers To |
-|-----------|-------------|-----------|
-| `polang.ref.create` | Create reference (mutable or immutable) | `memref.alloca` (mutable) or passthrough (immutable) |
-| `polang.ref.deref` | Read from reference | `memref.load` |
-| `polang.ref.store` | Write to mutable reference | `memref.store` |
 
 ## Type Conversions
 
@@ -405,8 +328,6 @@ The parser's type checker (`parser/src/type_checker.cpp`) focuses on **error det
 | Type validation | Validates explicit type annotations match usage |
 | Capture analysis | Identifies free variables for closures via `FreeVariableCollector` |
 | Type variable setup | Marks untyped parameters as `typevar` for MLIR inference |
-
-**Note:** Mutability validation (preventing assignment to immutable variables) is handled by the MLIR verifier in `polang.ref.store` operations.
 
 **Example:**
 
@@ -688,7 +609,7 @@ mlir/
 
 2. Type checker runs (type_checker.cpp)
    ├── Validates explicit type annotations
-   ├── Detects errors (undefined vars, mutability, arity)
+   ├── Detects errors (undefined vars, arity)
    ├── Performs capture analysis (FreeVariableCollector)
    └── Marks untyped parameters as TYPEVAR
 

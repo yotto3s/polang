@@ -1,4 +1,0 @@
-; RUN: %polang_repl %s | %FileCheck %s
-; CHECK: {{[0-9]+}} : mut i64
-let x = mut 42
-x

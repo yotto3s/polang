@@ -48,51 +48,6 @@ TEST(ParserTest, VariableWithIdentifierExpression) {
   EXPECT_EQ(identExpr->name, "x");
 }
 
-// ============== Mutable Variable Declaration Tests ==============
-
-TEST(ParserTest, MutableVariableDeclaration) {
-  auto block = parseOrFail("let x = mut 5");
-  ASSERT_NE(block, nullptr);
-  ASSERT_EQ(block->statements.size(), 1);
-
-  auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
-  ASSERT_NE(varDecl, nullptr);
-  EXPECT_EQ(varDecl->id->name, "x");
-
-  // Mutability is indicated by NMutRefExpression wrapping the value
-  auto* mutRefExpr = dynamic_cast<NMutRefExpression*>(varDecl->assignmentExpr.get());
-  ASSERT_NE(mutRefExpr, nullptr);
-  auto* intExpr = dynamic_cast<NInteger*>(mutRefExpr->expr.get());
-  ASSERT_NE(intExpr, nullptr);
-  EXPECT_EQ(intExpr->value, 5);
-}
-
-TEST(ParserTest, MutableTypedVariableDeclaration) {
-  auto block = parseOrFail("let counter : int = mut 0");
-  ASSERT_NE(block, nullptr);
-  ASSERT_EQ(block->statements.size(), 1);
-
-  auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
-  ASSERT_NE(varDecl, nullptr);
-  EXPECT_EQ(varDecl->id->name, "counter");
-  ASSERT_NE(varDecl->type, nullptr);
-  EXPECT_EQ(varDecl->type->getTypeName(), "int");
-  // Mutability is indicated by NMutRefExpression wrapping the value
-  auto* mutRefExpr = dynamic_cast<NMutRefExpression*>(varDecl->assignmentExpr.get());
-  ASSERT_NE(mutRefExpr, nullptr);
-}
-
-TEST(ParserTest, ImmutableVariableDeclaration) {
-  auto block = parseOrFail("let x = 5");
-  ASSERT_NE(block, nullptr);
-
-  auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
-  ASSERT_NE(varDecl, nullptr);
-  // Immutable declarations do NOT use NMutRefExpression
-  auto* mutRefExpr = dynamic_cast<NMutRefExpression*>(varDecl->assignmentExpr.get());
-  EXPECT_EQ(mutRefExpr, nullptr);
-}
-
 // ============== Function Declaration Tests ==============
 
 TEST(ParserTest, SimpleFunctionDeclaration) {

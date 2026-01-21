@@ -1,5 +1,0 @@
-; RUN: %polang_repl %s | %FileCheck %s
-
-; Test nested mutable scopes
-; CHECK: 2 : i64
-let x = mut 1 in let y = mut 2 in x <- *y; *x

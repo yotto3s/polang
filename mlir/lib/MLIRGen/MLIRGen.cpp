@@ -44,36 +44,9 @@ using namespace polang;
 
 namespace {
 
-/// Check if a variable declaration is mutable based on:
-/// 1. Type annotation has "mut " prefix, OR
-/// 2. Assignment expression is NMutRefExpression (for inferred types)
-[[nodiscard]] bool isVarDeclMutable(const NVariableDeclaration& decl) {
-  // Check type annotation first
-  if (decl.type != nullptr && isMutableRefType(decl.type->getTypeName())) {
-    return true;
-  }
-  // Check if assignment expression is NMutRefExpression
-  if (decl.assignmentExpr != nullptr) {
-    if (dynamic_cast<const NMutRefExpression*>(decl.assignmentExpr.get()) !=
-        nullptr) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/// Helper to create an NTypeSpec from a type name string.
-/// Handles reference types (e.g., "mut i64", "ref i32") recursively.
+/// Helper to create an appropriate NTypeSpec from a type name string
 [[nodiscard]] std::shared_ptr<const NTypeSpec>
-makeTypeSpecFromString(const std::string& typeName) {
-  if (isMutableRefType(typeName)) {
-    return std::make_shared<const NMutRefType>(
-        makeTypeSpecFromString(getReferentType(typeName)));
-  }
-  if (isImmutableRefType(typeName)) {
-    return std::make_shared<const NRefType>(
-        makeTypeSpecFromString(getReferentType(typeName)));
-  }
+makeTypeSpec(const std::string& typeName) {
   return std::make_shared<const NNamedType>(typeName);
 }
 
@@ -138,14 +111,6 @@ public:
   void visit(const NNamedType& /*node*/) override {
     // Type specifications are not directly visited during MLIR generation
     // They are accessed via getTypeName() when processing declarations
-  }
-
-  void visit(const NRefType& /*node*/) override {
-    // Type specifications are not directly visited during MLIR generation
-  }
-
-  void visit(const NMutRefType& /*node*/) override {
-    // Type specifications are not directly visited during MLIR generation
   }
 
   // Expression Visitor implementations
@@ -351,149 +316,6 @@ public:
     resultType = node.targetType;
   }
 
-  void visit(const NAssignment& node) override {
-    // Evaluate RHS
-    node.rhs->accept(*this);
-    if (!result) {
-      return;
-    }
-    Value value = result;
-    std::shared_ptr<const NTypeSpec> valueType = std::move(resultType);
-
-    // Look up the mutable reference for the variable
-    auto refValue = lookupMutableRef(node.lhs->name);
-    Value refForStore;
-    std::shared_ptr<const NTypeSpec> varType;
-
-    if (refValue) {
-      // Found mutable reference
-      refForStore = *refValue;
-      varType = lookupType(node.lhs->name);
-    } else {
-      // Check if it's an immutable value - create immutable ref for verifier
-      auto immIt = immutableValues.find(node.lhs->name);
-      if (immIt != immutableValues.end()) {
-        Value immVal = immIt->second;
-        varType = lookupType(node.lhs->name);
-        Type elemType =
-            varType != nullptr ? getPolangType(*varType) : getDefaultType();
-        // Create immutable reference - RefStoreOp verifier will catch this
-        Type immRefType =
-            RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
-        auto immRef =
-            builder.create<RefCreateOp>(loc(node.loc), immRefType, immVal,
-                                        /*is_mutable=*/false);
-        refForStore = immRef.getResult();
-      } else {
-        emitError(loc(node.loc))
-            << "Unknown variable in assignment: " << node.lhs->name;
-        result = nullptr;
-        return;
-      }
-    }
-
-    // Get the element type from the referent
-    Type elemType = getReferentMLIRType(varType.get());
-
-    // Store through the reference (MLIR verifier will catch immutable stores)
-    auto storeOp =
-        builder.create<RefStoreOp>(loc(node.loc), elemType, value, refForStore);
-
-    // Assignment expression returns the assigned value
-    result = storeOp.getResult();
-    resultType = std::move(valueType);
-  }
-
-  void visit(const NRefExpression& node) override {
-    // Evaluate the inner expression
-    node.expr->accept(*this);
-    if (!result) {
-      return;
-    }
-
-    // The inner expression should produce a value
-    // We wrap it in an immutable reference type
-    Value innerValue = result;
-    std::shared_ptr<const NTypeSpec> innerType = std::move(resultType);
-
-    // If the inner type is a mutable reference, create an immutable ref from it
-    if (isMutRef(innerType.get())) {
-      // Convert mut ref to immutable ref
-      auto inner = getInnerTypeSpec(innerType.get());
-      Type elemType = inner ? getPolangType(*inner) : getDefaultType();
-      Type refType =
-          RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
-      result = builder.create<RefCreateOp>(loc(node.loc), refType, innerValue);
-      resultType =
-          inner ? std::make_shared<const NRefType>(inner)
-                : std::make_shared<const NRefType>(
-                      std::make_shared<const NNamedType>(TypeNames::I64));
-    } else {
-      // The inner value is a plain value; create an immutable reference to it
-      // First create a mutable reference to the value, then convert to
-      // immutable
-      Type innerMLIRType =
-          innerType ? getPolangType(*innerType) : getDefaultType();
-
-      // Cast the value to the resolved type if needed (e.g., TypeVarType to
-      // i32)
-      if (innerValue.getType() != innerMLIRType) {
-        innerValue =
-            builder.create<CastOp>(loc(node.loc), innerMLIRType, innerValue);
-      }
-
-      // Create a mutable reference from the value
-      Type mutRefType =
-          RefType::get(builder.getContext(), innerMLIRType, /*isMutable=*/true);
-      auto mutRef =
-          builder.create<RefCreateOp>(loc(node.loc), mutRefType, innerValue,
-                                      /*is_mutable=*/true);
-
-      // Convert the mutable reference to an immutable reference
-      Type refType = RefType::get(builder.getContext(), innerMLIRType,
-                                  /*isMutable=*/false);
-      result = builder.create<RefCreateOp>(loc(node.loc), refType,
-                                           mutRef.getResult());
-      resultType =
-          innerType ? std::make_shared<const NRefType>(innerType)
-                    : std::make_shared<const NRefType>(
-                          std::make_shared<const NNamedType>(TypeNames::I64));
-    }
-  }
-
-  void visit(const NDerefExpression& node) override {
-    // Evaluate the reference expression
-    node.ref->accept(*this);
-    if (!result) {
-      return;
-    }
-    Value refValue = result;
-
-    // Check if it's a reference type (mutable or immutable)
-    if (isMutRef(resultType.get()) || isImmutRef(resultType.get())) {
-      auto innerTypeSpec = getInnerTypeSpec(resultType.get());
-      Type elemType = innerTypeSpec != nullptr ? getPolangType(*innerTypeSpec)
-                                               : getDefaultType();
-      result = builder.create<RefDerefOp>(loc(node.loc), elemType, refValue);
-      resultType = innerTypeSpec != nullptr
-                       ? innerTypeSpec
-                       : std::make_shared<const NNamedType>(TypeNames::I64);
-    } else {
-      emitError(loc(node.loc))
-          << "Cannot dereference non-reference type: "
-          << (resultType ? resultType->getTypeName() : "unknown");
-      result = nullptr;
-    }
-  }
-
-  void visit(const NMutRefExpression& node) override {
-    // Evaluate the inner expression and pass through the value
-    // The MutRefCreateOp is created by NVariableDeclaration when needed
-    // NMutRefExpression is purely for AST representation
-    node.expr->accept(*this);
-    // result and resultType are already set by visiting the inner expression
-  }
-
   void visit(const NBlock& node) override {
     Value lastValue = nullptr;
 
@@ -572,8 +394,6 @@ public:
   void visit(const NVariableDeclaration& node) override {
     // Get mangled variable name (includes module path)
     const std::string varName = mangledName(node.id->name);
-    // Derive mutability from type annotation or NMutRefExpression
-    const bool isMutable = isVarDeclMutable(node);
 
     // Determine the type - prefer type annotation from type checker
     std::shared_ptr<const NTypeSpec> typeSpec =
@@ -593,97 +413,12 @@ public:
       }
     }
 
-    if (isMutable) {
-      // Get the base type (strip mut prefix if present for type storage)
-      std::shared_ptr<const NTypeSpec> baseType;
-      if (isMutRef(typeSpec.get())) {
-        auto inner = getInnerTypeSpec(typeSpec.get());
-        baseType = inner != nullptr
-                       ? inner
-                       : std::make_shared<const NNamedType>(TypeNames::I64);
-      } else {
-        baseType = typeSpec;
-      }
+    // All variables are immutable - store SSA value directly (no alloca needed)
+    immutableValues[varName] = initValue;
+    typeTable[varName] = typeSpec;
 
-      // Mutable: Create a mutable reference using the resolved type from type
-      // checker
-      Type polangType = getPolangType(*baseType);
-      if (!polangType) {
-        result = nullptr;
-        return;
-      }
-      Type mutRefType =
-          RefType::get(builder.getContext(), polangType, /*isMutable=*/true);
-
-      if (initValue) {
-        // If initializing from an existing mutable reference, use it directly
-        if (auto refType = mlir::dyn_cast<RefType>(initValue.getType())) {
-          if (refType.isMutable()) {
-            // Value is already a mutable reference (e.g., from
-            // NMutRefExpression)
-            mutableRefTable[varName] = initValue;
-          } else {
-            // Create new mutable reference with initial value
-            auto mutRefOp = builder.create<RefCreateOp>(loc(node.loc),
-                                                        mutRefType, initValue,
-                                                        /*is_mutable=*/true);
-            mutableRefTable[varName] = mutRefOp.getResult();
-          }
-        } else {
-          // Create new mutable reference with initial value
-          auto mutRefOp =
-              builder.create<RefCreateOp>(loc(node.loc), mutRefType, initValue,
-                                          /*is_mutable=*/true);
-          mutableRefTable[varName] = mutRefOp.getResult();
-        }
-      } else {
-        // Create uninitialized mutable reference - use default value
-        Type llvmType = convertPolangType(polangType);
-        auto memRefType = MemRefType::get({}, llvmType);
-        auto alloca = builder.create<AllocaOp>(loc(node.loc), memRefType,
-                                               varName, polangType, isMutable);
-        mutableRefTable[varName] = alloca;
-      }
-
-      // Store the mutable reference type
-      typeTable[varName] = std::make_shared<const NMutRefType>(baseType);
-    } else {
-      // Immutable binding - store to appropriate table based on type
-      // NOLINTNEXTLINE(bugprone-branch-clone) - branches store to different
-      // maps
-      if (isMutRef(typeSpec.get())) {
-        // Copying a mutable reference to an immutable binding
-        // Store in mutableRefTable so assignment through the reference works
-        mutableRefTable[varName] = initValue;
-      } else {
-        // Regular immutable value - store SSA value directly (no alloca needed)
-        immutableValues[varName] = initValue;
-      }
-      typeTable[varName] = typeSpec;
-    }
-
-    // For mutable declarations, clear result since the type (mut T) doesn't
-    // match what most callers expect (T). For immutable declarations, keep the
-    // value.
-    if (isMutable) {
-      result = nullptr;
-    } else {
-      // For immutable reference types, dereference to match type checker
-      // behavior (type checker strips reference types from inferredType for
-      // declarations)
-      if (isImmutRef(typeSpec.get())) {
-        auto innerType = getInnerTypeSpec(typeSpec.get());
-        Type elemType =
-            innerType != nullptr ? getPolangType(*innerType) : getDefaultType();
-        result = builder.create<RefDerefOp>(loc(node.loc), elemType, initValue);
-        resultType = innerType != nullptr
-                         ? innerType
-                         : std::make_shared<const NNamedType>(TypeNames::I64);
-      } else {
-        result = initValue;
-        resultType = typeSpec;
-      }
-    }
+    result = initValue;
+    resultType = typeSpec;
   }
 
   void visit(const NFunctionDeclaration& node) override {
@@ -909,7 +644,6 @@ private:
   }
 
   // Symbol tables
-  std::map<std::string, Value> mutableRefTable; // Mutable reference values
   std::map<std::string, Value> argValues;       // Function arguments
   std::map<std::string, Value> immutableValues; // Immutable variable SSA values
   std::map<std::string, std::shared_ptr<const NTypeSpec>>
@@ -929,13 +663,12 @@ private:
   class SymbolTableScope {
   public:
     SymbolTableScope(MLIRGenVisitor& visitor, bool clearAllTables = false)
-        : visitor(visitor), savedMutableRefTable(visitor.mutableRefTable),
+        : visitor(visitor),
           savedTypeTable(visitor.typeTable),
           savedTypeVarTable(visitor.typeVarTable),
           savedArgValues(visitor.argValues),
           savedImmutableValues(visitor.immutableValues) {
       if (clearAllTables) {
-        visitor.mutableRefTable.clear();
         visitor.typeTable.clear();
         visitor.typeVarTable.clear();
         visitor.argValues.clear();
@@ -946,7 +679,6 @@ private:
     // NOLINTNEXTLINE(modernize-use-equals-default) - destructor restores saved
     // state
     ~SymbolTableScope() {
-      visitor.mutableRefTable = savedMutableRefTable;
       visitor.typeTable = savedTypeTable;
       visitor.typeVarTable = savedTypeVarTable;
       visitor.argValues = savedArgValues;
@@ -955,7 +687,6 @@ private:
 
   private:
     MLIRGenVisitor& visitor;
-    std::map<std::string, Value> savedMutableRefTable;
     std::map<std::string, std::shared_ptr<const NTypeSpec>> savedTypeTable;
     std::map<std::string, Type> savedTypeVarTable;
     std::map<std::string, Value> savedArgValues;
@@ -971,31 +702,14 @@ private:
     return builder.getUnknownLoc();
   }
 
-  /// Look up a mutable reference by name.
-  /// Returns the reference value itself (not dereferenced).
-  std::optional<Value> lookupMutableRef(const std::string& name) {
-    auto refIt = mutableRefTable.find(name);
-    if (refIt != mutableRefTable.end()) {
-      return refIt->second;
-    }
-    return std::nullopt;
-  }
-
   /// Look up a variable by name in the symbol tables.
-  /// For mutable references, returns the reference (not dereferenced).
-  /// Checks immutable values, mutable references, and function arguments.
+  /// Checks immutable values and function arguments.
   /// Returns nullopt if the variable is not found.
   std::optional<Value> lookupVariable(const std::string& name) {
     // Check immutable values first (SSA values, no load needed)
     auto immIt = immutableValues.find(name);
     if (immIt != immutableValues.end()) {
       return immIt->second;
-    }
-
-    // Check mutable references - return the reference itself
-    auto refIt = mutableRefTable.find(name);
-    if (refIt != mutableRefTable.end()) {
-      return refIt->second;
     }
 
     // Check function arguments
@@ -1025,44 +739,8 @@ private:
   }
 
   /// Get a Polang MLIR type from an NTypeSpec.
-  /// Handles NNamedType, NRefType, and NMutRefType.
-  /// Rejects nested reference types (e.g., ref ref i64).
+  /// Handles NNamedType only (no reference types in Polang).
   Type getPolangType(const NTypeSpec& typeSpec) {
-    // Handle NMutRefType
-    if (const auto* mutRef = dynamic_cast<const NMutRefType*>(&typeSpec)) {
-      // Reject nested reference types
-      if (dynamic_cast<const NRefType*>(mutRef->innerType.get()) != nullptr ||
-          dynamic_cast<const NMutRefType*>(mutRef->innerType.get()) !=
-              nullptr) {
-        emitError(builder.getUnknownLoc())
-            << "nested reference types not allowed";
-        hasMLIRGenErrors = true;
-        return nullptr;
-      }
-      Type elemType = getPolangType(*mutRef->innerType);
-      if (!elemType) {
-        return nullptr;
-      }
-      return RefType::get(builder.getContext(), elemType, /*isMutable=*/true);
-    }
-
-    // Handle NRefType
-    if (const auto* ref = dynamic_cast<const NRefType*>(&typeSpec)) {
-      // Reject nested reference types
-      if (dynamic_cast<const NRefType*>(ref->innerType.get()) != nullptr ||
-          dynamic_cast<const NMutRefType*>(ref->innerType.get()) != nullptr) {
-        emitError(builder.getUnknownLoc())
-            << "nested reference types not allowed";
-        hasMLIRGenErrors = true;
-        return nullptr;
-      }
-      Type elemType = getPolangType(*ref->innerType);
-      if (!elemType) {
-        return nullptr;
-      }
-      return RefType::get(builder.getContext(), elemType, /*isMutable=*/false);
-    }
-
     // Handle NNamedType
     if (const auto* named = dynamic_cast<const NNamedType*>(&typeSpec)) {
       const std::string& typeName = named->name;
@@ -1131,46 +809,6 @@ private:
     return nullptr;
   }
 
-  /// Get the MLIR type for the referent of a reference type.
-  /// If the type is a reference, returns the inner type.
-  /// If not a reference, returns the type itself.
-  Type getReferentMLIRType(const NTypeSpec* typeSpec) {
-    if (typeSpec == nullptr) {
-      return getDefaultType();
-    }
-    if (const auto* mutRef = dynamic_cast<const NMutRefType*>(typeSpec)) {
-      return getPolangType(*mutRef->innerType);
-    }
-    if (const auto* ref = dynamic_cast<const NRefType*>(typeSpec)) {
-      return getPolangType(*ref->innerType);
-    }
-    return getPolangType(*typeSpec);
-  }
-
-  /// Check if an NTypeSpec represents a mutable reference type.
-  [[nodiscard]] static bool isMutRef(const NTypeSpec* typeSpec) {
-    return dynamic_cast<const NMutRefType*>(typeSpec) != nullptr;
-  }
-
-  /// Check if an NTypeSpec represents an immutable reference type.
-  [[nodiscard]] static bool isImmutRef(const NTypeSpec* typeSpec) {
-    return dynamic_cast<const NRefType*>(typeSpec) != nullptr &&
-           dynamic_cast<const NMutRefType*>(typeSpec) == nullptr;
-  }
-
-  /// Get the inner type spec from a reference type.
-  /// Returns nullptr if not a reference type.
-  [[nodiscard]] static std::shared_ptr<const NTypeSpec>
-  getInnerTypeSpec(const NTypeSpec* typeSpec) {
-    if (const auto* mutRef = dynamic_cast<const NMutRefType*>(typeSpec)) {
-      return mutRef->innerType;
-    }
-    if (const auto* ref = dynamic_cast<const NRefType*>(typeSpec)) {
-      return ref->innerType;
-    }
-    return nullptr;
-  }
-
   Type getTypeForName(const std::string& name) {
     // First check typeVarTable for MLIR types (including type vars)
     auto varIt = typeVarTable.find(name);
@@ -1213,7 +851,7 @@ private:
       returnType = freshTypeVar();
     } else {
       // Type checker found a concrete type - use it
-      auto typeSpec = makeTypeSpecFromString(inferredType);
+      auto typeSpec = makeTypeSpec(inferredType);
       returnType = getPolangType(*typeSpec);
       if (!returnType) {
         return; // Stop generating if type error

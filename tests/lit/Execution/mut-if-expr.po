@@ -1,6 +1,0 @@
-; RUN: %polang_repl %s | %FileCheck %s
-
-; Test mutable with conditional expressions
-; CHECK: 5 : i64
-let x = mut (if true then 5 else 10)
-(*x)

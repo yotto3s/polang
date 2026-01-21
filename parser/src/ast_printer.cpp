@@ -42,14 +42,6 @@ void ASTPrinter::visit(const NNamedType& node) {
   // Types are printed via getTypeName() in parent visitors
 }
 
-void ASTPrinter::visit(const NRefType& node) {
-  // Types are printed via getTypeName() in parent visitors
-}
-
-void ASTPrinter::visit(const NMutRefType& node) {
-  // Types are printed via getTypeName() in parent visitors
-}
-
 void ASTPrinter::visit(const NInteger& node) {
   printPrefix();
   out << "NInteger " << node.value << "\n";
@@ -112,50 +104,6 @@ void ASTPrinter::visit(const NCastExpression& node) {
   {
     DepthScope scope(*this, false);
     node.expression->accept(*this);
-  }
-}
-
-void ASTPrinter::visit(const NAssignment& node) {
-  printPrefix();
-  out << "NAssignment\n";
-
-  {
-    DepthScope scope(*this, true);
-    node.lhs->accept(*this);
-  }
-  {
-    DepthScope scope(*this, false);
-    node.rhs->accept(*this);
-  }
-}
-
-void ASTPrinter::visit(const NRefExpression& node) {
-  printPrefix();
-  out << "NRefExpression\n";
-
-  {
-    DepthScope scope(*this, false);
-    node.expr->accept(*this);
-  }
-}
-
-void ASTPrinter::visit(const NDerefExpression& node) {
-  printPrefix();
-  out << "NDerefExpression\n";
-
-  {
-    DepthScope scope(*this, false);
-    node.ref->accept(*this);
-  }
-}
-
-void ASTPrinter::visit(const NMutRefExpression& node) {
-  printPrefix();
-  out << "NMutRefExpression\n";
-
-  {
-    DepthScope scope(*this, false);
-    node.expr->accept(*this);
   }
 }
 

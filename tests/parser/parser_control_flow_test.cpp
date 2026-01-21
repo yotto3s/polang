@@ -192,60 +192,6 @@ TEST(ParserTest, NestedLetExpression) {
   ASSERT_NE(bodyExpr, nullptr);
 }
 
-TEST(ParserTest, LetExpressionMutableBinding) {
-  auto block = parseOrFail("let x = mut 1 in x");
-  ASSERT_NE(block, nullptr);
-
-  auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
-  auto* letExpr = dynamic_cast<const NLetExpression*>(exprStmt->expression.get());
-  ASSERT_NE(letExpr, nullptr);
-  ASSERT_EQ(letExpr->bindings.size(), 1);
-  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
-  EXPECT_EQ(letExpr->bindings[0]->var->id->name, "x");
-  // Mutability is indicated by NMutRefExpression wrapping the value
-  auto* mutRefExpr = dynamic_cast<NMutRefExpression*>(letExpr->bindings[0]->var->assignmentExpr.get());
-  ASSERT_NE(mutRefExpr, nullptr);
-}
-
-TEST(ParserTest, LetExpressionMixedMutability) {
-  auto block = parseOrFail("let x = 1 and y = mut 2 in x + y");
-  ASSERT_NE(block, nullptr);
-
-  auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
-  auto* letExpr = dynamic_cast<const NLetExpression*>(exprStmt->expression.get());
-  ASSERT_NE(letExpr, nullptr);
-  ASSERT_EQ(letExpr->bindings.size(), 2);
-
-  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
-  EXPECT_EQ(letExpr->bindings[0]->var->id->name, "x");
-  // First binding is immutable (no NMutRefExpression)
-  auto* mutRefExpr0 = dynamic_cast<NMutRefExpression*>(letExpr->bindings[0]->var->assignmentExpr.get());
-  EXPECT_EQ(mutRefExpr0, nullptr);
-
-  ASSERT_FALSE(letExpr->bindings[1]->isFunction);
-  EXPECT_EQ(letExpr->bindings[1]->var->id->name, "y");
-  // Second binding is mutable (has NMutRefExpression)
-  auto* mutRefExpr1 = dynamic_cast<NMutRefExpression*>(letExpr->bindings[1]->var->assignmentExpr.get());
-  ASSERT_NE(mutRefExpr1, nullptr);
-}
-
-TEST(ParserTest, LetExpressionMutableWithTypeAnnotation) {
-  auto block = parseOrFail("let counter : int = mut 0 in counter");
-  ASSERT_NE(block, nullptr);
-
-  auto* exprStmt = getFirstStatement<NExpressionStatement>(block.get());
-  auto* letExpr = dynamic_cast<const NLetExpression*>(exprStmt->expression.get());
-  ASSERT_NE(letExpr, nullptr);
-  ASSERT_EQ(letExpr->bindings.size(), 1);
-  ASSERT_FALSE(letExpr->bindings[0]->isFunction);
-  EXPECT_EQ(letExpr->bindings[0]->var->id->name, "counter");
-  ASSERT_NE(letExpr->bindings[0]->var->type, nullptr);
-  EXPECT_EQ(letExpr->bindings[0]->var->type->getTypeName(), "int");
-  // Mutability is indicated by NMutRefExpression wrapping the value
-  auto* mutRefExpr = dynamic_cast<NMutRefExpression*>(letExpr->bindings[0]->var->assignmentExpr.get());
-  ASSERT_NE(mutRefExpr, nullptr);
-}
-
 TEST(ParserTest, LetExpressionInVariableDeclaration) {
   auto block = parseOrFail("let a = let x = 5 in x + 1");
   ASSERT_NE(block, nullptr);

@@ -101,28 +101,6 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
-// Reference type: ref T
-class NRefType : public NTypeSpec {
-public:
-  std::shared_ptr<const NTypeSpec> innerType;
-  explicit NRefType(std::shared_ptr<const NTypeSpec> inner) : innerType(std::move(inner)) {}
-  [[nodiscard]] std::string getTypeName() const override {
-    return "ref " + innerType->getTypeName();
-  }
-  void accept(Visitor &visitor) const override;
-};
-
-// Mutable reference type: mut T
-class NMutRefType : public NTypeSpec {
-public:
-  std::shared_ptr<const NTypeSpec> innerType;
-  explicit NMutRefType(std::shared_ptr<const NTypeSpec> inner) : innerType(std::move(inner)) {}
-  [[nodiscard]] std::string getTypeName() const override {
-    return "mut " + innerType->getTypeName();
-  }
-  void accept(Visitor &visitor) const override;
-};
-
 // Capture entry for closures (owns its type and id via shared_ptr/unique_ptr)
 // Mutability is derived from the type annotation (e.g., "mut i64" prefix)
 struct CaptureEntry {
@@ -209,39 +187,6 @@ public:
   NCastExpression(std::unique_ptr<NExpression> expr,
                   std::shared_ptr<const NTypeSpec> type)
       : expression(std::move(expr)), targetType(std::move(type)) {}
-  void accept(Visitor &visitor) const override;
-};
-
-class NAssignment : public NExpression {
-public:
-  std::unique_ptr<NIdentifier> lhs;
-  std::unique_ptr<NExpression> rhs;
-  NAssignment(std::unique_ptr<NIdentifier> lhs, std::unique_ptr<NExpression> rhs)
-      : lhs(std::move(lhs)), rhs(std::move(rhs)) {}
-  void accept(Visitor &visitor) const override;
-};
-
-class NRefExpression : public NExpression {
-public:
-  std::unique_ptr<NExpression> expr;
-  explicit NRefExpression(std::unique_ptr<NExpression> expr)
-      : expr(std::move(expr)) {}
-  void accept(Visitor &visitor) const override;
-};
-
-class NDerefExpression : public NExpression {
-public:
-  std::unique_ptr<NExpression> ref;
-  explicit NDerefExpression(std::unique_ptr<NExpression> ref)
-      : ref(std::move(ref)) {}
-  void accept(Visitor &visitor) const override;
-};
-
-class NMutRefExpression : public NExpression {
-public:
-  std::unique_ptr<NExpression> expr;
-  explicit NMutRefExpression(std::unique_ptr<NExpression> expr)
-      : expr(std::move(expr)) {}
   void accept(Visitor &visitor) const override;
 };
 

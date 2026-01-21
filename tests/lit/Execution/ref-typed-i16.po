@@ -1,7 +1,0 @@
-; RUN: %polang_repl %s | %FileCheck %s
-
-; Test creating immutable reference to i16 typed variable
-; CHECK: 1000 : i16
-let x:i16 = 1000
-let y = ref x
-*y

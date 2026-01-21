@@ -88,17 +88,6 @@ TEST(ASTPrinterTest, PrintVariableDeclaration) {
   EXPECT_NE(result.find("NInteger 5"), std::string::npos);
 }
 
-TEST(ASTPrinterTest, PrintMutableVariable) {
-  auto block = parseOrFail("let y = mut 10");
-  std::ostringstream out;
-  ASTPrinter printer(out);
-  printer.print(*block);
-
-  // Mutability is indicated by NMutRefExpression, not a "mut" flag in output
-  EXPECT_NE(out.str().find("NVariableDeclaration 'y'"), std::string::npos);
-  EXPECT_NE(out.str().find("NMutRefExpression"), std::string::npos);
-}
-
 TEST(ASTPrinterTest, PrintTypedVariable) {
   auto block = parseOrFail("let z: int = 42");
   std::ostringstream out;
@@ -186,18 +175,4 @@ TEST(ASTPrinterTest, MultipleStatements) {
   EXPECT_NE(result.find("NVariableDeclaration 'x'"), std::string::npos);
   EXPECT_NE(result.find("NVariableDeclaration 'y'"), std::string::npos);
   EXPECT_NE(result.find("NBinaryOperator '+'"), std::string::npos);
-}
-
-// ============== Assignment Tests ==============
-
-TEST(ASTPrinterTest, PrintAssignment) {
-  auto block = parseOrFail("x <- 10");
-  std::ostringstream out;
-  ASTPrinter printer(out);
-  printer.print(*block);
-
-  const std::string result = out.str();
-  EXPECT_NE(result.find("NAssignment"), std::string::npos);
-  EXPECT_NE(result.find("NIdentifier 'x'"), std::string::npos);
-  EXPECT_NE(result.find("NInteger 10"), std::string::npos);
 }

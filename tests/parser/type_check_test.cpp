@@ -123,70 +123,6 @@ TEST(TypeCheckTest, LetExpressionTypeMismatch) {
   EXPECT_TRUE(hasTypeError("let x : i64 = 1 and y : f64 = 2.0 in x + y"));
 }
 
-TEST(TypeCheckTest, AssignmentTypeMismatch) {
-  EXPECT_TRUE(hasTypeError("let x = mut 1\nx <- 2.0"));
-}
-
-// ============== Mutability Tests ==============
-
-TEST(TypeCheckTest, MutableVariableReassignment) {
-  // Mutable variable can be reassigned
-  EXPECT_TRUE(hasNoTypeError("let x = mut 1\nx <- 2\nx"));
-  EXPECT_TRUE(hasNoTypeError("let x: i64 = mut 1\nx <- 2\nx"));
-}
-
-TEST(TypeCheckTest, ImmutableVariableReassignment) {
-  // Immutable variable reassignment is no longer caught by AST type checker.
-  // It is now validated by MLIR verifier (RefStoreOp::verify()).
-  EXPECT_TRUE(hasNoTypeError("let x = 1\nx <- 2"));
-  EXPECT_TRUE(hasNoTypeError("let x: i64 = 1\nx <- 2"));
-}
-
-TEST(TypeCheckTest, MutableInLetExpression) {
-  // Mutable binding in let expression
-  EXPECT_TRUE(hasNoTypeError("let x = mut 1 in x <- 2"));
-  EXPECT_TRUE(hasNoTypeError("let x = mut 1 and y = 2 in x <- 10"));
-}
-
-TEST(TypeCheckTest, ImmutableInLetExpression) {
-  // Immutable binding reassignment is no longer caught by AST type checker.
-  // It is now validated by MLIR verifier (RefStoreOp::verify()).
-  EXPECT_TRUE(hasNoTypeError("let x = 1 in x <- 2"));
-  EXPECT_TRUE(hasNoTypeError("let x = 1 and y = mut 2 in x <- 10"));
-}
-
-TEST(TypeCheckTest, MultipleReassignments) {
-  // Multiple reassignments of the same mutable variable
-  EXPECT_TRUE(hasNoTypeError("let x = mut 1\nx <- 2\nx <- 3\nx"));
-}
-
-TEST(TypeCheckTest, MutableDoubleType) {
-  // Mutable double variable
-  EXPECT_TRUE(hasNoTypeError("let x: f64 = mut 1.0\nx <- 2.5\nx"));
-  EXPECT_TRUE(hasTypeError("let x: f64 = mut 1.0\nx <- 2")); // int to double
-}
-
-TEST(TypeCheckTest, MutableBoolType) {
-  // Mutable bool variable
-  EXPECT_TRUE(hasNoTypeError("let flag: bool = mut true\nflag <- false\nflag"));
-}
-
-TEST(TypeCheckTest, MixedMutabilityInLetExpression) {
-  // Mix of mutable and immutable bindings
-  EXPECT_TRUE(hasNoTypeError("let x = 1 and y = mut 2 in y <- 10"));
-  EXPECT_TRUE(hasNoTypeError("let a = mut 1 and b = 2 in a <- b"));
-}
-
-TEST(TypeCheckTest, NestedLetWithMutability) {
-  // Nested let expressions with mutable bindings
-  EXPECT_TRUE(hasNoTypeError("let x = mut 1 in let y = x in y"));
-  EXPECT_TRUE(hasNoTypeError("let x = 1 in let y = mut x in y <- 2"));
-}
-
-// Note: ImmutableReassignmentErrorMessage test removed.
-// Immutable reassignment errors are now caught by MLIR verifier,
-// not by the AST type checker.
-
 // ============== Error Message Tests ==============
 
 TEST(TypeCheckTest, ErrorMessageContainsOperator) {
@@ -383,11 +319,6 @@ TEST(TypeCheckTest, ClosureInLetExpression) {
   EXPECT_TRUE(hasNoTypeError("let x = 10 and f() = x + 1 in f()"));
 }
 
-TEST(TypeCheckTest, ClosureCapturesMutableVariable) {
-  // Function can capture mutable variable (requires explicit dereference)
-  EXPECT_TRUE(hasNoTypeError("let x = mut 10\nlet f() = (*x) + 1\nf()"));
-}
-
 TEST(TypeCheckTest, ClosureTypeMismatch) {
   // Captured variable type must be compatible with usage
   EXPECT_TRUE(hasTypeError("let x = 10\nlet f(): f64 = x + 1.0\nf()"));
@@ -433,17 +364,6 @@ TEST(TypeCheckTest, ClosureCaptureFromOuterNotSibling) {
 
 // ============== FreeVariableCollector Tests ==============
 // These tests specifically exercise the capture analysis paths
-
-TEST(TypeCheckTest, ClosureWithAssignment) {
-  // Assignment inside closure - captures mutable variable
-  EXPECT_TRUE(hasNoTypeError("let x = mut 10\nlet f() = x <- 20\nf()"));
-}
-
-TEST(TypeCheckTest, ClosureWithAssignmentAndCapture) {
-  // Assignment RHS captures another variable
-  EXPECT_TRUE(
-      hasNoTypeError("let y = 5\nlet x = mut 10\nlet f() = x <- y\nf()"));
-}
 
 TEST(TypeCheckTest, ClosureWithLetExpression) {
   // Let expression inside closure that captures outer variable
@@ -500,10 +420,4 @@ TEST(TypeCheckTest, ClosureWithNestedBlocks) {
 TEST(TypeCheckTest, ClosureDoesNotCaptureLocalLetBinding) {
   // Local let binding should not be captured
   EXPECT_TRUE(hasNoTypeError("let f() = let local = 5 in local + 1\nf()"));
-}
-
-TEST(TypeCheckTest, ClosureWithMutableAssignmentCapture) {
-  // Capture mutable variable via assignment LHS (requires explicit dereference)
-  EXPECT_TRUE(hasNoTypeError(
-      "let counter = mut 0\nlet inc() = counter <- (*counter) + 1\ninc()"));
 }

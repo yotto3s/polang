@@ -1,13 +1,12 @@
 # Polang Language Syntax
 
-Polang is a simple programming language with ML-inspired syntax and LLVM backend.
+Polang is a simple functional programming language with ML-inspired syntax and LLVM backend.
 
 ## Table of Contents
 
 - [Types](#types)
 - [Literals](#literals)
 - [Variables](#variables)
-- [Reference Types](#reference-types)
 - [Functions](#functions)
 - [Control Flow](#control-flow)
 - [Expressions](#expressions)
@@ -98,13 +97,13 @@ false
 
 ### Variable Declaration
 
-Variables are declared using the `let` keyword. By default, variables are **immutable**:
+Variables are declared using the `let` keyword. All variables in Polang are **immutable**:
 
 ```
-let x = 5           ; immutable, type inferred as int
-let y = 3.14        ; immutable, type inferred as double
-let z = true        ; immutable, type inferred as bool
-let w : int = 10    ; immutable, explicit type annotation
+let x = 5           ; type inferred as i64
+let y = 3.14        ; type inferred as f64
+let z = true        ; type inferred as bool
+let w : i64 = 10    ; explicit type annotation
 ```
 
 **Syntax:**
@@ -115,184 +114,8 @@ let <identifier> : <type> = <expression>
 
 - When type is omitted, it is **inferred from the initializer expression**
 - Variables must be initialized at declaration
-- **No implicit type conversion**: `let x: double = 42` is an error (must write `42.0`)
-
-### Mutable Variables
-
-To declare a mutable variable that can be reassigned, use `let x = mut value`:
-
-```
-let x = mut 5           ; mutable, type inferred as i64
-let y : mut i64 = mut 10  ; mutable, explicit type annotation
-```
-
-**Syntax:**
-```
-let <identifier> = mut <expression>
-let <identifier> : mut <type> = mut <expression>
-```
-
-### Variable Reassignment
-
-Only mutable variables can be reassigned using the `<-` operator:
-
-```
-let x = mut 5
-x <- 10             ; OK: x is mutable
-
-let y = 5
-y <- 10             ; ERROR: cannot reassign immutable variable
-```
-
-**Assignment as Expression:**
-
-The assignment operator `<-` returns the assigned value, making it an expression:
-
-```
-let x = mut 0
-x <- 10             ; evaluates to 10
-
-; Chained assignment (right-associative)
-let a = mut 0
-let b = mut 0
-a <- b <- 5         ; assigns 5 to both a and b, evaluates to 5
-```
-
-**Note:** The `=` operator is used only for initial binding (declaration). The `<-` operator is used for reassignment (mutation).
-
-## Reference Types
-
-Polang supports reference types for working with mutable and immutable memory locations.
-
-### Mutable References (`mut T`)
-
-Variables declared with `let x = mut value` have mutable reference type. A mutable reference allows both reading and writing the underlying value.
-
-```
-let x = mut 10       ; x has type 'mut i64' (mutable reference)
-x <- 20              ; write through mutable reference
-*x                   ; read value through dereference (20)
-```
-
-**Type Annotations:**
-```
-mut i64              ; mutable reference to i64
-mut f64              ; mutable reference to f64
-mut bool             ; mutable reference to bool
-```
-
-### Copying Mutable References
-
-When you assign a mutable reference to a new variable, the reference is copied (both point to the same location):
-
-```
-let x = mut 10       ; x is mut i64
-let r = x            ; r is also mut i64, points to same location
-r <- 20              ; writes through r
-*x                   ; reads 20 (x and r share the location)
-```
-
-### Extracting Values
-
-To copy the underlying value (not the reference), use the dereference operator `*`:
-
-```
-let x = mut 10       ; x is mut i64
-let v = *x           ; v is i64 (the value 10, not a reference)
-x <- 20              ; modify x
-v                    ; still 10 (v holds a copy of the value)
-```
-
-### Immutable References (`ref T`)
-
-Immutable references provide read-only access to a memory location. Create them using the `ref` keyword.
-
-**`ref *x` - Copy semantics (value snapshot):**
-
-When you write `ref *x`, the value is dereferenced and copied to new storage. The immutable reference does NOT share storage with the original, so mutations to the original are not visible:
-
-```
-let x = mut 10       ; x is mut i64
-let r = ref *x       ; r is ref i64 (copy of x's value)
-*r                   ; read value (10)
-x <- 20              ; write through mutable reference
-*r                   ; still 10 (r has its own copy)
-; r <- 30            ; ERROR: cannot write through immutable reference
-```
-
-**`ref x` - Shared storage (alias):**
-
-When you write `ref x` (without dereference), the immutable reference shares storage with the mutable reference. Mutations through the original are visible:
-
-```
-let x = mut 10       ; x is mut i64
-let r = ref x        ; r is ref i64 (shares storage with x)
-*r                   ; read value (10)
-x <- 20              ; write through mutable reference
-*r                   ; reads 20 (r sees the update)
-```
-
-**Type Annotations:**
-```
-ref i64              ; immutable reference to i64
-ref f64              ; immutable reference to f64
-ref bool             ; immutable reference to bool
-```
-
-### Dereference Operator (`*`)
-
-The `*` operator dereferences a reference to access the underlying value:
-
-```
-let x = mut 10
-*x                   ; read value from mutable reference (10)
-
-let r = ref *x
-*r                   ; read value from immutable reference (10)
-```
-
-### Reference Type Rules
-
-1. `let x = mut v` where `v : T` → `x` has type `mut T`
-2. `let y = x` where `x : mut T` → `y` has type `mut T` (reference copy)
-3. `ref e` where `e : T` → result type is `ref T`
-4. `*x` where `x : mut T` or `x : ref T` → result type is `T`
-5. `x <- v` requires `x : mut T` (cannot write through `ref T`)
-
-### Reference Examples
-
-```
-; Basic mutable variable
-let counter = mut 0
-counter <- counter + 1
-*counter              ; 1
-
-; Reference aliasing
-let a = mut 10
-let b = a            ; b is a copy of the reference
-b <- 20
-*a                   ; 20 (a and b refer to same location)
-
-; Value extraction
-let x = mut 100
-let copy = *x        ; copy holds the value 100
-x <- 200
-copy                 ; still 100
-
-; Immutable reference (copy with ref *x)
-let data = mut 42
-let reader = ref *data
-*reader              ; 42
-data <- 99
-*reader              ; still 42 (reader has its own copy)
-
-; Immutable reference (shared storage with ref x)
-let data2 = mut 42
-let reader2 = ref data2
-*reader2             ; 42
-data2 <- 99
-*reader2             ; 99 (sees the mutation)
-```
+- **No implicit type conversion**: `let x: f64 = 42` is an error (must write `42.0`)
+- Variables cannot be reassigned after declaration
 
 ## Functions
 
@@ -419,12 +242,10 @@ let x : int = 1 and y : double = 2.0 in x
 let <binding> (and <binding>)* in <expression>
 ```
 
-Where `<binding>` can be a variable binding (immutable by default):
+Where `<binding>` can be a variable binding:
 ```
 <identifier> = <expression>
 <identifier> : <type> = <expression>
-mut <identifier> = <expression>
-mut <identifier> : <type> = <expression>
 ```
 
 Or a function binding:
@@ -473,8 +294,6 @@ f()               ; returns 11
 **Capture Semantics:**
 - Variables are captured **by value** at call time
 - Captured variables are passed as implicit extra parameters
-- Both mutable and immutable variables can be captured
-- Mutations to captured variables inside the function do not affect the outer variable
 
 **Examples:**
 
@@ -507,7 +326,6 @@ Expressions can be:
 - **Comparisons**: `a == b`, `x < y` (return bool)
 - **Type conversions**: `x as i32`, `3.14 as i64`
 - **Function calls**: `add(1, 2)`
-- **Reassignments**: `x <- 5` (for mutable variables only)
 - **Parenthesized**: `(a + b) * c`
 - **If-expressions**: `if x > 0 then x else 0`
 - **Let-expressions**: `let x = 1 in x + 1`
@@ -551,36 +369,15 @@ let d: i32 = 3.7 as i32         ; convert float to integer (truncates to 3)
 
 See [Type Conversions](TypeSystem.md#type-conversions) for detailed conversion semantics.
 
-### Reassignment Operator
-
-| Operator | Description                           | Example   | Returns        |
-|----------|---------------------------------------|-----------|----------------|
-| `<-`     | Reassignment (mutable variables only) | `x <- 5`  | Assigned value |
-
-The reassignment operator returns the assigned value, allowing chained assignments like `a <- b <- 5`.
-
-**Note:** The `=` operator is used only for initial binding in declarations (`let x = 5`).
-
-### Reference Operators
-
-| Operator | Description                       | Example   | Returns        |
-|----------|-----------------------------------|-----------|----------------|
-| `ref`    | Create immutable reference        | `ref *x`  | Immutable ref  |
-| `*`      | Dereference (read through ref)    | `*x`      | Underlying value |
-
-**Note:** The `*` operator when used as a prefix (unary) dereferences a reference. As an infix (binary) operator, it remains multiplication.
-
 ### Operator Precedence
 
 From highest to lowest:
 
-1. `*expr` (unary dereference), `ref expr` (reference creation)
-2. Unary `-`, `!` (negation, logical not)
-3. `as` (type conversion)
-4. `*`, `/` (multiplication, division - binary)
-5. `+`, `-` (addition, subtraction)
-6. `==`, `!=`, `<`, `<=`, `>`, `>=` (comparisons)
-7. `<-` (reassignment, right-associative)
+1. Unary `-`, `!` (negation, logical not)
+2. `as` (type conversion)
+3. `*`, `/` (multiplication, division)
+4. `+`, `-` (addition, subtraction)
+5. `==`, `!=`, `<`, `<=`, `>`, `>=` (comparisons)
 
 Parentheses can be used to override precedence:
 
@@ -761,8 +558,7 @@ param_list  ::= param ("," param)*
 param       ::= identifier ":" type
               | identifier
 
-expression  ::= identifier "<-" expression
-              | qualified_name "(" call_args ")"
+expression  ::= qualified_name "(" call_args ")"
               | identifier "(" call_args ")"
               | qualified_name
               | identifier
@@ -773,8 +569,6 @@ expression  ::= identifier "<-" expression
               | "(" expression ")"
               | "if" expression "then" expression "else" expression
               | "let" let_bindings "in" expression
-              | "ref" expression
-              | "*" expression
 
 call_args   ::= ε
               | expression ("," expression)*
@@ -783,8 +577,6 @@ let_bindings ::= let_binding ("and" let_binding)*
 
 let_binding ::= identifier "=" expression
               | identifier ":" type "=" expression
-              | "mut" identifier "=" expression
-              | "mut" identifier ":" type "=" expression
               | identifier "(" param_list ")" ":" type "=" expression
               | identifier "(" param_list ")" "=" expression
               | identifier "()" ":" type "=" expression
@@ -804,8 +596,6 @@ double      ::= [0-9]+ "." [0-9]*
 boolean     ::= "true" | "false"
 
 type        ::= base_type
-              | "mut" base_type
-              | "ref" base_type
 
 base_type   ::= "i8" | "i16" | "i32" | "i64"
               | "u8" | "u16" | "u32" | "u64"
@@ -859,22 +649,6 @@ let answer = compute(1, 2, 3)
 ```
 let max(a: i64, b: i64): i64 = if a > b then a else b
 let larger = max(10, 20)
-```
-
-### Mutable Variables
-
-```
-let counter = mut 0
-counter <- counter + 1
-counter <- counter + 1
-counter <- counter + 1
-; counter is now 3
-
-; Chained assignment
-let x = mut 0
-let y = mut 0
-x <- y <- 10
-; both x and y are 10
 ```
 
 ### Type Conversions

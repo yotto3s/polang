@@ -1,6 +1,0 @@
-; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
-
-; Test error for nested ref in type annotation (ref ref T)
-; Type checker catches this before MLIR generation
-; CHECK: Type error: Variable 'y' declared as ref ref i64 but initialized with ref ref {{.*}}
-let y: ref ref i64 = ref (ref 10)

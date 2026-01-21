@@ -90,9 +90,6 @@ yy::parser::symbol_type yylex();
 %token TELSE "else"
 %token TTRUE "true"
 %token TFALSE "false"
-%token TMUT "mut"
-%token TREF "ref"
-%token TLARROW "<-"
 %token TMODULE "module"
 %token TENDMODULE "endmodule"
 %token TIMPORT "import"
@@ -123,22 +120,18 @@ yy::parser::symbol_type yylex();
 // Operator precedence (lowest to highest)
 %right TLET TIN TAND
 %right TIF TTHEN TELSE
-%right TEQUAL TLARROW
+%right TEQUAL
 %nonassoc COMPARISON TCEQ TCNE TCLT TCLE TCGT TCGE
 %left TPLUS TMINUS
 %left TMUL TDIV
 %left TAS
 %left TDOT
-%precedence TREF         // ref expr (unary)
-%precedence TDEREF       // *expr (unary dereference)
 
 /* Expected conflicts:
-   - ident TLPAREN (function call vs expr + (expr))
+   - ident TLPAREN (function call vs expr + (expr)) x2
    - ident TDOT (qualified name vs expr DOT)
-   - TMUL expr (unary deref vs binary multiplication)
-   - TMUT expr in var_decl/let_binding with binary operators
 */
-%expect 6
+%expect 3
 
 %start program
 
@@ -166,20 +159,6 @@ var_decl : TLET ident TEQUAL expr {
          | TLET ident TCOLON type_spec TEQUAL expr {
              /* let x : type = expr (immutable) */
              $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move($6));
-             SET_LOC($$, @$);
-           }
-         | TLET ident TEQUAL TMUT expr {
-             /* let x = mut expr (mutable, type to be inferred from NMutRefExpression) */
-             auto mutRef = std::make_unique<NMutRefExpression>(std::move($5));
-             SET_LOC(mutRef, @4);
-             $$ = std::make_unique<NVariableDeclaration>(std::move($2), std::move(mutRef));
-             SET_LOC($$, @$);
-           }
-         | TLET ident TCOLON type_spec TEQUAL TMUT expr {
-             /* let x : type = mut expr (mutable) */
-             auto mutRef = std::make_unique<NMutRefExpression>(std::move($7));
-             SET_LOC(mutRef, @6);
-             $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move(mutRef));
              SET_LOC($$, @$);
            }
          ;
@@ -328,12 +307,6 @@ ident : TIDENTIFIER { $$ = std::make_unique<NIdentifier>($1); SET_LOC($$, @$); }
 type_spec : ident {
               $$ = std::make_shared<const NNamedType>($1->name);
             }
-          | TREF type_spec {
-              $$ = std::make_shared<const NRefType>(std::move($2));
-            }
-          | TMUT type_spec {
-              $$ = std::make_shared<const NMutRefType>(std::move($2));
-            }
           ;
 
 numeric : TINTEGER { $$ = std::make_unique<NInteger>(atol($1.c_str())); SET_LOC($$, @$); }
@@ -344,8 +317,7 @@ boolean : TTRUE { $$ = std::make_unique<NBoolean>(true); SET_LOC($$, @$); }
         | TFALSE { $$ = std::make_unique<NBoolean>(false); SET_LOC($$, @$); }
         ;
 
-expr : ident TLARROW expr { $$ = std::make_unique<NAssignment>(std::move($1), std::move($3)); SET_LOC($$, @$); }
-     | ident TLPAREN call_args TRPAREN {
+expr : ident TLPAREN call_args TRPAREN {
          $$ = std::make_unique<NMethodCall>(std::move($1), std::move($3));
          SET_LOC($$, @$);
        }
@@ -423,16 +395,6 @@ expr : ident TLARROW expr { $$ = std::make_unique<NAssignment>(std::move($1), st
          $$ = std::make_unique<NLetExpression>(std::move($2), std::move($4));
          SET_LOC($$, @$);
        }
-     | TREF expr %prec TREF {
-         /* ref expr - create immutable reference */
-         $$ = std::make_unique<NRefExpression>(std::move($2));
-         SET_LOC($$, @$);
-       }
-     | TMUL expr %prec TDEREF {
-         /* *expr - dereference a reference */
-         $$ = std::make_unique<NDerefExpression>(std::move($2));
-         SET_LOC($$, @$);
-       }
      ;
 
 call_args : %empty { $$ = ExpressionList(); }
@@ -465,22 +427,6 @@ let_binding : ident TEQUAL expr {
             | ident TCOLON type_spec TEQUAL expr {
                 /* x : type = expr (immutable) */
                 auto varDecl = std::make_unique<NVariableDeclaration>(std::move($3), std::move($1), std::move($5));
-                SET_LOC(varDecl, @$);
-                $$ = std::make_unique<NLetBinding>(std::move(varDecl));
-              }
-            | ident TEQUAL TMUT expr {
-                /* x = mut expr (mutable, type to be inferred from NMutRefExpression) */
-                auto mutRef = std::make_unique<NMutRefExpression>(std::move($4));
-                SET_LOC(mutRef, @3);
-                auto varDecl = std::make_unique<NVariableDeclaration>(std::move($1), std::move(mutRef));
-                SET_LOC(varDecl, @$);
-                $$ = std::make_unique<NLetBinding>(std::move(varDecl));
-              }
-            | ident TCOLON type_spec TEQUAL TMUT expr {
-                /* x : type = mut expr (mutable) */
-                auto mutRef = std::make_unique<NMutRefExpression>(std::move($6));
-                SET_LOC(mutRef, @5);
-                auto varDecl = std::make_unique<NVariableDeclaration>(std::move($3), std::move($1), std::move(mutRef));
                 SET_LOC(varDecl, @$);
                 $$ = std::make_unique<NLetBinding>(std::move(varDecl));
               }

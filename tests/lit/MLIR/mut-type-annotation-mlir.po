@@ -1,9 +1,0 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
-
-; Test MLIR for type-annotated mutable variable (unified ref type)
-; CHECK: {{.*}}polang.func @__polang_entry() -> !polang.integer<32, signed>{{.*}}
-; CHECK: {{.*}}polang.constant.integer{{.*}}
-; CHECK: {{.*}}polang.ref.create{{.*}}is_mutable = true{{.*}}
-; CHECK: {{.*}}polang.ref.deref{{.*}}
-; CHECK: {{.*}}polang.return{{.*}}
-let x: mut i32 = mut 5 in *x

@@ -333,52 +333,6 @@ LogicalResult CmpOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// RefStoreOp verifier
-//===----------------------------------------------------------------------===//
-
-LogicalResult RefStoreOp::verify() {
-  auto refType = mlir::dyn_cast<RefType>(getRef().getType());
-  if (!refType) {
-    // If it's a type variable, defer to type inference
-    if (mlir::isa<TypeVarType>(getRef().getType())) {
-      return success();
-    }
-    return emitOpError("reference operand must be a reference type");
-  }
-  if (!refType.isMutable()) {
-    return emitOpError("cannot store through immutable reference");
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// RefCreateOp verifier
-//===----------------------------------------------------------------------===//
-
-LogicalResult RefCreateOp::verify() {
-  Type sourceType = getSource().getType();
-
-  // Skip validation for TypeVars - will be validated after type inference
-  if (mlir::isa<TypeVarType>(sourceType)) {
-    return success();
-  }
-
-  // If source is already a RefType, we're creating a nested reference
-  if (mlir::isa<RefType>(sourceType)) {
-    // This is allowed when creating an immutable ref from a mutable ref
-    // (is_mutable = false), but not when creating a new mutable ref
-    // from another ref (which would be ref ref T)
-    if (getIsMutable()) {
-      return emitOpError(
-                 "nested reference types not allowed: "
-                 "cannot create mutable reference from reference type: ")
-             << sourceType;
-    }
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // InferTypeOpInterface implementations
 //===----------------------------------------------------------------------===//
 

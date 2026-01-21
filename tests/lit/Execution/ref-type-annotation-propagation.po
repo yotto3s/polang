@@ -1,6 +1,0 @@
-; RUN: %polang_repl %s | %FileCheck %s
-; Test: ref i32 annotation propagates to resolve x as i32
-; CHECK: 10 : i32
-let x = 10
-let y: ref i32 = ref x
-*y

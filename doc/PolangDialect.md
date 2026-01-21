@@ -64,21 +64,6 @@ Type variables represent unknown types that are resolved during type inference.
 | `integer` | Must be integer type (i8-i64, u8-u64) | `i64` |
 | `float` | Must be float type (f32, f64) | `f64` |
 
-### Reference Types
-
-Reference types wrap a value and provide read/write access.
-
-| Polang Type | MLIR Type | Description |
-|-------------|-----------|-------------|
-| `mut T` | `!polang.ref<T, mutable>` | Mutable reference (read/write) |
-| `ref T` | `!polang.ref<T>` | Immutable reference (read-only) |
-
-**Examples:**
-```mlir
-!polang.ref<!polang.integer<64, signed>, mutable>  ; mutable ref i64
-!polang.ref<!polang.integer<64, signed>>           ; immutable ref i64
-```
-
 ## Operations
 
 ### Constant Operations
@@ -232,48 +217,6 @@ Yields a value from a region (used within if-then-else branches).
 polang.yield %0 : !polang.integer<64, signed>
 ```
 
-### Variable Operations
-
-#### `polang.alloca`
-
-Allocates stack memory for a mutable variable.
-
-```mlir
-%0 = polang.alloca "x", mutable : !polang.integer<64, signed> -> memref<!polang.integer<64, signed>>
-```
-
-**Note:** Immutable variables are optimized to use SSA values directly without allocation.
-
-### Reference Operations
-
-#### `polang.ref.create`
-
-Creates a reference from an initial value or source reference.
-
-```mlir
-; Create mutable reference (allocates memory)
-%ref = polang.ref.create %val {is_mutable = true} : !polang.integer<64, signed> -> !polang.ref<!polang.integer<64, signed>, mutable>
-
-; Create immutable reference from mutable (no allocation)
-%imm = polang.ref.create %mut {is_mutable = false} : !polang.ref<!polang.integer<64, signed>, mutable> -> !polang.ref<!polang.integer<64, signed>>
-```
-
-#### `polang.ref.deref`
-
-Dereferences a reference to read the value.
-
-```mlir
-%val = polang.ref.deref %ref : !polang.ref<!polang.integer<64, signed>, mutable> -> !polang.integer<64, signed>
-```
-
-#### `polang.ref.store`
-
-Stores a value through a mutable reference. The verifier ensures the reference is mutable.
-
-```mlir
-%result = polang.ref.store %val, %ref : !polang.integer<64, signed>, !polang.ref<!polang.integer<64, signed>, mutable> -> !polang.integer<64, signed>
-```
-
 ### Debug Operations
 
 #### `polang.print`
@@ -296,7 +239,6 @@ The Polang dialect uses custom verifiers to catch type errors during compilation
 | `polang.if` | Condition must be bool, branches must yield same type |
 | `polang.return` | Return value type must match function signature |
 | `polang.call` | Function must exist, arity and argument types must match |
-| `polang.ref.store` | Reference must be mutable (`!polang.ref<T, mutable>`) |
 
 **Type Compatibility:** Operations use a `typesAreCompatible()` helper that allows type variables during intermediate stages (before type inference resolves them).
 
@@ -392,10 +334,6 @@ Lowers Polang dialect operations to standard MLIR dialects (arith, func, scf, me
 | `polang.return` | `func.return` |
 | `polang.if` | `scf.if` |
 | `polang.yield` | `scf.yield` |
-| `polang.ref.create` (mutable) | `memref.alloca` + `memref.store` |
-| `polang.ref.create` (immutable) | passthrough |
-| `polang.ref.deref` | `memref.load` |
-| `polang.ref.store` | `memref.store` |
 
 **Type Lowering:**
 
@@ -405,7 +343,6 @@ Lowers Polang dialect operations to standard MLIR dialects (arith, func, scf, me
 | `!polang.float<32>` | `f32` |
 | `!polang.float<64>` | `f64` |
 | `!polang.bool` | `i1` |
-| `!polang.ref<T, mutable>` | `memref<T>` |
 
 ## File Structure
 

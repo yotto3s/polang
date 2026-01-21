@@ -134,35 +134,6 @@ def Polang_TypeVarType : Polang_Type<"TypeVar", "typevar"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Reference Types
-//===----------------------------------------------------------------------===//
-
-def Polang_RefType : Polang_Type<"Ref", "ref"> {
-  let summary = "Reference type (mutable or immutable)";
-  let description = [{
-    A reference type that wraps a value. Can be mutable or immutable.
-    - Mutable: created with 'let x = mut value', allows reading and writing
-    - Immutable: created with 'ref expr', allows only reading
-
-    Examples:
-    ```mlir
-    !polang.ref<!polang.integer<64, signed>, mutable>   ; mutable ref i64
-    !polang.ref<!polang.integer<64, signed>>            ; immutable ref i64
-    ```
-  }];
-  let parameters = (ins
-    "mlir::Type":$elementType,
-    DefaultValuedParameter<"bool", "false">:$isMutable
-  );
-  let hasCustomAssemblyFormat = 1;
-
-  let extraClassDeclaration = [{
-    bool isMutable() const { return getIsMutable(); }
-    bool isImmutable() const { return !getIsMutable(); }
-  }];
-}
-
-//===----------------------------------------------------------------------===//
 // Type constraints
 //===----------------------------------------------------------------------===//
 
@@ -178,8 +149,7 @@ def Polang_AnyNumericOrVar : AnyTypeOf<[
 ], "Polang numeric type or type variable">;
 
 def Polang_AnyTypeOrVar : AnyTypeOf<[
-    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_TypeVarType,
-    Polang_RefType
+    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_TypeVarType
 ], "any Polang type or type variable">;
 
 // Bool or type variable (for if conditions before type inference)
@@ -196,10 +166,5 @@ def Polang_IntegerOrTypeVar : AnyTypeOf<[
 def Polang_FloatOrTypeVar : AnyTypeOf<[
     Polang_FloatType, Polang_TypeVarType
 ], "float or type variable">;
-
-// Reference type or type variable
-def Polang_RefOrTypeVar : AnyTypeOf<[
-    Polang_RefType, Polang_TypeVarType
-], "reference type or type variable">;
 
 #endif // POLANG_TYPES_TD

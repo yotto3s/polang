@@ -30,8 +30,6 @@ public:
 
   // Type Specification Visitor methods
   void visit(const NNamedType& node) override;
-  void visit(const NRefType& node) override;
-  void visit(const NMutRefType& node) override;
 
   // Expression Visitor methods
   void visit(const NInteger& node) override;
@@ -42,10 +40,6 @@ public:
   void visit(const NMethodCall& node) override;
   void visit(const NBinaryOperator& node) override;
   void visit(const NCastExpression& node) override;
-  void visit(const NAssignment& node) override;
-  void visit(const NRefExpression& node) override;
-  void visit(const NDerefExpression& node) override;
-  void visit(const NMutRefExpression& node) override;
   void visit(const NBlock& node) override;
   void visit(const NIfExpression& node) override;
   void visit(const NLetExpression& node) override;

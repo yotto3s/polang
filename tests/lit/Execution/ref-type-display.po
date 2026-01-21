@@ -1,5 +1,0 @@
-; RUN: %polang_repl %s | %FileCheck %s
-; CHECK: {{[0-9]+}} : ref i64
-let x = mut 10
-let y = ref *x
-y

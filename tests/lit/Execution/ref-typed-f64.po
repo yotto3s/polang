@@ -1,7 +1,0 @@
-; RUN: %polang_repl %s | %FileCheck %s
-
-; Test creating immutable reference to f64 typed variable
-; CHECK: 3.14 : f64
-let x:f64 = 3.14
-let y = ref x
-*y

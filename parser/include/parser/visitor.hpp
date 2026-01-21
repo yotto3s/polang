@@ -7,16 +7,10 @@ class NDouble;
 class NBoolean;
 class NIdentifier;
 class NNamedType;
-class NRefType;
-class NMutRefType;
 class NQualifiedName;
 class NMethodCall;
 class NBinaryOperator;
 class NCastExpression;
-class NAssignment;
-class NRefExpression;
-class NDerefExpression;
-class NMutRefExpression;
 class NBlock;
 class NIfExpression;
 class NLetExpression;
@@ -77,8 +71,6 @@ public:
   /// @name Type Specification Visitors
   /// @{
   virtual void visit(const NNamedType& node) = 0;
-  virtual void visit(const NRefType& node) = 0;
-  virtual void visit(const NMutRefType& node) = 0;
   /// @}
 
   /// @name Expression Visitors
@@ -91,10 +83,6 @@ public:
   virtual void visit(const NMethodCall& node) = 0;
   virtual void visit(const NBinaryOperator& node) = 0;
   virtual void visit(const NCastExpression& node) = 0;
-  virtual void visit(const NAssignment& node) = 0;
-  virtual void visit(const NRefExpression& node) = 0;
-  virtual void visit(const NDerefExpression& node) = 0;
-  virtual void visit(const NMutRefExpression& node) = 0;
   virtual void visit(const NBlock& node) = 0;
   virtual void visit(const NIfExpression& node) = 0;
   virtual void visit(const NLetExpression& node) = 0;
