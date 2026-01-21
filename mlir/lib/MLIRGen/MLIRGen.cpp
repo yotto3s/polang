@@ -663,8 +663,7 @@ private:
   class SymbolTableScope {
   public:
     SymbolTableScope(MLIRGenVisitor& visitor, bool clearAllTables = false)
-        : visitor(visitor),
-          savedTypeTable(visitor.typeTable),
+        : visitor(visitor), savedTypeTable(visitor.typeTable),
           savedTypeVarTable(visitor.typeVarTable),
           savedArgValues(visitor.argValues),
           savedImmutableValues(visitor.immutableValues) {

@@ -7,14 +7,7 @@
 namespace polang {
 
 /// Enumeration of Polang's built-in type kinds.
-enum class TypeKind {
-  Integer,
-  Float,
-  Bool,
-  Function,
-  TypeVar,
-  Unknown
-};
+enum class TypeKind { Integer, Float, Bool, Function, TypeVar, Unknown };
 
 /// Type name constants to avoid magic strings throughout the codebase.
 /// Use these constants instead of string literals like "i32", "f64", etc.
