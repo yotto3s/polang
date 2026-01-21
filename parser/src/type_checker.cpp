@@ -415,6 +415,9 @@ void TypeChecker::typeCheckLetBindings(
     const std::map<std::string, std::string>& savedLocals,
     std::vector<std::string>& bindingTypes,
     std::vector<std::vector<std::string>>& funcParams) {
+  // NOTE: const_cast is used throughout this function to store resolved types
+  // and captures back into AST nodes. See comment in
+  // visit(NVariableDeclaration&).
   for (const auto& binding : bindings) {
     if (binding->isFunction) {
       const auto& func = binding->func;
@@ -650,6 +653,10 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
 }
 
 void TypeChecker::visit(const NVariableDeclaration& node) {
+  // NOTE: const_cast is used because the type checker needs to store resolved
+  // types back into AST nodes for the MLIR generator to access. This is an
+  // architectural decision - a cleaner approach would use a separate type
+  // environment map shared between TypeChecker and MLIRGen.
   auto& mutableNode = const_cast<NVariableDeclaration&>(node);
   const std::string varName = mangledName(node.id->name);
 
@@ -697,6 +704,8 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
 }
 
 void TypeChecker::visit(const NFunctionDeclaration& node) {
+  // NOTE: const_cast is used to store resolved types and captured variables
+  // back into AST nodes. See comment in visit(NVariableDeclaration&).
   auto& mutableNode = const_cast<NFunctionDeclaration&>(node);
 
   const std::string funcName = mangledName(node.id->name);
