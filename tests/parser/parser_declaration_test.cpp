@@ -27,7 +27,7 @@ TEST(ParserTest, TypedVariableDeclaration) {
   ASSERT_NE(varDecl, nullptr);
   EXPECT_EQ(varDecl->id->name, "pi");
   ASSERT_NE(varDecl->type, nullptr);
-  EXPECT_EQ(varDecl->type->name, "double");
+  EXPECT_EQ(varDecl->type->getTypeName(), "double");
 
   auto* doubleExpr = dynamic_cast<NDouble*>(varDecl->assignmentExpr.get());
   ASSERT_NE(doubleExpr, nullptr);
@@ -48,45 +48,6 @@ TEST(ParserTest, VariableWithIdentifierExpression) {
   EXPECT_EQ(identExpr->name, "x");
 }
 
-// ============== Mutable Variable Declaration Tests ==============
-
-TEST(ParserTest, MutableVariableDeclaration) {
-  auto block = parseOrFail("let mut x = 5");
-  ASSERT_NE(block, nullptr);
-  ASSERT_EQ(block->statements.size(), 1);
-
-  auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
-  ASSERT_NE(varDecl, nullptr);
-  EXPECT_EQ(varDecl->id->name, "x");
-  EXPECT_TRUE(varDecl->isMutable);
-
-  auto* intExpr = dynamic_cast<NInteger*>(varDecl->assignmentExpr.get());
-  ASSERT_NE(intExpr, nullptr);
-  EXPECT_EQ(intExpr->value, 5);
-}
-
-TEST(ParserTest, MutableTypedVariableDeclaration) {
-  auto block = parseOrFail("let mut counter : int = 0");
-  ASSERT_NE(block, nullptr);
-  ASSERT_EQ(block->statements.size(), 1);
-
-  auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
-  ASSERT_NE(varDecl, nullptr);
-  EXPECT_EQ(varDecl->id->name, "counter");
-  EXPECT_TRUE(varDecl->isMutable);
-  ASSERT_NE(varDecl->type, nullptr);
-  EXPECT_EQ(varDecl->type->name, "int");
-}
-
-TEST(ParserTest, ImmutableVariableDeclaration) {
-  auto block = parseOrFail("let x = 5");
-  ASSERT_NE(block, nullptr);
-
-  auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
-  ASSERT_NE(varDecl, nullptr);
-  EXPECT_FALSE(varDecl->isMutable);
-}
-
 // ============== Function Declaration Tests ==============
 
 TEST(ParserTest, SimpleFunctionDeclaration) {
@@ -98,11 +59,11 @@ TEST(ParserTest, SimpleFunctionDeclaration) {
   ASSERT_NE(funcDecl, nullptr);
   EXPECT_EQ(funcDecl->id->name, "square");
   ASSERT_NE(funcDecl->type, nullptr);
-  EXPECT_EQ(funcDecl->type->name, "int");
+  EXPECT_EQ(funcDecl->type->getTypeName(), "int");
   ASSERT_EQ(funcDecl->arguments.size(), 1);
   EXPECT_EQ(funcDecl->arguments[0]->id->name, "n");
   ASSERT_NE(funcDecl->arguments[0]->type, nullptr);
-  EXPECT_EQ(funcDecl->arguments[0]->type->name, "int");
+  EXPECT_EQ(funcDecl->arguments[0]->type->getTypeName(), "int");
 }
 
 TEST(ParserTest, FunctionWithMultipleArgs) {
@@ -114,7 +75,7 @@ TEST(ParserTest, FunctionWithMultipleArgs) {
   ASSERT_NE(funcDecl, nullptr);
   EXPECT_EQ(funcDecl->id->name, "add");
   ASSERT_NE(funcDecl->type, nullptr);
-  EXPECT_EQ(funcDecl->type->name, "int");
+  EXPECT_EQ(funcDecl->type->getTypeName(), "int");
   ASSERT_EQ(funcDecl->arguments.size(), 2);
   EXPECT_EQ(funcDecl->arguments[0]->id->name, "x");
   EXPECT_EQ(funcDecl->arguments[1]->id->name, "y");

@@ -232,7 +232,12 @@ struct TypeInferencePass
     }
 
     // Phase 3: Apply substitution to resolve all types
-    applySubstitution(module, subst);
+    applySubstitution(module, subst, hadError);
+
+    if (hadError) {
+      signalPassFailure();
+      return;
+    }
   }
 
 private:
@@ -334,7 +339,8 @@ private:
     }
   }
 
-  void applySubstitution(ModuleOp module, const Substitution& subst) {
+  void applySubstitution(ModuleOp module, const Substitution& subst,
+                         [[maybe_unused]] bool& hadError) {
     // First, identify which functions are polymorphic (before any
     // modifications)
     llvm::StringSet<> polymorphicFuncs;
@@ -360,7 +366,7 @@ private:
         // Store the actual argument types (they should already be concrete
         // or resolvable through the global substitution)
         SmallVector<Attribute> resolvedArgTypes;
-        auto ctx = call.getContext();
+        auto* ctx = call.getContext();
         for (Value arg : call.getOperands()) {
           Type resolvedType = subst.apply(arg.getType());
           // Apply defaults for numeric type vars (integer -> i64, float -> f64)
@@ -415,7 +421,7 @@ private:
       }
 
       FunctionType oldType = func.getFunctionType();
-      auto ctx = func.getContext();
+      auto* ctx = func.getContext();
 
       SmallVector<Type> newInputs;
       for (Type input : oldType.getInputs()) {
@@ -465,7 +471,7 @@ private:
         }
       }
 
-      auto ctx = op->getContext();
+      auto* ctx = op->getContext();
       bool needsUpdate = false;
       for (Type type : op->getResultTypes()) {
         Type resolved = subst.apply(type);

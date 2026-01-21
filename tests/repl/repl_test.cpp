@@ -75,12 +75,7 @@ TEST(ReplIntegration, MultipleFunctionsPersist) {
   EXPECT_THAT(result.stdout_output, HasSubstr("12 : i64"));
 }
 
-TEST(ReplIntegration, VariableReassignmentPersists) {
-  // Reassign variable and verify new value persists (explicit dereference required)
-  const auto result = runRepl("let mut x = 1\nx <- 100\n(*x)");
-  EXPECT_EQ(result.exit_code, 0);
-  EXPECT_THAT(result.stdout_output, HasSubstr("100 : i64"));
-}
+// VariableReassignmentPersists test removed - variables are now immutable
 
 // Assignment return value tests (AssignmentReturnsIntValue, AssignmentReturnsDoubleValue,
 // AssignmentReturnsBoolValue, ChainedAssignment) are covered by lit tests in tests/lit/Execution/
@@ -113,20 +108,9 @@ TEST(ReplIntegration, MultipleCapturedVariables) {
   EXPECT_THAT(result.stdout_output, HasSubstr("3 : i64"));
 }
 
-TEST(ReplIntegration, ClosureWithMutableCapture) {
-  // Explicit dereference required for mutable variable values
-  const auto result = runRepl("let mut x = 10\nlet f() = (*x) + 1\nf()");
-  EXPECT_EQ(result.exit_code, 0);
-  EXPECT_THAT(result.stdout_output, HasSubstr("11 : i64"));
-}
+// ClosureWithMutableCapture test removed - variables are now immutable
 
-TEST(ReplIntegration, ClosureCaptureByValue) {
-  // Capture is by reference, so mutation after function definition
-  // should be visible when calling (explicit dereference required)
-  const auto result = runRepl("let mut x = 10\nlet f() = (*x) + 1\nx <- 20\nf()");
-  EXPECT_EQ(result.exit_code, 0);
-  EXPECT_THAT(result.stdout_output, HasSubstr("21 : i64"));
-}
+// ClosureCaptureByValue test removed - variables are now immutable (no reassignment)
 
 TEST(ReplIntegration, ClosureCapturesDouble) {
   const auto result = runRepl("let x = 3.14\nlet f() = x + 1.0\nf()");

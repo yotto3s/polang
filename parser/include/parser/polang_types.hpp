@@ -7,16 +7,7 @@
 namespace polang {
 
 /// Enumeration of Polang's built-in type kinds.
-enum class TypeKind {
-  Integer,
-  Float,
-  Bool,
-  Function,
-  TypeVar,
-  MutableRef,
-  ImmutableRef,
-  Unknown
-};
+enum class TypeKind { Integer, Float, Bool, Function, TypeVar, Unknown };
 
 /// Type name constants to avoid magic strings throughout the codebase.
 /// Use these constants instead of string literals like "i32", "f64", etc.
@@ -42,22 +33,12 @@ struct TypeNames {
   static constexpr const char* FUNCTION = "function";
   static constexpr const char* TYPEVAR = "typevar";
   static constexpr const char* UNKNOWN = "unknown";
-  // Reference type prefixes
-  static constexpr const char* MUT_PREFIX = "mut ";
-  static constexpr const char* REF_PREFIX = "ref ";
 };
 
 /// Parse a type name string into a TypeKind enum.
 /// Returns std::nullopt if the string is not a recognized type name.
 [[nodiscard]] inline std::optional<TypeKind>
 parseTypeName(const std::string& name) noexcept {
-  // Check for reference types first (before other checks)
-  if (name.rfind(TypeNames::MUT_PREFIX, 0) == 0) {
-    return TypeKind::MutableRef;
-  }
-  if (name.rfind(TypeNames::REF_PREFIX, 0) == 0) {
-    return TypeKind::ImmutableRef;
-  }
   // Signed integers
   if (name == TypeNames::I8 || name == TypeNames::I16 ||
       name == TypeNames::I32 || name == TypeNames::I64) {
@@ -162,6 +143,12 @@ isGenericFloatType(const std::string& typeName) noexcept {
   return isGenericIntegerType(typeName) || isGenericFloatType(typeName);
 }
 
+/// Check if a type contains a generic type.
+[[nodiscard]] inline bool
+containsGenericType(const std::string& typeName) noexcept {
+  return isGenericType(typeName);
+}
+
 /// Check if two types are compatible for assignment/operations.
 /// Generic types are compatible with their concrete counterparts.
 [[nodiscard]] inline bool areTypesCompatible(const std::string& t1,
@@ -230,6 +217,12 @@ resolveGenericToDefault(const std::string& type) noexcept {
   return type;
 }
 
+/// Resolve all generic types within a type to their defaults.
+[[nodiscard]] inline std::string
+resolveAllGenericsToDefault(const std::string& type) noexcept {
+  return resolveGenericToDefault(type);
+}
+
 /// Convert a TypeKind to its string representation.
 /// Returns the kind name (e.g., "integer", "float", "bool").
 [[nodiscard]] inline const char* typeKindToString(TypeKind kind) noexcept {
@@ -244,10 +237,6 @@ resolveGenericToDefault(const std::string& type) noexcept {
     return "function";
   case TypeKind::TypeVar:
     return "typevar";
-  case TypeKind::MutableRef:
-    return "mutref";
-  case TypeKind::ImmutableRef:
-    return "ref";
   case TypeKind::Unknown:
     return "unknown";
   }
@@ -282,56 +271,6 @@ getFloatWidth(const std::string& typeName) noexcept {
     return 64;
   }
   return 0;
-}
-
-//===----------------------------------------------------------------------===//
-// Reference Type Helpers
-//===----------------------------------------------------------------------===//
-
-/// Check if a type name represents a mutable reference type.
-[[nodiscard]] inline bool
-isMutableRefType(const std::string& typeName) noexcept {
-  return typeName.rfind(TypeNames::MUT_PREFIX, 0) == 0;
-}
-
-/// Check if a type name represents an immutable reference type.
-[[nodiscard]] inline bool
-isImmutableRefType(const std::string& typeName) noexcept {
-  return typeName.rfind(TypeNames::REF_PREFIX, 0) == 0;
-}
-
-/// Check if a type name represents any reference type (mutable or immutable).
-[[nodiscard]] inline bool
-isReferenceType(const std::string& typeName) noexcept {
-  return isMutableRefType(typeName) || isImmutableRefType(typeName);
-}
-
-/// Get the referent type from a reference type.
-/// For "mut i64" returns "i64", for "ref i64" returns "i64".
-/// Returns the input unchanged if it's not a reference type.
-[[nodiscard]] inline std::string
-getReferentType(const std::string& refType) noexcept {
-  if (isMutableRefType(refType)) {
-    return refType.substr(4); // Skip "mut "
-  }
-  if (isImmutableRefType(refType)) {
-    return refType.substr(4); // Skip "ref "
-  }
-  return refType;
-}
-
-/// Create a mutable reference type from a base type.
-/// For "i64" returns "mut i64".
-[[nodiscard]] inline std::string
-makeMutableRefType(const std::string& baseType) noexcept {
-  return std::string(TypeNames::MUT_PREFIX) + baseType;
-}
-
-/// Create an immutable reference type from a base type.
-/// For "i64" returns "ref i64".
-[[nodiscard]] inline std::string
-makeImmutableRefType(const std::string& baseType) noexcept {
-  return std::string(TypeNames::REF_PREFIX) + baseType;
 }
 
 } // namespace polang

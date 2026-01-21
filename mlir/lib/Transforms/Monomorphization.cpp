@@ -151,24 +151,42 @@ struct MonomorphizationPass
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
-    // Step 1: Identify all polymorphic functions
+    auto polymorphicFuncs = identifyPolymorphicFunctions(module);
+    if (polymorphicFuncs.empty()) {
+      return;
+    }
+
+    auto callSignatures = collectCallSignatures(module, polymorphicFuncs);
+    auto specializedNames =
+        createSpecializedFunctions(module, polymorphicFuncs, callSignatures);
+    updateCallsToSpecialized(module, polymorphicFuncs, specializedNames);
+    markPolymorphicFunctions(polymorphicFuncs);
+    fixupEntryFunctionSignature(module);
+  }
+
+private:
+  /// Signature info for a monomorphized call site.
+  struct CallSignature {
+    SmallVector<Type> argTypes;
+    Type returnType;
+  };
+
+  /// Identify all polymorphic functions in the module.
+  [[nodiscard]] llvm::StringMap<FuncOp>
+  identifyPolymorphicFunctions(ModuleOp module) {
     llvm::StringMap<FuncOp> polymorphicFuncs;
     module.walk([&](FuncOp func) {
       if (isPolymorphicFunction(func)) {
         polymorphicFuncs[func.getSymName()] = func;
       }
     });
+    return polymorphicFuncs;
+  }
 
-    if (polymorphicFuncs.empty()) {
-      return; // Nothing to monomorphize
-    }
-
-    // Step 2: Collect all unique call signatures for each polymorphic function
-    // Map: function name -> (signature key -> (argTypes, returnType))
-    struct CallSignature {
-      SmallVector<Type> argTypes;
-      Type returnType;
-    };
+  /// Collect all unique call signatures for each polymorphic function.
+  [[nodiscard]] llvm::StringMap<llvm::StringMap<CallSignature>>
+  collectCallSignatures(ModuleOp module,
+                        const llvm::StringMap<FuncOp>& polymorphicFuncs) {
     llvm::StringMap<llvm::StringMap<CallSignature>> callSignatures;
 
     module.walk([&](CallOp call) {
@@ -176,7 +194,6 @@ struct MonomorphizationPass
         return;
       }
 
-      // Get resolved types from attributes (set by type inference)
       auto resolvedArgTypesAttr =
           call->getAttrOfType<ArrayAttr>("polang.resolved_arg_types");
       auto resolvedReturnTypeAttr =
@@ -192,7 +209,6 @@ struct MonomorphizationPass
       }
       Type returnType = resolvedReturnTypeAttr.getValue();
 
-      // Check if this signature already exists
       std::string sigKey = getSignatureKey(argTypes, returnType);
       auto& signatures = callSignatures[call.getCallee()];
       if (!signatures.contains(sigKey)) {
@@ -200,17 +216,26 @@ struct MonomorphizationPass
       }
     });
 
-    // Step 3: Create specialized functions for each unique signature
-    // Maps: original name -> (signature key -> specialized name)
+    return callSignatures;
+  }
+
+  /// Create specialized functions for each unique signature.
+  [[nodiscard]] llvm::StringMap<llvm::StringMap<std::string>>
+  createSpecializedFunctions(
+      ModuleOp module, const llvm::StringMap<FuncOp>& polymorphicFuncs,
+      const llvm::StringMap<llvm::StringMap<CallSignature>>& callSignatures) {
     llvm::StringMap<llvm::StringMap<std::string>> specializedNames;
 
-    for (auto& [funcName, signatures] : callSignatures) {
-      FuncOp origFunc = polymorphicFuncs[funcName];
+    for (const auto& [funcName, signatures] : callSignatures) {
+      auto funcIt = polymorphicFuncs.find(funcName);
+      if (funcIt == polymorphicFuncs.end()) {
+        continue;
+      }
+      FuncOp origFunc = funcIt->second;
 
-      for (auto& [sigKey, sig] : signatures) {
+      for (const auto& [sigKey, sig] : signatures) {
         std::string mangledName = getMangledName(funcName, sig.argTypes);
 
-        // Clone and specialize the function
         FuncOp specializedFunc = cloneAndSpecialize(
             origFunc, mangledName, sig.argTypes, sig.returnType, module);
 
@@ -220,7 +245,13 @@ struct MonomorphizationPass
       }
     }
 
-    // Step 4: Update all CallOps to use specialized functions
+    return specializedNames;
+  }
+
+  /// Update all CallOps to use specialized functions.
+  void updateCallsToSpecialized(
+      ModuleOp module, const llvm::StringMap<FuncOp>& polymorphicFuncs,
+      const llvm::StringMap<llvm::StringMap<std::string>>& specializedNames) {
     module.walk([&](CallOp call) {
       if (!polymorphicFuncs.contains(call.getCallee())) {
         return;
@@ -243,7 +274,6 @@ struct MonomorphizationPass
 
       std::string sigKey = getSignatureKey(argTypes, returnType);
 
-      // Find the specialized function name
       auto funcIt = specializedNames.find(call.getCallee());
       if (funcIt == specializedNames.end()) {
         return;
@@ -254,28 +284,27 @@ struct MonomorphizationPass
         return;
       }
 
-      // Update the call to use the specialized function
       call.setCalleeFromCallable(
           SymbolRefAttr::get(call.getContext(), sigIt->second));
 
-      // Update the call's result type if needed
       if (call.getResult() && call.getResult().getType() != returnType) {
         call.getResult().setType(returnType);
       }
 
-      // Remove the temporary attributes
       call->removeAttr("polang.resolved_arg_types");
       call->removeAttr("polang.resolved_return_type");
     });
+  }
 
-    // Step 5: Mark original polymorphic functions (for lowering to skip)
+  /// Mark original polymorphic functions for lowering to skip.
+  void markPolymorphicFunctions(llvm::StringMap<FuncOp>& polymorphicFuncs) {
     for (auto& [funcName, func] : polymorphicFuncs) {
       func->setAttr("polang.polymorphic", UnitAttr::get(func.getContext()));
     }
+  }
 
-    // Step 6: Fix up the __polang_entry function's signature
-    // After monomorphization, the return statement may return a value with
-    // a concrete type, but the function signature might still have a type var.
+  /// Fix up the __polang_entry function's signature if it has type variables.
+  void fixupEntryFunctionSignature(ModuleOp module) {
     module.walk([&](FuncOp func) {
       if (func.getSymName() != "__polang_entry") {
         return;
@@ -288,10 +317,9 @@ struct MonomorphizationPass
 
       Type returnType = funcType.getResult(0);
       if (!isTypeVar(returnType)) {
-        return; // Already concrete
+        return;
       }
 
-      // Find the return statement and get its actual value type
       Type actualReturnType;
       func.walk([&](ReturnOp returnOp) {
         if (returnOp.getValue()) {
@@ -300,17 +328,15 @@ struct MonomorphizationPass
       });
 
       if (!actualReturnType || isTypeVar(actualReturnType)) {
-        return; // Couldn't determine concrete type
+        return;
       }
 
-      // Update the function signature
       FunctionType newFuncType = FunctionType::get(
           func.getContext(), funcType.getInputs(), {actualReturnType});
       func.setType(newFuncType);
     });
   }
 
-private:
   /// Clone a polymorphic function and specialize it with concrete types
   FuncOp cloneAndSpecialize(FuncOp origFunc, StringRef newName,
                             ArrayRef<Type> concreteArgTypes,

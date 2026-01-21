@@ -134,44 +134,6 @@ def Polang_TypeVarType : Polang_Type<"TypeVar", "typevar"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Reference Types
-//===----------------------------------------------------------------------===//
-
-def Polang_MutRefType : Polang_Type<"MutRef", "mutref"> {
-  let summary = "Mutable reference type";
-  let description = [{
-    A mutable reference type that allows both reading and writing.
-    Created when declaring mutable variables with 'let mut'.
-    The element type is the type of the referenced value.
-
-    Examples:
-    ```mlir
-    !polang.mutref<!polang.integer<64, signed>>  ; mut i64
-    !polang.mutref<!polang.float<64>>            ; mut f64
-    ```
-  }];
-  let parameters = (ins "mlir::Type":$elementType);
-  let assemblyFormat = "`<` $elementType `>`";
-}
-
-def Polang_RefType : Polang_Type<"Ref", "ref"> {
-  let summary = "Immutable reference type";
-  let description = [{
-    An immutable reference type that allows only reading.
-    Created with 'ref expr' expressions.
-    The element type is the type of the referenced value.
-
-    Examples:
-    ```mlir
-    !polang.ref<!polang.integer<64, signed>>  ; ref i64
-    !polang.ref<!polang.float<64>>            ; ref f64
-    ```
-  }];
-  let parameters = (ins "mlir::Type":$elementType);
-  let assemblyFormat = "`<` $elementType `>`";
-}
-
-//===----------------------------------------------------------------------===//
 // Type constraints
 //===----------------------------------------------------------------------===//
 
@@ -187,8 +149,7 @@ def Polang_AnyNumericOrVar : AnyTypeOf<[
 ], "Polang numeric type or type variable">;
 
 def Polang_AnyTypeOrVar : AnyTypeOf<[
-    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_TypeVarType,
-    Polang_MutRefType, Polang_RefType
+    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_TypeVarType
 ], "any Polang type or type variable">;
 
 // Bool or type variable (for if conditions before type inference)
@@ -205,20 +166,5 @@ def Polang_IntegerOrTypeVar : AnyTypeOf<[
 def Polang_FloatOrTypeVar : AnyTypeOf<[
     Polang_FloatType, Polang_TypeVarType
 ], "float or type variable">;
-
-// Reference types (for reference operations)
-def Polang_AnyRefType : AnyTypeOf<[
-    Polang_MutRefType, Polang_RefType
-], "any reference type">;
-
-// Mutable reference or type variable
-def Polang_MutRefOrTypeVar : AnyTypeOf<[
-    Polang_MutRefType, Polang_TypeVarType
-], "mutable reference or type variable">;
-
-// Any reference or type variable
-def Polang_AnyRefOrTypeVar : AnyTypeOf<[
-    Polang_MutRefType, Polang_RefType, Polang_TypeVarType
-], "any reference type or type variable">;
 
 #endif // POLANG_TYPES_TD

@@ -48,8 +48,6 @@ void polang_reset_lexer_location() {
 "else"                  { return yy::parser::make_TELSE(LOC); }
 "true"                  { return yy::parser::make_TTRUE(LOC); }
 "false"                 { return yy::parser::make_TFALSE(LOC); }
-"mut"                   { return yy::parser::make_TMUT(LOC); }
-"ref"                   { return yy::parser::make_TREF(LOC); }
 "module"                { return yy::parser::make_TMODULE(LOC); }
 "endmodule"             { return yy::parser::make_TENDMODULE(LOC); }
 "import"                { return yy::parser::make_TIMPORT(LOC); }
@@ -59,7 +57,6 @@ void polang_reset_lexer_location() {
 [0-9]+\.[0-9]*          { return yy::parser::make_TDOUBLE(std::string(yytext, yyleng), LOC); }
 [0-9]+                  { return yy::parser::make_TINTEGER(std::string(yytext, yyleng), LOC); }
 "->"                    { return yy::parser::make_TARROW(LOC); }
-"<-"                    { return yy::parser::make_TLARROW(LOC); }
 "="                     { return yy::parser::make_TEQUAL(LOC); }
 "=="                    { return yy::parser::make_TCEQ(LOC); }
 "!="                    { return yy::parser::make_TCNE(LOC); }

@@ -1,5 +1,5 @@
 ; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
 
 ; Test type mismatch error between int and double
-; CHECK: Type error: Type mismatch in '+': i64 and f64
+; CHECK: Type error: Type mismatch in '+': i64 and f64 at line 5, column 1
 1 + 1.0

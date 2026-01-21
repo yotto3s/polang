@@ -29,7 +29,7 @@ The project includes a Docker environment with all dependencies pre-installed:
 docker/docker_run.sh
 
 # Run any command inside the docker container
-docker/run_docker_command.sh <command> [options]
+docker exec polang <command> [options]
 
 # Build the Docker image locally
 docker/docker_build.sh

@@ -13,6 +13,7 @@ public:
 
   void print(const NBlock& root);
 
+  void visit(const NNamedType& node) override;
   void visit(const NInteger& node) override;
   void visit(const NDouble& node) override;
   void visit(const NBoolean& node) override;
@@ -21,9 +22,6 @@ public:
   void visit(const NMethodCall& node) override;
   void visit(const NBinaryOperator& node) override;
   void visit(const NCastExpression& node) override;
-  void visit(const NAssignment& node) override;
-  void visit(const NRefExpression& node) override;
-  void visit(const NDerefExpression& node) override;
   void visit(const NBlock& node) override;
   void visit(const NIfExpression& node) override;
   void visit(const NLetExpression& node) override;

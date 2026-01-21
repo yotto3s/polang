@@ -13,7 +13,7 @@ The project uses Docker for a consistent development environment:
 docker/docker_run.sh
 
 # Run commands inside the container
-docker/run_docker_command.sh <command> [options]
+docker exec polang <command> [options]
 
 # Build the Docker image locally
 docker/docker_build.sh
