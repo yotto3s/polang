@@ -12,6 +12,7 @@
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangOps.h"
 #include "polang/Dialect/PolangTypes.h"
+#include "polang/PolangTypeConverter.h"
 
 // clang-format off
 #include "parser/node.hpp"
@@ -58,27 +59,19 @@ class MLIRGenVisitor : public Visitor {
 public:
   MLIRGenVisitor(MLIRContext& context, bool /*emitTypeVars*/ = false,
                  const std::string& filename = "<source>")
-      : builder(&context), sourceFilename(filename) {
+      : builder(&context), typeConverter(&context), sourceFilename(filename) {
     // Create a new module
     module = ModuleOp::create(builder.getUnknownLoc());
   }
 
   /// Generate a fresh type variable with optional kind constraint
   Type freshTypeVar(TypeVarKind kind = TypeVarKind::Any) {
-    return builder.getType<TypeVarType>(nextTypeVarId++, kind);
+    return typeConverter.freshTypeVar(kind);
   }
 
   /// Get a Polang type from annotation, or a fresh type variable if none
   Type getTypeOrFresh(const NTypeSpec* typeAnnotation) {
-    if (typeAnnotation != nullptr) {
-      Type ty = getPolangType(*typeAnnotation);
-      if (!ty) {
-        return nullptr; // Propagate error
-      }
-      return ty;
-    }
-    // No annotation - always emit type variable for polymorphic inference
-    return freshTypeVar();
+    return typeConverter.getTypeOrFresh(typeAnnotation);
   }
 
   /// Generate MLIR for the given AST block
@@ -614,12 +607,10 @@ public:
 
 private:
   OpBuilder builder;
+  PolangTypeConverter typeConverter;
   ModuleOp module;
   TypeChecker typeChecker;
   std::string sourceFilename;
-
-  // Type variable counter for generating fresh type variables
-  uint64_t nextTypeVarId = 0;
 
   // Track whether any errors occurred during MLIR generation
   bool hasMLIRGenErrors = false;
@@ -733,53 +724,12 @@ private:
   }
 
   /// Get the default type (i64) for cases where no type is specified.
-  Type getDefaultType() {
-    return polang::IntegerType::get(builder.getContext(), DEFAULT_INT_WIDTH,
-                                    Signedness::Signed);
-  }
+  Type getDefaultType() { return typeConverter.getDefaultType(); }
 
   /// Get a Polang MLIR type from an NTypeSpec.
   /// Handles NNamedType only (no reference types in Polang).
   Type getPolangType(const NTypeSpec& typeSpec) {
-    // Handle NNamedType
-    const auto* named = dynamic_cast<const NNamedType*>(&typeSpec);
-    if (named == nullptr) {
-      // Unknown type specification - should not happen
-      return nullptr;
-    }
-
-    const std::string& typeName = named->name;
-    const TypeMetadata meta = getTypeMetadata(typeName);
-
-    switch (meta.kind) {
-    case TypeKind::Integer:
-      if (meta.isGeneric) {
-        return freshTypeVar(TypeVarKind::Integer);
-      }
-      return polang::IntegerType::get(builder.getContext(), meta.width,
-                                      meta.isSigned() ? Signedness::Signed
-                                                      : Signedness::Unsigned);
-
-    case TypeKind::Float:
-      if (meta.isGeneric) {
-        return freshTypeVar(TypeVarKind::Float);
-      }
-      return polang::FloatType::get(builder.getContext(), meta.width);
-
-    case TypeKind::Bool:
-      return builder.getType<BoolType>();
-
-    case TypeKind::TypeVar:
-      return freshTypeVar();
-
-    case TypeKind::Function:
-    case TypeKind::Unknown:
-      // Default to i64 for unknown types
-      return getDefaultType();
-    }
-
-    // Unreachable, but needed for compiler
-    return getDefaultType();
+    return typeConverter.getPolangType(typeSpec);
   }
 
   Type getTypeForName(const std::string& name) {
@@ -797,19 +747,7 @@ private:
   }
 
   Type convertPolangType(Type polangType) {
-    if (auto intType = dyn_cast<polang::IntegerType>(polangType)) {
-      return builder.getIntegerType(intType.getWidth());
-    }
-    if (auto floatType = dyn_cast<polang::FloatType>(polangType)) {
-      if (floatType.getWidth() == 32) {
-        return builder.getF32Type();
-      }
-      return builder.getF64Type();
-    }
-    if (isa<BoolType>(polangType)) {
-      return builder.getI1Type();
-    }
-    return builder.getIntegerType(DEFAULT_INT_WIDTH);
+    return typeConverter.convertPolangType(polangType);
   }
 
   void generateMainFunction(const NBlock& block) {

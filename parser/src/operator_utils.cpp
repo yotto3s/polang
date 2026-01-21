@@ -6,6 +6,25 @@
 
 namespace polang {
 
+OperatorCategory getOperatorCategory(int op) noexcept {
+  switch (op) {
+  case yy::parser::token::TPLUS:
+  case yy::parser::token::TMINUS:
+  case yy::parser::token::TMUL:
+  case yy::parser::token::TDIV:
+    return OperatorCategory::Arithmetic;
+  case yy::parser::token::TCEQ:
+  case yy::parser::token::TCNE:
+  case yy::parser::token::TCLT:
+  case yy::parser::token::TCLE:
+  case yy::parser::token::TCGT:
+  case yy::parser::token::TCGE:
+    return OperatorCategory::Comparison;
+  default:
+    return OperatorCategory::Unknown;
+  }
+}
+
 std::string operatorToString(int op) noexcept {
   switch (op) {
   case yy::parser::token::TPLUS:
@@ -34,14 +53,11 @@ std::string operatorToString(int op) noexcept {
 }
 
 bool isArithmeticOperator(int op) noexcept {
-  return op == yy::parser::token::TPLUS || op == yy::parser::token::TMINUS ||
-         op == yy::parser::token::TMUL || op == yy::parser::token::TDIV;
+  return getOperatorCategory(op) == OperatorCategory::Arithmetic;
 }
 
 bool isComparisonOperator(int op) noexcept {
-  return op == yy::parser::token::TCEQ || op == yy::parser::token::TCNE ||
-         op == yy::parser::token::TCLT || op == yy::parser::token::TCLE ||
-         op == yy::parser::token::TCGT || op == yy::parser::token::TCGE;
+  return getOperatorCategory(op) == OperatorCategory::Comparison;
 }
 
 } // namespace polang
