@@ -126,6 +126,14 @@ private:
   void handleItemsImport(const NImportStatement& node);
   void handleWildcardImport(const NImportStatement& node);
 
+  // Helper methods for NBinaryOperator type checking
+  void checkArithmeticBinaryOp(const NBinaryOperator& node,
+                               const std::string& lhsType,
+                               const std::string& rhsType);
+  void checkComparisonBinaryOp(const NBinaryOperator& node,
+                               const std::string& lhsType,
+                               const std::string& rhsType);
+
   // Deferred type inference for generic types
   // Variables with unresolved generic types (name -> generic type)
   std::map<std::string, std::string> unresolvedGenerics;

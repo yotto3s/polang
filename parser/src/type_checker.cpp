@@ -271,6 +271,43 @@ void TypeChecker::visit(const NMethodCall& node) {
   }
 }
 
+void TypeChecker::checkArithmeticBinaryOp(const NBinaryOperator& node,
+                                          const std::string& lhsType,
+                                          const std::string& rhsType) {
+  const bool lhsIsTypevar = lhsType == TypeNames::TYPEVAR;
+  const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
+
+  if (!lhsIsTypevar && !rhsIsTypevar && !areTypesCompatible(lhsType, rhsType)) {
+    reportError("Type mismatch in '" + operatorToString(node.op) +
+                    "': " + resolveGenericToDefault(lhsType) + " and " +
+                    resolveGenericToDefault(rhsType),
+                node.loc);
+  }
+
+  if (lhsIsTypevar && !rhsIsTypevar) {
+    inferredType = rhsType;
+  } else {
+    // Resolve generic type using the other operand as context
+    inferredType = polang::resolveGenericType(lhsType, rhsType);
+  }
+}
+
+void TypeChecker::checkComparisonBinaryOp(const NBinaryOperator& node,
+                                          const std::string& lhsType,
+                                          const std::string& rhsType) {
+  const bool lhsIsTypevar = lhsType == TypeNames::TYPEVAR;
+  const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
+
+  if (!lhsIsTypevar && !rhsIsTypevar && !areTypesCompatible(lhsType, rhsType)) {
+    reportError(
+        "Type mismatch in comparison: " + resolveGenericToDefault(lhsType) +
+            " and " + resolveGenericToDefault(rhsType),
+        node.loc);
+  }
+
+  inferredType = TypeNames::BOOL;
+}
+
 void TypeChecker::visit(const NBinaryOperator& node) {
   node.lhs->accept(*this);
   const std::string lhsType = inferredType;
@@ -283,32 +320,16 @@ void TypeChecker::visit(const NBinaryOperator& node) {
     return;
   }
 
-  const bool lhsIsTypevar = lhsType == TypeNames::TYPEVAR;
-  const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
-
-  if (isArithmeticOperator(node.op)) {
-    if (!lhsIsTypevar && !rhsIsTypevar &&
-        !areTypesCompatible(lhsType, rhsType)) {
-      reportError("Type mismatch in '" + operatorToString(node.op) +
-                      "': " + resolveGenericToDefault(lhsType) + " and " +
-                      resolveGenericToDefault(rhsType),
-                  node.loc);
-    }
-    if (lhsIsTypevar && !rhsIsTypevar) {
-      inferredType = rhsType;
-    } else {
-      // Resolve generic type using the other operand as context
-      inferredType = polang::resolveGenericType(lhsType, rhsType);
-    }
-  } else if (isComparisonOperator(node.op)) {
-    if (!lhsIsTypevar && !rhsIsTypevar &&
-        !areTypesCompatible(lhsType, rhsType)) {
-      reportError(
-          "Type mismatch in comparison: " + resolveGenericToDefault(lhsType) +
-              " and " + resolveGenericToDefault(rhsType),
-          node.loc);
-    }
-    inferredType = TypeNames::BOOL;
+  switch (polang::getOperatorCategory(node.op)) {
+  case polang::OperatorCategory::Arithmetic:
+    checkArithmeticBinaryOp(node, lhsType, rhsType);
+    break;
+  case polang::OperatorCategory::Comparison:
+    checkComparisonBinaryOp(node, lhsType, rhsType);
+    break;
+  case polang::OperatorCategory::Unknown:
+    // Unknown operator - leave type as is
+    break;
   }
 }
 
