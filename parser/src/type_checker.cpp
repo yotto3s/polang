@@ -14,6 +14,11 @@ using polang::areTypesCompatible;
 using polang::containsGenericType;
 using polang::ErrorReporter;
 using polang::ErrorSeverity;
+using polang::formatArgCountError;
+using polang::formatFuncReturnTypeError;
+using polang::formatTypeMismatch;
+using polang::formatUndeclaredVar;
+using polang::formatVarDeclTypeError;
 using polang::isArithmeticOperator;
 using polang::isComparisonOperator;
 using polang::isFloatType;
@@ -197,7 +202,7 @@ void TypeChecker::visit(const NBoolean& node) {
 
 void TypeChecker::visit(const NIdentifier& node) {
   if (localTypes.find(node.name) == localTypes.end()) {
-    reportError("Undeclared variable: " + node.name, node.loc);
+    reportError(formatUndeclaredVar(node.name), node.loc);
     inferredType = TypeNames::UNKNOWN;
     return;
   }
@@ -229,10 +234,9 @@ void TypeChecker::visit(const NMethodCall& node) {
     const auto& paramTypes = paramIt->second;
 
     if (argTypes.size() != paramTypes.size()) {
-      reportError("Function '" + funcName + "' expects " +
-                      std::to_string(paramTypes.size()) + " argument(s), got " +
-                      std::to_string(argTypes.size()),
-                  node.loc);
+      reportError(
+          formatArgCountError(funcName, paramTypes.size(), argTypes.size()),
+          node.loc);
     } else {
       // Propagate concrete types from function parameters to arguments that
       // might be resolvable (in unresolvedGenerics)
@@ -641,10 +645,8 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
 
   if (!areTypesCompatible(actualType, expectedType) &&
       actualType != TypeNames::TYPEVAR && expectedType != TypeNames::TYPEVAR) {
-    reportError("Variable '" + node.id->name + "' declared as " + declType +
-                    " but initialized with " +
-                    resolveGenericToDefault(exprType) +
-                    " (no implicit conversion)",
+    reportError(formatVarDeclTypeError(node.id->name, declType,
+                                       resolveGenericToDefault(exprType)),
                 node.loc);
   }
 
@@ -762,10 +764,8 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
 
     if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR &&
         !areTypesCompatible(bodyType, declReturnType)) {
-      reportError("Function '" + node.id->name + "' declared to return " +
-                      declReturnType + " but body has type " +
-                      resolveGenericToDefault(bodyType) +
-                      " (no implicit conversion)",
+      reportError(formatFuncReturnTypeError(node.id->name, declReturnType,
+                                            resolveGenericToDefault(bodyType)),
                   node.loc);
     }
 
