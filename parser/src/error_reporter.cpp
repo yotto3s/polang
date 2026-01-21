@@ -80,14 +80,14 @@ void ErrorReporter::setFilename(const std::string& filename) {
   currentFilename = filename;
 }
 
-bool ErrorReporter::hasErrors() const {
+bool ErrorReporter::hasErrors() const noexcept {
   return std::any_of(errorList.begin(), errorList.end(), [](const auto& err) {
     return err.severity == ErrorSeverity::Error ||
            err.severity == ErrorSeverity::Fatal;
   });
 }
 
-bool ErrorReporter::hasWarnings() const {
+bool ErrorReporter::hasWarnings() const noexcept {
   return std::any_of(errorList.begin(), errorList.end(), [](const auto& err) {
     return err.severity == ErrorSeverity::Warning;
   });

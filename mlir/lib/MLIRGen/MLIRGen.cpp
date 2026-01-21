@@ -77,7 +77,8 @@ public:
   /// Generate MLIR for the given AST block
   ModuleOp generate(const NBlock& block) {
     // Always run type checker for error detection (undefined vars, etc.)
-    typeChecker.check(block);
+    // Return value intentionally ignored since we check hasErrors() directly
+    (void)typeChecker.check(block);
 
     // If type checker found errors, fail early
     if (typeChecker.hasErrors()) {

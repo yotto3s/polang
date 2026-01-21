@@ -62,10 +62,10 @@ public:
   }
 
   /// Check if any errorList have been reported.
-  [[nodiscard]] bool hasErrors() const;
+  [[nodiscard]] bool hasErrors() const noexcept;
 
   /// Check if any warnings have been reported.
-  [[nodiscard]] bool hasWarnings() const;
+  [[nodiscard]] bool hasWarnings() const noexcept;
 
   /// Clear all collected errorList.
   void clear();
