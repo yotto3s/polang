@@ -12,6 +12,54 @@ For detailed documentation, see:
 - `doc/TypeSystem.md` - Type system and inference
 - `doc/Testing.md` - Test infrastructure, coverage, and CI/CD
 
+## Development Workflow
+
+When planning changes that modify the codebase, follow this test-first workflow:
+
+1. **Create/modify tests first** - Write tests that define the expected behavior
+2. **Commit the tests** - Create a commit with just the test changes
+3. **Wait for review** - Pause for the user to review and approve the tests
+4. **Then implement** - Start modifying the codebase to make the tests pass
+
+This ensures agreement on expected behavior before implementation begins.
+
+### Plan Mode Behavior
+
+When in PLAN mode, keep asking clarifying questions until there are no unclear points in the plan. Do not exit PLAN mode until:
+
+1. All ambiguous requirements have been clarified
+2. Assumptions have been verified with the user
+3. Architectural decisions and trade-offs are confirmed
+4. The plan is complete and unambiguous
+
+### After Exiting Plan Mode
+
+Once the plan is complete and approved, immediately:
+
+1. **Create a GitHub issue** - Include the full plan as a TODO checklist in the body
+2. **Checkout a new branch** - Named appropriately for the feature/fix
+3. **Create a draft PR with an empty commit** - Link it to the issue
+
+```bash
+# Create GitHub issue with full plan as TODO list
+gh issue create --title "Issue title" --body "## Plan
+
+- [ ] Step 1: Description
+- [ ] Step 2: Description
+- [ ] Step 3: Description
+..."
+
+# Create branch and empty commit
+git checkout -b feature/issue-name
+git commit --allow-empty -m "Initial commit for: issue title"
+
+# Push and create draft PR linked to the issue
+git push -u origin feature/issue-name
+gh pr create --title "Issue title" --body "Closes #<issue-number>" --draft
+```
+
+This establishes the PR early for visibility and tracking before implementation begins.
+
 ## Docker Environment
 
 All commands should be run inside the Docker container:
@@ -73,6 +121,14 @@ When modifying code, update the relevant documentation:
 | Tests / CI | `doc/Testing.md` |
 | Build system | `doc/Building.md` |
 | Architecture | `doc/Architecture.md` |
+
+## MLIR Development
+
+When modifying code under `mlir/`, in PLAN mode, **read** the official MLIR documentation to make informed decisions:
+
+- **Main site**: https://mlir.llvm.org/
+- **Deprecation notices**: https://mlir.llvm.org/deprecation/ - Check for deprecated APIs before using them
+- **Documentation**: https://mlir.llvm.org/docs/ - Read dialect sections to choose the most appropriate dialect and follow recommended patterns
 
 ## Lit Test Categories
 
