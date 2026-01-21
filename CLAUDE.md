@@ -20,6 +20,7 @@ When planning changes that modify the codebase, follow this test-first workflow:
 2. **Commit the tests** - Create a commit with just the test changes
 3. **Wait for review** - Pause for the user to review and approve the tests
 4. **Then implement** - Start modifying the codebase to make the tests pass
+5. **Commit changes and push on each phase** - Keep each commit clean and minimal
 
 This ensures agreement on expected behavior before implementation begins.
 
