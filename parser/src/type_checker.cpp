@@ -205,18 +205,18 @@ void TypeChecker::visit(const NIdentifier& node) {
 }
 
 void TypeChecker::visit(const NQualifiedName& node) {
-  const std::string mangled = node.mangledName();
+  const std::string mangled = node.getMangledName();
   auto it = localTypes.find(mangled);
   if (it != localTypes.end()) {
     inferredType = it->second;
     return;
   }
-  reportError("Undefined qualified name: " + node.fullName(), node.loc);
+  reportError("Undefined qualified name: " + node.getFullName(), node.loc);
   inferredType = TypeNames::UNKNOWN;
 }
 
 void TypeChecker::visit(const NMethodCall& node) {
-  const std::string funcName = node.effectiveName();
+  const std::string funcName = node.getEffectiveName();
 
   std::vector<std::string> argTypes;
   for (const auto& arg : node.arguments) {
@@ -768,21 +768,21 @@ void TypeChecker::visit(const NModuleDeclaration& node) {
 }
 
 void TypeChecker::handleModuleImport(const NImportStatement& node) {
-  const std::string moduleName = node.modulePath->mangledName();
+  const std::string moduleName = node.modulePath->getMangledName();
   moduleAliases[node.modulePath->parts.back()] = moduleName;
 }
 
 void TypeChecker::handleModuleAliasImport(const NImportStatement& node) {
-  const std::string moduleName = node.modulePath->mangledName();
+  const std::string moduleName = node.modulePath->getMangledName();
   moduleAliases[node.alias] = moduleName;
 }
 
 void TypeChecker::handleItemsImport(const NImportStatement& node) {
-  const std::string moduleName = node.modulePath->mangledName();
+  const std::string moduleName = node.modulePath->getMangledName();
 
   for (const auto& item : node.items) {
     const std::string mangledItemName = moduleName + "$$" + item.name;
-    const std::string localName = item.effectiveName();
+    const std::string localName = item.getEffectiveName();
 
     auto typeIt = localTypes.find(mangledItemName);
     if (typeIt != localTypes.end()) {
@@ -803,7 +803,7 @@ void TypeChecker::handleItemsImport(const NImportStatement& node) {
 }
 
 void TypeChecker::handleWildcardImport(const NImportStatement& node) {
-  const std::string moduleName = node.modulePath->mangledName();
+  const std::string moduleName = node.modulePath->getMangledName();
   const std::string prefix = moduleName + "$$";
 
   auto exportsIt = moduleExports.find(moduleName);

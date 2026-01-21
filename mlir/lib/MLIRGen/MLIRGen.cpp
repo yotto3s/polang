@@ -150,7 +150,7 @@ public:
   void visit(const NQualifiedName& node) override {
     // Qualified name access (e.g., Math.PI)
     // Look up using mangled name
-    const std::string mangled = node.mangledName();
+    const std::string mangled = node.getMangledName();
     auto value = lookupVariable(mangled);
     if (value) {
       result = *value;
@@ -160,13 +160,14 @@ public:
       return;
     }
 
-    emitError(loc(node.loc)) << "Unknown qualified name: " << node.fullName();
+    emitError(loc(node.loc))
+        << "Unknown qualified name: " << node.getFullName();
     result = nullptr;
   }
 
   void visit(const NMethodCall& node) override {
     // Get the effective function name (mangled for qualified calls)
-    std::string funcName = node.effectiveName();
+    std::string funcName = node.getEffectiveName();
 
     // Resolve imported symbol to mangled name if applicable
     auto importIt = importedSymbols.find(funcName);
@@ -535,7 +536,7 @@ public:
   void visit(const NImportStatement& node) override {
     // Import statements are processed by the type checker.
     // For MLIR generation, we need to create aliases for imported symbols.
-    const std::string moduleName = node.modulePath->mangledName();
+    const std::string moduleName = node.modulePath->getMangledName();
 
     switch (node.kind) {
     case ImportKind::Module:
@@ -548,7 +549,7 @@ public:
       // from Math import add, PI - create local aliases
       for (const auto& item : node.items) {
         const std::string mangled = moduleName + "$$" + item.name;
-        const std::string localName = item.effectiveName();
+        const std::string localName = item.getEffectiveName();
 
         // Track the import mapping for name resolution
         importedSymbols[localName] = mangled;
@@ -733,7 +734,7 @@ private:
 
   /// Get the default type (i64) for cases where no type is specified.
   Type getDefaultType() {
-    return polang::IntegerType::get(builder.getContext(), 64,
+    return polang::IntegerType::get(builder.getContext(), DEFAULT_INT_WIDTH,
                                     Signedness::Signed);
   }
 
@@ -741,71 +742,44 @@ private:
   /// Handles NNamedType only (no reference types in Polang).
   Type getPolangType(const NTypeSpec& typeSpec) {
     // Handle NNamedType
-    if (const auto* named = dynamic_cast<const NNamedType*>(&typeSpec)) {
-      const std::string& typeName = named->name;
+    const auto* named = dynamic_cast<const NNamedType*>(&typeSpec);
+    if (named == nullptr) {
+      // Unknown type specification - should not happen
+      return nullptr;
+    }
 
-      // Signed integers
-      if (typeName == TypeNames::I8) {
-        return polang::IntegerType::get(builder.getContext(), 8,
-                                        Signedness::Signed);
-      }
-      if (typeName == TypeNames::I16) {
-        return polang::IntegerType::get(builder.getContext(), 16,
-                                        Signedness::Signed);
-      }
-      if (typeName == TypeNames::I32) {
-        return polang::IntegerType::get(builder.getContext(), 32,
-                                        Signedness::Signed);
-      }
-      if (typeName == TypeNames::I64) {
-        return polang::IntegerType::get(builder.getContext(), 64,
-                                        Signedness::Signed);
-      }
-      // Unsigned integers
-      if (typeName == TypeNames::U8) {
-        return polang::IntegerType::get(builder.getContext(), 8,
-                                        Signedness::Unsigned);
-      }
-      if (typeName == TypeNames::U16) {
-        return polang::IntegerType::get(builder.getContext(), 16,
-                                        Signedness::Unsigned);
-      }
-      if (typeName == TypeNames::U32) {
-        return polang::IntegerType::get(builder.getContext(), 32,
-                                        Signedness::Unsigned);
-      }
-      if (typeName == TypeNames::U64) {
-        return polang::IntegerType::get(builder.getContext(), 64,
-                                        Signedness::Unsigned);
-      }
-      // Floats
-      if (typeName == TypeNames::F32) {
-        return polang::FloatType::get(builder.getContext(), 32);
-      }
-      if (typeName == TypeNames::F64) {
-        return polang::FloatType::get(builder.getContext(), 64);
-      }
-      // Bool
-      if (typeName == TypeNames::BOOL) {
-        return builder.getType<BoolType>();
-      }
-      // Type variable
-      if (typeName == TypeNames::TYPEVAR) {
-        return freshTypeVar();
-      }
-      // Generic types (unresolved literals)
-      if (typeName == TypeNames::GENERIC_INT) {
+    const std::string& typeName = named->name;
+    const TypeMetadata meta = getTypeMetadata(typeName);
+
+    switch (meta.kind) {
+    case TypeKind::Integer:
+      if (meta.isGeneric) {
         return freshTypeVar(TypeVarKind::Integer);
       }
-      if (typeName == TypeNames::GENERIC_FLOAT) {
+      return polang::IntegerType::get(builder.getContext(), meta.width,
+                                      meta.isSigned() ? Signedness::Signed
+                                                      : Signedness::Unsigned);
+
+    case TypeKind::Float:
+      if (meta.isGeneric) {
         return freshTypeVar(TypeVarKind::Float);
       }
-      // Default to i64
+      return polang::FloatType::get(builder.getContext(), meta.width);
+
+    case TypeKind::Bool:
+      return builder.getType<BoolType>();
+
+    case TypeKind::TypeVar:
+      return freshTypeVar();
+
+    case TypeKind::Function:
+    case TypeKind::Unknown:
+      // Default to i64 for unknown types
       return getDefaultType();
     }
 
-    // Unknown type - should not happen
-    return nullptr;
+    // Unreachable, but needed for compiler
+    return getDefaultType();
   }
 
   Type getTypeForName(const std::string& name) {
@@ -835,7 +809,7 @@ private:
     if (isa<BoolType>(polangType)) {
       return builder.getI1Type();
     }
-    return builder.getI64Type();
+    return builder.getIntegerType(DEFAULT_INT_WIDTH);
   }
 
   void generateMainFunction(const NBlock& block) {

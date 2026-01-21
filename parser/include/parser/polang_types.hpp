@@ -6,8 +6,43 @@
 
 namespace polang {
 
+/// Default bit widths for types when not explicitly specified.
+constexpr unsigned DEFAULT_INT_WIDTH = 64;
+constexpr unsigned DEFAULT_FLOAT_WIDTH = 64;
+
 /// Enumeration of Polang's built-in type kinds.
 enum class TypeKind { Integer, Float, Bool, Function, TypeVar, Unknown };
+
+/// Signedness for integer types.
+enum class TypeSignedness { Signed, Unsigned };
+
+/// Metadata about a Polang type, capturing width, signedness, and kind.
+/// Used to centralize type information and avoid repeated string parsing.
+struct TypeMetadata {
+  TypeKind kind = TypeKind::Unknown;
+  unsigned width = 0;
+  TypeSignedness signedness = TypeSignedness::Signed;
+  bool isGeneric = false;
+
+  [[nodiscard]] constexpr bool isInteger() const noexcept {
+    return kind == TypeKind::Integer;
+  }
+  [[nodiscard]] constexpr bool isFloat() const noexcept {
+    return kind == TypeKind::Float;
+  }
+  [[nodiscard]] constexpr bool isBool() const noexcept {
+    return kind == TypeKind::Bool;
+  }
+  [[nodiscard]] constexpr bool isSigned() const noexcept {
+    return signedness == TypeSignedness::Signed;
+  }
+  [[nodiscard]] constexpr bool isUnsigned() const noexcept {
+    return signedness == TypeSignedness::Unsigned;
+  }
+  [[nodiscard]] constexpr bool isNumeric() const noexcept {
+    return isInteger() || isFloat();
+  }
+};
 
 /// Type name constants to avoid magic strings throughout the codebase.
 /// Use these constants instead of string literals like "i32", "f64", etc.
@@ -243,34 +278,127 @@ resolveAllGenericsToDefault(const std::string& type) noexcept {
   return "unknown";
 }
 
+/// Get comprehensive metadata about a type from its name.
+/// Returns metadata with kind=Unknown for unrecognized types.
+[[nodiscard]] inline TypeMetadata
+getTypeMetadata(const std::string& typeName) noexcept {
+  TypeMetadata meta;
+
+  // Signed integers
+  if (typeName == TypeNames::I8) {
+    meta.kind = TypeKind::Integer;
+    meta.width = 8;
+    meta.signedness = TypeSignedness::Signed;
+    return meta;
+  }
+  if (typeName == TypeNames::I16) {
+    meta.kind = TypeKind::Integer;
+    meta.width = 16;
+    meta.signedness = TypeSignedness::Signed;
+    return meta;
+  }
+  if (typeName == TypeNames::I32) {
+    meta.kind = TypeKind::Integer;
+    meta.width = 32;
+    meta.signedness = TypeSignedness::Signed;
+    return meta;
+  }
+  if (typeName == TypeNames::I64) {
+    meta.kind = TypeKind::Integer;
+    meta.width = 64;
+    meta.signedness = TypeSignedness::Signed;
+    return meta;
+  }
+
+  // Unsigned integers
+  if (typeName == TypeNames::U8) {
+    meta.kind = TypeKind::Integer;
+    meta.width = 8;
+    meta.signedness = TypeSignedness::Unsigned;
+    return meta;
+  }
+  if (typeName == TypeNames::U16) {
+    meta.kind = TypeKind::Integer;
+    meta.width = 16;
+    meta.signedness = TypeSignedness::Unsigned;
+    return meta;
+  }
+  if (typeName == TypeNames::U32) {
+    meta.kind = TypeKind::Integer;
+    meta.width = 32;
+    meta.signedness = TypeSignedness::Unsigned;
+    return meta;
+  }
+  if (typeName == TypeNames::U64) {
+    meta.kind = TypeKind::Integer;
+    meta.width = 64;
+    meta.signedness = TypeSignedness::Unsigned;
+    return meta;
+  }
+
+  // Generic integer (unresolved literal)
+  if (typeName == TypeNames::GENERIC_INT) {
+    meta.kind = TypeKind::Integer;
+    meta.width = DEFAULT_INT_WIDTH;
+    meta.signedness = TypeSignedness::Signed;
+    meta.isGeneric = true;
+    return meta;
+  }
+
+  // Floats
+  if (typeName == TypeNames::F32) {
+    meta.kind = TypeKind::Float;
+    meta.width = 32;
+    return meta;
+  }
+  if (typeName == TypeNames::F64) {
+    meta.kind = TypeKind::Float;
+    meta.width = 64;
+    return meta;
+  }
+
+  // Generic float (unresolved literal)
+  if (typeName == TypeNames::GENERIC_FLOAT) {
+    meta.kind = TypeKind::Float;
+    meta.width = DEFAULT_FLOAT_WIDTH;
+    meta.isGeneric = true;
+    return meta;
+  }
+
+  // Bool
+  if (typeName == TypeNames::BOOL) {
+    meta.kind = TypeKind::Bool;
+    meta.width = 1;
+    return meta;
+  }
+
+  // Function, TypeVar, Unknown
+  if (typeName == TypeNames::FUNCTION) {
+    meta.kind = TypeKind::Function;
+    return meta;
+  }
+  if (typeName == TypeNames::TYPEVAR) {
+    meta.kind = TypeKind::TypeVar;
+    return meta;
+  }
+
+  // Unknown type
+  meta.kind = TypeKind::Unknown;
+  return meta;
+}
+
 /// Get the bit width of an integer type. Returns 0 for non-integer types.
 [[nodiscard]] inline unsigned
 getIntegerWidth(const std::string& typeName) noexcept {
-  if (typeName == TypeNames::I8 || typeName == TypeNames::U8) {
-    return 8;
-  }
-  if (typeName == TypeNames::I16 || typeName == TypeNames::U16) {
-    return 16;
-  }
-  if (typeName == TypeNames::I32 || typeName == TypeNames::U32) {
-    return 32;
-  }
-  if (typeName == TypeNames::I64 || typeName == TypeNames::U64) {
-    return 64;
-  }
-  return 0;
+  const TypeMetadata meta = getTypeMetadata(typeName);
+  return meta.isInteger() ? meta.width : 0;
 }
 
 /// Get the bit width of a float type. Returns 0 for non-float types.
 [[nodiscard]] inline unsigned
 getFloatWidth(const std::string& typeName) noexcept {
-  if (typeName == TypeNames::F32) {
-    return 32;
-  }
-  if (typeName == TypeNames::F64) {
-    return 64;
-  }
-  return 0;
+  const TypeMetadata meta = getTypeMetadata(typeName);
+  return meta.isFloat() ? meta.width : 0;
 }
 
 } // namespace polang

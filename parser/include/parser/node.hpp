@@ -118,7 +118,7 @@ public:
   // Convenience constructor from single identifier
   explicit NQualifiedName(std::string name) : parts({std::move(name)}) {}
   // Get the full qualified name as a string (e.g., "Math.add")
-  [[nodiscard]] std::string fullName() const {
+  [[nodiscard]] std::string getFullName() const {
     std::string result;
     for (size_t i = 0; i < parts.size(); ++i) {
       if (i > 0) {
@@ -129,7 +129,7 @@ public:
     return result;
   }
   // Get mangled name for MLIR (e.g., "Math$$add")
-  [[nodiscard]] std::string mangledName() const {
+  [[nodiscard]] std::string getMangledName() const {
     std::string result;
     for (size_t i = 0; i < parts.size(); ++i) {
       if (i > 0) {
@@ -142,7 +142,7 @@ public:
   // Check if this is a simple (unqualified) name
   [[nodiscard]] bool isSimple() const { return parts.size() == 1; }
   // Get the simple name (last part)
-  [[nodiscard]] const std::string &simpleName() const { return parts.back(); }
+  [[nodiscard]] const std::string &getSimpleName() const { return parts.back(); }
   void accept(Visitor &visitor) const override;
 };
 
@@ -157,12 +157,12 @@ public:
       : id(std::move(id)), qualifiedId(nullptr) {}
   // Constructor for qualified calls
   NMethodCall(std::unique_ptr<NQualifiedName> qid, ExpressionList arguments)
-      : id(std::make_unique<NIdentifier>(qid->simpleName())),
+      : id(std::make_unique<NIdentifier>(qid->getSimpleName())),
         qualifiedId(std::move(qid)), arguments(std::move(arguments)) {}
   // Get the effective function name (mangled if qualified)
-  [[nodiscard]] std::string effectiveName() const {
+  [[nodiscard]] std::string getEffectiveName() const {
     if (qualifiedId != nullptr) {
-      return qualifiedId->mangledName();
+      return qualifiedId->getMangledName();
     }
     return id->name;
   }
@@ -299,7 +299,7 @@ struct ImportItem {
   ImportItem(std::string name, std::string alias = "")
       : name(std::move(name)), alias(std::move(alias)) {}
   // Get the effective name to use in code
-  [[nodiscard]] std::string effectiveName() const {
+  [[nodiscard]] std::string getEffectiveName() const {
     return alias.empty() ? name : alias;
   }
 };

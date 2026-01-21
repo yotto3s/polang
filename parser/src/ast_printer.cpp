@@ -64,13 +64,13 @@ void ASTPrinter::visit(const NIdentifier& node) {
 
 void ASTPrinter::visit(const NQualifiedName& node) {
   printPrefix();
-  out << "NQualifiedName '" << node.fullName() << "'\n";
+  out << "NQualifiedName '" << node.getFullName() << "'\n";
 }
 
 void ASTPrinter::visit(const NMethodCall& node) {
   printPrefix();
   if (node.qualifiedId != nullptr) {
-    out << "NMethodCall '" << node.qualifiedId->fullName() << "'\n";
+    out << "NMethodCall '" << node.qualifiedId->getFullName() << "'\n";
   } else {
     out << "NMethodCall '" << node.id->name << "'\n";
   }
@@ -257,13 +257,13 @@ void ASTPrinter::visit(const NImportStatement& node) {
 
   switch (node.kind) {
   case ImportKind::Module:
-    out << "import " << node.modulePath->fullName();
+    out << "import " << node.modulePath->getFullName();
     break;
   case ImportKind::ModuleAlias:
-    out << "import " << node.modulePath->fullName() << " as " << node.alias;
+    out << "import " << node.modulePath->getFullName() << " as " << node.alias;
     break;
   case ImportKind::Items:
-    out << "from " << node.modulePath->fullName() << " import ";
+    out << "from " << node.modulePath->getFullName() << " import ";
     for (size_t i = 0; i < node.items.size(); ++i) {
       if (i > 0) {
         out << ", ";
@@ -275,7 +275,7 @@ void ASTPrinter::visit(const NImportStatement& node) {
     }
     break;
   case ImportKind::All:
-    out << "from " << node.modulePath->fullName() << " import *";
+    out << "from " << node.modulePath->getFullName() << " import *";
     break;
   }
   out << "\n";
