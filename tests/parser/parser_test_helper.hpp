@@ -15,6 +15,9 @@
 #include "parser/parser_api.hpp"
 // clang-format on
 
+// Token type shorthand
+using token = yy::parser::token;
+
 // Parse and return root block, fails test if null
 inline std::unique_ptr<NBlock> parseOrFail(const std::string& source) {
   auto block = polang_parse(source);

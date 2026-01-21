@@ -1,6 +1,6 @@
 ; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
 
 ; Test error when calling function with wrong number of arguments
-; CHECK: Type error: Function 'add' expects 1 argument(s), got 2
-let add(a: int): int = a
+; CHECK: Type error: Function 'add' expects 1 argument(s), got 2 at line 6, column 1
+let add(a: i64): i64 = a
 add(1, 2)

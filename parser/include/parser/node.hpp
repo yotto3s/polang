@@ -13,6 +13,15 @@ class NVariableDeclaration;
 class NFunctionDeclaration;
 class NIdentifier;
 
+// Source location information for error reporting
+struct SourceLocation {
+  int line = 0;
+  int column = 0;
+  SourceLocation() = default;
+  SourceLocation(int l, int c) : line(l), column(c) {}
+  [[nodiscard]] bool isValid() const { return line > 0; }
+};
+
 // Smart pointer type aliases for owning containers
 using StatementList = std::vector<std::unique_ptr<NStatement>>;
 using ExpressionList = std::vector<std::unique_ptr<NExpression>>;
@@ -35,8 +44,10 @@ using LetBindingList = std::vector<std::unique_ptr<NLetBinding>>;
 // clang-format off
 class Node {
 public:
+  SourceLocation loc;
   virtual ~Node() noexcept = default;
   virtual void accept(Visitor &visitor) const = 0;
+  void setLocation(int line, int column) { loc = SourceLocation(line, column); }
 };
 
 class NExpression : public Node {};
@@ -71,14 +82,32 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
-// Capture entry for closures (owns its type and id via unique_ptr)
+// Forward declaration
+class NTypeSpec;
+
+// Base class for type specifications
+class NTypeSpec : public Node {
+public:
+  // Get the string representation of this type (for backwards compatibility)
+  [[nodiscard]] virtual std::string getTypeName() const = 0;
+};
+
+// Named type (base types like i64, f64, bool, typevar)
+class NNamedType : public NTypeSpec {
+public:
+  std::string name;
+  explicit NNamedType(std::string name) : name(std::move(name)) {}
+  [[nodiscard]] std::string getTypeName() const override { return name; }
+  void accept(Visitor &visitor) const override;
+};
+
+// Capture entry for closures (owns its type and id via shared_ptr/unique_ptr)
+// Mutability is derived from the type annotation (e.g., "mut i64" prefix)
 struct CaptureEntry {
-  std::unique_ptr<NIdentifier> type;
+  std::shared_ptr<const NTypeSpec> type;
   std::unique_ptr<NIdentifier> id;
-  bool isMutable;
-  CaptureEntry(std::unique_ptr<NIdentifier> type, std::unique_ptr<NIdentifier> id,
-               bool isMutable)
-      : type(std::move(type)), id(std::move(id)), isMutable(isMutable) {}
+  CaptureEntry(std::shared_ptr<const NTypeSpec> type, std::unique_ptr<NIdentifier> id)
+      : type(std::move(type)), id(std::move(id)) {}
 };
 
 // Qualified name for module access: Math.add, Math.Internal.helper
@@ -151,12 +180,13 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
-class NAssignment : public NExpression {
+class NCastExpression : public NExpression {
 public:
-  std::unique_ptr<NIdentifier> lhs;
-  std::unique_ptr<NExpression> rhs;
-  NAssignment(std::unique_ptr<NIdentifier> lhs, std::unique_ptr<NExpression> rhs)
-      : lhs(std::move(lhs)), rhs(std::move(rhs)) {}
+  std::unique_ptr<NExpression> expression;
+  std::shared_ptr<const NTypeSpec> targetType;
+  NCastExpression(std::unique_ptr<NExpression> expr,
+                  std::shared_ptr<const NTypeSpec> type)
+      : expression(std::move(expr)), targetType(std::move(type)) {}
   void accept(Visitor &visitor) const override;
 };
 
@@ -199,29 +229,27 @@ public:
 
 class NVariableDeclaration : public NStatement {
 public:
-  std::unique_ptr<NIdentifier> type;  // nullptr when type should be inferred
+  std::shared_ptr<const NTypeSpec> type;  // nullptr when type should be inferred
   std::unique_ptr<NIdentifier> id;
   std::unique_ptr<NExpression> assignmentExpr;
-  bool isMutable;  // true for 'let mut', false for 'let'
+  // Mutability is derived from type annotation (e.g., "mut i64" prefix)
+  // or from NMutRefExpression in assignmentExpr
   // Constructor for inferred type (no annotation)
   NVariableDeclaration(std::unique_ptr<NIdentifier> id,
-                       std::unique_ptr<NExpression> assignmentExpr,
-                       bool isMutable = false)
-      : type(nullptr), id(std::move(id)), assignmentExpr(std::move(assignmentExpr)),
-        isMutable(isMutable) {}
+                       std::unique_ptr<NExpression> assignmentExpr)
+      : type(nullptr), id(std::move(id)), assignmentExpr(std::move(assignmentExpr)) {}
   // Constructor for explicit type annotation
-  NVariableDeclaration(std::unique_ptr<NIdentifier> type,
+  NVariableDeclaration(std::shared_ptr<const NTypeSpec> type,
                        std::unique_ptr<NIdentifier> id,
-                       std::unique_ptr<NExpression> assignmentExpr,
-                       bool isMutable = false)
+                       std::unique_ptr<NExpression> assignmentExpr)
       : type(std::move(type)), id(std::move(id)),
-        assignmentExpr(std::move(assignmentExpr)), isMutable(isMutable) {}
+        assignmentExpr(std::move(assignmentExpr)) {}
   void accept(Visitor &visitor) const override;
 };
 
 class NFunctionDeclaration : public NStatement {
 public:
-  std::unique_ptr<NIdentifier> type;  // nullptr when return type should be inferred
+  std::shared_ptr<const NTypeSpec> type;  // nullptr when return type should be inferred
   std::unique_ptr<NIdentifier> id;
   VariableList arguments;
   std::unique_ptr<NBlock> block;
@@ -232,7 +260,7 @@ public:
       : type(nullptr), id(std::move(id)), arguments(std::move(arguments)),
         block(std::move(block)) {}
   // Constructor for explicit return type
-  NFunctionDeclaration(std::unique_ptr<NIdentifier> type,
+  NFunctionDeclaration(std::shared_ptr<const NTypeSpec> type,
                        std::unique_ptr<NIdentifier> id, VariableList arguments,
                        std::unique_ptr<NBlock> block)
       : type(std::move(type)), id(std::move(id)), arguments(std::move(arguments)),

@@ -44,25 +44,38 @@ using namespace polang;
 
 namespace {
 
+/// Helper to create an appropriate NTypeSpec from a type name string
+[[nodiscard]] std::shared_ptr<const NTypeSpec>
+makeTypeSpec(const std::string& typeName) {
+  return std::make_shared<const NNamedType>(typeName);
+}
+
 //===----------------------------------------------------------------------===//
 // MLIRGenVisitor - Generates MLIR from Polang AST
 //===----------------------------------------------------------------------===//
 
 class MLIRGenVisitor : public Visitor {
 public:
-  MLIRGenVisitor(MLIRContext& context, bool /*emitTypeVars*/ = false)
-      : builder(&context) {
+  MLIRGenVisitor(MLIRContext& context, bool /*emitTypeVars*/ = false,
+                 const std::string& filename = "<source>")
+      : builder(&context), sourceFilename(filename) {
     // Create a new module
     module = ModuleOp::create(builder.getUnknownLoc());
   }
 
-  /// Generate a fresh type variable
-  Type freshTypeVar() { return builder.getType<TypeVarType>(nextTypeVarId++); }
+  /// Generate a fresh type variable with optional kind constraint
+  Type freshTypeVar(TypeVarKind kind = TypeVarKind::Any) {
+    return builder.getType<TypeVarType>(nextTypeVarId++, kind);
+  }
 
   /// Get a Polang type from annotation, or a fresh type variable if none
-  Type getTypeOrFresh(const NIdentifier* typeAnnotation) {
+  Type getTypeOrFresh(const NTypeSpec* typeAnnotation) {
     if (typeAnnotation != nullptr) {
-      return getPolangType(typeAnnotation->name);
+      Type ty = getPolangType(*typeAnnotation);
+      if (!ty) {
+        return nullptr; // Propagate error
+      }
+      return ty;
     }
     // No annotation - always emit type variable for polymorphic inference
     return freshTypeVar();
@@ -81,6 +94,11 @@ public:
     // Generate the main function that wraps the top-level code
     generateMainFunction(block);
 
+    // Check if any errors occurred during MLIR generation
+    if (hasMLIRGenErrors) {
+      return nullptr;
+    }
+
     // Skip module verification since type variables may be present.
     // Type inference pass will resolve them and verification will happen later.
     // We keep verification disabled to allow polymorphic types.
@@ -89,20 +107,30 @@ public:
     return module;
   }
 
-  // Visitor interface implementations
+  // Type Specification Visitor implementations
+  void visit(const NNamedType& /*node*/) override {
+    // Type specifications are not directly visited during MLIR generation
+    // They are accessed via getTypeName() when processing declarations
+  }
+
+  // Expression Visitor implementations
   void visit(const NInteger& node) override {
-    result = builder.create<ConstantIntOp>(loc(), node.value);
-    resultType = TypeNames::INT;
+    // Create type variable constrained to integer types
+    auto type = freshTypeVar(TypeVarKind::Integer);
+    result = builder.create<ConstantIntegerOp>(loc(node.loc), type, node.value);
+    resultType = std::make_shared<const NNamedType>(TypeNames::GENERIC_INT);
   }
 
   void visit(const NDouble& node) override {
-    result = builder.create<ConstantDoubleOp>(loc(), node.value);
-    resultType = TypeNames::DOUBLE;
+    // Create type variable constrained to float types
+    auto type = freshTypeVar(TypeVarKind::Float);
+    result = builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
+    resultType = std::make_shared<const NNamedType>(TypeNames::GENERIC_FLOAT);
   }
 
   void visit(const NBoolean& node) override {
-    result = builder.create<ConstantBoolOp>(loc(), node.value);
-    resultType = TypeNames::BOOL;
+    result = builder.create<ConstantBoolOp>(loc(node.loc), node.value);
+    resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
   }
 
   void visit(const NIdentifier& node) override {
@@ -110,11 +138,12 @@ public:
     if (value) {
       result = *value;
       auto type = lookupType(node.name);
-      resultType = type.value_or(TypeNames::INT);
+      resultType =
+          type ? type : std::make_shared<const NNamedType>(TypeNames::I64);
       return;
     }
 
-    emitError(loc()) << "Unknown variable: " << node.name;
+    emitError(loc(node.loc)) << "Unknown variable: " << node.name;
     result = nullptr;
   }
 
@@ -126,11 +155,12 @@ public:
     if (value) {
       result = *value;
       auto type = lookupType(mangled);
-      resultType = type.value_or(TypeNames::INT);
+      resultType =
+          type ? type : std::make_shared<const NNamedType>(TypeNames::I64);
       return;
     }
 
-    emitError(loc()) << "Unknown qualified name: " << node.fullName();
+    emitError(loc(node.loc)) << "Unknown qualified name: " << node.fullName();
     result = nullptr;
   }
 
@@ -171,28 +201,32 @@ public:
     auto funcRetMLIRIt = functionReturnMLIRTypes.find(funcName);
     if (funcRetMLIRIt != functionReturnMLIRTypes.end()) {
       resultTy = funcRetMLIRIt->second;
-      // Set resultType string if we have it
+      // Set resultType if we have it
       auto funcRetTypeIt = functionReturnTypes.find(funcName);
       if (funcRetTypeIt != functionReturnTypes.end()) {
         resultType = funcRetTypeIt->second;
       } else {
-        resultType = TypeNames::UNKNOWN;
+        resultType = std::make_shared<const NNamedType>(TypeNames::UNKNOWN);
       }
     } else {
-      // Fallback to string-based lookup
+      // Fallback to NTypeSpec-based lookup
       auto funcRetTypeIt = functionReturnTypes.find(funcName);
       if (funcRetTypeIt != functionReturnTypes.end()) {
-        resultTy = getPolangType(funcRetTypeIt->second);
+        resultTy = getPolangType(*funcRetTypeIt->second);
+        if (!resultTy) {
+          result = nullptr;
+          return;
+        }
         resultType = funcRetTypeIt->second;
       } else {
         // Function not found - generate fresh type var for unknown function
         resultTy = freshTypeVar();
-        resultType = TypeNames::UNKNOWN;
+        resultType = std::make_shared<const NNamedType>(TypeNames::UNKNOWN);
       }
     }
 
-    auto callOp =
-        builder.create<CallOp>(loc(), funcName, TypeRange{resultTy}, args);
+    auto callOp = builder.create<CallOp>(loc(node.loc), funcName,
+                                         TypeRange{resultTy}, args);
     result = callOp.getResult();
   }
 
@@ -202,7 +236,7 @@ public:
       return;
     }
     Value lhs = result;
-    std::string lhsType = resultType;
+    std::shared_ptr<const NTypeSpec> lhsType = std::move(resultType);
 
     node.rhs->accept(*this);
     if (!result) {
@@ -210,68 +244,76 @@ public:
     }
     Value rhs = result;
 
-    // Arithmetic operations - use LHS type as result type
-    // This allows type variables since the verifier uses typesAreCompatible()
+    // Use switch for cleaner operator dispatch
     Type arithResultTy = lhs.getType();
-    if (node.op == TPLUS) {
-      result = builder.create<AddOp>(loc(), arithResultTy, lhs, rhs);
-      resultType = lhsType;
-    } else if (node.op == TMINUS) {
-      result = builder.create<SubOp>(loc(), arithResultTy, lhs, rhs);
-      resultType = lhsType;
-    } else if (node.op == TMUL) {
-      result = builder.create<MulOp>(loc(), arithResultTy, lhs, rhs);
-      resultType = lhsType;
-    } else if (node.op == TDIV) {
-      result = builder.create<DivOp>(loc(), arithResultTy, lhs, rhs);
-      resultType = lhsType;
-    }
-    // Comparison operations
-    else if (node.op == TCEQ) {
-      result = builder.create<CmpOp>(loc(), CmpPredicate::eq, lhs, rhs);
-      resultType = TypeNames::BOOL;
-    } else if (node.op == TCNE) {
-      result = builder.create<CmpOp>(loc(), CmpPredicate::ne, lhs, rhs);
-      resultType = TypeNames::BOOL;
-    } else if (node.op == TCLT) {
-      result = builder.create<CmpOp>(loc(), CmpPredicate::lt, lhs, rhs);
-      resultType = TypeNames::BOOL;
-    } else if (node.op == TCLE) {
-      result = builder.create<CmpOp>(loc(), CmpPredicate::le, lhs, rhs);
-      resultType = TypeNames::BOOL;
-    } else if (node.op == TCGT) {
-      result = builder.create<CmpOp>(loc(), CmpPredicate::gt, lhs, rhs);
-      resultType = TypeNames::BOOL;
-    } else if (node.op == TCGE) {
-      result = builder.create<CmpOp>(loc(), CmpPredicate::ge, lhs, rhs);
-      resultType = TypeNames::BOOL;
-    } else {
-      emitError(loc()) << "Unknown binary operator: " << node.op;
+    switch (node.op) {
+    // Arithmetic operations - use LHS type as result type
+    case yy::parser::token::TPLUS:
+      result = builder.create<AddOp>(loc(node.loc), arithResultTy, lhs, rhs);
+      resultType = std::move(lhsType);
+      break;
+    case yy::parser::token::TMINUS:
+      result = builder.create<SubOp>(loc(node.loc), arithResultTy, lhs, rhs);
+      resultType = std::move(lhsType);
+      break;
+    case yy::parser::token::TMUL:
+      result = builder.create<MulOp>(loc(node.loc), arithResultTy, lhs, rhs);
+      resultType = std::move(lhsType);
+      break;
+    case yy::parser::token::TDIV:
+      result = builder.create<DivOp>(loc(node.loc), arithResultTy, lhs, rhs);
+      resultType = std::move(lhsType);
+      break;
+    // Comparison operations - result is always bool
+    case yy::parser::token::TCEQ:
+      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::eq, lhs, rhs);
+      resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+      break;
+    case yy::parser::token::TCNE:
+      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::ne, lhs, rhs);
+      resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+      break;
+    case yy::parser::token::TCLT:
+      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::lt, lhs, rhs);
+      resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+      break;
+    case yy::parser::token::TCLE:
+      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::le, lhs, rhs);
+      resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+      break;
+    case yy::parser::token::TCGT:
+      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::gt, lhs, rhs);
+      resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+      break;
+    case yy::parser::token::TCGE:
+      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::ge, lhs, rhs);
+      resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+      break;
+    default:
+      emitError(loc(node.loc)) << "Unknown binary operator: " << node.op;
       result = nullptr;
+      break;
     }
   }
 
-  void visit(const NAssignment& node) override {
-    // Evaluate RHS
-    node.rhs->accept(*this);
+  void visit(const NCastExpression& node) override {
+    // Evaluate the expression to cast
+    node.expression->accept(*this);
     if (!result) {
       return;
     }
-    Value value = result;
+    const Value inputValue = result;
 
-    // Get the alloca for the variable
-    auto it = symbolTable.find(node.lhs->name);
-    if (it == symbolTable.end()) {
-      emitError(loc()) << "Unknown variable in assignment: " << node.lhs->name;
+    // Get the target type
+    Type targetType = getPolangType(*node.targetType);
+    if (!targetType) {
       result = nullptr;
       return;
     }
 
-    // Store the value
-    builder.create<StoreOp>(loc(), value, it->second);
-
-    // Assignment expression returns the assigned value
-    result = value;
+    // Create the cast operation
+    result = builder.create<CastOp>(loc(node.loc), targetType, inputValue);
+    resultType = node.targetType;
   }
 
   void visit(const NBlock& node) override {
@@ -297,11 +339,12 @@ public:
 
     // Infer result type from the type checker
     node.thenExpr->accept(*this);
-    std::string ifResultType = resultType;
+    std::shared_ptr<const NTypeSpec> ifResultType = std::move(resultType);
 
     // Create if operation
-    Type resultTy = getPolangType(ifResultType);
-    auto ifOp = builder.create<IfOp>(loc(), resultTy, condition);
+    Type resultTy =
+        ifResultType ? getPolangType(*ifResultType) : getDefaultType();
+    auto ifOp = builder.create<IfOp>(loc(node.loc), resultTy, condition);
 
     // Generate then region
     {
@@ -309,7 +352,7 @@ public:
       builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
       node.thenExpr->accept(*this);
       if (result) {
-        builder.create<YieldOp>(loc(), result);
+        builder.create<YieldOp>(loc(node.thenExpr->loc), result);
       }
     }
 
@@ -319,12 +362,12 @@ public:
       builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
       node.elseExpr->accept(*this);
       if (result) {
-        builder.create<YieldOp>(loc(), result);
+        builder.create<YieldOp>(loc(node.elseExpr->loc), result);
       }
     }
 
     result = ifOp.getResult();
-    resultType = ifResultType;
+    resultType = std::move(ifResultType);
   }
 
   void visit(const NLetExpression& node) override {
@@ -352,35 +395,30 @@ public:
     // Get mangled variable name (includes module path)
     const std::string varName = mangledName(node.id->name);
 
-    // Determine the type
-    std::string typeName =
-        node.type != nullptr ? node.type->name : TypeNames::INT;
+    // Determine the type - prefer type annotation from type checker
+    std::shared_ptr<const NTypeSpec> typeSpec =
+        node.type != nullptr
+            ? node.type
+            : std::make_shared<const NNamedType>(TypeNames::I64);
+    Value initValue = nullptr;
     if (node.assignmentExpr != nullptr) {
-      // Infer type from assignment
+      // Evaluate the assignment expression
       node.assignmentExpr->accept(*this);
-      typeName = resultType;
-    }
+      initValue = result;
 
-    if (node.isMutable) {
-      // Mutable: use alloca/store pattern
-      Type polangType = getPolangType(typeName);
-      Type llvmType = convertPolangType(polangType);
-
-      auto memRefType = MemRefType::get({}, llvmType);
-      auto alloca = builder.create<AllocaOp>(loc(), memRefType, varName,
-                                             polangType, node.isMutable);
-
-      if (node.assignmentExpr != nullptr && result) {
-        builder.create<StoreOp>(loc(), result, alloca);
+      // Only use resultType if we don't have a type annotation
+      // The type checker sets node.type with resolved types
+      if (node.type == nullptr && resultType) {
+        typeSpec = std::move(resultType);
       }
-
-      symbolTable[varName] = alloca;
-    } else {
-      // Immutable: store SSA value directly (no alloca needed)
-      immutableValues[varName] = result;
     }
 
-    typeTable[varName] = typeName;
+    // All variables are immutable - store SSA value directly (no alloca needed)
+    immutableValues[varName] = initValue;
+    typeTable[varName] = typeSpec;
+
+    result = initValue;
+    resultType = typeSpec;
   }
 
   void visit(const NFunctionDeclaration& node) override {
@@ -418,7 +456,7 @@ public:
     // Return type - use type variable if not specified
     Type returnType = getTypeOrFresh(node.type.get());
     if (node.type != nullptr) {
-      functionReturnTypes[funcName] = node.type->name;
+      functionReturnTypes[funcName] = node.type;
     }
     functionReturnMLIRTypes[funcName] = returnType;
 
@@ -433,7 +471,7 @@ public:
       captureRefs.push_back(name);
     }
 
-    auto funcOp = builder.create<FuncOp>(loc(), funcName, funcType,
+    auto funcOp = builder.create<FuncOp>(loc(node.loc), funcName, funcType,
                                          ArrayRef<StringRef>(captureRefs));
 
     // Create entry block with arguments
@@ -450,7 +488,7 @@ public:
       argValues[arg->id->name] = entryBlock->getArgument(argIdx);
       typeVarTable[arg->id->name] = argMLIRTypes[i];
       if (arg->type != nullptr) {
-        typeTable[arg->id->name] = arg->type->name;
+        typeTable[arg->id->name] = arg->type;
       }
       ++argIdx;
     }
@@ -461,7 +499,7 @@ public:
       argValues[capture.id->name] = entryBlock->getArgument(argIdx);
       typeVarTable[capture.id->name] = captureMLIRTypes[i];
       if (capture.type != nullptr) {
-        typeTable[capture.id->name] = capture.type->name;
+        typeTable[capture.id->name] = capture.type;
       }
       ++argIdx;
     }
@@ -469,11 +507,12 @@ public:
     // Generate function body
     node.block->accept(*this);
 
-    // Add return
+    // Add return - NOLINTNEXTLINE(bugprone-branch-clone) - different op
+    // signatures
     if (result) {
-      builder.create<ReturnOp>(loc(), result);
+      builder.create<ReturnOp>(loc(node.block->loc), result);
     } else {
-      builder.create<ReturnOp>(loc());
+      builder.create<ReturnOp>(loc(node.loc));
     }
 
     result = nullptr; // Function declarations don't produce a value
@@ -520,7 +559,7 @@ public:
           immutableValues[localName] = *value;
           auto type = lookupType(mangled);
           if (type) {
-            typeTable[localName] = *type;
+            typeTable[localName] = type;
           }
         }
 
@@ -576,13 +615,17 @@ private:
   OpBuilder builder;
   ModuleOp module;
   TypeChecker typeChecker;
+  std::string sourceFilename;
 
   // Type variable counter for generating fresh type variables
   uint64_t nextTypeVarId = 0;
 
+  // Track whether any errors occurred during MLIR generation
+  bool hasMLIRGenErrors = false;
+
   // Current result value and type
   Value result;
-  std::string resultType;
+  std::shared_ptr<const NTypeSpec> resultType;
 
   // Module path for name mangling (e.g., ["Math", "Internal"])
   std::vector<std::string> currentModulePath;
@@ -601,14 +644,14 @@ private:
   }
 
   // Symbol tables
-  std::map<std::string, Value> symbolTable;     // Mutable variable allocas
   std::map<std::string, Value> argValues;       // Function arguments
   std::map<std::string, Value> immutableValues; // Immutable variable SSA values
-  std::map<std::string, std::string> typeTable; // Variable types
+  std::map<std::string, std::shared_ptr<const NTypeSpec>>
+      typeTable; // Variable types
   std::map<std::string, Type>
       typeVarTable; // Variable types as MLIR types (for type vars)
   std::map<std::string, std::vector<std::string>> functionCaptures;
-  std::map<std::string, std::string> functionReturnTypes;
+  std::map<std::string, std::shared_ptr<const NTypeSpec>> functionReturnTypes;
   std::map<std::string, Type>
       functionReturnMLIRTypes; // Function return types as MLIR types
   std::map<std::string, std::string>
@@ -620,13 +663,11 @@ private:
   class SymbolTableScope {
   public:
     SymbolTableScope(MLIRGenVisitor& visitor, bool clearAllTables = false)
-        : visitor(visitor), savedSymbolTable(visitor.symbolTable),
-          savedTypeTable(visitor.typeTable),
+        : visitor(visitor), savedTypeTable(visitor.typeTable),
           savedTypeVarTable(visitor.typeVarTable),
           savedArgValues(visitor.argValues),
           savedImmutableValues(visitor.immutableValues) {
       if (clearAllTables) {
-        visitor.symbolTable.clear();
         visitor.typeTable.clear();
         visitor.typeVarTable.clear();
         visitor.argValues.clear();
@@ -634,8 +675,9 @@ private:
       }
     }
 
+    // NOLINTNEXTLINE(modernize-use-equals-default) - destructor restores saved
+    // state
     ~SymbolTableScope() {
-      visitor.symbolTable = savedSymbolTable;
       visitor.typeTable = savedTypeTable;
       visitor.typeVarTable = savedTypeVarTable;
       visitor.argValues = savedArgValues;
@@ -644,29 +686,29 @@ private:
 
   private:
     MLIRGenVisitor& visitor;
-    std::map<std::string, Value> savedSymbolTable;
-    std::map<std::string, std::string> savedTypeTable;
+    std::map<std::string, std::shared_ptr<const NTypeSpec>> savedTypeTable;
     std::map<std::string, Type> savedTypeVarTable;
     std::map<std::string, Value> savedArgValues;
     std::map<std::string, Value> savedImmutableValues;
   };
 
-  Location loc() { return builder.getUnknownLoc(); }
+  /// Create MLIR location from source location
+  Location loc(const SourceLocation& srcLoc) {
+    if (srcLoc.isValid()) {
+      return FileLineColLoc::get(builder.getContext(), sourceFilename,
+                                 srcLoc.line, srcLoc.column);
+    }
+    return builder.getUnknownLoc();
+  }
 
   /// Look up a variable by name in the symbol tables.
-  /// Checks immutable values, mutable allocas, and function arguments.
+  /// Checks immutable values and function arguments.
   /// Returns nullopt if the variable is not found.
   std::optional<Value> lookupVariable(const std::string& name) {
     // Check immutable values first (SSA values, no load needed)
     auto immIt = immutableValues.find(name);
     if (immIt != immutableValues.end()) {
       return immIt->second;
-    }
-
-    // Check mutable variables (allocas, need load)
-    auto it = symbolTable.find(name);
-    if (it != symbolTable.end()) {
-      return builder.create<LoadOp>(loc(), getTypeForName(name), it->second);
     }
 
     // Check function arguments
@@ -679,29 +721,91 @@ private:
   }
 
   /// Look up a variable's type by name.
-  std::optional<std::string> lookupType(const std::string& name) {
+  /// Returns nullptr if not found.
+  [[nodiscard]] std::shared_ptr<const NTypeSpec>
+  lookupType(const std::string& name) {
     auto it = typeTable.find(name);
     if (it != typeTable.end()) {
       return it->second;
     }
-    return std::nullopt;
+    return nullptr;
   }
 
-  Type getPolangType(const std::string& typeName) {
-    if (typeName == TypeNames::INT) {
-      return builder.getType<IntType>();
+  /// Get the default type (i64) for cases where no type is specified.
+  Type getDefaultType() {
+    return polang::IntegerType::get(builder.getContext(), 64,
+                                    Signedness::Signed);
+  }
+
+  /// Get a Polang MLIR type from an NTypeSpec.
+  /// Handles NNamedType only (no reference types in Polang).
+  Type getPolangType(const NTypeSpec& typeSpec) {
+    // Handle NNamedType
+    if (const auto* named = dynamic_cast<const NNamedType*>(&typeSpec)) {
+      const std::string& typeName = named->name;
+
+      // Signed integers
+      if (typeName == TypeNames::I8) {
+        return polang::IntegerType::get(builder.getContext(), 8,
+                                        Signedness::Signed);
+      }
+      if (typeName == TypeNames::I16) {
+        return polang::IntegerType::get(builder.getContext(), 16,
+                                        Signedness::Signed);
+      }
+      if (typeName == TypeNames::I32) {
+        return polang::IntegerType::get(builder.getContext(), 32,
+                                        Signedness::Signed);
+      }
+      if (typeName == TypeNames::I64) {
+        return polang::IntegerType::get(builder.getContext(), 64,
+                                        Signedness::Signed);
+      }
+      // Unsigned integers
+      if (typeName == TypeNames::U8) {
+        return polang::IntegerType::get(builder.getContext(), 8,
+                                        Signedness::Unsigned);
+      }
+      if (typeName == TypeNames::U16) {
+        return polang::IntegerType::get(builder.getContext(), 16,
+                                        Signedness::Unsigned);
+      }
+      if (typeName == TypeNames::U32) {
+        return polang::IntegerType::get(builder.getContext(), 32,
+                                        Signedness::Unsigned);
+      }
+      if (typeName == TypeNames::U64) {
+        return polang::IntegerType::get(builder.getContext(), 64,
+                                        Signedness::Unsigned);
+      }
+      // Floats
+      if (typeName == TypeNames::F32) {
+        return polang::FloatType::get(builder.getContext(), 32);
+      }
+      if (typeName == TypeNames::F64) {
+        return polang::FloatType::get(builder.getContext(), 64);
+      }
+      // Bool
+      if (typeName == TypeNames::BOOL) {
+        return builder.getType<BoolType>();
+      }
+      // Type variable
+      if (typeName == TypeNames::TYPEVAR) {
+        return freshTypeVar();
+      }
+      // Generic types (unresolved literals)
+      if (typeName == TypeNames::GENERIC_INT) {
+        return freshTypeVar(TypeVarKind::Integer);
+      }
+      if (typeName == TypeNames::GENERIC_FLOAT) {
+        return freshTypeVar(TypeVarKind::Float);
+      }
+      // Default to i64
+      return getDefaultType();
     }
-    if (typeName == TypeNames::DOUBLE) {
-      return builder.getType<DoubleType>();
-    }
-    if (typeName == TypeNames::BOOL) {
-      return builder.getType<BoolType>();
-    }
-    if (typeName == TypeNames::TYPEVAR) {
-      return freshTypeVar();
-    }
-    // Default to int
-    return builder.getType<IntType>();
+
+    // Unknown type - should not happen
+    return nullptr;
   }
 
   Type getTypeForName(const std::string& name) {
@@ -710,19 +814,22 @@ private:
     if (varIt != typeVarTable.end()) {
       return varIt->second;
     }
-    // Fall back to string-based type table
+    // Fall back to NTypeSpec-based type table
     auto it = typeTable.find(name);
-    if (it != typeTable.end()) {
-      return getPolangType(it->second);
+    if (it != typeTable.end() && it->second) {
+      return getPolangType(*it->second);
     }
-    return builder.getType<IntType>();
+    return getDefaultType();
   }
 
   Type convertPolangType(Type polangType) {
-    if (isa<IntType>(polangType)) {
-      return builder.getI64Type();
+    if (auto intType = dyn_cast<polang::IntegerType>(polangType)) {
+      return builder.getIntegerType(intType.getWidth());
     }
-    if (isa<DoubleType>(polangType)) {
+    if (auto floatType = dyn_cast<polang::FloatType>(polangType)) {
+      if (floatType.getWidth() == 32) {
+        return builder.getF32Type();
+      }
       return builder.getF64Type();
     }
     if (isa<BoolType>(polangType)) {
@@ -732,16 +839,30 @@ private:
   }
 
   void generateMainFunction(const NBlock& block) {
-    // Get the inferred return type from the type checker (already ran in
-    // generate())
+    // Get the inferred return type from the type checker
     std::string inferredType = typeChecker.getInferredType();
-    Type returnType = getPolangType(inferredType);
+
+    // Use type checker's type if it's concrete, otherwise use type variable
+    Type returnType;
+    if (inferredType == TypeNames::UNKNOWN ||
+        inferredType == TypeNames::TYPEVAR || isGenericType(inferredType)) {
+      // Type is unknown or generic - use type variable for MLIR inference
+      returnType = freshTypeVar();
+    } else {
+      // Type checker found a concrete type - use it
+      auto typeSpec = makeTypeSpec(inferredType);
+      returnType = getPolangType(*typeSpec);
+      if (!returnType) {
+        return; // Stop generating if type error
+      }
+    }
 
     // Create entry function with dynamic return type
     auto funcType = builder.getFunctionType({}, {returnType});
 
     builder.setInsertionPointToEnd(module.getBody());
-    auto entryFunc = builder.create<FuncOp>(loc(), "__polang_entry", funcType);
+    auto entryFunc =
+        builder.create<FuncOp>(loc(block.loc), "__polang_entry", funcType);
 
     // Create entry block
     Block* entryBlock = entryFunc.addEntryBlock();
@@ -752,18 +873,24 @@ private:
 
     // Return the last expression value, or default value of correct type
     if (result) {
-      builder.create<ReturnOp>(loc(), result);
+      builder.create<ReturnOp>(loc(block.loc), result);
     } else {
       // Create default value matching the return type
       Value defaultVal;
-      if (inferredType == TypeNames::DOUBLE) {
-        defaultVal = builder.create<ConstantDoubleOp>(loc(), 0.0);
+      if (isFloatType(inferredType)) {
+        auto floatTy = polang::FloatType::get(builder.getContext(),
+                                              getFloatWidth(inferredType));
+        defaultVal =
+            builder.create<ConstantFloatOp>(loc(block.loc), floatTy, 0.0);
       } else if (inferredType == TypeNames::BOOL) {
-        defaultVal = builder.create<ConstantBoolOp>(loc(), false);
+        // NOLINTNEXTLINE(bugprone-branch-clone) - creates different op types
+        defaultVal = builder.create<ConstantBoolOp>(loc(block.loc), false);
       } else {
-        defaultVal = builder.create<ConstantIntOp>(loc(), 0);
+        // Use the return type (already resolved or type variable)
+        defaultVal =
+            builder.create<ConstantIntegerOp>(loc(block.loc), returnType, 0);
       }
-      builder.create<ReturnOp>(loc(), defaultVal);
+      builder.create<ReturnOp>(loc(block.loc), defaultVal);
     }
   }
 };

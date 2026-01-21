@@ -1,0 +1,23 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test MLIR representation of functions with typed parameters
+; This verifies the type infrastructure works for non-default types
+
+; Function with i32 parameters shows correct MLIR types
+; CHECK: {{.*}}polang.func @add_i32(%{{.*}}: !polang.integer<32, signed>, %{{.*}}: !polang.integer<32, signed>) -> !polang.integer<32, signed>{{.*}}
+let add_i32(a: i32, b: i32): i32 = a + b
+
+; Function with i16 parameters
+; CHECK: {{.*}}polang.func @mul_i16(%{{.*}}: !polang.integer<16, signed>, %{{.*}}: !polang.integer<16, signed>) -> !polang.integer<16, signed>{{.*}}
+let mul_i16(a: i16, b: i16): i16 = a * b
+
+; Function with u64 parameters
+; CHECK: {{.*}}polang.func @add_u64(%{{.*}}: !polang.integer<64, unsigned>, %{{.*}}: !polang.integer<64, unsigned>) -> !polang.integer<64, unsigned>{{.*}}
+let add_u64(a: u64, b: u64): u64 = a + b
+
+; Function with f32 parameters
+; CHECK: {{.*}}polang.func @mul_f32(%{{.*}}: !polang.float<32>, %{{.*}}: !polang.float<32>) -> !polang.float<32>{{.*}}
+let mul_f32(a: f32, b: f32): f32 = a * b
+
+; Default expression to make it compile
+42

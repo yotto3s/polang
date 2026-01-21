@@ -4,7 +4,7 @@
 ; multiple specialized versions through monomorphization.
 
 ; Specialized versions (order may vary)
-; CHECK-DAG: {{.*}}polang.func @identity$int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+; CHECK-DAG: {{.*}}polang.func @identity$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 ; CHECK-DAG: {{.*}}polang.func @identity$bool(%{{.*}}: !polang.bool) -> !polang.bool{{.*}}
 
 ; Original polymorphic function is preserved and marked

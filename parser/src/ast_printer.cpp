@@ -38,6 +38,10 @@ ASTPrinter::DepthScope::~DepthScope() noexcept {
   printer.depthHasMore.pop_back();
 }
 
+void ASTPrinter::visit(const NNamedType& node) {
+  // Types are printed via getTypeName() in parent visitors
+}
+
 void ASTPrinter::visit(const NInteger& node) {
   printPrefix();
   out << "NInteger " << node.value << "\n";
@@ -93,17 +97,13 @@ void ASTPrinter::visit(const NBinaryOperator& node) {
   }
 }
 
-void ASTPrinter::visit(const NAssignment& node) {
+void ASTPrinter::visit(const NCastExpression& node) {
   printPrefix();
-  out << "NAssignment\n";
+  out << "NCastExpression -> " << node.targetType->getTypeName() << "\n";
 
   {
-    DepthScope scope(*this, true);
-    node.lhs->accept(*this);
-  }
-  {
     DepthScope scope(*this, false);
-    node.rhs->accept(*this);
+    node.expression->accept(*this);
   }
 }
 
@@ -188,11 +188,9 @@ void ASTPrinter::visit(const NExpressionStatement& node) {
 void ASTPrinter::visit(const NVariableDeclaration& node) {
   printPrefix();
   out << "NVariableDeclaration '" << node.id->name << "'";
-  if (node.isMutable) {
-    out << " mut";
-  }
+  // Mutability is now derived from the type annotation (e.g., "mut i64")
   if (node.type != nullptr) {
-    out << " : " << node.type->name;
+    out << " : " << node.type->getTypeName();
   }
   out << "\n";
 
@@ -212,13 +210,13 @@ void ASTPrinter::visit(const NFunctionDeclaration& node) {
     }
     out << node.arguments[i]->id->name;
     if (node.arguments[i]->type != nullptr) {
-      out << ": " << node.arguments[i]->type->name;
+      out << ": " << node.arguments[i]->type->getTypeName();
     }
   }
   out << ")";
 
   if (node.type != nullptr) {
-    out << " -> " << node.type->name;
+    out << " -> " << node.type->getTypeName();
   }
   out << "\n";
 

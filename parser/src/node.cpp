@@ -9,13 +9,15 @@ void NBoolean::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NIdentifier::accept(Visitor& visitor) const { visitor.visit(*this); }
 
+void NNamedType::accept(Visitor& visitor) const { visitor.visit(*this); }
+
 void NQualifiedName::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NMethodCall::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NBinaryOperator::accept(Visitor& visitor) const { visitor.visit(*this); }
 
-void NAssignment::accept(Visitor& visitor) const { visitor.visit(*this); }
+void NCastExpression::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NBlock::accept(Visitor& visitor) const { visitor.visit(*this); }
 

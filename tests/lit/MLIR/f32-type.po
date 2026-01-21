@@ -1,0 +1,14 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test MLIR representation of f32 float type
+
+; Function with f32 parameters
+; CHECK: {{.*}}polang.func @add_f32(%{{.*}}: !polang.float<32>, %{{.*}}: !polang.float<32>) -> !polang.float<32>{{.*}}
+let add_f32(a: f32, b: f32): f32 = a + b
+
+; Function with f32 return type, mixing with arithmetic
+; CHECK: {{.*}}polang.func @mul_f32(%{{.*}}: !polang.float<32>, %{{.*}}: !polang.float<32>) -> !polang.float<32>{{.*}}
+let mul_f32(a: f32, b: f32): f32 = a * b
+
+; Default expression
+42

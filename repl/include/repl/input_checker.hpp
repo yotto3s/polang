@@ -24,6 +24,14 @@ public:
         continue;
       }
 
+      // Skip comments (semicolon to end of line)
+      if (input[i] == ';') {
+        while (i < input.size() && input[i] != '\n') {
+          ++i;
+        }
+        continue;
+      }
+
       // Track parentheses
       if (input[i] == '(') {
         ++parenDepth;
@@ -35,6 +43,17 @@ public:
         --parenDepth;
         lastToken = ")";
         ++i;
+        continue;
+      }
+
+      // Check for numeric literals
+      if (std::isdigit(static_cast<unsigned char>(input[i])) != 0) {
+        while (i < input.size() &&
+               (std::isdigit(static_cast<unsigned char>(input[i])) != 0 ||
+                input[i] == '.')) {
+          ++i;
+        }
+        lastToken = "number";
         continue;
       }
 

@@ -8,6 +8,7 @@
 #define POLANG_TYPES_TD
 
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/EnumAttr.td"
 include "polang/Dialect/PolangDialect.td"
 
 //===----------------------------------------------------------------------===//
@@ -19,20 +20,77 @@ class Polang_Type<string name, string typeMnemonic, list<Trait> traits = []>
   let mnemonic = typeMnemonic;
 }
 
-def Polang_IntType : Polang_Type<"Int", "int"> {
-  let summary = "64-bit signed integer type";
+//===----------------------------------------------------------------------===//
+// Signedness enum for integer types
+//===----------------------------------------------------------------------===//
+
+def Polang_Signed : I32EnumAttrCase<"Signed", 0, "signed">;
+def Polang_Unsigned : I32EnumAttrCase<"Unsigned", 1, "unsigned">;
+
+def Polang_Signedness : I32EnumAttr<"Signedness", "integer signedness", [
+    Polang_Signed, Polang_Unsigned
+]> {
+  let cppNamespace = "::polang";
+}
+
+//===----------------------------------------------------------------------===//
+// TypeVarKind enum for type variable constraints
+//===----------------------------------------------------------------------===//
+
+def Polang_TypeVarKind_Any : I32EnumAttrCase<"Any", 0, "any">;
+def Polang_TypeVarKind_Integer : I32EnumAttrCase<"Integer", 1, "integer">;
+def Polang_TypeVarKind_Float : I32EnumAttrCase<"Float", 2, "float">;
+
+def Polang_TypeVarKind : I32EnumAttr<"TypeVarKind", "type variable kind", [
+    Polang_TypeVarKind_Any, Polang_TypeVarKind_Integer, Polang_TypeVarKind_Float
+]> {
+  let cppNamespace = "::polang";
+}
+
+//===----------------------------------------------------------------------===//
+// Parameterized numeric types
+//===----------------------------------------------------------------------===//
+
+def Polang_IntegerType : Polang_Type<"Integer", "integer"> {
+  let summary = "Integer type with configurable width and signedness";
   let description = [{
-    The Polang integer type represents a 64-bit signed integer value.
-    It maps to `int` in Polang source code.
+    Parameterized integer type supporting 8, 16, 32, and 64-bit widths,
+    both signed and unsigned.
+
+    Examples:
+    ```mlir
+    !polang.integer<32, signed>   ; i32
+    !polang.integer<8, unsigned>  ; u8
+    !polang.integer<64, signed>   ; i64
+    ```
+  }];
+
+  let parameters = (ins
+    "unsigned":$width,
+    "Signedness":$signedness
+  );
+  let assemblyFormat = "`<` $width `,` $signedness `>`";
+
+  let extraClassDeclaration = [{
+    bool isSigned() const { return getSignedness() == Signedness::Signed; }
+    bool isUnsigned() const { return getSignedness() == Signedness::Unsigned; }
   }];
 }
 
-def Polang_DoubleType : Polang_Type<"Double", "double"> {
-  let summary = "64-bit floating-point type";
+def Polang_FloatType : Polang_Type<"Float", "float"> {
+  let summary = "Floating-point type with configurable width";
   let description = [{
-    The Polang double type represents a 64-bit floating-point value.
-    It maps to `double` in Polang source code.
+    Parameterized floating-point type supporting 32 and 64-bit widths.
+
+    Examples:
+    ```mlir
+    !polang.float<32>  ; f32
+    !polang.float<64>  ; f64
+    ```
   }];
+
+  let parameters = (ins "unsigned":$width);
+  let assemblyFormat = "`<` $width `>`";
 }
 
 def Polang_BoolType : Polang_Type<"Bool", "bool"> {
@@ -44,43 +102,69 @@ def Polang_BoolType : Polang_Type<"Bool", "bool"> {
 }
 
 def Polang_TypeVarType : Polang_Type<"TypeVar", "typevar"> {
-  let summary = "Type variable for polymorphic types";
+  let summary = "Type variable for polymorphic type inference";
   let description = [{
-    Represents an unresolved type variable used during type inference.
-    The parameter is a unique identifier for the type variable.
+    Represents an unresolved type that will be determined by type inference.
+    The optional `kind` parameter constrains what concrete types this variable
+    can unify with:
+    - `any` (default): Can unify with any type (for polymorphic functions)
+    - `integer`: Can only unify with integer types (for integer literals)
+    - `float`: Can only unify with float types (for float literals)
 
-    Example:
+    Examples:
     ```mlir
-    %x : !polang.typevar<0>
+    !polang.typevar<1>          ; unconstrained type variable
+    !polang.typevar<2, integer> ; must resolve to an integer type
+    !polang.typevar<3, float>   ; must resolve to a float type
     ```
   }];
 
-  let parameters = (ins "uint64_t":$id);
-  let assemblyFormat = "`<` $id `>`";
+  let parameters = (ins
+    "uint64_t":$id,
+    DefaultValuedParameter<"TypeVarKind", "TypeVarKind::Any">:$kind
+  );
+
+  let hasCustomAssemblyFormat = 1;
+
+  let extraClassDeclaration = [{
+    bool isAny() const { return getKind() == TypeVarKind::Any; }
+    bool isIntegerKind() const { return getKind() == TypeVarKind::Integer; }
+    bool isFloatKind() const { return getKind() == TypeVarKind::Float; }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
 // Type constraints
 //===----------------------------------------------------------------------===//
 
-def Polang_AnyNumericType : AnyTypeOf<[Polang_IntType, Polang_DoubleType],
+def Polang_AnyNumericType : AnyTypeOf<[Polang_IntegerType, Polang_FloatType],
     "Polang numeric type">;
 
-def Polang_AnyType : AnyTypeOf<[Polang_IntType, Polang_DoubleType, Polang_BoolType],
+def Polang_AnyType : AnyTypeOf<[Polang_IntegerType, Polang_FloatType, Polang_BoolType],
     "any Polang type">;
 
 // Type constraints that include type variables (for use before type inference)
 def Polang_AnyNumericOrVar : AnyTypeOf<[
-    Polang_IntType, Polang_DoubleType, Polang_TypeVarType
+    Polang_IntegerType, Polang_FloatType, Polang_TypeVarType
 ], "Polang numeric type or type variable">;
 
 def Polang_AnyTypeOrVar : AnyTypeOf<[
-    Polang_IntType, Polang_DoubleType, Polang_BoolType, Polang_TypeVarType
+    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_TypeVarType
 ], "any Polang type or type variable">;
 
 // Bool or type variable (for if conditions before type inference)
 def Polang_BoolOrTypeVar : AnyTypeOf<[
     Polang_BoolType, Polang_TypeVarType
 ], "bool or type variable">;
+
+// Integer or type variable (for integer constants before type inference)
+def Polang_IntegerOrTypeVar : AnyTypeOf<[
+    Polang_IntegerType, Polang_TypeVarType
+], "integer or type variable">;
+
+// Float or type variable (for float constants before type inference)
+def Polang_FloatOrTypeVar : AnyTypeOf<[
+    Polang_FloatType, Polang_TypeVarType
+], "float or type variable">;
 
 #endif // POLANG_TYPES_TD

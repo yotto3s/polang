@@ -3,4 +3,4 @@
 ; Test recursive function generates correct call pattern
 ; CHECK: {{.*}}@factorial{{.*}}
 ; CHECK: {{.*}}call{{.*}}@factorial{{.*}}
-let factorial(n: int): int = if n <= 1 then 1 else n * factorial(n - 1)
+let factorial(n: i64): i64 = if n <= 1 then 1 else n * factorial(n - 1)

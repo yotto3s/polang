@@ -6,5 +6,5 @@
 ; CHECK: {{.*}}polang.func @identity(%{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
 
 ; Monomorphized version for int
-; CHECK: {{.*}}polang.func @identity$int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+; CHECK: {{.*}}polang.func @identity$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 let identity(x) = x in identity(42)

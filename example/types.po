@@ -1,6 +1,6 @@
 ; Type system demonstration
-let i: int = 42           ; integer type
-let d: double = 3.14159   ; double type
+let i: i64 = 42           ; integer type
+let d: f64 = 3.14159   ; double type
 let b: bool = true        ; boolean type
 
 ; Comparisons return bool

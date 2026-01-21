@@ -11,7 +11,11 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Types.h"
+
+// Include the Signedness enum before the types that use it
+#include "polang/Dialect/PolangEnums.h.inc"
 
 #define GET_TYPEDEF_CLASSES
 #include "polang/Dialect/PolangTypes.h.inc"

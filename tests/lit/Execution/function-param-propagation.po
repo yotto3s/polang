@@ -1,0 +1,6 @@
+; RUN: %polang_repl %s | %FileCheck %s
+; Test: function parameter i32 propagates to resolve a as i32
+; CHECK: 5 : i32
+let id(x: i32): i32 = x
+let a = 5
+id(a)

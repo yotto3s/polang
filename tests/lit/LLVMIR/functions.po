@@ -5,7 +5,7 @@
 ; CHECK-NEXT:   %{{[0-9]+}} = call i64 @square(i64 5)
 ; CHECK-NEXT:   ret i64 %{{[0-9]+}}
 ; CHECK-NEXT: }
-let square(x: int): int = x * x
+let square(x: i64): i64 = x * x
 square(5)
 
 ; Test function definition

@@ -1,11 +1,11 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
 ; Test double constant
-; CHECK:      polang.func @double_val() -> !polang.double {
-; CHECK-NEXT:   %{{[0-9]+}} = polang.constant.double 3.140000e+00 : !polang.double
-; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.double
+; CHECK:      polang.func @double_val() -> !polang.float<64> {
+; CHECK-NEXT:   %{{[0-9]+}} = polang.constant.float 3.140000e+00 : !polang.float<64>
+; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
 ; CHECK-NEXT: }
-let double_val(): double = 3.14
+let double_val(): f64 = 3.14
 
 ; Test bool constant
 ; CHECK:      polang.func @bool_val() -> !polang.bool {

@@ -6,10 +6,11 @@ class NInteger;
 class NDouble;
 class NBoolean;
 class NIdentifier;
+class NNamedType;
 class NQualifiedName;
 class NMethodCall;
 class NBinaryOperator;
-class NAssignment;
+class NCastExpression;
 class NBlock;
 class NIfExpression;
 class NLetExpression;
@@ -67,6 +68,11 @@ class Visitor {
 public:
   virtual ~Visitor() noexcept = default;
 
+  /// @name Type Specification Visitors
+  /// @{
+  virtual void visit(const NNamedType& node) = 0;
+  /// @}
+
   /// @name Expression Visitors
   /// @{
   virtual void visit(const NInteger& node) = 0;
@@ -76,7 +82,7 @@ public:
   virtual void visit(const NQualifiedName& node) = 0;
   virtual void visit(const NMethodCall& node) = 0;
   virtual void visit(const NBinaryOperator& node) = 0;
-  virtual void visit(const NAssignment& node) = 0;
+  virtual void visit(const NCastExpression& node) = 0;
   virtual void visit(const NBlock& node) = 0;
   virtual void visit(const NIfExpression& node) = 0;
   virtual void visit(const NLetExpression& node) = 0;

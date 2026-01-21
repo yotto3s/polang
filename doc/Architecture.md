@@ -14,6 +14,7 @@ polang/
 ├── doc/                        # Documentation
 │   ├── Syntax.md               # Language syntax reference
 │   ├── TypeSystem.md           # Type system documentation
+│   ├── PolangDialect.md        # MLIR dialect operations and types
 │   ├── Architecture.md         # This file
 │   ├── Building.md             # Build instructions
 │   ├── Development.md          # Development guidelines
@@ -107,6 +108,22 @@ if (ast) {
 }
 ```
 
+#### Source Location Tracking
+
+Every AST node carries source location information via the `SourceLocation` struct defined in `node.hpp`:
+
+```cpp
+struct SourceLocation {
+  int line = 0;
+  int column = 0;
+  SourceLocation() = default;
+  SourceLocation(int l, int c) : line(l), column(c) {}
+  [[nodiscard]] bool isValid() const { return line > 0; }
+};
+```
+
+Locations are populated during parsing using Bison's `@$` syntax, which tracks the position of grammar rules. This enables precise error messages with line and column information throughout the compilation pipeline.
+
 **Key modules:**
 
 | Module | Description |
@@ -120,7 +137,11 @@ if (ast) {
 
 Custom MLIR dialect that closely mirrors Polang language semantics.
 
-- **Types**: `!polang.int`, `!polang.double`, `!polang.bool`, `!polang.typevar<id>`
+- **Types**:
+  - Integer: `!polang.integer<width, signedness>` (e.g., `!polang.integer<64, signed>` for `i64`)
+  - Float: `!polang.float<width>` (e.g., `!polang.float<64>` for `f64`)
+  - Boolean: `!polang.bool`
+  - Type variable: `!polang.typevar<id, kind>` (e.g., `!polang.typevar<0, Integer>`)
 - **Operations**: Constants, arithmetic, comparisons, control flow, functions
 - **Passes**: Type inference, monomorphization, lowering to standard dialects
 
@@ -143,6 +164,8 @@ Interactive read-eval-print loop with JIT execution.
 
 ## Compilation Pipeline
 
+Source locations are tracked throughout the pipeline, enabling precise error messages with line and column information.
+
 ```
 Source Code (.po)
        │
@@ -150,21 +173,21 @@ Source Code (.po)
 ┌─────────────────┐
 │  Lexer (Flex)   │  parser/src/lexer.l
 └────────┬────────┘
-         │ Tokens
+         │ Tokens (with positions)
          ▼
 ┌─────────────────┐
 │  Parser (Bison) │  parser/src/parser.y
 └────────┬────────┘
-         │ AST
+         │ AST (with SourceLocation on each node)
          ▼
 ┌─────────────────┐
 │  Type Checker   │  parser/src/type_checker.cpp
-└────────┬────────┘
+└────────┬────────┘  (reports errors with line:column)
          │ Typed AST
          ▼
 ┌─────────────────┐
 │   MLIRGen       │  mlir/lib/MLIRGen/MLIRGen.cpp
-└────────┬────────┘
+└────────┬────────┘  (uses FileLineColLoc for MLIR ops)
          │ Polang Dialect MLIR (with type variables)
          ▼
 ┌─────────────────┐
@@ -194,7 +217,9 @@ Source Code (.po)
 
 ## Polang MLIR Dialect
 
-The Polang dialect is a custom MLIR dialect that closely mirrors the language semantics. This provides:
+The Polang dialect is a custom MLIR dialect that closely mirrors the language semantics. For detailed documentation of all operations, types, and passes, see [PolangDialect.md](PolangDialect.md).
+
+This provides:
 
 - **Extensibility**: Easy to add new language features
 - **Optimization opportunities**: Custom passes can operate on high-level operations
@@ -215,27 +240,53 @@ The Polang dialect uses custom verifiers to catch type errors during compilation
 | `polang.if` | Verifies condition is `!polang.bool`, both branches yield same type |
 | `polang.return` | Verifies return value matches function signature |
 | `polang.call` | Verifies function exists, arity matches, and argument types match |
-| `polang.store` | Verifies target variable is mutable |
+| `polang.ref.store` | Verifies reference is mutable |
 
 Type variables are resolved by the type inference pass before lowering to standard dialects.
 
 ### Types
 
+#### Integer Types
+
 | Polang Type | MLIR Type | Lowers To |
 |-------------|-----------|-----------|
-| `int` | `!polang.int` | `i64` |
-| `double` | `!polang.double` | `f64` |
+| `i8` | `!polang.integer<8, signed>` | `i8` |
+| `i16` | `!polang.integer<16, signed>` | `i16` |
+| `i32` | `!polang.integer<32, signed>` | `i32` |
+| `i64` | `!polang.integer<64, signed>` | `i64` |
+| `u8` | `!polang.integer<8, unsigned>` | `i8` |
+| `u16` | `!polang.integer<16, unsigned>` | `i16` |
+| `u32` | `!polang.integer<32, unsigned>` | `i32` |
+| `u64` | `!polang.integer<64, unsigned>` | `i64` |
+
+#### Float Types
+
+| Polang Type | MLIR Type | Lowers To |
+|-------------|-----------|-----------|
+| `f32` | `!polang.float<32>` | `f32` |
+| `f64` | `!polang.float<64>` | `f64` |
+
+#### Other Types
+
+| Polang Type | MLIR Type | Lowers To |
+|-------------|-----------|-----------|
 | `bool` | `!polang.bool` | `i1` |
-| (type variable) | `!polang.typevar<id>` | (resolved by type inference) |
+| (type variable) | `!polang.typevar<id, kind>` | (resolved by type inference) |
+
+**Legacy aliases:** `int` maps to `i64`, `double` maps to `f64`.
 
 #### Type Variables
 
-Type variables (`!polang.typevar<id>`) represent unknown types during the initial MLIR generation phase. They are used for:
+Type variables (`!polang.typevar<id, kind>`) represent unknown types during the initial MLIR generation phase. They are used for:
 
 - Function parameters without explicit type annotations
 - Return types that depend on polymorphic parameters
 
-Type variables are resolved by the type inference pass before lowering to standard dialects. Each type variable has a unique numeric ID (e.g., `!polang.typevar<0>`, `!polang.typevar<1>`).
+Type variables have two components:
+- **id**: A unique numeric identifier (e.g., `0`, `1`, `2`)
+- **kind**: A constraint on what types it can resolve to (`Any`, `Integer`, or `Float`)
+
+Type variables are resolved by the type inference pass before lowering to standard dialects. Unresolved type variables default to `i64` for `Integer` kind and `f64` for `Float` kind.
 
 ### Operations
 
@@ -243,51 +294,55 @@ Type variables are resolved by the type inference pass before lowering to standa
 
 | Operation | Description | Example |
 |-----------|-------------|---------|
-| `polang.constant.int` | Integer literal | `%0 = polang.constant.int 42 : !polang.int` |
-| `polang.constant.double` | Double literal | `%0 = polang.constant.double 3.14 : !polang.double` |
+| `polang.constant.int` | Integer literal | `%0 = polang.constant.int 42 : !polang.integer<64, signed>` |
+| `polang.constant.float` | Float literal | `%0 = polang.constant.float 3.14 : !polang.float<64>` |
 | `polang.constant.bool` | Boolean literal | `%0 = polang.constant.bool true : !polang.bool` |
+
+Note: Integer and float constants use the specific type at their point of use. Default literals use `i64` and `f64` respectively.
 
 #### Arithmetic
 
 | Operation | Description | Example |
 |-----------|-------------|---------|
-| `polang.add` | Addition | `%2 = polang.add %0, %1 : !polang.int` |
-| `polang.sub` | Subtraction | `%2 = polang.sub %0, %1 : !polang.int` |
-| `polang.mul` | Multiplication | `%2 = polang.mul %0, %1 : !polang.int` |
-| `polang.div` | Division | `%2 = polang.div %0, %1 : !polang.int` |
+| `polang.add` | Addition | `%2 = polang.add %0, %1 : !polang.integer<64, signed>` |
+| `polang.sub` | Subtraction | `%2 = polang.sub %0, %1 : !polang.integer<64, signed>` |
+| `polang.mul` | Multiplication | `%2 = polang.mul %0, %1 : !polang.integer<64, signed>` |
+| `polang.div` | Division | `%2 = polang.div %0, %1 : !polang.integer<64, signed>` |
+
+Arithmetic operations work with any integer or float type of the same width and signedness.
 
 #### Comparison
 
 | Operation | Predicates | Example |
 |-----------|------------|---------|
-| `polang.cmp` | `eq`, `ne`, `lt`, `le`, `gt`, `ge` | `%2 = polang.cmp gt, %0, %1 : !polang.int` |
+| `polang.cmp` | `eq`, `ne`, `lt`, `le`, `gt`, `ge` | `%2 = polang.cmp gt, %0, %1 : !polang.integer<64, signed>` |
 
-**Note:** Comparison operations only support numeric types (`!polang.int` and `!polang.double`). Boolean values cannot be compared with `==` or `!=`; use conditional logic instead.
+**Note:** Comparison operations only support numeric types (integer and float). Boolean values cannot be compared with `==` or `!=`; use conditional logic instead.
 
 #### Functions
 
 | Operation | Description | Example |
 |-----------|-------------|---------|
-| `polang.func` | Function definition | `polang.func @add(%a: !polang.int) -> !polang.int { ... }` |
-| `polang.call` | Function call | `%0 = polang.call @add(%x) : (!polang.int) -> !polang.int` |
-| `polang.return` | Return from function | `polang.return %0 : !polang.int` |
+| `polang.func` | Function definition | `polang.func @add(%a: !polang.integer<64, signed>) -> !polang.integer<64, signed> { ... }` |
+| `polang.call` | Function call | `%0 = polang.call @add(%x) : (!polang.integer<64, signed>) -> !polang.integer<64, signed>` |
+| `polang.return` | Return from function | `polang.return %0 : !polang.integer<64, signed>` |
 
 #### Control Flow
 
 | Operation | Description | Example |
 |-----------|-------------|---------|
-| `polang.if` | If-then-else expression | `%0 = polang.if %cond -> !polang.int { ... } else { ... }` |
-| `polang.yield` | Yield value from region | `polang.yield %0 : !polang.int` |
+| `polang.if` | If-then-else expression | `%0 = polang.if %cond -> !polang.integer<64, signed> { ... } else { ... }` |
+| `polang.yield` | Yield value from region | `polang.yield %0 : !polang.integer<64, signed>` |
 
-#### Variables
+#### Reference Operations
 
 | Operation | Description | Example |
 |-----------|-------------|---------|
-| `polang.alloca` | Allocate mutable variable | `%0 = polang.alloca "x", mutable : !polang.int -> memref<i64>` |
-| `polang.load` | Load from mutable variable | `%1 = polang.load %0 : memref<i64> -> !polang.int` |
-| `polang.store` | Store to mutable variable | `polang.store %val, %0 : !polang.int, memref<i64>` |
+| `polang.ref.create` | Create mutable/immutable reference | `%0 = polang.ref.create %val {is_mutable = true} : !polang.integer<64, signed> -> !polang.ref<!polang.integer<64, signed>, mutable>` |
+| `polang.ref.deref` | Read from reference | `%1 = polang.ref.deref %0 : !polang.ref<!polang.integer<64, signed>, mutable> -> !polang.integer<64, signed>` |
+| `polang.ref.store` | Write to mutable reference | `%1 = polang.ref.store %val, %0 : !polang.integer<64, signed>, !polang.ref<!polang.integer<64, signed>, mutable> -> !polang.integer<64, signed>` |
 
-**Note:** Immutable variables (declared with `let`) are optimized to use SSA values directly without memory allocation. Only mutable variables (declared with `let mut`) use the alloca/load/store pattern.
+**Note:** Immutable variables (declared with `let`) are optimized to use SSA values directly without memory allocation. Only mutable variables (declared with `let x = mut value`) use reference operations.
 
 ## Lowering Stages
 
@@ -327,28 +382,27 @@ module {
 
 #### Mutable Variable Handling
 
-Mutable variables (declared with `let mut`) require memory allocation since their values can change:
+Mutable variables (declared with `let x = mut value`) use reference operations since their values can change:
 
 **Example (mutable variable):**
 
 ```polang
-let mut x = 10
+let x = mut 10
 x <- 20
-x
+*x
 ```
 
 Generates:
 
 ```mlir
 module {
-  polang.func @__polang_entry() -> !polang.int {
-    %0 = polang.constant.int 10 : !polang.int
-    %1 = polang.alloca "x", mutable : !polang.int -> memref<i64>
-    polang.store %0, %1 : !polang.int, memref<i64>
-    %2 = polang.constant.int 20 : !polang.int
-    polang.store %2, %1 : !polang.int, memref<i64>
-    %3 = polang.load %1 : memref<i64> -> !polang.int
-    polang.return %3 : !polang.int
+  polang.func @__polang_entry() -> !polang.integer<64, signed> {
+    %0 = polang.constant.integer 10 : !polang.integer<64, signed>
+    %1 = polang.ref.create %0 {is_mutable = true} : !polang.integer<64, signed> -> !polang.ref<!polang.integer<64, signed>, mutable>
+    %2 = polang.constant.integer 20 : !polang.integer<64, signed>
+    %3 = polang.ref.store %2, %1 : !polang.integer<64, signed>, !polang.ref<!polang.integer<64, signed>, mutable> -> !polang.integer<64, signed>
+    %4 = polang.ref.deref %1 : !polang.ref<!polang.integer<64, signed>, mutable> -> !polang.integer<64, signed>
+    polang.return %4 : !polang.integer<64, signed>
   }
 }
 ```
@@ -405,33 +459,44 @@ The `PolangToStandardPass` lowers Polang dialect operations to standard MLIR dia
 | Polang Operation | Lowers To |
 |------------------|-----------|
 | `polang.constant.int` | `arith.constant` |
-| `polang.constant.double` | `arith.constant` |
+| `polang.constant.float` | `arith.constant` |
 | `polang.constant.bool` | `arith.constant` |
-| `polang.add` (int) | `arith.addi` |
-| `polang.add` (double) | `arith.addf` |
-| `polang.sub` (int) | `arith.subi` |
-| `polang.sub` (double) | `arith.subf` |
-| `polang.mul` (int) | `arith.muli` |
-| `polang.mul` (double) | `arith.mulf` |
-| `polang.div` (int) | `arith.divsi` |
-| `polang.div` (double) | `arith.divf` |
-| `polang.cmp` (int) | `arith.cmpi` |
-| `polang.cmp` (double) | `arith.cmpf` |
+| `polang.add` (integer) | `arith.addi` |
+| `polang.add` (float) | `arith.addf` |
+| `polang.sub` (integer) | `arith.subi` |
+| `polang.sub` (float) | `arith.subf` |
+| `polang.mul` (integer) | `arith.muli` |
+| `polang.mul` (float) | `arith.mulf` |
+| `polang.div` (signed integer) | `arith.divsi` |
+| `polang.div` (unsigned integer) | `arith.divui` |
+| `polang.div` (float) | `arith.divf` |
+| `polang.cmp` (signed integer) | `arith.cmpi` (signed predicates) |
+| `polang.cmp` (unsigned integer) | `arith.cmpi` (unsigned predicates) |
+| `polang.cmp` (float) | `arith.cmpf` |
 | `polang.func` | `func.func` |
 | `polang.call` | `func.call` |
 | `polang.return` | `func.return` |
 | `polang.if` | `scf.if` |
 | `polang.yield` | `scf.yield` |
-| `polang.alloca` | `memref.alloca` |
-| `polang.load` | `memref.load` |
-| `polang.store` | `memref.store` |
+| `polang.ref.create` (mutable) | `memref.alloca` + `memref.store` |
+| `polang.ref.create` (immutable) | passthrough |
+| `polang.ref.deref` | `memref.load` |
+| `polang.ref.store` | `memref.store` |
 
 **Type Conversions:**
 
 | Polang Type | Standard Type |
 |-------------|---------------|
-| `!polang.int` | `i64` |
-| `!polang.double` | `f64` |
+| `!polang.integer<8, signed>` | `i8` |
+| `!polang.integer<16, signed>` | `i16` |
+| `!polang.integer<32, signed>` | `i32` |
+| `!polang.integer<64, signed>` | `i64` |
+| `!polang.integer<8, unsigned>` | `i8` |
+| `!polang.integer<16, unsigned>` | `i16` |
+| `!polang.integer<32, unsigned>` | `i32` |
+| `!polang.integer<64, unsigned>` | `i64` |
+| `!polang.float<32>` | `f32` |
+| `!polang.float<64>` | `f64` |
 | `!polang.bool` | `i1` |
 
 ### Stage 4: Standard to LLVM Dialect
@@ -463,18 +528,18 @@ if 5 > 3 then 10 else 20
 **Polang Dialect:**
 ```mlir
 module {
-  polang.func @__polang_entry() -> !polang.int {
-    %0 = polang.constant.int 5 : !polang.int
-    %1 = polang.constant.int 3 : !polang.int
-    %2 = polang.cmp gt, %0, %1 : !polang.int
-    %3 = polang.if %2 -> !polang.int {
-      %4 = polang.constant.int 10 : !polang.int
-      polang.yield %4 : !polang.int
+  polang.func @__polang_entry() -> !polang.integer<64, signed> {
+    %0 = polang.constant.int 5 : !polang.integer<64, signed>
+    %1 = polang.constant.int 3 : !polang.integer<64, signed>
+    %2 = polang.cmp gt, %0, %1 : !polang.integer<64, signed>
+    %3 = polang.if %2 -> !polang.integer<64, signed> {
+      %4 = polang.constant.int 10 : !polang.integer<64, signed>
+      polang.yield %4 : !polang.integer<64, signed>
     } else {
-      %5 = polang.constant.int 20 : !polang.int
-      polang.yield %5 : !polang.int
+      %5 = polang.constant.int 20 : !polang.integer<64, signed>
+      polang.yield %5 : !polang.integer<64, signed>
     }
-    polang.return %3 : !polang.int
+    polang.return %3 : !polang.integer<64, signed>
   }
 }
 ```
@@ -514,24 +579,24 @@ Closures are implemented by converting captured variables into extra function pa
 **Example:**
 ```polang
 let base = 10 in
-  let add_base = fn(x: int): int -> x + base in
+  let add_base = fn(x: i64): i64 -> x + base in
     add_base(5)
 ```
 
 The function `add_base` captures `base`. In MLIR:
 
 ```mlir
-polang.func @add_base(%x: !polang.int, %base: !polang.int) -> !polang.int
+polang.func @add_base(%x: !polang.integer<64, signed>, %base: !polang.integer<64, signed>) -> !polang.integer<64, signed>
     captures ["base"] {
-  %0 = polang.add %x, %base : !polang.int
-  polang.return %0 : !polang.int
+  %0 = polang.add %x, %base : !polang.integer<64, signed>
+  polang.return %0 : !polang.integer<64, signed>
 }
 ```
 
 At the call site, the captured value is passed as an extra argument:
 
 ```mlir
-%result = polang.call @add_base(%arg, %base_val) : (!polang.int, !polang.int) -> !polang.int
+%result = polang.call @add_base(%arg, %base_val) : (!polang.integer<64, signed>, !polang.integer<64, signed>) -> !polang.integer<64, signed>
 ```
 
 ## Key Types
@@ -540,6 +605,7 @@ At the call site, the captured value is passed as an extra argument:
 |------|----------|-------------|
 | `NBlock` | `node.hpp` | Root AST node containing statements |
 | `std::unique_ptr<NBlock>` | `parser_api.hpp` | Owned pointer returned by `polang_parse()` |
+| `SourceLocation` | `node.hpp` | Source position (line/column) for error reporting |
 | `MLIRCodeGenContext` | `mlir_codegen.hpp` | MLIR code generation context |
 | `Visitor` | `visitor.hpp` | Base class for AST visitors |
 | `ErrorReporter` | `error_reporter.hpp` | Unified error reporting |
@@ -606,7 +672,8 @@ mlir/
 
 ## Related Documentation
 
-- `doc/Syntax.md` - Language syntax reference
-- `doc/TypeSystem.md` - Type system and inference
-- `doc/Building.md` - Build instructions
-- `doc/Testing.md` - Test infrastructure and CI/CD
+- [Syntax.md](Syntax.md) - Language syntax reference
+- [TypeSystem.md](TypeSystem.md) - Type system and inference
+- [PolangDialect.md](PolangDialect.md) - MLIR dialect operations and types
+- [Building.md](Building.md) - Build instructions
+- [Testing.md](Testing.md) - Test infrastructure and CI/CD

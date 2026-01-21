@@ -2,10 +2,10 @@
 
 ; Test function declaration
 ; CHECK:      NBlock
-; CHECK-NEXT: `-NFunctionDeclaration 'add' (a: int, b: int) -> int
+; CHECK-NEXT: `-NFunctionDeclaration 'add' (a: i64, b: i64) -> i64
 ; CHECK-NEXT:   `-NBlock
 ; CHECK-NEXT:     `-NExpressionStatement
 ; CHECK-NEXT:       `-NBinaryOperator '+'
 ; CHECK-NEXT:         |-NIdentifier 'a'
 ; CHECK-NEXT:         `-NIdentifier 'b'
-let add(a: int, b: int): int = a + b
+let add(a: i64, b: i64): i64 = a + b

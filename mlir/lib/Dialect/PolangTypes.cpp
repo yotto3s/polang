@@ -22,6 +22,49 @@ using namespace polang;
 
 #pragma GCC diagnostic pop
 
+//===----------------------------------------------------------------------===//
+// TypeVarType custom print/parse
+//===----------------------------------------------------------------------===//
+
+void TypeVarType::print(AsmPrinter& printer) const {
+  printer << "<" << getId();
+  if (getKind() != TypeVarKind::Any) {
+    printer << ", " << stringifyTypeVarKind(getKind());
+  }
+  printer << ">";
+}
+
+Type TypeVarType::parse(AsmParser& parser) {
+  uint64_t id = 0;
+  TypeVarKind kind = TypeVarKind::Any;
+
+  if (parser.parseLess() || parser.parseInteger(id)) {
+    return {};
+  }
+
+  // Check for optional kind
+  if (succeeded(parser.parseOptionalComma())) {
+    StringRef kindStr;
+    if (parser.parseKeyword(&kindStr)) {
+      return {};
+    }
+    auto maybeKind = symbolizeTypeVarKind(kindStr);
+    if (!maybeKind) {
+      parser.emitError(parser.getCurrentLocation(),
+                       "invalid type variable kind: ")
+          << kindStr;
+      return {};
+    }
+    kind = *maybeKind;
+  }
+
+  if (parser.parseGreater()) {
+    return {};
+  }
+
+  return TypeVarType::get(parser.getContext(), id, kind);
+}
+
 void PolangDialect::registerTypes() {
   addTypes<
 #define GET_TYPEDEF_LIST

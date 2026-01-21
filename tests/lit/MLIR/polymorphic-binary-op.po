@@ -4,7 +4,7 @@
 ; When the same parameter is used multiple times, the type is consistent.
 
 ; Specialized version for int
-; CHECK-DAG: {{.*}}polang.func @double_val$int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+; CHECK-DAG: {{.*}}polang.func @double_val$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 
 ; Original polymorphic function is preserved
 ; CHECK-DAG: {{.*}}polang.func @double_val(%{{.*}}: !polang.typevar{{.*}}) -> !polang.typevar{{.*}} attributes {polang.polymorphic}{{.*}}

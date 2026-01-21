@@ -1,6 +1,6 @@
 ; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
 
 ; Test function argument type mismatch
-; CHECK: {{.*}}argument 1 expects int, got double{{.*}}
-let f(x: int): int = x
+; CHECK: {{.*}}argument 1 expects i64, got f64{{.*}}
+let f(x: i64): i64 = x
 f(3.14)

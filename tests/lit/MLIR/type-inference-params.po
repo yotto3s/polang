@@ -16,8 +16,8 @@ let half(x) = x / 2.0
 let is_zero(x) = x == 0
 
 ; Partially typed function (x is int, y is typevar)
-; CHECK: {{.*}}polang.func @add(%{{.*}}: !polang.int, %{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
-let add(x: int, y) = x + y
+; CHECK: {{.*}}polang.func @add(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
+let add(x: i64, y) = x + y
 
 ; Entry point (required for valid program)
 0

@@ -115,7 +115,8 @@ bool MLIRCodeGenContext::runTypeInference() {
 
   // Add the type inference pass - collects constraints and resolves types
   // for non-polymorphic functions. Polymorphic functions are preserved
-  // with type variables.
+  // with type variables. Also computes resolved arg/return types for calls
+  // to polymorphic functions (stored as attributes for monomorphization).
   pm.addPass(polang::createTypeInferencePass());
 
   // Add the monomorphization pass - creates specialized versions of
@@ -253,6 +254,25 @@ bool MLIRCodeGenContext::runCode(int64_t& result) {
   return true;
 }
 
+namespace {
+
+/// Convert a Polang type to its string representation
+std::string typeToString(Type type) {
+  if (auto intType = dyn_cast<polang::IntegerType>(type)) {
+    std::string prefix = intType.isSigned() ? "i" : "u";
+    return prefix + std::to_string(intType.getWidth());
+  }
+  if (auto floatType = dyn_cast<polang::FloatType>(type)) {
+    return "f" + std::to_string(floatType.getWidth());
+  }
+  if (isa<polang::BoolType>(type)) {
+    return "bool";
+  }
+  return "unknown";
+}
+
+} // namespace
+
 std::string MLIRCodeGenContext::getResolvedReturnType() const {
   if (!module || !*module) {
     return "unknown";
@@ -269,18 +289,7 @@ std::string MLIRCodeGenContext::getResolvedReturnType() const {
     return "void";
   }
 
-  Type returnType = funcType.getResult(0);
-  if (isa<polang::IntType>(returnType)) {
-    return "int";
-  }
-  if (isa<polang::DoubleType>(returnType)) {
-    return "double";
-  }
-  if (isa<polang::BoolType>(returnType)) {
-    return "bool";
-  }
-
-  return "unknown";
+  return typeToString(funcType.getResult(0));
 }
 
 } // namespace polang

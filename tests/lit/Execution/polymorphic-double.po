@@ -1,9 +1,9 @@
 ; RUN: %polang_repl %s | %FileCheck %s
-; CHECK: 6.28 : double
+; CHECK: 6.28 : f64
 
 ; Test function with explicit double type annotation.
 ; Note: Polymorphic functions with double types currently don't print
 ; results due to REPL type detection limitation.
 
-let double_it(x: double) = x + x
+let double_it(x: f64) = x + x
 double_it(3.14)

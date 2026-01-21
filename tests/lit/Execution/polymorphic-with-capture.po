@@ -1,5 +1,5 @@
 ; RUN: %polang_repl %s | %FileCheck %s
-; CHECK: 15 : int
+; CHECK: 15 : i64
 
 ; Test polymorphic function with captured variable execution.
 

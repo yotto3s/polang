@@ -1,0 +1,6 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test float widening (f32 -> f64)
+; CHECK: 3.14{{.*}} : f64
+let x: f32 = 3.14 as f32
+x as f64

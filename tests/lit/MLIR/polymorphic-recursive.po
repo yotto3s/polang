@@ -3,13 +3,13 @@
 ; Test recursive function with type inference via monomorphization.
 
 ; Polymorphic template function
-; CHECK: {{.*}}polang.func @countdown(%{{.*}}: !polang.typevar{{.*}}) -> !polang.int{{.*}}
+; CHECK: {{.*}}polang.func @countdown(%{{.*}}: !polang.typevar{{.*}}) -> !polang.integer<64, signed>{{.*}}
 
 ; Monomorphized version for int parameter
-; CHECK: {{.*}}polang.func @countdown$int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+; CHECK: {{.*}}polang.func @countdown$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 
 ; Verify recursive call in monomorphized version
-; CHECK: {{.*}}polang.call @countdown$int{{.*}}
+; CHECK: {{.*}}polang.call @countdown$i64{{.*}}
 
 let countdown(n) = if n == 0 then 0 else countdown(n - 1)
 countdown(5)

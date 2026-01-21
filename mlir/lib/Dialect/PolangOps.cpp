@@ -203,21 +203,6 @@ LogicalResult ReturnOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// StoreOp verifier
-//===----------------------------------------------------------------------===//
-
-LogicalResult StoreOp::verify() {
-  // Check if the reference comes from an alloca
-  if (auto allocaOp = getRef().getDefiningOp<AllocaOp>()) {
-    if (!allocaOp.getIsMutable()) {
-      return emitOpError("cannot store to immutable variable '")
-             << allocaOp.getName() << "'";
-    }
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // CallOp verifier and SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
@@ -308,6 +293,35 @@ LogicalResult DivOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// CastOp verifier
+//===----------------------------------------------------------------------===//
+
+LogicalResult CastOp::verify() {
+  Type inputType = getInput().getType();
+  Type resultType = getResult().getType();
+
+  // Allow type variables - they will be resolved by type inference pass
+  if (isa<TypeVarType>(inputType) || isa<TypeVarType>(resultType)) {
+    return success();
+  }
+
+  // Both types must be numeric (not bool)
+  const bool inputIsNumeric =
+      isa<polang::IntegerType>(inputType) || isa<polang::FloatType>(inputType);
+  const bool resultIsNumeric = isa<polang::IntegerType>(resultType) ||
+                               isa<polang::FloatType>(resultType);
+
+  if (!inputIsNumeric) {
+    return emitOpError("input type must be numeric, got ") << inputType;
+  }
+  if (!resultIsNumeric) {
+    return emitOpError("result type must be numeric, got ") << resultType;
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // Comparison operation verifier
 //===----------------------------------------------------------------------===//
 
@@ -330,3 +344,86 @@ LogicalResult CmpOp::verify() {
 // element type is the LLVM type (i64), not the Polang type (!polang.int).
 // The Polang type is stored in AllocaOp's elementType attribute, which requires
 // walking to the defining op. MLIRGen already specifies the type explicitly.
+
+//===----------------------------------------------------------------------===//
+// ConstantIntegerOp custom print/parse
+//===----------------------------------------------------------------------===//
+
+void ConstantIntegerOp::print(OpAsmPrinter& p) {
+  // Print just the integer value (without the IntegerAttr's type)
+  p << " " << getValueAttr().getValue();
+  p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"value"});
+  p << " : ";
+  p.printType(getResult().getType());
+}
+
+ParseResult ConstantIntegerOp::parse(OpAsmParser& parser,
+                                     OperationState& result) {
+  APInt value;
+  Type resultType;
+
+  // Parse the raw integer value
+  if (parser.parseInteger(value) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(resultType)) {
+    return failure();
+  }
+
+  // Create the IntegerAttr with the appropriate bit width
+  unsigned width = 64; // Default width for type variables
+  if (auto intType = dyn_cast<polang::IntegerType>(resultType)) {
+    width = intType.getWidth();
+  } else if (!isa<TypeVarType>(resultType)) {
+    return parser.emitError(parser.getNameLoc(),
+                            "expected polang.integer or typevar type");
+  }
+  auto attr = IntegerAttr::get(
+      mlir::IntegerType::get(parser.getContext(), width), value);
+  result.addAttribute("value", attr);
+  result.addTypes(resultType);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ConstantFloatOp custom print/parse
+//===----------------------------------------------------------------------===//
+
+void ConstantFloatOp::print(OpAsmPrinter& p) {
+  // Print the float value
+  p << " ";
+  p.printFloat(getValueAttr().getValue());
+  p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"value"});
+  p << " : ";
+  p.printType(getResult().getType());
+}
+
+ParseResult ConstantFloatOp::parse(OpAsmParser& parser,
+                                   OperationState& result) {
+  double value;
+  Type resultType;
+
+  // Parse the raw float value
+  if (parser.parseFloat(value) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(resultType)) {
+    return failure();
+  }
+
+  // Create the FloatAttr with the appropriate type
+  mlir::Type attrType =
+      Float64Type::get(parser.getContext()); // Default for type vars
+  if (auto floatType = dyn_cast<polang::FloatType>(resultType)) {
+    if (floatType.getWidth() == 32) {
+      attrType = Float32Type::get(parser.getContext());
+    } else {
+      attrType = Float64Type::get(parser.getContext());
+    }
+  } else if (!isa<TypeVarType>(resultType)) {
+    return parser.emitError(parser.getNameLoc(),
+                            "expected polang.float or typevar type");
+  }
+  auto attr = FloatAttr::get(attrType, value);
+  result.addAttribute("value", attr);
+  result.addTypes(resultType);
+  return success();
+}

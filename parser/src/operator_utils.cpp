@@ -1,32 +1,32 @@
 // clang-format off
 #include "parser/operator_utils.hpp"
 #include "parser/node.hpp"
-#include "parser.hpp" // Must be after node.hpp for bison union types
+#include "parser.hpp" // Must be after node.hpp for bison token types
 // clang-format on
 
 namespace polang {
 
 std::string operatorToString(int op) noexcept {
   switch (op) {
-  case TPLUS:
+  case yy::parser::token::TPLUS:
     return "+";
-  case TMINUS:
+  case yy::parser::token::TMINUS:
     return "-";
-  case TMUL:
+  case yy::parser::token::TMUL:
     return "*";
-  case TDIV:
+  case yy::parser::token::TDIV:
     return "/";
-  case TCEQ:
+  case yy::parser::token::TCEQ:
     return "==";
-  case TCNE:
+  case yy::parser::token::TCNE:
     return "!=";
-  case TCLT:
+  case yy::parser::token::TCLT:
     return "<";
-  case TCLE:
+  case yy::parser::token::TCLE:
     return "<=";
-  case TCGT:
+  case yy::parser::token::TCGT:
     return ">";
-  case TCGE:
+  case yy::parser::token::TCGE:
     return ">=";
   default:
     return "?";
@@ -34,12 +34,14 @@ std::string operatorToString(int op) noexcept {
 }
 
 bool isArithmeticOperator(int op) noexcept {
-  return op == TPLUS || op == TMINUS || op == TMUL || op == TDIV;
+  return op == yy::parser::token::TPLUS || op == yy::parser::token::TMINUS ||
+         op == yy::parser::token::TMUL || op == yy::parser::token::TDIV;
 }
 
 bool isComparisonOperator(int op) noexcept {
-  return op == TCEQ || op == TCNE || op == TCLT || op == TCLE || op == TCGT ||
-         op == TCGE;
+  return op == yy::parser::token::TCEQ || op == yy::parser::token::TCNE ||
+         op == yy::parser::token::TCLT || op == yy::parser::token::TCLE ||
+         op == yy::parser::token::TCGT || op == yy::parser::token::TCGE;
 }
 
 } // namespace polang

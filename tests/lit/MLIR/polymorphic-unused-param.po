@@ -5,10 +5,10 @@
 ; Monomorphization creates a specialized version.
 
 ; The specialized function with concrete int type
-; CHECK-DAG: {{.*}}polang.func @unused$int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+; CHECK-DAG: {{.*}}polang.func @unused$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 
 ; The original polymorphic function is marked
-; CHECK-DAG: {{.*}}polang.func @unused(%{{.*}}: !polang.typevar{{.*}}) -> !polang.int{{.*}} attributes {polang.polymorphic}{{.*}}
+; CHECK-DAG: {{.*}}polang.func @unused(%{{.*}}: !polang.typevar{{.*}}) -> !polang.integer<64, signed>{{.*}} attributes {polang.polymorphic}{{.*}}
 
 let unused(x) = 42
 

@@ -1,5 +1,5 @@
 ; RUN: %polang_repl %s | %FileCheck %s
-; CHECK: 3 : int
+; CHECK: 3 : i64
 
 let add(x, y) = x + y
 add(1, 2)

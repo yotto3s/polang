@@ -2,13 +2,13 @@
 
 ; Test polymorphic identity function with type inference and monomorphization.
 ; The identity function has no type annotations, so it uses type variables.
-; Monomorphization creates a specialized version (identity$int) for the call site.
+; Monomorphization creates a specialized version (identity$i64) for the call site.
 
 ; The entry function calls the specialized version
-; CHECK-DAG: {{.*}}polang.func @__polang_entry() -> !polang.int{{.*}}
+; CHECK-DAG: {{.*}}polang.func @__polang_entry() -> !polang.integer<64, signed>{{.*}}
 
-; The specialized identity function with concrete int types
-; CHECK-DAG: {{.*}}polang.func @identity$int(%{{.*}}: !polang.int) -> !polang.int{{.*}}
+; The specialized identity function with concrete types
+; CHECK-DAG: {{.*}}polang.func @identity$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 
 ; The original polymorphic identity function is marked as polymorphic
 ; CHECK-DAG: {{.*}}polang.func @identity(%{{.*}}: !polang.typevar{{.*}}) -> !polang.typevar{{.*}} attributes {polang.polymorphic}{{.*}}

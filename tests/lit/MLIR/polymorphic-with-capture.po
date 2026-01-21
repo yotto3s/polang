@@ -5,13 +5,13 @@
 ; Type is inferred via monomorphization at call site.
 
 ; Polymorphic template function with captured base
-; CHECK: {{.*}}polang.func @add_base(%{{.*}}: !polang.typevar{{.*}}, %{{.*}}: !polang.int){{.*}}
+; CHECK: {{.*}}polang.func @add_base(%{{.*}}: !polang.typevar{{.*}}, %{{.*}}: !polang.integer<64, signed>){{.*}}
 
 ; Monomorphized version for int parameter
-; CHECK: {{.*}}polang.func @add_base$int_int(%{{.*}}: !polang.int, %{{.*}}: !polang.int) -> !polang.int{{.*}}
+; CHECK: {{.*}}polang.func @add_base$i64_i64(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 
 ; Verify add operation in monomorphized version
-; CHECK: {{.*}}polang.add{{.*}}!polang.int, !polang.int{{.*}}
+; CHECK: {{.*}}polang.add{{.*}}!polang.integer<64, signed>, !polang.integer<64, signed>{{.*}}
 
 let base = 10
 let add_base(x) = x + base

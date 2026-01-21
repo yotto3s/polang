@@ -6,6 +6,12 @@ This document describes the Polang type system, including type inference and pol
 
 - [Overview](#overview)
 - [Primitive Types](#primitive-types)
+- [Type Conversions](#type-conversions)
+  - [Conversion Syntax](#conversion-syntax)
+  - [Allowed Conversions](#allowed-conversions)
+  - [Conversion Semantics](#conversion-semantics)
+  - [Literal Type Inference](#literal-type-inference)
+  - [Boolean Conversions](#boolean-conversions)
 - [Type Inference](#type-inference)
   - [Local Type Inference](#local-type-inference)
   - [If-Expression Type Inference](#if-expression-type-inference)
@@ -25,7 +31,7 @@ Polang uses a Hindley-Milner style type system with:
 - **Static typing**: All types are determined at compile time
 - **Type inference**: Types can be inferred from context, reducing annotation burden
 - **Polymorphic functions**: Functions can work with multiple types via type variables
-- **No implicit conversions**: Types must match exactly (e.g., `int` and `double` are distinct)
+- **Explicit conversions only**: No implicit type coercions; use `as` for numeric conversions
 
 The type system is implemented in two phases:
 
@@ -34,12 +40,32 @@ The type system is implemented in two phases:
 
 ## Primitive Types
 
-Polang supports three primitive types:
+Polang supports a variety of numeric types with explicit width and signedness, plus a boolean type:
+
+### Integer Types
 
 | Type | Description | Size | MLIR Type | LLVM Type |
 |------|-------------|------|-----------|-----------|
-| `int` | Signed integer | 64-bit | `!polang.int` | `i64` |
-| `double` | Floating-point | 64-bit | `!polang.double` | `f64` |
+| `i8` | Signed 8-bit integer | 8-bit | `!polang.integer<8, signed>` | `i8` |
+| `i16` | Signed 16-bit integer | 16-bit | `!polang.integer<16, signed>` | `i16` |
+| `i32` | Signed 32-bit integer | 32-bit | `!polang.integer<32, signed>` | `i32` |
+| `i64` | Signed 64-bit integer | 64-bit | `!polang.integer<64, signed>` | `i64` |
+| `u8` | Unsigned 8-bit integer | 8-bit | `!polang.integer<8, unsigned>` | `i8` |
+| `u16` | Unsigned 16-bit integer | 16-bit | `!polang.integer<16, unsigned>` | `i16` |
+| `u32` | Unsigned 32-bit integer | 32-bit | `!polang.integer<32, unsigned>` | `i32` |
+| `u64` | Unsigned 64-bit integer | 64-bit | `!polang.integer<64, unsigned>` | `i64` |
+
+### Floating-Point Types
+
+| Type | Description | Size | MLIR Type | LLVM Type |
+|------|-------------|------|-----------|-----------|
+| `f32` | Single-precision float | 32-bit | `!polang.float<32>` | `f32` |
+| `f64` | Double-precision float | 64-bit | `!polang.float<64>` | `f64` |
+
+### Boolean Type
+
+| Type | Description | Size | MLIR Type | LLVM Type |
+|------|-------------|------|-----------|-----------|
 | `bool` | Boolean | 1-bit | `!polang.bool` | `i1` |
 
 ### Type Constants
@@ -48,14 +74,245 @@ Type names are defined as compile-time constants in `parser/include/parser/polan
 
 ```cpp
 struct TypeNames {
-  static constexpr const char* INT = "int";
-  static constexpr const char* DOUBLE = "double";
+  // Signed integers
+  static constexpr const char* I8 = "i8";
+  static constexpr const char* I16 = "i16";
+  static constexpr const char* I32 = "i32";
+  static constexpr const char* I64 = "i64";
+
+  // Unsigned integers
+  static constexpr const char* U8 = "u8";
+  static constexpr const char* U16 = "u16";
+  static constexpr const char* U32 = "u32";
+  static constexpr const char* U64 = "u64";
+
+  // Floating-point
+  static constexpr const char* F32 = "f32";
+  static constexpr const char* F64 = "f64";
+
+  // Other types
   static constexpr const char* BOOL = "bool";
   static constexpr const char* FUNCTION = "function";
   static constexpr const char* TYPEVAR = "typevar";
   static constexpr const char* UNKNOWN = "unknown";
 };
 ```
+
+### Literal Type Defaults
+
+When type inference encounters a numeric literal without explicit type context, it defaults to:
+
+- **Integer literals** → `i64` (signed 64-bit)
+- **Float literals** → `f64` (64-bit double precision)
+
+This means `42` has type `i64` and `3.14` has type `f64` by default.
+
+## Type Conversions
+
+Polang supports explicit type conversions between numeric types using the `as` keyword. All conversions must be explicit; there are no implicit type coercions.
+
+### Conversion Syntax
+
+The `as` keyword converts a value from one numeric type to another:
+
+```polang
+expression as TargetType
+```
+
+**Examples:**
+
+```polang
+let a: i32 = 1000
+let b: i64 = a as i64       ; widen i32 to i64
+let c: i8 = a as i8         ; narrow i32 to i8 (truncates)
+let d: f64 = a as f64       ; convert integer to float
+let e: i32 = 3.14 as i32    ; convert float to integer (truncates toward zero)
+```
+
+### Operator Precedence
+
+The `as` operator has higher precedence than arithmetic operators but lower precedence than unary operators:
+
+| Precedence | Operators |
+|------------|-----------|
+| Highest | Parentheses, function calls |
+| | Unary `-`, `!` |
+| | **`as` (type conversion)** |
+| | `*`, `/`, `%` |
+| | `+`, `-` |
+| | `<`, `>`, `<=`, `>=`, `==`, `!=` |
+| | `&&` |
+| Lowest | `\|\|` |
+
+**Precedence examples:**
+
+```polang
+a + b as i32        ; means: a + (b as i32)
+-x as i32           ; means: (-x) as i32
+a * b as f64 + c    ; means: (a * (b as f64)) + c
+(a + b) as i32      ; parentheses override precedence
+```
+
+### Allowed Conversions
+
+Only numeric-to-numeric conversions are permitted:
+
+| From Type | To Type | Allowed |
+|-----------|---------|---------|
+| Any integer (`i8`-`i64`, `u8`-`u64`) | Any integer | ✓ |
+| Any integer | Any float (`f32`, `f64`) | ✓ |
+| Any float | Any integer | ✓ |
+| Any float | Any float | ✓ |
+| `bool` | Any type | ✗ |
+| Any type | `bool` | ✗ |
+
+**Type error examples:**
+
+```polang
+let x: i32 = true as i32    ; Error: cannot convert bool to i32
+let b: bool = 1 as bool     ; Error: cannot convert i32 to bool
+```
+
+### Conversion Semantics
+
+#### Integer Widening
+
+Converting to a larger integer type preserves the value exactly:
+
+| Conversion | Operation | Example |
+|------------|-----------|---------|
+| Signed → Larger signed | Sign-extend | `(-1i8) as i64` → `-1i64` |
+| Unsigned → Larger unsigned | Zero-extend | `255u8 as u64` → `255u64` |
+| Unsigned → Larger signed | Zero-extend | `255u8 as i64` → `255i64` |
+| Signed → Larger unsigned | Sign-extend then reinterpret | `(-1i8) as u64` → `18446744073709551615u64` |
+
+#### Integer Narrowing
+
+Converting to a smaller integer type truncates the value, keeping only the low-order bits (wrap-around behavior):
+
+```polang
+let a: i32 = 256
+let b: i8 = a as i8          ; b = 0 (256 mod 256)
+
+let c: i32 = 257
+let d: i8 = c as i8          ; d = 1 (257 mod 256)
+
+let e: i32 = -1
+let f: u8 = e as u8          ; f = 255 (bit pattern preserved)
+```
+
+#### Sign Reinterpretation
+
+Converting between signed and unsigned types of the same width reinterprets the bit pattern:
+
+```polang
+let a: i32 = -1
+let b: u32 = a as u32        ; b = 4294967295 (same bits, different interpretation)
+
+let c: u32 = 4294967295
+let d: i32 = c as i32        ; d = -1
+```
+
+#### Float Widening
+
+Converting `f32` to `f64` is always exact with no precision loss:
+
+```polang
+let a: f32 = 3.14
+let b: f64 = a as f64        ; exact conversion
+```
+
+#### Float Narrowing
+
+Converting `f64` to `f32` rounds to the nearest representable value (IEEE 754 round-to-nearest, ties-to-even):
+
+```polang
+let a: f64 = 3.141592653589793
+let b: f32 = a as f32        ; rounded to f32 precision
+```
+
+Very large `f64` values may overflow to `±infinity` when converted to `f32`.
+
+#### Integer to Float
+
+Integer values are converted to the nearest representable floating-point value:
+
+```polang
+let a: i64 = 42
+let b: f64 = a as f64        ; b = 42.0
+
+let c: i64 = 9007199254740993   ; larger than f64 can represent exactly
+let d: f64 = c as f64           ; may lose precision
+```
+
+Note: `f64` has 53 bits of mantissa precision, so `i64` values larger than 2^53 may not be exactly representable.
+
+#### Float to Integer
+
+Float-to-integer conversion uses **saturating truncation toward zero**:
+
+1. **Truncation**: The fractional part is discarded, rounding toward zero
+2. **Saturation**: Values outside the target range are clamped to the minimum or maximum
+3. **NaN handling**: `NaN` converts to `0`
+
+```polang
+; Truncation toward zero
+let a: i32 = 3.7 as i32      ; a = 3
+let b: i32 = -3.7 as i32     ; b = -3
+
+; Saturation at bounds
+let c: i8 = 1000.0 as i8     ; c = 127 (i8 max)
+let d: i8 = -1000.0 as i8    ; d = -128 (i8 min)
+let e: u8 = -1.0 as u8       ; e = 0 (u8 min, since negative)
+let f: u8 = 1000.0 as u8     ; f = 255 (u8 max)
+
+; Infinity handling
+let g: i32 = (1.0 / 0.0) as i32   ; g = 2147483647 (i32 max)
+let h: i32 = (-1.0 / 0.0) as i32  ; h = -2147483648 (i32 min)
+
+; NaN handling
+let i: i32 = (0.0 / 0.0) as i32   ; i = 0
+```
+
+### Literal Type Inference
+
+Numeric literals adapt to their declared type context when the value fits:
+
+```polang
+let a: i8 = 42               ; OK: 42 fits in i8, literal is i8
+let b: i16 = 1000            ; OK: 1000 fits in i16, literal is i16
+let c: f32 = 3.14            ; OK: literal becomes f32
+let d: u8 = 200              ; OK: 200 fits in u8
+```
+
+**Compile-time error** if the literal value doesn't fit in the target type:
+
+```polang
+let x: i8 = 1000             ; Error: 1000 doesn't fit in i8 (-128 to 127)
+let y: u8 = 256              ; Error: 256 doesn't fit in u8 (0 to 255)
+let z: u8 = -1               ; Error: -1 doesn't fit in u8 (unsigned)
+```
+
+When no type context is available, literals default to `i64` (integers) or `f64` (floats):
+
+```polang
+let a = 42                   ; a: i64
+let b = 3.14                 ; b: f64
+```
+
+### Boolean Conversions
+
+Boolean values cannot be converted to or from numeric types using `as`. Use explicit expressions instead:
+
+```polang
+; Instead of: x as bool (not allowed)
+let is_nonzero: bool = x != 0
+
+; Instead of: b as i32 (not allowed)
+let int_value: i32 = if b then 1 else 0
+```
+
+This design ensures that boolean semantics are always explicit in the code.
 
 ## Type Inference
 
@@ -67,7 +324,7 @@ The parser's type checker (`parser/src/type_checker.cpp`) focuses on **error det
 
 | Responsibility | Description |
 |----------------|-------------|
-| Error detection | Undefined variables, immutable reassignment, arity mismatch |
+| Error detection | Undefined variables, arity mismatch |
 | Type validation | Validates explicit type annotations match usage |
 | Capture analysis | Identifies free variables for closures via `FreeVariableCollector` |
 | Type variable setup | Marks untyped parameters as `typevar` for MLIR inference |
@@ -166,26 +423,48 @@ In the parser, type variables are represented as the string `"typevar"`:
 mutable_arg.type = new NIdentifier(TypeNames::TYPEVAR);
 ```
 
-In MLIR, type variables are parameterized types with unique IDs:
+In MLIR, type variables are parameterized types with unique IDs and a **kind** that constrains what types they can resolve to:
 
 ```mlir
-!polang.typevar<0>   ; First type variable
-!polang.typevar<1>   ; Second type variable
+!polang.typevar<0, Any>      ; Can be any type
+!polang.typevar<1, Integer>  ; Must resolve to an integer type
+!polang.typevar<2, Float>    ; Must resolve to a float type
 ```
+
+### Type Variable Kinds
+
+Type variables have a **kind** that constrains their resolution:
+
+| Kind | Description | Default Resolution |
+|------|-------------|-------------------|
+| `Any` | No constraint, can be any type | `i64` (if no other info) |
+| `Integer` | Must be an integer type (i8-i64, u8-u64) | `i64` |
+| `Float` | Must be a float type (f32, f64) | `f64` |
+
+The kind is inferred from usage:
+- Integer literals (e.g., `42`) create `Integer`-kind constraints
+- Float literals (e.g., `3.14`) create `Float`-kind constraints
+- Operations on type variables propagate kind constraints
 
 ### Definition
 
 Type variables are defined in `mlir/include/polang/Dialect/PolangTypes.td`:
 
 ```tablegen
+def Polang_TypeVarKind : I32EnumAttr<"TypeVarKind", "Type variable kind", [
+  I32EnumAttrCase<"Any", 0>,
+  I32EnumAttrCase<"Integer", 1>,
+  I32EnumAttrCase<"Float", 2>
+]>;
+
 def Polang_TypeVarType : Polang_Type<"TypeVar", "typevar"> {
   let summary = "Type variable for polymorphic types";
   let description = [{
     Represents an unresolved type variable used during type inference.
-    The parameter is a unique identifier for the type variable.
+    The id is a unique identifier, and kind constrains resolution.
   }];
-  let parameters = (ins "uint64_t":$id);
-  let assemblyFormat = "`<` $id `>`";
+  let parameters = (ins "uint64_t":$id, "TypeVarKind":$kind);
+  let assemblyFormat = "`<` $id `,` $kind `>`";
 }
 ```
 
@@ -330,7 +609,7 @@ mlir/
 
 2. Type checker runs (type_checker.cpp)
    ├── Validates explicit type annotations
-   ├── Detects errors (undefined vars, mutability, arity)
+   ├── Detects errors (undefined vars, arity)
    ├── Performs capture analysis (FreeVariableCollector)
    └── Marks untyped parameters as TYPEVAR
 
@@ -378,16 +657,16 @@ LogicalResult ReturnOp::verify() {
 ### Example 1: Simple Type Inference
 
 ```polang
-let add(x: int, y) = x + y
+let add(x: i64, y) = x + y
 add(1, 2)
 ```
 
 **Inference:**
-- `x` is explicitly `int`
+- `x` is explicitly `i64`
 - `y` is marked as `typevar` by the parser
-- MLIR unifies `y` with `int` (from `x + y` where `x: int`)
-- Return type inferred as `int` (result of `+`)
-- Monomorphization creates `add$int_int`
+- MLIR unifies `y` with `i64` (from `x + y` where `x: i64`)
+- Return type inferred as `i64` (result of `+`)
+- Monomorphization creates `add$i64_i64`
 
 ### Example 2: Polymorphic Identity
 
@@ -397,11 +676,11 @@ identity(42)
 ```
 
 **Inference:**
-- `x` has no local constraints → assigned `typevar<0>`
-- Return type depends on `x` → assigned `typevar<1>`
-- Call `identity(42)` constrains `typevar<0>` to `int`
-- Unification: `typevar<1>` = `typevar<0>` = `int`
-- Final type: `identity: (int) -> int`
+- `x` has no local constraints → assigned `typevar<0, Any>`
+- Return type depends on `x` → assigned `typevar<1, Any>`
+- Call `identity(42)` constrains `typevar<0>` to `i64` (integer literal default)
+- Unification: `typevar<1>` = `typevar<0>` = `i64`
+- Final type: `identity$i64: (i64) -> i64`
 
 ### Example 3: Multiple Parameters
 
@@ -412,8 +691,8 @@ first(1, 2.0)
 
 **Inference:**
 - `x` and `y` both get type variables
-- Call site: `x` constrained to `int`, `y` constrained to `double`
-- Final type: `first: (int, double) -> int`
+- Call site: `x` constrained to `i64` (integer literal), `y` constrained to `f64` (float literal)
+- Final type: `first$i64_f64: (i64, f64) -> i64`
 
 ### Example 4: Inference from Operations
 
@@ -424,9 +703,22 @@ is_positive(5)
 
 **Inference:**
 - `x` marked as `typevar` by parser
-- MLIR unifies `x` with `int` (from `x > 0` where `0` is `int`)
+- MLIR unifies `x` with `Integer`-kind from `x > 0` where `0` is an integer literal
+- At call site, `5` is an integer literal → resolves to `i64`
 - Return type is `bool` (result of comparison)
-- Final type: `is_positive$int: (int) -> bool`
+- Final type: `is_positive$i64: (i64) -> bool`
+
+### Example 5: Float Type Inference
+
+```polang
+let add(x, y) = x + y
+add(1.5, 2.0)
+```
+
+**Inference:**
+- `x` and `y` get type variables with `Float` kind (from float literals at call site)
+- Float-kind type variables default to `f64`
+- Final type: `add$f64_f64: (f64, f64) -> f64`
 
 ## Monomorphization
 
@@ -444,17 +736,17 @@ Polymorphic functions are specialized (monomorphized) for each unique set of arg
 
 ```polang
 let identity(x) = x
-identity(42)     ; Creates identity$int
+identity(42)     ; Creates identity$i64
 identity(true)   ; Creates identity$bool
 ```
 
 **Generated MLIR:**
 
 ```mlir
-polang.func @identity(%arg0: !polang.typevar<0>) -> !polang.typevar<1>
+polang.func @identity(%arg0: !polang.typevar<0, Any>) -> !polang.typevar<1, Any>
     attributes {polang.polymorphic} { ... }
 
-polang.func @identity$int(%arg0: !polang.int) -> !polang.int { ... }
+polang.func @identity$i64(%arg0: !polang.integer<64, signed>) -> !polang.integer<64, signed> { ... }
 
 polang.func @identity$bool(%arg0: !polang.bool) -> !polang.bool { ... }
 ```
@@ -470,13 +762,35 @@ let unused(x) = x  ; Kept with polang.polymorphic attribute
 
 ## Error Handling
 
+Error messages include source location information (line and column) to help identify where problems occur.
+
+### Error Message Format
+
+Type checker errors use the format:
+```
+Type error: <message> at line <line>, column <column>
+```
+
+MLIR-level errors use MLIR's location format:
+```
+loc("<source>":line:column): error: <message>
+```
+
 ### Type Mismatch Errors
 
 When types cannot be unified, the compiler reports an error:
 
 ```polang
-let f(x: int) = x
-f(3.14)  ; Error: argument 1 expects int, got double
+let f(x: i64) = x
+f(3.14)  ; Type error: argument 1 expects i64, got f64 at line 2, column 1
+```
+
+### Undeclared Variable Errors
+
+References to undefined variables report the location of the reference:
+
+```polang
+x + 1  ; Type error: Undeclared variable: x at line 1, column 1
 ```
 
 ### Unresolved Type Variables
