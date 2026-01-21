@@ -24,7 +24,7 @@ namespace polang {
 /// Provides a centralized place for all type conversion logic.
 class PolangTypeConverter {
 public:
-  explicit PolangTypeConverter(mlir::MLIRContext* context);
+  explicit PolangTypeConverter(mlir::MLIRContext* ctx);
 
   /// Generate a fresh type variable with optional kind constraint.
   [[nodiscard]] mlir::Type freshTypeVar(TypeVarKind kind = TypeVarKind::Any);

@@ -58,8 +58,9 @@ makeTypeSpec(const std::string& typeName) {
 class MLIRGenVisitor : public Visitor {
 public:
   MLIRGenVisitor(MLIRContext& context, bool /*emitTypeVars*/ = false,
-                 const std::string& filename = "<source>")
-      : builder(&context), typeConverter(&context), sourceFilename(filename) {
+                 std::string filename = "<source>")
+      : builder(&context), typeConverter(&context),
+        sourceFilename(std::move(filename)) {
     // Create a new module
     module = ModuleOp::create(builder.getUnknownLoc());
   }

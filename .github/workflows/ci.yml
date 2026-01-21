@@ -105,6 +105,9 @@ jobs:
       - name: Configure
         run: cmake --preset lint
 
+      - name: Build
+        run: cmake --build --preset lint
+
       - name: Run clang-tidy
         run: ./scripts/run-clang-tidy.sh build/lint
 

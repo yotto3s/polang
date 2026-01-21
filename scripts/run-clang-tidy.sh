@@ -2,7 +2,7 @@
 # Run clang-tidy on the Polang codebase
 # Usage: ./scripts/run-clang-tidy.sh [build_dir] [--fix] [files...]
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -66,7 +66,7 @@ fi
 # Run clang-tidy in parallel
 echo "Running clang-tidy on ${#FILES[@]} files..."
 printf '%s\n' "${FILES[@]}" | xargs -P"$(nproc)" -I{} \
-    clang-tidy -p "$TEMP_BUILD_DIR" $FIX_FLAG {} 2>&1 | \
+    clang-tidy -p "$TEMP_BUILD_DIR" $FIX_FLAG --warnings-as-errors='*' {} 2>&1 | \
     grep -v "warnings generated" | \
     grep -v "Suppressed" | \
     grep -v "Use -header-filter" || true
