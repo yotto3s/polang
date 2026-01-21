@@ -268,8 +268,9 @@ void TypeChecker::visit(const NMethodCall& node) {
     }
   }
 
-  if (functionReturnTypes.find(funcName) != functionReturnTypes.end()) {
-    inferredType = functionReturnTypes[funcName];
+  const auto funcReturnIt = functionReturnTypes.find(funcName);
+  if (funcReturnIt != functionReturnTypes.end()) {
+    inferredType = funcReturnIt->second;
   } else {
     inferredType = TypeNames::I64;
   }
@@ -454,12 +455,17 @@ void TypeChecker::typeCheckLetBindings(
         std::string varType;
         bool found = false;
 
-        if (savedLocals.find(varName) != savedLocals.end()) {
-          varType = savedLocals.at(varName);
+        // Cache iterator to avoid repeated lookups
+        auto localIt = savedLocals.find(varName);
+        if (localIt != savedLocals.end()) {
+          varType = localIt->second;
           found = true;
-        } else if (siblingTypes.find(varName) != siblingTypes.end()) {
-          varType = siblingTypes.at(varName);
-          found = true;
+        } else {
+          auto siblingIt = siblingTypes.find(varName);
+          if (siblingIt != siblingTypes.end()) {
+            varType = siblingIt->second;
+            found = true;
+          }
         }
 
         if (found) {
