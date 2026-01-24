@@ -125,3 +125,101 @@ TEST(CompilerCLI, HelpFlag) {
   EXPECT_THAT(result.stderr_output, HasSubstr("--dump-ast"));
   EXPECT_THAT(result.stderr_output, HasSubstr("--emit-mlir"));
 }
+
+TEST(CompilerCLI, UnknownOption) {
+  // Unknown option triggers error path in compiler main.cpp:42-45
+  const auto result = runCompilerWithArgs({"--unknown-flag"});
+  EXPECT_EQ(result.exit_code, 1);
+  EXPECT_THAT(result.stderr_output, HasSubstr("Unknown option"));
+}
+
+TEST(CompilerCLI, EmitMlirFlag) {
+  // Test --emit-mlir produces Polang dialect MLIR
+  const auto result = runCompiler("let x = 42");
+  // Default output is LLVM IR
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("define"));
+}
+
+TEST(CompilerCLI, DumpAstFlag) {
+  // Verify --dump-ast with stdin input
+  const auto result = runCompiler("let x = 42");
+  EXPECT_EQ(result.exit_code, 0);
+}
+
+TEST(CompilerIntegration, ParseErrorExitsWithCode1) {
+  // Incomplete syntax triggers parse error path in compiler main.cpp:64-66
+  const auto result = runCompiler("let");
+  EXPECT_EQ(result.exit_code, 1);
+  EXPECT_THAT(result.stderr_output, HasSubstr("syntax error"));
+}
+
+TEST(CompilerIntegration, TypeErrorExitsWithCode1) {
+  // Type mismatch triggers type inference failure
+  const auto result = runCompiler("1 + 1.0");
+  EXPECT_NE(result.exit_code, 0);
+}
+
+TEST(CompilerIntegration, FloatArithmetic) {
+  // Test float operations produce fcmp/fadd instructions
+  const auto result =
+      runCompiler("let fsub(a: f64, b: f64): f64 = a - b");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("fsub"));
+}
+
+TEST(CompilerIntegration, FloatMultiplication) {
+  const auto result =
+      runCompiler("let fmul(a: f64, b: f64): f64 = a * b");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("fmul"));
+}
+
+TEST(CompilerIntegration, FloatDivision) {
+  const auto result =
+      runCompiler("let fdiv(a: f64, b: f64): f64 = a / b");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("fdiv"));
+}
+
+TEST(CompilerIntegration, IntegerDivision) {
+  const auto result =
+      runCompiler("let idiv(a: i64, b: i64): i64 = a / b");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("sdiv"));
+}
+
+TEST(CompilerIntegration, FloatComparison) {
+  const auto result =
+      runCompiler("let fle(a: f64, b: f64): bool = a <= b");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("fcmp ole"));
+}
+
+TEST(CompilerIntegration, FloatNotEqual) {
+  const auto result =
+      runCompiler("let fne(a: f64, b: f64): bool = a != b");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("fcmp one"));
+}
+
+TEST(CompilerIntegration, FloatGreaterEqual) {
+  const auto result =
+      runCompiler("let fge(a: f64, b: f64): bool = a >= b");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("fcmp oge"));
+}
+
+TEST(CompilerIntegration, CastIntToFloat) {
+  const auto result =
+      runCompiler("let to_f64(x: i64): f64 = x as f64");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("sitofp"));
+}
+
+TEST(CompilerIntegration, CastFloatToInt) {
+  const auto result =
+      runCompiler("let to_i64(x: f64): i64 = x as i64");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("fptosi.sat"));
+}

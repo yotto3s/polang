@@ -135,3 +135,79 @@ TEST(ReplIntegration, ClosureMultipleSiblings) {
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("3 : i64"));
 }
+
+// ============== Error Path Tests ==============
+// These tests verify error handling in repl_session.cpp
+
+TEST(ReplIntegration, ParseErrorReturnsFailure) {
+  // Incomplete syntax triggers parse error in repl_session.cpp:47-48
+  const auto result = runRepl("let");
+  EXPECT_NE(result.exit_code, 0);
+  EXPECT_THAT(result.stderr_output, HasSubstr("syntax error"));
+}
+
+TEST(ReplIntegration, TypeMismatchError) {
+  // Type mismatch triggers type check error path in repl_session.cpp:65-76
+  const auto result = runRepl("1 + 1.0");
+  EXPECT_NE(result.exit_code, 0);
+  EXPECT_THAT(result.stderr_output, HasSubstr("Type error"));
+}
+
+TEST(ReplIntegration, UndeclaredVariableError) {
+  // Undeclared variable triggers type check error with rollback
+  const auto result = runRepl("x + 1");
+  EXPECT_NE(result.exit_code, 0);
+  EXPECT_THAT(result.stderr_output, HasSubstr("Undeclared variable"));
+}
+
+TEST(ReplIntegration, TypeErrorAfterValidDeclaration) {
+  // First line succeeds (declaration), second line has type error
+  // This exercises the rollback path: accumulatedAst->statements.resize()
+  const auto result = runRepl("let x = 42\nx + 1.0");
+  EXPECT_NE(result.exit_code, 0);
+  EXPECT_THAT(result.stderr_output, HasSubstr("Type error"));
+}
+
+TEST(ReplIntegration, DeclarationDoesNotPrintValue) {
+  // A declaration (not expression) should not print a value
+  // This exercises the lastIsExpression=false path in repl_session.cpp:80-89
+  const auto result = runRepl("let x = 42");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_TRUE(result.stdout_output.empty());
+}
+
+TEST(ReplIntegration, FunctionArityMismatch) {
+  // Wrong number of arguments triggers type error
+  const auto result = runRepl("let f(x: i64): i64 = x\nf(1, 2)");
+  EXPECT_NE(result.exit_code, 0);
+  EXPECT_THAT(result.stderr_output, HasSubstr("argument"));
+}
+
+TEST(ReplIntegration, FloatResultDisplay) {
+  // Tests the float type detection in repl main.cpp printResult
+  const auto result = runRepl("3.14 + 1.0");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("4.14"));
+  EXPECT_THAT(result.stdout_output, HasSubstr("f64"));
+}
+
+TEST(ReplIntegration, BoolResultDisplay) {
+  // Tests the bool type detection in repl main.cpp printResult
+  const auto result = runRepl("1 < 2");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("true : bool"));
+}
+
+TEST(ReplIntegration, BoolFalseDisplay) {
+  const auto result = runRepl("2 < 1");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("false : bool"));
+}
+
+TEST(ReplIntegration, MultipleEvaluationsLastPrints) {
+  // Multiple expressions - only the last one is printed in file mode
+  // In stdin mode, each is printed separately
+  const auto result = runRepl("1 + 1\n2 + 2\n3 + 3");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("6 : i64"));
+}

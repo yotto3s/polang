@@ -44,12 +44,12 @@ Unit tests for the lexer, parser, and type checker.
 
 ### Compiler Tests (`tests/compiler/`)
 
-Integration tests for the LLVM IR code generation.
+Integration tests for the LLVM IR code generation and MLIR verifier unit tests.
 
-| Test | Description |
-|------|-------------|
-| `CompilerIntegration.*` | End-to-end compilation tests |
-| `CompilerCLI.HelpFlag` | CLI `--help` flag test |
+| Test File | Description |
+|-----------|-------------|
+| `compiler_test.cpp` | End-to-end compilation, CLI flags, float/cast ops |
+| `mlir_verifier_test.cpp` | MLIR verifier error paths (programmatic MLIR construction) |
 
 ### REPL Tests (`tests/repl/`)
 
@@ -65,12 +65,12 @@ FileCheck-based tests organized by output type:
 | Directory | Count | Description |
 |-----------|-------|-------------|
 | `AST/` | 19 | AST dump verification (`--dump-ast`) |
-| `MLIR/` | 31 | Polang dialect MLIR output (`--emit-mlir`) |
-| `LLVMIR/` | 13 | LLVM IR generation |
-| `Execution/` | 28 | REPL execution results |
-| `Errors/` | 13 | Error message verification |
+| `MLIR/` | 32 | Polang dialect MLIR output (`--emit-mlir`) |
+| `LLVMIR/` | 16 | LLVM IR generation |
+| `Execution/` | 36 | REPL execution results |
+| `Errors/` | 16 | Error message verification |
 
-**Total: 104 lit tests**
+**Total: 119 lit tests**
 
 ## Writing Lit Tests
 
@@ -172,8 +172,8 @@ The HTML report is generated at `build/coverage_html/index.html`.
 
 ### Current Coverage
 
-- **Lines:** ~86% (2314 of 2680 lines)
-- **Functions:** ~92% (280 of 304 functions)
+- **Lines:** ~90% (target)
+- **Functions:** ~92%
 
 ### Adding Coverage for New Code
 
@@ -217,6 +217,17 @@ Required by MLIR's `CallOpInterface` for call graph analysis, but not used since
 | `mlir/lib/Dialect/PolangOps.cpp` | `CallOp::getCalleeType()` | Call graph analysis |
 | `mlir/lib/Dialect/PolangOps.cpp` | `CallOp::setCalleeFromCallable()` | Call graph analysis |
 | `mlir/lib/Dialect/PolangOps.cpp` | `FuncOp::parse()` | MLIR text parsing |
+
+### MLIR Text Parsing Methods (4 functions)
+
+These `parse()` and `print()` methods implement MLIR textual format for ops/types. They are required by the MLIR framework but not exercised because Polang constructs MLIR programmatically (never parses MLIR text).
+
+| File | Function | Purpose |
+|------|----------|---------|
+| `mlir/lib/Dialect/PolangOps.cpp` | `ConstantIntegerOp::parse()` | MLIR text parsing for integer constants |
+| `mlir/lib/Dialect/PolangOps.cpp` | `ConstantFloatOp::parse()` | MLIR text parsing for float constants |
+| `mlir/lib/Dialect/PolangOps.cpp` | `FuncOp::print()` | MLIR text printing for functions |
+| `mlir/lib/Dialect/PolangTypes.cpp` | `TypeVarType::parse()` | MLIR text parsing for type variables |
 
 ### PrintOp Lowering (1 function)
 
