@@ -210,6 +210,11 @@
       "output": {
         "outputOnFailure": true
       },
+      "filter": {
+        "exclude": {
+          "name": "VerifierTest|TypeInferencePassTest|ConversionPassTest"
+        }
+      },
       "environment": {
         "ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1"
       }

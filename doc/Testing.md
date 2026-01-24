@@ -317,6 +317,21 @@ Memory and undefined behavior checking with 2 configurations:
 - Debug build for better stack traces
 - Configured with `halt_on_error=1` to fail fast
 
+#### Known Issues: ASan False Positives with MLIR Tests
+
+The MLIR unit tests (`mlir_verifier_test`, `type_inference_pass_test`, `conversion_pass_test`)
+are excluded from the ASan preset due to false positive "use-after-poison" errors.
+
+**Root cause:** LLVM's `BumpPtrAllocator` (header-only template in `llvm/Support/Allocator.h`)
+calls `__asan_poison_memory_region()` / `__asan_unpoison_memory_region()` to annotate slab
+allocations. When test binaries are compiled with `-fsanitize=address`, these calls are active.
+However, the pre-installed MLIR static libraries (`/usr/lib/llvm-20/lib/libMLIR*.a`) were compiled
+without ASan, so their instantiations of the same template have these as no-ops. The linker
+produces a binary where slabs get poisoned but individual allocations are never unpoisoned,
+triggering false "use-after-poison" errors during `MLIRContext` construction.
+
+These tests still run in all other presets (clang-debug, gcc-debug, etc.) ensuring full coverage.
+
 ### Docker Image
 
 The CI uses a Docker image (`ghcr.io/<owner>/polang-dev:latest`) containing:
