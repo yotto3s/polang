@@ -174,8 +174,8 @@ The HTML report is generated at `build/coverage_html/index.html`.
 
 ### Current Coverage
 
-- **Lines:** ~90% (target)
-- **Functions:** ~92%
+- **Lines:** 88.3% (2912 of 3298 lines)
+- **Functions:** 91.2% (361 of 396 functions)
 
 ### Adding Coverage for New Code
 
