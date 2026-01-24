@@ -50,6 +50,8 @@ Integration tests for the LLVM IR code generation and MLIR verifier unit tests.
 |-----------|-------------|
 | `compiler_test.cpp` | End-to-end compilation, CLI flags, float/cast ops |
 | `mlir_verifier_test.cpp` | MLIR verifier error paths (programmatic MLIR construction) |
+| `conversion_pass_test.cpp` | Polang-to-Standard conversion pass tests |
+| `type_inference_pass_test.cpp` | Type inference pass tests |
 
 ### REPL Tests (`tests/repl/`)
 
@@ -64,13 +66,13 @@ FileCheck-based tests organized by output type:
 
 | Directory | Count | Description |
 |-----------|-------|-------------|
-| `AST/` | 19 | AST dump verification (`--dump-ast`) |
-| `MLIR/` | 32 | Polang dialect MLIR output (`--emit-mlir`) |
+| `AST/` | 18 | AST dump verification (`--dump-ast`) |
+| `MLIR/` | 39 | Polang dialect MLIR output (`--emit-mlir`) |
 | `LLVMIR/` | 16 | LLVM IR generation |
-| `Execution/` | 36 | REPL execution results |
-| `Errors/` | 16 | Error message verification |
+| `Execution/` | 55 | REPL execution results |
+| `Errors/` | 15 | Error message verification |
 
-**Total: 119 lit tests**
+**Total: 143 lit tests**
 
 ## Writing Lit Tests
 

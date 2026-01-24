@@ -44,13 +44,13 @@ docker exec polang cmake --build build -j$(nproc)
 $ ./build/bin/PolangRepl
 Polang REPL (type 'exit' or Ctrl+D to quit)
 > 1 + 2
-3 : int
+3 : i64
 > let x = 5
 > x * 2
-10 : int
-> let double (n: int): int = n * 2
+10 : i64
+> let double (n: i64): i64 = n * 2
 > double(21)
-42 : int
+42 : i64
 > if x > 3 then true else false
 true : bool
 > exit
