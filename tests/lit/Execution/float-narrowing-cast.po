@@ -1,0 +1,8 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test float narrowing cast (f64 -> f32 -> f64 round trip)
+let narrow_and_widen(x: f64): f64 = (x as f32) as f64
+
+; 3.14 should survive f64->f32->f64 round trip (with some precision loss)
+; CHECK: 3.14{{.*}} : f64
+narrow_and_widen(3.14)

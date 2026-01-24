@@ -1,0 +1,21 @@
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; Test all float comparison predicates
+
+; CHECK:      define i1 @fle(double %{{[0-9]+}}, double %{{[0-9]+}}) {
+; CHECK-NEXT:   %{{[0-9]+}} = fcmp ole double %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK-NEXT:   ret i1 %{{[0-9]+}}
+; CHECK-NEXT: }
+let fle(a: f64, b: f64): bool = a <= b
+
+; CHECK:      define i1 @fge(double %{{[0-9]+}}, double %{{[0-9]+}}) {
+; CHECK-NEXT:   %{{[0-9]+}} = fcmp oge double %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK-NEXT:   ret i1 %{{[0-9]+}}
+; CHECK-NEXT: }
+let fge(a: f64, b: f64): bool = a >= b
+
+; CHECK:      define i1 @fne(double %{{[0-9]+}}, double %{{[0-9]+}}) {
+; CHECK-NEXT:   %{{[0-9]+}} = fcmp one double %{{[0-9]+}}, %{{[0-9]+}}
+; CHECK-NEXT:   ret i1 %{{[0-9]+}}
+; CHECK-NEXT: }
+let fne(a: f64, b: f64): bool = a != b

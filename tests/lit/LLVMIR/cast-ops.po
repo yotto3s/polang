@@ -1,0 +1,29 @@
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; Test integer to float cast (sitofp)
+; CHECK:      define double @int_to_float(i64 %{{[0-9]+}}) {
+; CHECK-NEXT:   %{{[0-9]+}} = sitofp i64 %{{[0-9]+}} to double
+; CHECK-NEXT:   ret double %{{[0-9]+}}
+; CHECK-NEXT: }
+let int_to_float(x: i64): f64 = x as f64
+
+; Test float to integer cast (saturating)
+; CHECK:      define i64 @float_to_int(double %{{[0-9]+}}) {
+; CHECK-NEXT:   %{{[0-9]+}} = call i64 @llvm.fptosi.sat.i64.f64(double %{{[0-9]+}})
+; CHECK-NEXT:   ret i64 %{{[0-9]+}}
+; CHECK-NEXT: }
+let float_to_int(x: f64): i64 = x as i64
+
+; Test integer widening (i32 to i64)
+; CHECK:      define i64 @widen_int(i32 %{{[0-9]+}}) {
+; CHECK-NEXT:   %{{[0-9]+}} = sext i32 %{{[0-9]+}} to i64
+; CHECK-NEXT:   ret i64 %{{[0-9]+}}
+; CHECK-NEXT: }
+let widen_int(x: i32): i64 = x as i64
+
+; Test integer narrowing (i64 to i32)
+; CHECK:      define i32 @narrow_int(i64 %{{[0-9]+}}) {
+; CHECK-NEXT:   %{{[0-9]+}} = trunc i64 %{{[0-9]+}} to i32
+; CHECK-NEXT:   ret i32 %{{[0-9]+}}
+; CHECK-NEXT: }
+let narrow_int(x: i64): i32 = x as i32

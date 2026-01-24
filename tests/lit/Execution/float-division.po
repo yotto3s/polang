@@ -1,0 +1,5 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test float division operation directly
+; CHECK: 2.5 : f64
+5.0 / 2.0
