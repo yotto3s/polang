@@ -249,6 +249,33 @@ TEST(ErrorReporterTest, CReportErrorWithReporter) {
   ErrorReporter::setCurrent(saved);
 }
 
+// ============== Error Formatting Helper Tests ==============
+
+TEST(ErrorFormattingTest, FormatTypeMismatch) {
+  EXPECT_EQ(formatTypeMismatch("in '+'", "i32", "f64"),
+            "Type mismatch in '+': expected i32, got f64");
+}
+
+TEST(ErrorFormattingTest, FormatArgCountError) {
+  EXPECT_EQ(formatArgCountError("foo", 2, 3),
+            "Function 'foo' expects 2 argument(s), got 3");
+}
+
+TEST(ErrorFormattingTest, FormatVarDeclTypeError) {
+  EXPECT_EQ(formatVarDeclTypeError("x", "i32", "f64"),
+            "Variable 'x' declared as i32 but initialized with f64 "
+            "(no implicit conversion)");
+}
+
+TEST(ErrorFormattingTest, FormatUndeclaredVar) {
+  EXPECT_EQ(formatUndeclaredVar("x"), "Undeclared variable: x");
+}
+
+TEST(ErrorFormattingTest, FormatFuncReturnTypeError) {
+  EXPECT_EQ(formatFuncReturnTypeError("foo", "i32", "f64"),
+            "Function 'foo' declared to return i32 but body has type f64");
+}
+
 TEST(ErrorReporterTest, CReportErrorWithoutReporter) {
   StderrCapture capture;
   ErrorReporter* saved = ErrorReporter::current();

@@ -640,16 +640,12 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
   // expected is concrete, propagate back. We check by trying to propagate - if
   // the source variable is in unresolvedGenerics, it will be resolved;
   // otherwise nothing happens.
-  const std::string& actualType = [&]() {
-    if (!isGenericType(expectedType) && expectedType != TypeNames::TYPEVAR) {
-      // Try to propagate the concrete type back to the source
-      propagateTypeToSource(node.assignmentExpr.get(), expectedType);
-      // Re-evaluate the expression type after propagation
-      node.assignmentExpr->accept(*this);
-      return inferredType;
-    }
-    return exprType;
-  }();
+  std::string actualType = exprType;
+  if (!isGenericType(expectedType) && expectedType != TypeNames::TYPEVAR) {
+    propagateTypeToSource(node.assignmentExpr.get(), expectedType);
+    node.assignmentExpr->accept(*this);
+    actualType = inferredType;
+  }
 
   if (!areTypesCompatible(actualType, expectedType) &&
       actualType != TypeNames::TYPEVAR && expectedType != TypeNames::TYPEVAR) {

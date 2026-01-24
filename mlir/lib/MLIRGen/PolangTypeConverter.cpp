@@ -13,13 +13,13 @@
 
 #include "mlir/IR/BuiltinTypes.h"
 
+#pragma GCC diagnostic pop
+
 // clang-format off
 #include "parser/node.hpp"
 #include "parser.hpp"  // Must be after node.hpp for bison union types
 // clang-format on
 #include "parser/polang_types.hpp"
-
-#pragma GCC diagnostic pop
 
 using namespace mlir;
 using namespace polang;

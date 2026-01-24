@@ -232,6 +232,139 @@ TEST(PolangTypesTest, IsUnknownTypeI64) { EXPECT_FALSE(isUnknownType("i64")); }
 
 TEST(PolangTypesTest, IsUnknownTypeEmpty) { EXPECT_FALSE(isUnknownType("")); }
 
+// ============== getTypeMetadata Tests ==============
+
+TEST(PolangTypesTest, GetTypeMetadataSignedIntegers) {
+  auto meta = getTypeMetadata("i8");
+  EXPECT_EQ(meta.kind, TypeKind::Integer);
+  EXPECT_EQ(meta.width, 8u);
+  EXPECT_EQ(meta.signedness, TypeSignedness::Signed);
+  EXPECT_FALSE(meta.isGeneric);
+
+  meta = getTypeMetadata("i16");
+  EXPECT_EQ(meta.kind, TypeKind::Integer);
+  EXPECT_EQ(meta.width, 16u);
+  EXPECT_EQ(meta.signedness, TypeSignedness::Signed);
+
+  meta = getTypeMetadata("i32");
+  EXPECT_EQ(meta.kind, TypeKind::Integer);
+  EXPECT_EQ(meta.width, 32u);
+  EXPECT_EQ(meta.signedness, TypeSignedness::Signed);
+
+  meta = getTypeMetadata("i64");
+  EXPECT_EQ(meta.kind, TypeKind::Integer);
+  EXPECT_EQ(meta.width, 64u);
+  EXPECT_EQ(meta.signedness, TypeSignedness::Signed);
+}
+
+TEST(PolangTypesTest, GetTypeMetadataUnsignedIntegers) {
+  auto meta = getTypeMetadata("u8");
+  EXPECT_EQ(meta.kind, TypeKind::Integer);
+  EXPECT_EQ(meta.width, 8u);
+  EXPECT_EQ(meta.signedness, TypeSignedness::Unsigned);
+  EXPECT_FALSE(meta.isGeneric);
+
+  meta = getTypeMetadata("u16");
+  EXPECT_EQ(meta.kind, TypeKind::Integer);
+  EXPECT_EQ(meta.width, 16u);
+  EXPECT_EQ(meta.signedness, TypeSignedness::Unsigned);
+
+  meta = getTypeMetadata("u32");
+  EXPECT_EQ(meta.kind, TypeKind::Integer);
+  EXPECT_EQ(meta.width, 32u);
+  EXPECT_EQ(meta.signedness, TypeSignedness::Unsigned);
+
+  meta = getTypeMetadata("u64");
+  EXPECT_EQ(meta.kind, TypeKind::Integer);
+  EXPECT_EQ(meta.width, 64u);
+  EXPECT_EQ(meta.signedness, TypeSignedness::Unsigned);
+}
+
+TEST(PolangTypesTest, GetTypeMetadataGenericInt) {
+  auto meta = getTypeMetadata("{int}");
+  EXPECT_EQ(meta.kind, TypeKind::Integer);
+  EXPECT_EQ(meta.width, DEFAULT_INT_WIDTH);
+  EXPECT_EQ(meta.signedness, TypeSignedness::Signed);
+  EXPECT_TRUE(meta.isGeneric);
+}
+
+TEST(PolangTypesTest, GetTypeMetadataFloats) {
+  auto meta = getTypeMetadata("f32");
+  EXPECT_EQ(meta.kind, TypeKind::Float);
+  EXPECT_EQ(meta.width, 32u);
+  EXPECT_FALSE(meta.isGeneric);
+
+  meta = getTypeMetadata("f64");
+  EXPECT_EQ(meta.kind, TypeKind::Float);
+  EXPECT_EQ(meta.width, 64u);
+  EXPECT_FALSE(meta.isGeneric);
+}
+
+TEST(PolangTypesTest, GetTypeMetadataGenericFloat) {
+  auto meta = getTypeMetadata("{float}");
+  EXPECT_EQ(meta.kind, TypeKind::Float);
+  EXPECT_EQ(meta.width, DEFAULT_FLOAT_WIDTH);
+  EXPECT_TRUE(meta.isGeneric);
+}
+
+TEST(PolangTypesTest, GetTypeMetadataBool) {
+  auto meta = getTypeMetadata("bool");
+  EXPECT_EQ(meta.kind, TypeKind::Bool);
+  EXPECT_EQ(meta.width, 1u);
+}
+
+TEST(PolangTypesTest, GetTypeMetadataFunction) {
+  auto meta = getTypeMetadata("function");
+  EXPECT_EQ(meta.kind, TypeKind::Function);
+}
+
+TEST(PolangTypesTest, GetTypeMetadataTypeVar) {
+  auto meta = getTypeMetadata("typevar");
+  EXPECT_EQ(meta.kind, TypeKind::TypeVar);
+}
+
+TEST(PolangTypesTest, GetTypeMetadataUnknownString) {
+  auto meta = getTypeMetadata("not_a_type");
+  EXPECT_EQ(meta.kind, TypeKind::Unknown);
+}
+
+// ============== TypeMetadata Helper Methods Tests ==============
+
+TEST(PolangTypesTest, TypeMetadataIsInteger) {
+  EXPECT_TRUE(getTypeMetadata("i64").isInteger());
+  EXPECT_FALSE(getTypeMetadata("f64").isInteger());
+  EXPECT_FALSE(getTypeMetadata("bool").isInteger());
+}
+
+TEST(PolangTypesTest, TypeMetadataIsFloat) {
+  EXPECT_TRUE(getTypeMetadata("f64").isFloat());
+  EXPECT_FALSE(getTypeMetadata("i64").isFloat());
+  EXPECT_FALSE(getTypeMetadata("bool").isFloat());
+}
+
+TEST(PolangTypesTest, TypeMetadataIsBool) {
+  EXPECT_TRUE(getTypeMetadata("bool").isBool());
+  EXPECT_FALSE(getTypeMetadata("i64").isBool());
+  EXPECT_FALSE(getTypeMetadata("f64").isBool());
+}
+
+TEST(PolangTypesTest, TypeMetadataIsSigned) {
+  EXPECT_TRUE(getTypeMetadata("i64").isSigned());
+  EXPECT_FALSE(getTypeMetadata("u64").isSigned());
+}
+
+TEST(PolangTypesTest, TypeMetadataIsUnsigned) {
+  EXPECT_TRUE(getTypeMetadata("u64").isUnsigned());
+  EXPECT_FALSE(getTypeMetadata("i64").isUnsigned());
+}
+
+TEST(PolangTypesTest, TypeMetadataIsNumeric) {
+  EXPECT_TRUE(getTypeMetadata("i64").isNumeric());
+  EXPECT_TRUE(getTypeMetadata("f64").isNumeric());
+  EXPECT_FALSE(getTypeMetadata("bool").isNumeric());
+  EXPECT_FALSE(getTypeMetadata("function").isNumeric());
+}
+
 // ============== Round-trip Tests ==============
 
 TEST(PolangTypesTest, RoundTripAllTypes) {
