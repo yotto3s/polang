@@ -1,0 +1,7 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test unsigned integer to float cast (UIToFPOp)
+let u32_to_f64(x: u32): f64 = x as f64
+
+; CHECK: 42 : f64
+u32_to_f64(42 as u32)

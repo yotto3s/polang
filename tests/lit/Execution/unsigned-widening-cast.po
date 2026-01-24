@@ -1,0 +1,11 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test unsigned integer widening cast (ExtUIOp)
+; u8 -> u64 should zero-extend
+let widen_u8(x: u8): u64 = x as u64
+
+; u16 -> u32 should zero-extend
+let widen_u16(x: u16): u32 = x as u32
+
+; CHECK: 255 : u64
+widen_u8(255 as u8)
