@@ -440,20 +440,112 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
 }
 
 //===----------------------------------------------------------------------===//
-// LetExprOp verifier
+// LetExprOp custom print/parse and verifier
 //===----------------------------------------------------------------------===//
 
+void LetExprOp::print(OpAsmPrinter& p) {
+  p << " -> " << getResult().getType() << " ";
+  p.printRegion(getBindings(), /*printEntryBlockArgs=*/false);
+  p << " do ";
+  p.printRegion(getBody(), /*printEntryBlockArgs=*/true);
+  p.printOptionalAttrDict((*this)->getAttrs());
+}
+
+ParseResult LetExprOp::parse(OpAsmParser& parser, OperationState& result) {
+  // Parse: -> type { bindings } do { body }
+  Type resultType;
+  if (parser.parseArrow() || parser.parseType(resultType)) {
+    return failure();
+  }
+  result.addTypes(resultType);
+
+  // Parse bindings region
+  Region* bindings = result.addRegion();
+  if (parser.parseRegion(*bindings, /*arguments=*/{}, /*argTypes=*/{})) {
+    return failure();
+  }
+
+  // Ensure bindings region has an entry block
+  if (bindings->empty()) {
+    bindings->push_back(new Block());
+  }
+
+  // Parse "do" keyword
+  if (parser.parseKeyword("do")) {
+    return failure();
+  }
+
+  // Parse body region (with entry block args)
+  Region* body = result.addRegion();
+  if (parser.parseRegion(*body)) {
+    return failure();
+  }
+
+  // Ensure body region has an entry block
+  if (body->empty()) {
+    body->push_back(new Block());
+  }
+
+  if (parser.parseOptionalAttrDict(result.attributes)) {
+    return failure();
+  }
+
+  return success();
+}
+
 LogicalResult LetExprOp::verify() {
+  // 1. Bindings region must not be empty
+  if (getBindings().empty() || getBindings().front().empty()) {
+    return emitOpError("bindings region must not be empty");
+  }
+
+  // 2. Bindings must end with yield.bindings
+  auto* bindingsTerminator = getBindings().front().getTerminator();
+  auto yieldBindingsOp = dyn_cast<YieldBindingsOp>(bindingsTerminator);
+  if (!yieldBindingsOp) {
+    return emitOpError("bindings must end with polang_ast.yield.bindings");
+  }
+
+  // 3. Bindings region must only contain var_bind operations (+ terminator)
+  Block& bindingsBlock = getBindings().front();
+  for (Operation& op : bindingsBlock.without_terminator()) {
+    if (!isa<VarBindOp>(&op)) {
+      return emitOpError("bindings region must only contain polang_ast.var_bind "
+                         "operations, but found: ")
+             << op.getName();
+    }
+  }
+
+  // 4. Body region must not be empty
   if (getBody().empty() || getBody().front().empty()) {
     return emitOpError("body region must not be empty");
   }
 
-  auto* terminator = getBody().front().getTerminator();
-  auto yieldOp = dyn_cast<YieldOp>(terminator);
+  // 5. Body's block arguments must match yield.bindings operands
+  Block& bodyEntry = getBody().front();
+  if (bodyEntry.getNumArguments() != yieldBindingsOp.getValues().size()) {
+    return emitOpError("body block argument count (")
+           << bodyEntry.getNumArguments()
+           << ") doesn't match yield.bindings operand count ("
+           << yieldBindingsOp.getValues().size() << ")";
+  }
+  for (auto [blockArg, yieldVal] :
+       llvm::zip(bodyEntry.getArguments(), yieldBindingsOp.getValues())) {
+    if (!typesAreCompatible(blockArg.getType(), yieldVal.getType())) {
+      return emitOpError("body block argument type ")
+             << blockArg.getType() << " doesn't match yield.bindings type "
+             << yieldVal.getType();
+    }
+  }
+
+  // 6. Body must end with polang_ast.yield
+  auto* bodyTerminator = getBody().front().getTerminator();
+  auto yieldOp = dyn_cast<YieldOp>(bodyTerminator);
   if (!yieldOp) {
     return emitOpError("body must end with polang_ast.yield");
   }
 
+  // 7. Yield type must match result type
   if (!typesAreCompatible(yieldOp.getValue().getType(), getResult().getType())) {
     return emitOpError("yield type ")
            << yieldOp.getValue().getType() << " doesn't match result type "
