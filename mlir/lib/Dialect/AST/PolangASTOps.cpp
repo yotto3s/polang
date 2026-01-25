@@ -466,9 +466,11 @@ LogicalResult LetExprOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void ImportOp::print(OpAsmPrinter& p) {
-  p << " " << getModuleName();
+  p << " ";
+  p.printAttribute(getModuleNameAttr());
   if (getAlias()) {
-    p << " as " << *getAlias();
+    p << " as ";
+    p.printAttribute(getAliasAttr());
   }
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"module_name", "alias"});

@@ -19,11 +19,11 @@ polang_ast.module @Math {
 }
 
 // Test import statement
-// CHECK-NEXT:   polang_ast.import Math
+// CHECK-NEXT:   polang_ast.import @Math
 polang_ast.import @Math
 
 // Test import with alias
-// CHECK-NEXT:   polang_ast.import Math as M
+// CHECK-NEXT:   polang_ast.import @Math as @M
 polang_ast.import @Math as @M
 
 // CHECK-NEXT: }
