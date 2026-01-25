@@ -44,12 +44,14 @@ Unit tests for the lexer, parser, and type checker.
 
 ### Compiler Tests (`tests/compiler/`)
 
-Integration tests for the LLVM IR code generation.
+Integration tests for the LLVM IR code generation and MLIR verifier unit tests.
 
-| Test | Description |
-|------|-------------|
-| `CompilerIntegration.*` | End-to-end compilation tests |
-| `CompilerCLI.HelpFlag` | CLI `--help` flag test |
+| Test File | Description |
+|-----------|-------------|
+| `compiler_test.cpp` | End-to-end compilation, CLI flags, float/cast ops |
+| `mlir_verifier_test.cpp` | MLIR verifier error paths (programmatic MLIR construction) |
+| `conversion_pass_test.cpp` | Polang-to-Standard conversion pass tests |
+| `type_inference_pass_test.cpp` | Type inference pass tests |
 
 ### REPL Tests (`tests/repl/`)
 
@@ -64,13 +66,13 @@ FileCheck-based tests organized by output type:
 
 | Directory | Count | Description |
 |-----------|-------|-------------|
-| `AST/` | 19 | AST dump verification (`--dump-ast`) |
-| `MLIR/` | 31 | Polang dialect MLIR output (`--emit-mlir`) |
-| `LLVMIR/` | 13 | LLVM IR generation |
-| `Execution/` | 28 | REPL execution results |
-| `Errors/` | 13 | Error message verification |
+| `AST/` | 18 | AST dump verification (`--dump-ast`) |
+| `MLIR/` | 39 | Polang dialect MLIR output (`--emit-mlir`) |
+| `LLVMIR/` | 16 | LLVM IR generation |
+| `Execution/` | 55 | REPL execution results |
+| `Errors/` | 15 | Error message verification |
 
-**Total: 104 lit tests**
+**Total: 143 lit tests**
 
 ## Writing Lit Tests
 
@@ -172,8 +174,8 @@ The HTML report is generated at `build/coverage_html/index.html`.
 
 ### Current Coverage
 
-- **Lines:** ~86% (2314 of 2680 lines)
-- **Functions:** ~92% (280 of 304 functions)
+- **Lines:** 88.3% (2912 of 3298 lines)
+- **Functions:** 91.2% (361 of 396 functions)
 
 ### Adding Coverage for New Code
 
@@ -217,6 +219,17 @@ Required by MLIR's `CallOpInterface` for call graph analysis, but not used since
 | `mlir/lib/Dialect/PolangOps.cpp` | `CallOp::getCalleeType()` | Call graph analysis |
 | `mlir/lib/Dialect/PolangOps.cpp` | `CallOp::setCalleeFromCallable()` | Call graph analysis |
 | `mlir/lib/Dialect/PolangOps.cpp` | `FuncOp::parse()` | MLIR text parsing |
+
+### MLIR Text Parsing Methods (4 functions)
+
+These `parse()` and `print()` methods implement MLIR textual format for ops/types. They are required by the MLIR framework but not exercised because Polang constructs MLIR programmatically (never parses MLIR text).
+
+| File | Function | Purpose |
+|------|----------|---------|
+| `mlir/lib/Dialect/PolangOps.cpp` | `ConstantIntegerOp::parse()` | MLIR text parsing for integer constants |
+| `mlir/lib/Dialect/PolangOps.cpp` | `ConstantFloatOp::parse()` | MLIR text parsing for float constants |
+| `mlir/lib/Dialect/PolangOps.cpp` | `FuncOp::print()` | MLIR text printing for functions |
+| `mlir/lib/Dialect/PolangTypes.cpp` | `TypeVarType::parse()` | MLIR text parsing for type variables |
 
 ### PrintOp Lowering (1 function)
 
@@ -303,6 +316,21 @@ Memory and undefined behavior checking with 2 configurations:
 - Uses Clang 20 compiler (required for sanitizers)
 - Debug build for better stack traces
 - Configured with `halt_on_error=1` to fail fast
+
+#### Known Issues: ASan False Positives with MLIR Tests
+
+The MLIR unit tests (`mlir_verifier_test`, `type_inference_pass_test`, `conversion_pass_test`)
+are excluded from the ASan preset due to false positive "use-after-poison" errors.
+
+**Root cause:** LLVM's `BumpPtrAllocator` (header-only template in `llvm/Support/Allocator.h`)
+calls `__asan_poison_memory_region()` / `__asan_unpoison_memory_region()` to annotate slab
+allocations. When test binaries are compiled with `-fsanitize=address`, these calls are active.
+However, the pre-installed MLIR static libraries (`/usr/lib/llvm-20/lib/libMLIR*.a`) were compiled
+without ASan, so their instantiations of the same template have these as no-ops. The linker
+produces a binary where slabs get poisoned but individual allocations are never unpoisoned,
+triggering false "use-after-poison" errors during `MLIRContext` construction.
+
+These tests still run in all other presets (clang-debug, gcc-debug, etc.) ensuring full coverage.
 
 ### Docker Image
 

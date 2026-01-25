@@ -173,7 +173,6 @@ Expected outputs:
 | `functions.po` | `25 : i64` |
 | `hello.po` | `7 : i64` |
 | `let_expressions.po` | `16 : i64` |
-| `mutability.po` | `23 : i64` |
 | `types.po` | `84 : i64` |
 | `variables.po` | `30 : i64` |
 
@@ -218,7 +217,7 @@ Lit tests use FileCheck to verify compiler output:
 - Use exact full-line patterns when possible
 - Use `{{.*}}pattern{{.*}}` for partial matching
 
-See `doc/Tests.md` for detailed test documentation.
+See `doc/Testing.md` for detailed test documentation.
 
 ## Documentation
 
@@ -227,9 +226,9 @@ When modifying code, update the relevant documentation:
 | Change Type | Documentation |
 |-------------|---------------|
 | Language syntax | `doc/Syntax.md` |
-| MLIR pipeline | `doc/Lowering.md` |
+| MLIR pipeline | `doc/Architecture.md` |
 | Type system | `doc/TypeSystem.md` |
-| Tests | `doc/Tests.md` |
+| Tests | `doc/Testing.md` |
 | Build system | `doc/Building.md` |
 | Architecture | `doc/Architecture.md` |
 
@@ -255,7 +254,7 @@ GitHub Actions runs on every push and pull request:
 - **sanitizers**: AddressSanitizer and UndefinedBehaviorSanitizer
 - **coverage**: Code coverage uploaded to Codecov
 
-See `doc/CI_CD.md` for detailed CI documentation.
+See `doc/Testing.md` for detailed CI documentation.
 
 ## Workflow Summary
 

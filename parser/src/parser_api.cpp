@@ -15,9 +15,6 @@ extern YY_BUFFER_STATE yy_scan_string(const char* str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 extern void polang_reset_lexer_location();
 
-// Global AST root (defined in parser.cpp, generated from parser.y)
-extern std::unique_ptr<NBlock> programBlock;
-
 std::unique_ptr<NBlock> polang_parse(const std::string& source) {
   polang_reset_lexer_location();
   programBlock = nullptr; // Reset before parsing

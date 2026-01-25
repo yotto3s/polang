@@ -1,0 +1,11 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test f32 float constant lowering
+; A function with f32 return type forces the float literal to be f32
+let f32_val(x: f64): f32 = x as f32
+
+; Round-trip through f32 to verify the constant path works
+let f32_roundtrip(x: f64): f64 = (x as f32) as f64
+
+; CHECK: 2.5 : f64
+f32_roundtrip(2.5)

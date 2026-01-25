@@ -1,0 +1,8 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test same-width cast (should be a no-op)
+; Casting i64 to i64 should just pass through
+let same_cast(x: i64): i64 = x as i64
+
+; CHECK: 42 : i64
+same_cast(42)

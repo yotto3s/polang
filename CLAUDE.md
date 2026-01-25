@@ -20,6 +20,7 @@ When planning changes that modify the codebase, follow this test-first workflow:
 2. **Commit the tests** - Create a commit with just the test changes
 3. **Wait for review** - Pause for the user to review and approve the tests
 4. **Then implement** - Start modifying the codebase to make the tests pass
+5. **Commit changes and push on each phase** - Keep each commit clean and minimal
 
 This ensures agreement on expected behavior before implementation begins.
 
@@ -134,11 +135,11 @@ When modifying code under `mlir/`, in PLAN mode, **read** the official MLIR docu
 
 | Directory | Count | Description |
 |-----------|-------|-------------|
-| `tests/lit/AST/` | 20 | AST dump tests (`--dump-ast`) |
-| `tests/lit/MLIR/` | 38 | MLIR output tests (`--emit-mlir`) |
-| `tests/lit/LLVMIR/` | 13 | LLVM IR generation |
-| `tests/lit/Execution/` | 39 | REPL execution |
-| `tests/lit/Errors/` | 16 | Error handling |
+| `tests/lit/AST/` | 18 | AST dump tests (`--dump-ast`) |
+| `tests/lit/MLIR/` | 39 | MLIR output tests (`--emit-mlir`) |
+| `tests/lit/LLVMIR/` | 16 | LLVM IR generation |
+| `tests/lit/Execution/` | 55 | REPL execution |
+| `tests/lit/Errors/` | 15 | Error handling |
 
 ## Expected Example Outputs
 

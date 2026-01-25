@@ -131,6 +131,29 @@ TEST(OperatorUtilsTest, IsComparisonOperatorUnknown) {
   EXPECT_FALSE(isComparisonOperator(0));
 }
 
+// ============== getOperatorCategory Tests ==============
+
+TEST(OperatorUtilsTest, GetOperatorCategoryArithmetic) {
+  EXPECT_EQ(getOperatorCategory(token::TPLUS), OperatorCategory::Arithmetic);
+  EXPECT_EQ(getOperatorCategory(token::TMINUS), OperatorCategory::Arithmetic);
+  EXPECT_EQ(getOperatorCategory(token::TMUL), OperatorCategory::Arithmetic);
+  EXPECT_EQ(getOperatorCategory(token::TDIV), OperatorCategory::Arithmetic);
+}
+
+TEST(OperatorUtilsTest, GetOperatorCategoryComparison) {
+  EXPECT_EQ(getOperatorCategory(token::TCEQ), OperatorCategory::Comparison);
+  EXPECT_EQ(getOperatorCategory(token::TCNE), OperatorCategory::Comparison);
+  EXPECT_EQ(getOperatorCategory(token::TCLT), OperatorCategory::Comparison);
+  EXPECT_EQ(getOperatorCategory(token::TCLE), OperatorCategory::Comparison);
+  EXPECT_EQ(getOperatorCategory(token::TCGT), OperatorCategory::Comparison);
+  EXPECT_EQ(getOperatorCategory(token::TCGE), OperatorCategory::Comparison);
+}
+
+TEST(OperatorUtilsTest, GetOperatorCategoryUnknown) {
+  EXPECT_EQ(getOperatorCategory(0), OperatorCategory::Unknown);
+  EXPECT_EQ(getOperatorCategory(999), OperatorCategory::Unknown);
+}
+
 // ============== Mutual Exclusion Tests ==============
 
 TEST(OperatorUtilsTest, ArithmeticAndComparisonMutuallyExclusive) {

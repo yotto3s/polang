@@ -103,8 +103,8 @@ public:
       }
       return type;
     }
-    // For now, only type variables can be substituted
-    // TODO: Handle function types when added
+    // For now, only type variables can be substituted.
+    // Function types will need recursive substitution (see issue #9).
     return type;
   }
 
@@ -171,7 +171,7 @@ private:
     if (auto typeVar = dyn_cast<TypeVarType>(type)) {
       return typeVar.getId() == var;
     }
-    // TODO: Check inside function types when added
+    // Function types will need recursive occurs check (see issue #9).
     return false;
   }
 

@@ -217,8 +217,8 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
 
     // Check the original type to determine signedness
     auto origType = op.getLhs().getType();
-    // NOLINTNEXTLINE(bugprone-branch-clone) - different div ops for different
-    // types
+    // clang-format off
+    // NOLINTNEXTLINE(bugprone-branch-clone) - different div ops for different types
     if (isa<polang::FloatType>(origType)) {
       rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
     } else if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
@@ -233,6 +233,7 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
     } else {
       rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
     }
+    // clang-format on
     return success();
   }
 };

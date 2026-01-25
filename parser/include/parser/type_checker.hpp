@@ -50,18 +50,20 @@ public:
   void visit(const NImportStatement& node) override;
 
   // Get the inferred type of the last visited node
-  [[nodiscard]] std::string getInferredType() const { return inferredType; }
+  [[nodiscard]] std::string getInferredType() const noexcept {
+    return inferredType;
+  }
 
   // Retrieve all collected errors
-  [[nodiscard]] const std::vector<TypeCheckError>& getErrors() const {
+  [[nodiscard]] const std::vector<TypeCheckError>& getErrors() const noexcept {
     return errors;
   }
 
   // Check if there were any errors
-  [[nodiscard]] bool hasErrors() const { return !errors.empty(); }
+  [[nodiscard]] bool hasErrors() const noexcept { return !errors.empty(); }
 
   // Check an AST and return errors
-  std::vector<TypeCheckError> check(const NBlock& ast);
+  [[nodiscard]] std::vector<TypeCheckError> check(const NBlock& ast);
 
 private:
   std::string inferredType;
@@ -125,6 +127,14 @@ private:
   void handleModuleAliasImport(const NImportStatement& node);
   void handleItemsImport(const NImportStatement& node);
   void handleWildcardImport(const NImportStatement& node);
+
+  // Helper methods for NBinaryOperator type checking
+  void checkArithmeticBinaryOp(const NBinaryOperator& node,
+                               const std::string& lhsType,
+                               const std::string& rhsType);
+  void checkComparisonBinaryOp(const NBinaryOperator& node,
+                               const std::string& lhsType,
+                               const std::string& rhsType);
 
   // Deferred type inference for generic types
   // Variables with unresolved generic types (name -> generic type)

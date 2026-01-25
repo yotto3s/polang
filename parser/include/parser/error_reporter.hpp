@@ -62,10 +62,10 @@ public:
   }
 
   /// Check if any errorList have been reported.
-  [[nodiscard]] bool hasErrors() const;
+  [[nodiscard]] bool hasErrors() const noexcept;
 
   /// Check if any warnings have been reported.
-  [[nodiscard]] bool hasWarnings() const;
+  [[nodiscard]] bool hasWarnings() const noexcept;
 
   /// Clear all collected errorList.
   void clear();
@@ -75,6 +75,62 @@ private:
   ErrorCallback errorCallback;
   std::string currentFilename;
 };
+
+// Error message formatting helpers.
+// These provide consistent formatting for common error types.
+
+/// Format a type mismatch error message.
+/// @param context Description of where the mismatch occurred (e.g., "in '+'")
+/// @param expected The expected type
+/// @param actual The actual type found
+[[nodiscard]] inline std::string formatTypeMismatch(const std::string& context,
+                                                    const std::string& expected,
+                                                    const std::string& actual) {
+  return "Type mismatch " + context + ": expected " + expected + ", got " +
+         actual;
+}
+
+/// Format an argument count error message.
+/// @param funcName The function name
+/// @param expected The expected number of arguments
+/// @param actual The actual number of arguments provided
+[[nodiscard]] inline std::string
+formatArgCountError(const std::string& funcName, size_t expected,
+                    size_t actual) {
+  return "Function '" + funcName + "' expects " + std::to_string(expected) +
+         " argument(s), got " + std::to_string(actual);
+}
+
+/// Format a variable declaration type error message.
+/// @param varName The variable name
+/// @param declaredType The declared type annotation
+/// @param actualType The actual type of the initializer
+[[nodiscard]] inline std::string
+formatVarDeclTypeError(const std::string& varName,
+                       const std::string& declaredType,
+                       const std::string& actualType) {
+  return "Variable '" + varName + "' declared as " + declaredType +
+         " but initialized with " + actualType + " (no implicit conversion)";
+}
+
+/// Format an undeclared variable error message.
+/// @param varName The variable name
+[[nodiscard]] inline std::string
+formatUndeclaredVar(const std::string& varName) {
+  return "Undeclared variable: " + varName;
+}
+
+/// Format a function return type error message.
+/// @param funcName The function name
+/// @param declaredType The declared return type
+/// @param actualType The actual type returned
+[[nodiscard]] inline std::string
+formatFuncReturnTypeError(const std::string& funcName,
+                          const std::string& declaredType,
+                          const std::string& actualType) {
+  return "Function '" + funcName + "' declared to return " + declaredType +
+         " but body has type " + actualType;
+}
 
 } // namespace polang
 

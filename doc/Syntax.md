@@ -45,15 +45,6 @@ Polang supports a variety of numeric types with explicit width and signedness:
 |--------|---------------|--------|
 | `bool` | Boolean value | 1-bit  |
 
-### Legacy Type Aliases
-
-For compatibility, the following aliases are supported:
-
-| Alias    | Maps To |
-|----------|---------|
-| `int`    | `i64`   |
-| `double` | `f64`   |
-
 ### Default Literal Types
 
 - Integer literals (e.g., `42`) default to `i64`
@@ -600,7 +591,6 @@ type        ::= base_type
 base_type   ::= "i8" | "i16" | "i32" | "i64"
               | "u8" | "u16" | "u32" | "u64"
               | "f32" | "f64"
-              | "int" | "double"   ; legacy aliases
               | "bool"
 
 comment     ::= ";" [^\n]*

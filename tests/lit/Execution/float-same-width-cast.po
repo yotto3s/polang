@@ -1,0 +1,8 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test same-width float cast (identity, no-op)
+; Casting f64 to f64 should just pass through
+let same_float_cast(x: f64): f64 = x as f64
+
+; CHECK: 3.14 : f64
+same_float_cast(3.14)

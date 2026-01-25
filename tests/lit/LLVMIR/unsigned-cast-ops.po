@@ -1,0 +1,21 @@
+; RUN: %polang_compiler %s | %FileCheck %s
+
+; Test unsigned integer widening (u8 to u64) uses zext
+; CHECK:      define i64 @widen_unsigned(i8 %{{[0-9]+}}) {
+; CHECK-NEXT:   %{{[0-9]+}} = zext i8 %{{[0-9]+}} to i64
+; CHECK-NEXT:   ret i64 %{{[0-9]+}}
+; CHECK-NEXT: }
+let widen_unsigned(x: u8): u64 = x as u64
+
+; Test unsigned integer to float (u32 to f64) uses uitofp
+; CHECK:      define double @unsigned_to_float(i32 %{{[0-9]+}}) {
+; CHECK-NEXT:   %{{[0-9]+}} = uitofp i32 %{{[0-9]+}} to double
+; CHECK-NEXT:   ret double %{{[0-9]+}}
+; CHECK-NEXT: }
+let unsigned_to_float(x: u32): f64 = x as f64
+
+; Test same-width float cast (f64 to f64) is identity
+; CHECK:      define double @same_width_float(double %{{[0-9]+}}) {
+; CHECK-NEXT:   ret double %{{[0-9]+}}
+; CHECK-NEXT: }
+let same_width_float(x: f64): f64 = x as f64

@@ -1,0 +1,17 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test polymorphic function called with both int and float arguments,
+; creating multiple specialized versions through monomorphization.
+
+; Specialized for float pair
+; CHECK-DAG: {{.*}}polang.func @add$f64_f64(%{{.*}}: !polang.float<64>, %{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}}
+
+; Specialized for int pair
+; CHECK-DAG: {{.*}}polang.func @add$i64_i64(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+
+; Original polymorphic function is preserved
+; CHECK-DAG: {{.*}}polang.func @add({{.*}}) -> !polang.typevar{{.*}} attributes {polang.polymorphic}{{.*}}
+
+let add(x, y) = x + y
+add(1, 2)
+add(1.0, 2.0)

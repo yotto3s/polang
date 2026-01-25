@@ -14,6 +14,11 @@ using polang::areTypesCompatible;
 using polang::containsGenericType;
 using polang::ErrorReporter;
 using polang::ErrorSeverity;
+using polang::formatArgCountError;
+using polang::formatFuncReturnTypeError;
+using polang::formatTypeMismatch;
+using polang::formatUndeclaredVar;
+using polang::formatVarDeclTypeError;
 using polang::isArithmeticOperator;
 using polang::isComparisonOperator;
 using polang::isFloatType;
@@ -197,7 +202,7 @@ void TypeChecker::visit(const NBoolean& node) {
 
 void TypeChecker::visit(const NIdentifier& node) {
   if (localTypes.find(node.name) == localTypes.end()) {
-    reportError("Undeclared variable: " + node.name, node.loc);
+    reportError(formatUndeclaredVar(node.name), node.loc);
     inferredType = TypeNames::UNKNOWN;
     return;
   }
@@ -205,18 +210,18 @@ void TypeChecker::visit(const NIdentifier& node) {
 }
 
 void TypeChecker::visit(const NQualifiedName& node) {
-  const std::string mangled = node.mangledName();
+  const std::string mangled = node.getMangledName();
   auto it = localTypes.find(mangled);
   if (it != localTypes.end()) {
     inferredType = it->second;
     return;
   }
-  reportError("Undefined qualified name: " + node.fullName(), node.loc);
+  reportError("Undefined qualified name: " + node.getFullName(), node.loc);
   inferredType = TypeNames::UNKNOWN;
 }
 
 void TypeChecker::visit(const NMethodCall& node) {
-  const std::string funcName = node.effectiveName();
+  const std::string funcName = node.getEffectiveName();
 
   std::vector<std::string> argTypes;
   for (const auto& arg : node.arguments) {
@@ -229,10 +234,9 @@ void TypeChecker::visit(const NMethodCall& node) {
     const auto& paramTypes = paramIt->second;
 
     if (argTypes.size() != paramTypes.size()) {
-      reportError("Function '" + funcName + "' expects " +
-                      std::to_string(paramTypes.size()) + " argument(s), got " +
-                      std::to_string(argTypes.size()),
-                  node.loc);
+      reportError(
+          formatArgCountError(funcName, paramTypes.size(), argTypes.size()),
+          node.loc);
     } else {
       // Propagate concrete types from function parameters to arguments that
       // might be resolvable (in unresolvedGenerics)
@@ -264,11 +268,49 @@ void TypeChecker::visit(const NMethodCall& node) {
     }
   }
 
-  if (functionReturnTypes.find(funcName) != functionReturnTypes.end()) {
-    inferredType = functionReturnTypes[funcName];
+  const auto funcReturnIt = functionReturnTypes.find(funcName);
+  if (funcReturnIt != functionReturnTypes.end()) {
+    inferredType = funcReturnIt->second;
   } else {
     inferredType = TypeNames::I64;
   }
+}
+
+void TypeChecker::checkArithmeticBinaryOp(const NBinaryOperator& node,
+                                          const std::string& lhsType,
+                                          const std::string& rhsType) {
+  const bool lhsIsTypevar = lhsType == TypeNames::TYPEVAR;
+  const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
+
+  if (!lhsIsTypevar && !rhsIsTypevar && !areTypesCompatible(lhsType, rhsType)) {
+    reportError("Type mismatch in '" + operatorToString(node.op) +
+                    "': " + resolveGenericToDefault(lhsType) + " and " +
+                    resolveGenericToDefault(rhsType),
+                node.loc);
+  }
+
+  if (lhsIsTypevar && !rhsIsTypevar) {
+    inferredType = rhsType;
+  } else {
+    // Resolve generic type using the other operand as context
+    inferredType = polang::resolveGenericType(lhsType, rhsType);
+  }
+}
+
+void TypeChecker::checkComparisonBinaryOp(const NBinaryOperator& node,
+                                          const std::string& lhsType,
+                                          const std::string& rhsType) {
+  const bool lhsIsTypevar = lhsType == TypeNames::TYPEVAR;
+  const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
+
+  if (!lhsIsTypevar && !rhsIsTypevar && !areTypesCompatible(lhsType, rhsType)) {
+    reportError(
+        "Type mismatch in comparison: " + resolveGenericToDefault(lhsType) +
+            " and " + resolveGenericToDefault(rhsType),
+        node.loc);
+  }
+
+  inferredType = TypeNames::BOOL;
 }
 
 void TypeChecker::visit(const NBinaryOperator& node) {
@@ -283,32 +325,16 @@ void TypeChecker::visit(const NBinaryOperator& node) {
     return;
   }
 
-  const bool lhsIsTypevar = lhsType == TypeNames::TYPEVAR;
-  const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
-
-  if (isArithmeticOperator(node.op)) {
-    if (!lhsIsTypevar && !rhsIsTypevar &&
-        !areTypesCompatible(lhsType, rhsType)) {
-      reportError("Type mismatch in '" + operatorToString(node.op) +
-                      "': " + resolveGenericToDefault(lhsType) + " and " +
-                      resolveGenericToDefault(rhsType),
-                  node.loc);
-    }
-    if (lhsIsTypevar && !rhsIsTypevar) {
-      inferredType = rhsType;
-    } else {
-      // Resolve generic type using the other operand as context
-      inferredType = polang::resolveGenericType(lhsType, rhsType);
-    }
-  } else if (isComparisonOperator(node.op)) {
-    if (!lhsIsTypevar && !rhsIsTypevar &&
-        !areTypesCompatible(lhsType, rhsType)) {
-      reportError(
-          "Type mismatch in comparison: " + resolveGenericToDefault(lhsType) +
-              " and " + resolveGenericToDefault(rhsType),
-          node.loc);
-    }
-    inferredType = TypeNames::BOOL;
+  switch (polang::getOperatorCategory(node.op)) {
+  case polang::OperatorCategory::Arithmetic:
+    checkArithmeticBinaryOp(node, lhsType, rhsType);
+    break;
+  case polang::OperatorCategory::Comparison:
+    checkComparisonBinaryOp(node, lhsType, rhsType);
+    break;
+  case polang::OperatorCategory::Unknown:
+    // Unknown operator - leave type as is
+    break;
   }
 }
 
@@ -394,6 +420,9 @@ void TypeChecker::typeCheckLetBindings(
     const std::map<std::string, std::string>& savedLocals,
     std::vector<std::string>& bindingTypes,
     std::vector<std::vector<std::string>>& funcParams) {
+  // NOTE: const_cast is used throughout this function to store resolved types
+  // and captures back into AST nodes. See comment in
+  // visit(NVariableDeclaration&).
   for (const auto& binding : bindings) {
     if (binding->isFunction) {
       const auto& func = binding->func;
@@ -426,12 +455,17 @@ void TypeChecker::typeCheckLetBindings(
         std::string varType;
         bool found = false;
 
-        if (savedLocals.find(varName) != savedLocals.end()) {
-          varType = savedLocals.at(varName);
+        // Cache iterator to avoid repeated lookups
+        auto localIt = savedLocals.find(varName);
+        if (localIt != savedLocals.end()) {
+          varType = localIt->second;
           found = true;
-        } else if (siblingTypes.find(varName) != siblingTypes.end()) {
-          varType = siblingTypes.at(varName);
-          found = true;
+        } else {
+          auto siblingIt = siblingTypes.find(varName);
+          if (siblingIt != siblingTypes.end()) {
+            varType = siblingIt->second;
+            found = true;
+          }
         }
 
         if (found) {
@@ -600,27 +634,23 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
                                                  const std::string& exprType) {
   const std::string declType = node.type->getTypeName();
 
-  std::string expectedType = declType;
-  std::string actualType = exprType;
+  const std::string& expectedType = declType;
 
   // If actual type could be re-resolved (source is in unresolvedGenerics) and
   // expected is concrete, propagate back. We check by trying to propagate - if
   // the source variable is in unresolvedGenerics, it will be resolved;
   // otherwise nothing happens.
+  std::string actualType = exprType;
   if (!isGenericType(expectedType) && expectedType != TypeNames::TYPEVAR) {
-    // Try to propagate the concrete type back to the source
     propagateTypeToSource(node.assignmentExpr.get(), expectedType);
-    // Re-evaluate the expression type after propagation
     node.assignmentExpr->accept(*this);
     actualType = inferredType;
   }
 
   if (!areTypesCompatible(actualType, expectedType) &&
       actualType != TypeNames::TYPEVAR && expectedType != TypeNames::TYPEVAR) {
-    reportError("Variable '" + node.id->name + "' declared as " + declType +
-                    " but initialized with " +
-                    resolveGenericToDefault(exprType) +
-                    " (no implicit conversion)",
+    reportError(formatVarDeclTypeError(node.id->name, declType,
+                                       resolveGenericToDefault(exprType)),
                 node.loc);
   }
 
@@ -629,6 +659,10 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
 }
 
 void TypeChecker::visit(const NVariableDeclaration& node) {
+  // NOTE: const_cast is used because the type checker needs to store resolved
+  // types back into AST nodes for the MLIR generator to access. This is an
+  // architectural decision - a cleaner approach would use a separate type
+  // environment map shared between TypeChecker and MLIRGen.
   auto& mutableNode = const_cast<NVariableDeclaration&>(node);
   const std::string varName = mangledName(node.id->name);
 
@@ -676,6 +710,8 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
 }
 
 void TypeChecker::visit(const NFunctionDeclaration& node) {
+  // NOTE: const_cast is used to store resolved types and captured variables
+  // back into AST nodes. See comment in visit(NVariableDeclaration&).
   auto& mutableNode = const_cast<NFunctionDeclaration&>(node);
 
   const std::string funcName = mangledName(node.id->name);
@@ -732,10 +768,8 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
 
     if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR &&
         !areTypesCompatible(bodyType, declReturnType)) {
-      reportError("Function '" + node.id->name + "' declared to return " +
-                      declReturnType + " but body has type " +
-                      resolveGenericToDefault(bodyType) +
-                      " (no implicit conversion)",
+      reportError(formatFuncReturnTypeError(node.id->name, declReturnType,
+                                            resolveGenericToDefault(bodyType)),
                   node.loc);
     }
 
@@ -768,21 +802,21 @@ void TypeChecker::visit(const NModuleDeclaration& node) {
 }
 
 void TypeChecker::handleModuleImport(const NImportStatement& node) {
-  const std::string moduleName = node.modulePath->mangledName();
+  const std::string moduleName = node.modulePath->getMangledName();
   moduleAliases[node.modulePath->parts.back()] = moduleName;
 }
 
 void TypeChecker::handleModuleAliasImport(const NImportStatement& node) {
-  const std::string moduleName = node.modulePath->mangledName();
+  const std::string moduleName = node.modulePath->getMangledName();
   moduleAliases[node.alias] = moduleName;
 }
 
 void TypeChecker::handleItemsImport(const NImportStatement& node) {
-  const std::string moduleName = node.modulePath->mangledName();
+  const std::string moduleName = node.modulePath->getMangledName();
 
   for (const auto& item : node.items) {
     const std::string mangledItemName = moduleName + "$$" + item.name;
-    const std::string localName = item.effectiveName();
+    const std::string localName = item.getEffectiveName();
 
     auto typeIt = localTypes.find(mangledItemName);
     if (typeIt != localTypes.end()) {
@@ -803,7 +837,7 @@ void TypeChecker::handleItemsImport(const NImportStatement& node) {
 }
 
 void TypeChecker::handleWildcardImport(const NImportStatement& node) {
-  const std::string moduleName = node.modulePath->mangledName();
+  const std::string moduleName = node.modulePath->getMangledName();
   const std::string prefix = moduleName + "$$";
 
   auto exportsIt = moduleExports.find(moduleName);

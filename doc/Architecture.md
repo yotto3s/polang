@@ -35,6 +35,7 @@ polang/
 │   ├── CMakeLists.txt
 │   ├── src/
 │   │   ├── lexer.l             # Flex lexer
+│   │   ├── node.cpp            # AST node implementations
 │   │   ├── parser.y            # Bison grammar
 │   │   ├── parser_api.cpp      # Parser API implementation
 │   │   ├── ast_printer.cpp     # AST printer implementation
@@ -45,6 +46,7 @@ polang/
 │       ├── node.hpp            # AST node definitions
 │       ├── parser_api.hpp      # Parser API header
 │       ├── ast_printer.hpp     # AST printer header
+│       ├── type_checker.hpp    # Type checker header
 │       ├── visitor.hpp         # Visitor pattern base class
 │       ├── polang_types.hpp    # Type constants and utilities
 │       ├── operator_utils.hpp  # Operator classification utilities
@@ -272,8 +274,6 @@ Type variables are resolved by the type inference pass before lowering to standa
 |-------------|-----------|-----------|
 | `bool` | `!polang.bool` | `i1` |
 | (type variable) | `!polang.typevar<id, kind>` | (resolved by type inference) |
-
-**Legacy aliases:** `int` maps to `i64`, `double` maps to `f64`.
 
 #### Type Variables
 
