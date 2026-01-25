@@ -172,3 +172,294 @@ LogicalResult DivOp::verify() {
   }
   return success();
 }
+
+//===----------------------------------------------------------------------===//
+// CastOp verifier
+//===----------------------------------------------------------------------===//
+
+LogicalResult CastOp::verify() {
+  Type inputType = getInput().getType();
+  Type resultType = getResult().getType();
+
+  // Allow type variables - they will be resolved by type inference pass
+  if (isa<TypeVarType>(inputType) || isa<TypeVarType>(resultType)) {
+    return success();
+  }
+  if (isa<polang::TypeVarType>(inputType) ||
+      isa<polang::TypeVarType>(resultType)) {
+    return success();
+  }
+
+  // Both types must be numeric
+  const bool inputIsNumeric = isa<polang::IntegerType>(inputType) ||
+                              isa<polang::FloatType>(inputType);
+  const bool resultIsNumeric = isa<polang::IntegerType>(resultType) ||
+                               isa<polang::FloatType>(resultType);
+
+  if (!inputIsNumeric) {
+    return emitOpError("input type must be numeric, got ") << inputType;
+  }
+  if (!resultIsNumeric) {
+    return emitOpError("result type must be numeric, got ") << resultType;
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// CmpOp verifier
+//===----------------------------------------------------------------------===//
+
+LogicalResult CmpOp::verify() {
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType())) {
+    return emitOpError("comparison operand types must be compatible");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// IfOp builder and verifier
+//===----------------------------------------------------------------------===//
+
+void IfOp::build(OpBuilder& builder, OperationState& state, Type resultType,
+                 Value condition) {
+  (void)builder;
+  state.addOperands(condition);
+  state.addTypes(resultType);
+
+  // Create then region
+  Region* thenRegion = state.addRegion();
+  thenRegion->push_back(new Block());
+
+  // Create else region
+  Region* elseRegion = state.addRegion();
+  elseRegion->push_back(new Block());
+}
+
+LogicalResult IfOp::verify() {
+  // Check that both regions have terminators
+  if (getThenRegion().empty() || getThenRegion().front().empty()) {
+    return emitOpError("then region must not be empty");
+  }
+  if (getElseRegion().empty() || getElseRegion().front().empty()) {
+    return emitOpError("else region must not be empty");
+  }
+
+  auto* thenTerminator = getThenRegion().front().getTerminator();
+  auto* elseTerminator = getElseRegion().front().getTerminator();
+
+  auto thenYield = dyn_cast<YieldOp>(thenTerminator);
+  auto elseYield = dyn_cast<YieldOp>(elseTerminator);
+
+  if (!thenYield) {
+    return emitOpError("then region must end with polang_ast.yield");
+  }
+  if (!elseYield) {
+    return emitOpError("else region must end with polang_ast.yield");
+  }
+
+  // Check that yield types are compatible with result type
+  if (!typesAreCompatible(thenYield.getValue().getType(),
+                          getResult().getType())) {
+    return emitOpError("then branch yields ")
+           << thenYield.getValue().getType() << " but if expects "
+           << getResult().getType();
+  }
+
+  if (!typesAreCompatible(elseYield.getValue().getType(),
+                          getResult().getType())) {
+    return emitOpError("else branch yields ")
+           << elseYield.getValue().getType() << " but if expects "
+           << getResult().getType();
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// FuncOp builder, verifier, and custom print/parse
+//===----------------------------------------------------------------------===//
+
+void FuncOp::build(OpBuilder& builder, OperationState& state, StringRef name,
+                   FunctionType type, ArrayRef<NamedAttribute> attrs,
+                   ArrayRef<DictionaryAttr> argAttrs) {
+  state.addAttribute(SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(name));
+  state.addAttribute(getFunctionTypeAttrName(state.name),
+                     TypeAttr::get(type));
+  state.attributes.append(attrs.begin(), attrs.end());
+  state.addRegion();
+
+  if (argAttrs.empty()) {
+    return;
+  }
+  assert(type.getNumInputs() == argAttrs.size());
+  function_interface_impl::addArgAndResultAttrs(
+      builder, state, argAttrs, /*resultAttrs=*/{},
+      getArgAttrsAttrName(state.name), getResAttrsAttrName(state.name));
+}
+
+void FuncOp::print(OpAsmPrinter& p) {
+  function_interface_impl::printFunctionOp(
+      p, *this, /*isVariadic=*/false, getFunctionTypeAttrName(),
+      getArgAttrsAttrName(), getResAttrsAttrName());
+}
+
+ParseResult FuncOp::parse(OpAsmParser& parser, OperationState& result) {
+  auto buildFuncType = [](Builder& builder, ArrayRef<Type> argTypes,
+                          ArrayRef<Type> results,
+                          function_interface_impl::VariadicFlag,
+                          std::string&) {
+    return builder.getFunctionType(argTypes, results);
+  };
+  return function_interface_impl::parseFunctionOp(
+      parser, result, /*allowVariadic=*/false,
+      getFunctionTypeAttrName(result.name), buildFuncType,
+      getArgAttrsAttrName(result.name), getResAttrsAttrName(result.name));
+}
+
+LogicalResult FuncOp::verify() {
+  // Verify the function type matches the entry block arguments
+  if (getBody().empty()) {
+    return success();
+  }
+
+  FunctionType funcType = getFunctionType();
+  Block& entryBlock = getBody().front();
+
+  if (funcType.getNumInputs() != entryBlock.getNumArguments()) {
+    return emitOpError("function type has ")
+           << funcType.getNumInputs() << " arguments but entry block has "
+           << entryBlock.getNumArguments();
+  }
+
+  for (unsigned i = 0, e = funcType.getNumInputs(); i != e; ++i) {
+    if (funcType.getInput(i) != entryBlock.getArgument(i).getType()) {
+      return emitOpError("type of entry block argument #")
+             << i << " (" << entryBlock.getArgument(i).getType()
+             << ") must match the type of the function argument ("
+             << funcType.getInput(i) << ")";
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// CallOp interface methods and verifySymbolUses
+//===----------------------------------------------------------------------===//
+
+CallInterfaceCallable CallOp::getCallableForCallee() {
+  return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+}
+
+void CallOp::setCalleeFromCallable(CallInterfaceCallable callee) {
+  (*this)->setAttr("callee", llvm::cast<SymbolRefAttr>(callee));
+}
+
+Operation::operand_range CallOp::getArgOperands() {
+  return getOperands();
+}
+
+MutableOperandRange CallOp::getArgOperandsMutable() {
+  return getOperandsMutable();
+}
+
+FunctionType CallOp::getCalleeType() {
+  return FunctionType::get(getContext(), getOperandTypes(), getResultTypes());
+}
+
+LogicalResult CallOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
+  // Check that the callee attribute was specified.
+  auto fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
+  if (!fnAttr) {
+    return emitOpError("requires a 'callee' symbol reference attribute");
+  }
+
+  auto fn = symbolTable.lookupNearestSymbolFrom<FuncOp>(*this, fnAttr);
+  if (!fn) {
+    return emitOpError() << "'" << fnAttr.getValue()
+                         << "' does not reference a valid function";
+  }
+
+  // Verify that the operand and result types match the callee.
+  FunctionType fnType = fn.getFunctionType();
+  if (fnType.getNumInputs() != getNumOperands()) {
+    return emitOpError("incorrect number of operands for callee");
+  }
+
+  for (unsigned i = 0, e = fnType.getNumInputs(); i != e; ++i) {
+    if (!typesAreCompatible(getOperand(i).getType(), fnType.getInput(i))) {
+      return emitOpError("operand type mismatch: expected ")
+             << fnType.getInput(i) << " but got " << getOperand(i).getType()
+             << " for operand #" << i;
+    }
+  }
+
+  if (fnType.getNumResults() != getNumResults()) {
+    return emitOpError("incorrect number of results for callee");
+  }
+
+  for (unsigned i = 0, e = fnType.getNumResults(); i != e; ++i) {
+    if (!typesAreCompatible(getResult(i).getType(), fnType.getResult(i))) {
+      return emitOpError("result type mismatch: expected ")
+             << fnType.getResult(i) << " but got " << getResult(i).getType()
+             << " for result #" << i;
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// LetExprOp verifier
+//===----------------------------------------------------------------------===//
+
+LogicalResult LetExprOp::verify() {
+  if (getBody().empty() || getBody().front().empty()) {
+    return emitOpError("body region must not be empty");
+  }
+
+  auto* terminator = getBody().front().getTerminator();
+  auto yieldOp = dyn_cast<YieldOp>(terminator);
+  if (!yieldOp) {
+    return emitOpError("body must end with polang_ast.yield");
+  }
+
+  if (!typesAreCompatible(yieldOp.getValue().getType(), getResult().getType())) {
+    return emitOpError("yield type ")
+           << yieldOp.getValue().getType() << " doesn't match result type "
+           << getResult().getType();
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ImportOp custom print/parse
+//===----------------------------------------------------------------------===//
+
+void ImportOp::print(OpAsmPrinter& p) {
+  p << " " << getModuleName();
+  if (getAlias()) {
+    p << " as " << *getAlias();
+  }
+  p.printOptionalAttrDict((*this)->getAttrs(),
+                          /*elidedAttrs=*/{"module_name", "alias"});
+}
+
+ParseResult ImportOp::parse(OpAsmParser& parser, OperationState& result) {
+  FlatSymbolRefAttr moduleRef;
+  if (parser.parseAttribute(moduleRef, "module_name", result.attributes)) {
+    return failure();
+  }
+
+  if (succeeded(parser.parseOptionalKeyword("as"))) {
+    FlatSymbolRefAttr aliasRef;
+    if (parser.parseAttribute(aliasRef, "alias", result.attributes)) {
+      return failure();
+    }
+  }
+
+  return parser.parseOptionalAttrDict(result.attributes);
+}
