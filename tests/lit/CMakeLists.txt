@@ -17,6 +17,7 @@ set(POLANG_OBJ_ROOT "${CMAKE_CURRENT_BINARY_DIR}")
 set(POLANG_SRC_ROOT "${CMAKE_SOURCE_DIR}")
 set(POLANG_COMPILER_PATH "${CMAKE_BINARY_DIR}/bin/PolangCompiler")
 set(POLANG_REPL_PATH "${CMAKE_BINARY_DIR}/bin/PolangRepl")
+set(POLANG_OPT_PATH "${CMAKE_BINARY_DIR}/bin/polang-opt")
 
 # Generate lit.site.cfg.py from template
 configure_file(
@@ -46,10 +47,21 @@ foreach(SUBDIR ${TEST_SUBDIRS})
     endforeach()
 endforeach()
 
+# Copy MLIR AST dialect test files
+file(GLOB MLIR_AST_TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/MLIR/AST/*.mlir")
+foreach(TEST_FILE ${MLIR_AST_TEST_FILES})
+    get_filename_component(TEST_NAME "${TEST_FILE}" NAME)
+    configure_file(
+        "${TEST_FILE}"
+        "${CMAKE_CURRENT_BINARY_DIR}/MLIR/AST/${TEST_NAME}"
+        COPYONLY
+    )
+endforeach()
+
 # Add custom target to run lit tests
 add_custom_target(check-polang-lit
     COMMAND ${LIT_COMMAND} -v "${CMAKE_CURRENT_BINARY_DIR}"
-    DEPENDS PolangCompiler PolangRepl
+    DEPENDS PolangCompiler PolangRepl polang-opt
     COMMENT "Running Polang lit tests"
     USES_TERMINAL
 )
@@ -62,5 +74,5 @@ add_test(
 
 # Set dependencies for the test
 set_tests_properties(polang-lit-tests PROPERTIES
-    DEPENDS "PolangCompiler;PolangRepl"
+    DEPENDS "PolangCompiler;PolangRepl;polang-opt"
 )
