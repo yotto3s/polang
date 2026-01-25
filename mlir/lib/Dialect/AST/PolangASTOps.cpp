@@ -345,10 +345,12 @@ ParseResult FuncOp::parse(OpAsmParser& parser, OperationState& result) {
 }
 
 LogicalResult FuncOp::verify() {
-  // Verify the function type matches the entry block arguments
+  // Function must have a body
   if (getBody().empty()) {
-    return success();
+    return emitOpError("must have a body");
   }
+
+  // Verify the function type matches the entry block arguments
 
   FunctionType funcType = getFunctionType();
   Block& entryBlock = getBody().front();
