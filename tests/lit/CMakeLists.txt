@@ -58,6 +58,17 @@ foreach(TEST_FILE ${MLIR_AST_TEST_FILES})
     )
 endforeach()
 
+# Copy MLIR AST dialect error test files
+file(GLOB MLIR_AST_ERROR_TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/MLIR/AST/Errors/*.mlir")
+foreach(TEST_FILE ${MLIR_AST_ERROR_TEST_FILES})
+    get_filename_component(TEST_NAME "${TEST_FILE}" NAME)
+    configure_file(
+        "${TEST_FILE}"
+        "${CMAKE_CURRENT_BINARY_DIR}/MLIR/AST/Errors/${TEST_NAME}"
+        COPYONLY
+    )
+endforeach()
+
 # Add custom target to run lit tests
 add_custom_target(check-polang-lit
     COMMAND ${LIT_COMMAND} -v "${CMAKE_CURRENT_BINARY_DIR}"

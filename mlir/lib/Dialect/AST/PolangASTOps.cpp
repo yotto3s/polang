@@ -37,6 +37,24 @@ bool typesAreCompatible(Type t1, Type t2) {
   }
   return false;
 }
+
+/// Check if a type is compatible with boolean for if conditions.
+/// A type is boolean-compatible if it's:
+/// - polang.bool (concrete bool type)
+/// - A type variable with 'any' kind (can unify with bool)
+/// Type variables with 'integer' or 'float' kind are NOT compatible.
+bool isBoolCompatible(Type type) {
+  if (isa<polang::BoolType>(type)) {
+    return true;
+  }
+  if (auto typeVar = dyn_cast<TypeVarType>(type)) {
+    return typeVar.isAny();
+  }
+  if (auto typeVar = dyn_cast<polang::TypeVarType>(type)) {
+    return typeVar.isAny();
+  }
+  return false;
+}
 } // namespace
 
 #define GET_OP_CLASSES
@@ -237,6 +255,14 @@ void IfOp::build(OpBuilder& builder, OperationState& state, Type resultType,
 }
 
 LogicalResult IfOp::verify() {
+  // Check condition type is compatible with boolean
+  Type condType = getCondition().getType();
+  if (!isBoolCompatible(condType)) {
+    return emitOpError(
+               "condition type must be bool or unconstrained type variable, got ")
+           << condType;
+  }
+
   // Check that both regions have terminators
   if (getThenRegion().empty() || getThenRegion().front().empty()) {
     return emitOpError("then region must not be empty");
