@@ -21,6 +21,24 @@
 using namespace mlir;
 using namespace polang::ast;
 
+namespace {
+/// Check if two types are compatible for verification purposes.
+/// Types are compatible if they are equal OR if either is a type variable.
+/// Type variables will be resolved by the type inference pass.
+bool typesAreCompatible(Type t1, Type t2) {
+  if (t1 == t2) {
+    return true;
+  }
+  if (isa<TypeVarType>(t1) || isa<TypeVarType>(t2)) {
+    return true;
+  }
+  if (isa<polang::TypeVarType>(t1) || isa<polang::TypeVarType>(t2)) {
+    return true;
+  }
+  return false;
+}
+} // namespace
+
 #define GET_OP_CLASSES
 #include "polang/Dialect/PolangASTOps.cpp.inc"
 
@@ -108,5 +126,49 @@ ParseResult ConstantFloatOp::parse(OpAsmParser& parser,
   auto attr = FloatAttr::get(attrType, value);
   result.addAttribute("value", attr);
   result.addTypes(resultType);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// Arithmetic operation verifiers
+//===----------------------------------------------------------------------===//
+
+LogicalResult AddOp::verify() {
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType())) {
+    return emitOpError("operand types must be compatible");
+  }
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType())) {
+    return emitOpError("result type must be compatible with operands");
+  }
+  return success();
+}
+
+LogicalResult SubOp::verify() {
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType())) {
+    return emitOpError("operand types must be compatible");
+  }
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType())) {
+    return emitOpError("result type must be compatible with operands");
+  }
+  return success();
+}
+
+LogicalResult MulOp::verify() {
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType())) {
+    return emitOpError("operand types must be compatible");
+  }
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType())) {
+    return emitOpError("result type must be compatible with operands");
+  }
+  return success();
+}
+
+LogicalResult DivOp::verify() {
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType())) {
+    return emitOpError("operand types must be compatible");
+  }
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType())) {
+    return emitOpError("result type must be compatible with operands");
+  }
   return success();
 }

@@ -99,4 +99,64 @@ def PolangAST_ConstantBoolOp : PolangAST_Op<"constant.bool", [Pure]> {
   let assemblyFormat = "$value attr-dict `:` type($result)";
 }
 
+//===----------------------------------------------------------------------===//
+// Arithmetic operations
+//===----------------------------------------------------------------------===//
+
+class PolangAST_ArithOp<string mnemonic> : PolangAST_Op<mnemonic, [Pure]> {
+  let arguments = (ins PolangAST_AnyNumericOrVar:$lhs, PolangAST_AnyNumericOrVar:$rhs);
+  let results = (outs PolangAST_AnyNumericOrVar:$result);
+  let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($lhs) `,` type($rhs) `->` type($result)";
+
+  let hasVerifier = 1;
+}
+
+def PolangAST_AddOp : PolangAST_ArithOp<"add"> {
+  let summary = "AST-level addition operation";
+  let description = [{
+    Adds two numeric values. Types may include type variables.
+
+    Example:
+    ```mlir
+    %0 = polang_ast.add %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+    ```
+  }];
+}
+
+def PolangAST_SubOp : PolangAST_ArithOp<"sub"> {
+  let summary = "AST-level subtraction operation";
+  let description = [{
+    Subtracts second operand from first. Types may include type variables.
+
+    Example:
+    ```mlir
+    %0 = polang_ast.sub %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+    ```
+  }];
+}
+
+def PolangAST_MulOp : PolangAST_ArithOp<"mul"> {
+  let summary = "AST-level multiplication operation";
+  let description = [{
+    Multiplies two numeric values. Types may include type variables.
+
+    Example:
+    ```mlir
+    %0 = polang_ast.mul %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+    ```
+  }];
+}
+
+def PolangAST_DivOp : PolangAST_ArithOp<"div"> {
+  let summary = "AST-level division operation";
+  let description = [{
+    Divides first operand by second. Types may include type variables.
+
+    Example:
+    ```mlir
+    %0 = polang_ast.div %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+    ```
+  }];
+}
+
 #endif // POLANG_AST_OPS_TD
