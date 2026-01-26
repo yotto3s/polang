@@ -431,9 +431,18 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
   }
 
   // Regular function call (no type arguments)
+  // Check for FuncOp first
   auto funcOp =
       symbolTable.lookupNearestSymbolFrom<FuncOp>(*this, getCalleeAttr());
   if (!funcOp) {
+    // Check for SpecializedFuncOp (after monomorphization)
+    auto specializedOp = symbolTable.lookupNearestSymbolFrom<SpecializedFuncOp>(
+        *this, getCalleeAttr());
+    if (specializedOp) {
+      // Specialized functions are valid call targets - detailed type checking
+      // is done during lowering when the body is instantiated
+      return success();
+    }
     return emitOpError("references undefined function '") << getCallee() << "'";
   }
 
