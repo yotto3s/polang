@@ -269,22 +269,22 @@ def PolangAST_YieldOp : PolangAST_Op<"yield", [Pure, Terminator, ParentOneOf<["I
   let assemblyFormat = "$value `:` type($value) attr-dict";
 }
 
-def PolangAST_YieldBindingsOp : PolangAST_Op<"yield.bindings",
+def PolangAST_YieldBindingOp : PolangAST_Op<"yield.binding",
     [Pure, Terminator, HasParent<"LetExprOp">]> {
-  let summary = "Yield bound values to let expression body";
+  let summary = "Yield bound value from a binding region";
   let description = [{
-    Terminates the bindings region of a let expression and yields
-    the bound values as inputs to the body region's block arguments.
+    Terminates a binding region of a let expression and yields
+    the bound value as input to the body region's corresponding block argument.
 
     Example:
     ```mlir
-    polang_ast.yield.bindings %x, %y : !polang.integer<64, signed>, !polang.integer<64, signed>
+    polang_ast.yield.binding %x : !polang.integer<64, signed>
     ```
   }];
 
-  let arguments = (ins Variadic<PolangAST_AnyTypeOrVar>:$values);
+  let arguments = (ins PolangAST_AnyTypeOrVar:$value);
 
-  let assemblyFormat = "($values^ `:` type($values))? attr-dict";
+  let assemblyFormat = "$value `:` type($value) attr-dict";
 }
 
 //===----------------------------------------------------------------------===//
@@ -435,53 +435,43 @@ def PolangAST_QualifiedRefOp : PolangAST_Op<"qualified_ref", [Pure]> {
 //===----------------------------------------------------------------------===//
 
 def PolangAST_LetExprOp : PolangAST_Op<"let_expr", [RecursiveMemoryEffects]> {
-  let summary = "Let-in expression with variable bindings";
+  let summary = "Let-in expression with separate binding regions";
   let description = [{
-    A let expression with separate regions for bindings and body.
-    The bindings region contains var_bind operations and ends with yield.bindings.
+    A let expression with separate regions for each binding and a body.
+    Each binding region computes a value independently and yields it.
     The body region receives bound values as block arguments.
+
+    Note: The body region is declared first in the region list (as MLIR requires
+    the variadic region to be last), but in the assembly format we print
+    bindings first followed by body for natural reading order.
 
     Example:
     ```mlir
-    %result = polang_ast.let_expr -> !polang.integer<64, signed> {
-      %x = polang_ast.var_bind "x" = %val : !polang.integer<64, signed>
-      polang_ast.yield.bindings %x : !polang.integer<64, signed>
-    } do {
-    ^bb0(%x_arg: !polang.integer<64, signed>):
-      polang_ast.yield %x_arg : !polang.integer<64, signed>
-    }
+    %result = polang_ast.let_expr ["x", "y"] -> !polang.integer<64, signed>
+      binding {
+        polang_ast.yield.binding %val1 : !polang.integer<64, signed>
+      }
+      binding {
+        polang_ast.yield.binding %val2 : !polang.integer<64, signed>
+      }
+      body {
+      ^bb0(%x: !polang.integer<64, signed>, %y: !polang.integer<64, signed>):
+        %sum = polang_ast.add %x, %y : ...
+        polang_ast.yield %sum : !polang.integer<64, signed>
+      }
     ```
   }];
 
+  let arguments = (ins StrArrayAttr:$var_names);
   let results = (outs PolangAST_AnyTypeOrVar:$result);
+  // Body must come first since MLIR requires variadic regions to be last
   let regions = (region
-    SizedRegion<1>:$bindings,
-    SizedRegion<1>:$body
+    SizedRegion<1>:$body,
+    VariadicRegion<SizedRegion<1>>:$bindings
   );
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
-}
-
-def PolangAST_VarBindOp : PolangAST_Op<"var_bind",
-    [Pure, HasParent<"LetExprOp">,
-     TypesMatchWith<"result type matches value type",
-                    "value", "result", "$_self">]> {
-  let summary = "Variable binding in let expression";
-  let description = [{
-    Binds a value to a variable name within a let expression.
-    Produces the bound value as an SSA result for use with yield.bindings.
-
-    Example:
-    ```mlir
-    %x = polang_ast.var_bind "x" = %val : !polang.integer<64, signed>
-    ```
-  }];
-
-  let arguments = (ins StrAttr:$var_name, PolangAST_AnyTypeOrVar:$value);
-  let results = (outs PolangAST_AnyTypeOrVar:$result);
-
-  let assemblyFormat = "$var_name `=` $value attr-dict `:` type($value)";
 }
 
 //===----------------------------------------------------------------------===//

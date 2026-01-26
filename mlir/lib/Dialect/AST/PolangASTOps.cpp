@@ -444,76 +444,102 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
 //===----------------------------------------------------------------------===//
 
 void LetExprOp::print(OpAsmPrinter& p) {
-  p << " -> " << getResult().getType() << " ";
-  p.printRegion(getBindings(), /*printEntryBlockArgs=*/false);
-  p << " do ";
+  // Print var_names attribute
+  p << " ";
+  p.printAttribute(getVarNamesAttr());
+  p << " -> " << getResult().getType();
+
+  // Print each binding region
+  for (Region& binding : getBindings()) {
+    p << "\n  binding ";
+    p.printRegion(binding, /*printEntryBlockArgs=*/false);
+  }
+
+  // Print body region
+  p << "\n  body ";
   p.printRegion(getBody(), /*printEntryBlockArgs=*/true);
-  p.printOptionalAttrDict((*this)->getAttrs());
+  p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"var_names"});
 }
 
 ParseResult LetExprOp::parse(OpAsmParser& parser, OperationState& result) {
-  // Parse: -> type { bindings } do { body }
+  // Parse: ["name1", "name2", ...] -> type binding { } binding { } body { }
+  ArrayAttr varNamesAttr;
   Type resultType;
-  if (parser.parseArrow() || parser.parseType(resultType)) {
+
+  if (parser.parseAttribute(varNamesAttr, "var_names", result.attributes) ||
+      parser.parseArrow() || parser.parseType(resultType)) {
     return failure();
   }
   result.addTypes(resultType);
 
-  // Parse bindings region
-  Region* bindings = result.addRegion();
-  if (parser.parseRegion(*bindings, /*arguments=*/{}, /*argTypes=*/{})) {
+  // Note: Body region must be added first (MLIR requires variadic regions last)
+  // but we parse bindings first for natural reading order
+
+  // Parse binding regions into temporary storage
+  size_t numBindings = varNamesAttr.size();
+  SmallVector<std::unique_ptr<Region>> bindingRegions;
+  for (size_t i = 0; i < numBindings; ++i) {
+    if (parser.parseKeyword("binding")) {
+      return failure();
+    }
+    auto bindingRegion = std::make_unique<Region>();
+    if (parser.parseRegion(*bindingRegion, /*arguments=*/{}, /*argTypes=*/{})) {
+      return failure();
+    }
+    if (bindingRegion->empty()) {
+      bindingRegion->push_back(new Block());
+    }
+    bindingRegions.push_back(std::move(bindingRegion));
+  }
+
+  // Parse body region and add it first (as required by region order)
+  if (parser.parseKeyword("body")) {
     return failure();
   }
-
-  // Ensure bindings region has an entry block
-  if (bindings->empty()) {
-    bindings->push_back(new Block());
-  }
-
-  // Parse "do" keyword
-  if (parser.parseKeyword("do")) {
-    return failure();
-  }
-
-  // Parse body region (with entry block args)
   Region* body = result.addRegion();
   if (parser.parseRegion(*body)) {
     return failure();
   }
-
-  // Ensure body region has an entry block
   if (body->empty()) {
     body->push_back(new Block());
   }
 
-  if (parser.parseOptionalAttrDict(result.attributes)) {
-    return failure();
+  // Now add binding regions (variadic, must be last in region list)
+  for (auto& bindingRegion : bindingRegions) {
+    Region* binding = result.addRegion();
+    binding->takeBody(*bindingRegion);
   }
 
-  return success();
+  return parser.parseOptionalAttrDict(result.attributes);
 }
 
 LogicalResult LetExprOp::verify() {
-  // 1. Bindings region must not be empty
-  if (getBindings().empty() || getBindings().front().empty()) {
-    return emitOpError("bindings region must not be empty");
+  // 1. Must have at least one binding
+  if (getBindings().empty()) {
+    return emitOpError("must have at least one binding region");
   }
 
-  // 2. Bindings must end with yield.bindings
-  auto* bindingsTerminator = getBindings().front().getTerminator();
-  auto yieldBindingsOp = dyn_cast<YieldBindingsOp>(bindingsTerminator);
-  if (!yieldBindingsOp) {
-    return emitOpError("bindings must end with polang_ast.yield.bindings");
+  // 2. Number of binding regions must match var_names count
+  if (getBindings().size() != getVarNames().size()) {
+    return emitOpError("number of binding regions (")
+           << getBindings().size() << ") must match var_names count ("
+           << getVarNames().size() << ")";
   }
 
-  // 3. Bindings region must only contain var_bind operations (+ terminator)
-  Block& bindingsBlock = getBindings().front();
-  for (Operation& op : bindingsBlock.without_terminator()) {
-    if (!isa<VarBindOp>(&op)) {
-      return emitOpError("bindings region must only contain polang_ast.var_bind "
-                         "operations, but found: ")
-             << op.getName();
+  // 3. Each binding region must have exactly one block ending with yield.binding
+  SmallVector<Type> bindingTypes;
+  for (auto [idx, binding] : llvm::enumerate(getBindings())) {
+    if (binding.empty() || binding.front().empty()) {
+      return emitOpError("binding region #") << idx << " must not be empty";
     }
+
+    auto* terminator = binding.front().getTerminator();
+    auto yieldBinding = dyn_cast<YieldBindingOp>(terminator);
+    if (!yieldBinding) {
+      return emitOpError("binding region #")
+             << idx << " must end with polang_ast.yield.binding";
+    }
+    bindingTypes.push_back(yieldBinding.getValue().getType());
   }
 
   // 4. Body region must not be empty
@@ -521,20 +547,20 @@ LogicalResult LetExprOp::verify() {
     return emitOpError("body region must not be empty");
   }
 
-  // 5. Body's block arguments must match yield.bindings operands
+  // 5. Body block arguments must match binding yields
   Block& bodyEntry = getBody().front();
-  if (bodyEntry.getNumArguments() != yieldBindingsOp.getValues().size()) {
+  if (bodyEntry.getNumArguments() != bindingTypes.size()) {
     return emitOpError("body block argument count (")
            << bodyEntry.getNumArguments()
-           << ") doesn't match yield.bindings operand count ("
-           << yieldBindingsOp.getValues().size() << ")";
+           << ") doesn't match binding count (" << bindingTypes.size() << ")";
   }
-  for (auto [blockArg, yieldVal] :
-       llvm::zip(bodyEntry.getArguments(), yieldBindingsOp.getValues())) {
-    if (!typesAreCompatible(blockArg.getType(), yieldVal.getType())) {
-      return emitOpError("body block argument type ")
-             << blockArg.getType() << " doesn't match yield.bindings type "
-             << yieldVal.getType();
+  for (auto [idx, pair] :
+       llvm::enumerate(llvm::zip(bodyEntry.getArguments(), bindingTypes))) {
+    auto [blockArg, yieldType] = pair;
+    if (!typesAreCompatible(blockArg.getType(), yieldType)) {
+      return emitOpError("body block argument #")
+             << idx << " type " << blockArg.getType()
+             << " doesn't match binding yield type " << yieldType;
     }
   }
 
