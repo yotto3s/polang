@@ -80,6 +80,72 @@ foreach(TEST_FILE ${MLIR_POLANG_TEST_FILES})
     )
 endforeach()
 
+# Copy MLIR Polang dialect error test files
+file(GLOB MLIR_POLANG_ERROR_TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/MLIR/Polang/Errors/*.mlir")
+foreach(TEST_FILE ${MLIR_POLANG_ERROR_TEST_FILES})
+    get_filename_component(TEST_NAME "${TEST_FILE}" NAME)
+    configure_file(
+        "${TEST_FILE}"
+        "${CMAKE_CURRENT_BINARY_DIR}/MLIR/Polang/Errors/${TEST_NAME}"
+        COPYONLY
+    )
+endforeach()
+
+# Copy MLIR Transforms name-resolution test files
+file(GLOB MLIR_NAMERESOLUTION_TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/MLIR/Transforms/name-resolution/*.mlir")
+foreach(TEST_FILE ${MLIR_NAMERESOLUTION_TEST_FILES})
+    get_filename_component(TEST_NAME "${TEST_FILE}" NAME)
+    configure_file(
+        "${TEST_FILE}"
+        "${CMAKE_CURRENT_BINARY_DIR}/MLIR/Transforms/name-resolution/${TEST_NAME}"
+        COPYONLY
+    )
+endforeach()
+
+# Copy MLIR Transforms name-resolution error test files
+file(GLOB MLIR_NAMERESOLUTION_ERROR_TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/MLIR/Transforms/name-resolution/errors/*.mlir")
+foreach(TEST_FILE ${MLIR_NAMERESOLUTION_ERROR_TEST_FILES})
+    get_filename_component(TEST_NAME "${TEST_FILE}" NAME)
+    configure_file(
+        "${TEST_FILE}"
+        "${CMAKE_CURRENT_BINARY_DIR}/MLIR/Transforms/name-resolution/errors/${TEST_NAME}"
+        COPYONLY
+    )
+endforeach()
+
+# Copy MLIR Transforms type-check test files
+file(GLOB MLIR_TYPECHECK_TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/MLIR/Transforms/type-check/*.mlir")
+foreach(TEST_FILE ${MLIR_TYPECHECK_TEST_FILES})
+    get_filename_component(TEST_NAME "${TEST_FILE}" NAME)
+    configure_file(
+        "${TEST_FILE}"
+        "${CMAKE_CURRENT_BINARY_DIR}/MLIR/Transforms/type-check/${TEST_NAME}"
+        COPYONLY
+    )
+endforeach()
+
+# Copy MLIR Transforms type-check error test files
+file(GLOB MLIR_TYPECHECK_ERROR_TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/MLIR/Transforms/type-check/errors/*.mlir")
+foreach(TEST_FILE ${MLIR_TYPECHECK_ERROR_TEST_FILES})
+    get_filename_component(TEST_NAME "${TEST_FILE}" NAME)
+    configure_file(
+        "${TEST_FILE}"
+        "${CMAKE_CURRENT_BINARY_DIR}/MLIR/Transforms/type-check/errors/${TEST_NAME}"
+        COPYONLY
+    )
+endforeach()
+
+# Copy MLIR Transforms ast-to-polang test files
+file(GLOB MLIR_ASTTOPOLANG_TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/MLIR/Transforms/ast-to-polang/*.mlir")
+foreach(TEST_FILE ${MLIR_ASTTOPOLANG_TEST_FILES})
+    get_filename_component(TEST_NAME "${TEST_FILE}" NAME)
+    configure_file(
+        "${TEST_FILE}"
+        "${CMAKE_CURRENT_BINARY_DIR}/MLIR/Transforms/ast-to-polang/${TEST_NAME}"
+        COPYONLY
+    )
+endforeach()
+
 # Add custom target to run lit tests
 add_custom_target(check-polang-lit
     COMMAND ${LIT_COMMAND} -v "${CMAKE_CURRENT_BINARY_DIR}"

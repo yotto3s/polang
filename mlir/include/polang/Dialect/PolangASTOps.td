@@ -313,6 +313,7 @@ def PolangAST_FuncOp : PolangAST_Op<"func", [
   let arguments = (ins
     SymbolNameAttr:$sym_name,
     TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<StrArrayAttr>:$captures,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
     OptionalAttr<DictArrayAttr>:$res_attrs
   );

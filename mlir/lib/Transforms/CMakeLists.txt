@@ -1,4 +1,6 @@
 add_mlir_library(PolangTransforms
+  NameResolution.cpp
+  TypeCheck.cpp
   TypeInference.cpp
   Monomorphization.cpp
 
@@ -10,6 +12,7 @@ add_mlir_library(PolangTransforms
 
   LINK_LIBS PUBLIC
   PolangDialect
+  PolangASTDialect
   MLIRIR
   MLIRPass
   MLIRFuncDialect

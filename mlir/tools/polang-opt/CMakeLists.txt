@@ -10,6 +10,8 @@ target_link_libraries(polang-opt
   PRIVATE
   PolangDialect
   PolangASTDialect
+  PolangTransforms
+  PolangConversion
   MLIRIR
   MLIRParser
   MLIRPass

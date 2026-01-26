@@ -19,6 +19,12 @@
 
 namespace polang {
 
+/// Create a pass to resolve variable references to SSA values.
+std::unique_ptr<mlir::Pass> createNameResolutionPass();
+
+/// Create a pass to validate type correctness of AST dialect IR.
+std::unique_ptr<mlir::Pass> createTypeCheckPass();
+
 /// Create a pass to infer types for type variables using Hindley-Milner.
 std::unique_ptr<mlir::Pass> createTypeInferencePass();
 
