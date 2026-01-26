@@ -1,7 +1,8 @@
 // RUN: %polang_opt %s -split-input-file -verify-diagnostics
 
-// Note: "binding count must match var_names count" is enforced at parse time,
-// not at verifier time, since the parser reads exactly var_names.size() bindings.
+// Note: in textual form, "binding count must match var_names count" is guaranteed
+// by the parser (it reads exactly var_names.size() bindings), but the verifier
+// still enforces this for programmatic IR construction.
 
 // Test that body block argument count must match binding count
 %0 = polang_ast.constant.integer 10 : !polang.integer<64, signed>
