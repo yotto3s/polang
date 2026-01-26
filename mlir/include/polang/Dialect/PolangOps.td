@@ -9,6 +9,7 @@
 
 include "polang/Dialect/PolangDialect.td"
 include "polang/Dialect/PolangTypes.td"
+include "polang/Dialect/PolangEnums.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
@@ -254,22 +255,8 @@ def Polang_CastOp : Polang_Op<"cast", [Pure]> {
 
 //===----------------------------------------------------------------------===//
 // Comparison operations
+// CmpPredicate enum is defined in PolangEnums.td (shared with AST dialect)
 //===----------------------------------------------------------------------===//
-
-def Polang_CmpPredicateEQ  : I64EnumAttrCase<"eq", 0>;
-def Polang_CmpPredicateNE  : I64EnumAttrCase<"ne", 1>;
-def Polang_CmpPredicateLT  : I64EnumAttrCase<"lt", 2>;
-def Polang_CmpPredicateLE  : I64EnumAttrCase<"le", 3>;
-def Polang_CmpPredicateGT  : I64EnumAttrCase<"gt", 4>;
-def Polang_CmpPredicateGE  : I64EnumAttrCase<"ge", 5>;
-
-def Polang_CmpPredicate : I64EnumAttr<
-    "CmpPredicate", "comparison predicate",
-    [Polang_CmpPredicateEQ, Polang_CmpPredicateNE,
-     Polang_CmpPredicateLT, Polang_CmpPredicateLE,
-     Polang_CmpPredicateGT, Polang_CmpPredicateGE]> {
-  let cppNamespace = "::polang";
-}
 
 def Polang_CmpOp : Polang_Op<"cmp", [
     Pure,
@@ -467,15 +454,78 @@ def Polang_IfOp : Polang_Op<"if", [
 def Polang_YieldOp : Polang_Op<"yield", [
     Pure,
     Terminator,
-    ParentOneOf<["IfOp"]>
+    ParentOneOf<["IfOp", "LetExprOp"]>
   ]> {
   let summary = "Yield value from region";
   let description = [{
-    Yields a value from a region (if-then-else branches).
+    Yields a value from a region (if-then-else branches, let expressions).
 
     Example:
     ```mlir
     polang.yield %0 : !polang.integer<64, signed>
+    ```
+  }];
+
+  let arguments = (ins Polang_AnyTypeOrVar:$value);
+
+  let assemblyFormat = "$value `:` type($value) attr-dict";
+}
+
+//===----------------------------------------------------------------------===//
+// Let expression operations
+//===----------------------------------------------------------------------===//
+
+def Polang_LetExprOp : Polang_Op<"let_expr", [RecursiveMemoryEffects]> {
+  let summary = "Let-in expression with separate binding regions";
+  let description = [{
+    A let expression with separate regions for each binding and a body.
+    Each binding region computes a value independently and yields it via
+    yield.binding. The body region receives bound values as block arguments.
+
+    Binding regions are isolated from each other, enabling parallel evaluation.
+
+    Example:
+    ```mlir
+    %result = polang.let_expr ["x", "y"] -> !polang.integer<64, signed>
+      binding {
+        polang.yield.binding %val1 : !polang.integer<64, signed>
+      }
+      binding {
+        polang.yield.binding %val2 : !polang.integer<64, signed>
+      }
+      body {
+      ^bb0(%x: !polang.integer<64, signed>, %y: !polang.integer<64, signed>):
+        %sum = polang.add %x, %y : ...
+        polang.yield %sum : !polang.integer<64, signed>
+      }
+    ```
+  }];
+
+  let arguments = (ins StrArrayAttr:$var_names);
+  let results = (outs Polang_AnyTypeOrVar:$result);
+  // Body must come first since MLIR requires variadic regions to be last
+  let regions = (region
+    SizedRegion<1>:$body,
+    VariadicRegion<SizedRegion<1>>:$bindings
+  );
+
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+}
+
+def Polang_YieldBindingOp : Polang_Op<"yield.binding", [
+    Pure,
+    Terminator,
+    HasParent<"LetExprOp">
+  ]> {
+  let summary = "Yield bound value from a binding region";
+  let description = [{
+    Terminates a binding region of a let expression and yields
+    the bound value as input to the body region's corresponding block argument.
+
+    Example:
+    ```mlir
+    polang.yield.binding %x : !polang.integer<64, signed>
     ```
   }];
 
