@@ -67,6 +67,24 @@ public:
       }
       llvm_unreachable("Unknown TypeVarKind");
     });
+    // Handle type parameters that weren't substituted - apply defaults based on
+    // constraint (for explicit generics)
+    addConversion([](TypeParamType type) -> Type {
+      auto* ctx = type.getContext();
+      switch (type.getConstraint()) {
+      case TypeParamKind::Integer:
+        // Default integer type parameters to i64
+        return mlir::IntegerType::get(ctx, 64);
+      case TypeParamKind::Float:
+        // Default float type parameters to f64
+        return Float64Type::get(ctx);
+      case TypeParamKind::Numeric:
+      case TypeParamKind::Any:
+        // Generic type params default to i64
+        return mlir::IntegerType::get(ctx, 64);
+      }
+      llvm_unreachable("Unknown TypeParamKind");
+    });
   }
 };
 
