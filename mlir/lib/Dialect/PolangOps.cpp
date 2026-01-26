@@ -99,6 +99,149 @@ void CallOp::build(OpBuilder& builder, OperationState& state, StringRef callee,
   state.addTypes(results);
 }
 
+void CallOp::build(OpBuilder& builder, OperationState& state, StringRef callee,
+                   ArrayAttr typeArgs, TypeRange results, ValueRange operands) {
+  state.addOperands(operands);
+  state.addAttribute("callee",
+                     SymbolRefAttr::get(builder.getContext(), callee));
+  if (typeArgs) {
+    state.addAttribute("type_args", typeArgs);
+  }
+  state.addTypes(results);
+}
+
+void CallOp::print(OpAsmPrinter& p) {
+  p << " @" << getCallee();
+
+  // Print type arguments if present
+  if (auto typeArgs = getTypeArgs()) {
+    p << "<[";
+    llvm::interleaveComma(*typeArgs, p, [&](Attribute attr) {
+      p.printAttribute(attr);
+    });
+    p << "]>";
+  }
+
+  // Print operands
+  p << "(";
+  p.printOperands(getOperands());
+  p << ")";
+
+  // Print optional attributes (excluding callee and type_args)
+  SmallVector<StringRef> elidedAttrs = {"callee"};
+  if (getTypeArgs()) {
+    elidedAttrs.push_back("type_args");
+  }
+  p.printOptionalAttrDict((*this)->getAttrs(), elidedAttrs);
+
+  // Print function type
+  p << " : (";
+  llvm::interleaveComma(getOperandTypes(), p, [&](Type type) {
+    p.printType(type);
+  });
+  p << ") -> ";
+  if (getNumResults() == 0) {
+    p << "()";
+  } else {
+    p.printType(getResult().getType());
+  }
+}
+
+ParseResult CallOp::parse(OpAsmParser& parser, OperationState& result) {
+  FlatSymbolRefAttr calleeAttr;
+  SmallVector<OpAsmParser::UnresolvedOperand> operands;
+  SmallVector<Type> operandTypes;
+  Type resultType;
+
+  // Parse callee symbol
+  if (parser.parseAttribute(calleeAttr, "callee", result.attributes)) {
+    return failure();
+  }
+
+  // Parse optional type arguments: <[type1, type2, ...]>
+  if (succeeded(parser.parseOptionalLess())) {
+    if (parser.parseLSquare()) {
+      return failure();
+    }
+
+    SmallVector<Attribute> typeArgs;
+    if (failed(parser.parseOptionalRSquare())) {
+      do {
+        Type type;
+        if (parser.parseType(type)) {
+          return failure();
+        }
+        typeArgs.push_back(TypeAttr::get(type));
+      } while (succeeded(parser.parseOptionalComma()));
+
+      if (parser.parseRSquare()) {
+        return failure();
+      }
+    }
+
+    if (parser.parseGreater()) {
+      return failure();
+    }
+
+    if (!typeArgs.empty()) {
+      result.addAttribute("type_args",
+                          parser.getBuilder().getArrayAttr(typeArgs));
+    }
+  }
+
+  // Parse operands
+  if (parser.parseLParen()) {
+    return failure();
+  }
+
+  if (failed(parser.parseOptionalRParen())) {
+    if (parser.parseOperandList(operands) || parser.parseRParen()) {
+      return failure();
+    }
+  }
+
+  // Parse optional attributes
+  if (parser.parseOptionalAttrDict(result.attributes)) {
+    return failure();
+  }
+
+  // Parse function type: (operand_types) -> result_type
+  if (parser.parseColon() || parser.parseLParen()) {
+    return failure();
+  }
+
+  if (failed(parser.parseOptionalRParen())) {
+    if (parser.parseTypeList(operandTypes) || parser.parseRParen()) {
+      return failure();
+    }
+  }
+
+  if (parser.parseArrow()) {
+    return failure();
+  }
+
+  // Parse result type (could be () for void or a single type)
+  if (succeeded(parser.parseOptionalLParen())) {
+    if (parser.parseRParen()) {
+      return failure();
+    }
+    // No result type
+  } else {
+    if (parser.parseType(resultType)) {
+      return failure();
+    }
+    result.addTypes(resultType);
+  }
+
+  // Resolve operands
+  if (parser.resolveOperands(operands, operandTypes, parser.getNameLoc(),
+                             result.operands)) {
+    return failure();
+  }
+
+  return success();
+}
+
 CallInterfaceCallable CallOp::getCallableForCallee() {
   return (*this)->getAttrOfType<SymbolRefAttr>("callee");
 }
@@ -220,6 +363,74 @@ LogicalResult CallOp::verify() {
 }
 
 LogicalResult CallOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
+  auto typeArgs = getTypeArgs();
+
+  // If type arguments are provided, must call a generic function
+  if (typeArgs) {
+    auto genericFuncOp =
+        symbolTable.lookupNearestSymbolFrom<GenericFuncOp>(*this,
+                                                          getCalleeAttr());
+    if (!genericFuncOp) {
+      // Check if it's a regular function (error: type args on non-generic)
+      auto funcOp =
+          symbolTable.lookupNearestSymbolFrom<FuncOp>(*this, getCalleeAttr());
+      if (funcOp) {
+        return emitOpError("type arguments provided but '")
+               << getCallee() << "' is not a generic function";
+      }
+      return emitOpError("references undefined function '")
+             << getCallee() << "'";
+    }
+
+    // Check type argument count matches type parameter count
+    unsigned numTypeParams = genericFuncOp.getNumTypeParams();
+    if (typeArgs->size() != numTypeParams) {
+      return emitOpError("expects ")
+             << numTypeParams << " type argument(s) but got "
+             << typeArgs->size();
+    }
+
+    // Check that each type argument satisfies its constraint
+    for (size_t i = 0; i < typeArgs->size(); ++i) {
+      auto typeArg = llvm::cast<TypeAttr>((*typeArgs)[i]).getValue();
+      auto constraint = genericFuncOp.getConstraintAt(i);
+      auto paramName =
+          llvm::cast<StringAttr>(genericFuncOp.getTypeParams()[i]).getValue();
+
+      // Check constraint satisfaction
+      bool satisfies = false;
+      switch (constraint) {
+      case TypeParamKind::Any:
+        satisfies = llvm::isa<polang::IntegerType>(typeArg) ||
+                    llvm::isa<polang::FloatType>(typeArg) ||
+                    llvm::isa<BoolType>(typeArg);
+        break;
+      case TypeParamKind::Numeric:
+        satisfies = llvm::isa<polang::IntegerType>(typeArg) ||
+                    llvm::isa<polang::FloatType>(typeArg);
+        break;
+      case TypeParamKind::Integer:
+        satisfies = llvm::isa<polang::IntegerType>(typeArg);
+        break;
+      case TypeParamKind::Float:
+        satisfies = llvm::isa<polang::FloatType>(typeArg);
+        break;
+      }
+
+      if (!satisfies) {
+        return emitOpError("type argument ")
+               << typeArg << " does not satisfy '"
+               << stringifyTypeParamKind(constraint)
+               << "' constraint for type parameter '" << paramName << "'";
+      }
+    }
+
+    // For generic calls, we skip argument type checking since the types
+    // contain TypeParamType which will be resolved during monomorphization
+    return success();
+  }
+
+  // Regular function call (no type arguments)
   auto funcOp =
       symbolTable.lookupNearestSymbolFrom<FuncOp>(*this, getCalleeAttr());
   if (!funcOp) {

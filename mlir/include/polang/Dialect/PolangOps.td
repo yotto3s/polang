@@ -351,27 +351,40 @@ def Polang_CallOp : Polang_Op<"call", [
   let summary = "Function call";
   let description = [{
     Calls a function with the given arguments.
+    For generic functions, type arguments can be provided.
 
-    Example:
+    Examples:
     ```mlir
+    // Regular function call
     %0 = polang.call @add(%a, %b) : (!polang.integer<64, signed>, !polang.integer<64, signed>) -> !polang.integer<64, signed>
+
+    // Generic function call with type arguments
+    %1 = polang.call @identity<[!polang.integer<64, signed>]>(%x) : (!polang.integer<64, signed>) -> !polang.integer<64, signed>
     ```
   }];
 
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<Polang_AnyTypeOrVar>:$operands);
+  let arguments = (ins
+    FlatSymbolRefAttr:$callee,
+    OptionalAttr<TypeArrayAttr>:$type_args,
+    Variadic<Polang_AnyTypeOrVar>:$operands
+  );
   let results = (outs Optional<Polang_AnyTypeOrVar>:$result);
 
-  let assemblyFormat = [{
-    $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
-  }];
+  let hasCustomAssemblyFormat = 1;
 
   let builders = [
     OpBuilder<(ins "llvm::StringRef":$callee, "mlir::TypeRange":$results,
+                   CArg<"mlir::ValueRange", "{}">:$operands)>,
+    OpBuilder<(ins "llvm::StringRef":$callee, "mlir::ArrayAttr":$typeArgs,
+                   "mlir::TypeRange":$results,
                    CArg<"mlir::ValueRange", "{}">:$operands)>
   ];
 
   let extraClassDeclaration = [{
     mlir::FunctionType getCalleeType();
+
+    /// Check if this is a generic function call (has type arguments).
+    bool isGenericCall() { return getTypeArgs().has_value(); }
   }];
 
   let hasVerifier = 1;
