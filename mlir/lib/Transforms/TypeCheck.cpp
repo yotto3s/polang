@@ -170,9 +170,8 @@ private:
 
     auto expectedArgs = funcOp.getNumArguments();
     if (numArgs != expectedArgs) {
-      callOp.emitError("function @")
-          << callee << " expects " << expectedArgs << " arguments but got "
-          << numArgs;
+      callOp.emitError("function @") << callee << " expects " << expectedArgs
+                                     << " arguments but got " << numArgs;
       hadError = true;
     }
   }

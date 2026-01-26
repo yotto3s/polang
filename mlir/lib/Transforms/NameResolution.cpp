@@ -105,8 +105,7 @@ private:
   void resolveFunction(ASTFuncOp func, bool& hadError) {
     // Collect all var_refs to resolve (can't modify while walking)
     SmallVector<ASTVarRefOp> varRefsToResolve;
-    func.walk(
-        [&](ASTVarRefOp varRef) { varRefsToResolve.push_back(varRef); });
+    func.walk([&](ASTVarRefOp varRef) { varRefsToResolve.push_back(varRef); });
 
     // Resolve each var_ref
     for (ASTVarRefOp varRef : varRefsToResolve) {

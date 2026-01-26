@@ -164,9 +164,8 @@ private:
   [[nodiscard]] llvm::StringMap<GenericFuncOp>
   collectGenericFunctions(ModuleOp module) {
     llvm::StringMap<GenericFuncOp> genericFuncs;
-    module.walk([&](GenericFuncOp func) {
-      genericFuncs[func.getSymName()] = func;
-    });
+    module.walk(
+        [&](GenericFuncOp func) { genericFuncs[func.getSymName()] = func; });
     return genericFuncs;
   }
 
@@ -329,8 +328,8 @@ private:
 
   /// Collect all unique call signatures for each polymorphic function.
   [[nodiscard]] llvm::StringMap<llvm::StringMap<CallSignature>>
-  collectCallSignaturesLegacy(
-      ModuleOp module, const llvm::StringMap<FuncOp>& polymorphicFuncs) {
+  collectCallSignaturesLegacy(ModuleOp module,
+                              const llvm::StringMap<FuncOp>& polymorphicFuncs) {
     llvm::StringMap<llvm::StringMap<CallSignature>> callSignatures;
 
     module.walk([&](CallOp call) {

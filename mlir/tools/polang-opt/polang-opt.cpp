@@ -8,6 +8,11 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
@@ -56,6 +61,13 @@ void registerPolangPasses() {
       [](mlir::OpPassManager& pm) {
         pm.addPass(polang::createASTToPolangPass());
       });
+
+  // Register Polang-to-Standard lowering pass
+  mlir::PassPipelineRegistration<>(
+      "convert-polang-to-standard", "Lower Polang dialect to standard dialects",
+      [](mlir::OpPassManager& pm) {
+        pm.addPass(polang::createPolangToStandardPass());
+      });
 }
 
 } // namespace
@@ -66,6 +78,12 @@ int main(int argc, char** argv) {
   mlir::DialectRegistry registry;
   registry.insert<polang::PolangDialect>();
   registry.insert<polang::ast::PolangASTDialect>();
+  // Register dialects needed for lowering
+  registry.insert<mlir::arith::ArithDialect>();
+  registry.insert<mlir::func::FuncDialect>();
+  registry.insert<mlir::scf::SCFDialect>();
+  registry.insert<mlir::memref::MemRefDialect>();
+  registry.insert<mlir::LLVM::LLVMDialect>();
   return mlir::asMainReturnCode(
       mlir::MlirOptMain(argc, argv, "Polang optimizer", registry));
 }

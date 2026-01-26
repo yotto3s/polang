@@ -116,9 +116,8 @@ void CallOp::print(OpAsmPrinter& p) {
   // Print type arguments if present
   if (auto typeArgs = getTypeArgs()) {
     p << "<[";
-    llvm::interleaveComma(*typeArgs, p, [&](Attribute attr) {
-      p.printAttribute(attr);
-    });
+    llvm::interleaveComma(*typeArgs, p,
+                          [&](Attribute attr) { p.printAttribute(attr); });
     p << "]>";
   }
 
@@ -136,9 +135,8 @@ void CallOp::print(OpAsmPrinter& p) {
 
   // Print function type
   p << " : (";
-  llvm::interleaveComma(getOperandTypes(), p, [&](Type type) {
-    p.printType(type);
-  });
+  llvm::interleaveComma(getOperandTypes(), p,
+                        [&](Type type) { p.printType(type); });
   p << ") -> ";
   if (getNumResults() == 0) {
     p << "()";
@@ -367,9 +365,8 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
 
   // If type arguments are provided, must call a generic function
   if (typeArgs) {
-    auto genericFuncOp =
-        symbolTable.lookupNearestSymbolFrom<GenericFuncOp>(*this,
-                                                          getCalleeAttr());
+    auto genericFuncOp = symbolTable.lookupNearestSymbolFrom<GenericFuncOp>(
+        *this, getCalleeAttr());
     if (!genericFuncOp) {
       // Check if it's a regular function (error: type args on non-generic)
       auto funcOp =
