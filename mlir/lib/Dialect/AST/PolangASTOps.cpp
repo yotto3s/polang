@@ -499,53 +499,41 @@ LogicalResult LetExprOp::verify() {
     return emitOpError("bindings region must not be empty");
   }
 
-  // 2. Bindings must end with yield.bindings
+  // 2. Bindings must end with yield.binding
   auto* bindingsTerminator = getBindings().front().getTerminator();
-  auto yieldBindingsOp = dyn_cast<YieldBindingsOp>(bindingsTerminator);
-  if (!yieldBindingsOp) {
-    return emitOpError("bindings must end with polang_ast.yield.bindings");
+  auto yieldBindingOp = dyn_cast<YieldBindingOp>(bindingsTerminator);
+  if (!yieldBindingOp) {
+    return emitOpError("bindings must end with polang_ast.yield.binding");
   }
 
-  // 3. Bindings region must only contain var_bind operations (+ terminator)
-  Block& bindingsBlock = getBindings().front();
-  for (Operation& op : bindingsBlock.without_terminator()) {
-    if (!isa<VarBindOp>(&op)) {
-      return emitOpError("bindings region must only contain polang_ast.var_bind "
-                         "operations, but found: ")
-             << op.getName();
-    }
-  }
-
-  // 4. Body region must not be empty
+  // 3. Body region must not be empty
   if (getBody().empty() || getBody().front().empty()) {
     return emitOpError("body region must not be empty");
   }
 
-  // 5. Body's block arguments must match yield.bindings operands
+  // 4. Body must have exactly one block argument matching the yield.binding value
   Block& bodyEntry = getBody().front();
-  if (bodyEntry.getNumArguments() != yieldBindingsOp.getValues().size()) {
+  if (bodyEntry.getNumArguments() != 1) {
     return emitOpError("body block argument count (")
            << bodyEntry.getNumArguments()
-           << ") doesn't match yield.bindings operand count ("
-           << yieldBindingsOp.getValues().size() << ")";
+           << ") must be 1 to match yield.binding";
   }
-  for (auto [blockArg, yieldVal] :
-       llvm::zip(bodyEntry.getArguments(), yieldBindingsOp.getValues())) {
-    if (!typesAreCompatible(blockArg.getType(), yieldVal.getType())) {
-      return emitOpError("body block argument type ")
-             << blockArg.getType() << " doesn't match yield.bindings type "
-             << yieldVal.getType();
-    }
+  if (!typesAreCompatible(bodyEntry.getArgument(0).getType(),
+                          yieldBindingOp.getValue().getType())) {
+    return emitOpError("body block argument type ")
+           << bodyEntry.getArgument(0).getType()
+           << " doesn't match yield.binding type "
+           << yieldBindingOp.getValue().getType();
   }
 
-  // 6. Body must end with polang_ast.yield
+  // 5. Body must end with polang_ast.yield
   auto* bodyTerminator = getBody().front().getTerminator();
   auto yieldOp = dyn_cast<YieldOp>(bodyTerminator);
   if (!yieldOp) {
     return emitOpError("body must end with polang_ast.yield");
   }
 
-  // 7. Yield type must match result type
+  // 6. Yield type must match result type
   if (!typesAreCompatible(yieldOp.getValue().getType(), getResult().getType())) {
     return emitOpError("yield type ")
            << yieldOp.getValue().getType() << " doesn't match result type "

@@ -269,22 +269,22 @@ def PolangAST_YieldOp : PolangAST_Op<"yield", [Pure, Terminator, ParentOneOf<["I
   let assemblyFormat = "$value `:` type($value) attr-dict";
 }
 
-def PolangAST_YieldBindingsOp : PolangAST_Op<"yield.bindings",
+def PolangAST_YieldBindingOp : PolangAST_Op<"yield.binding",
     [Pure, Terminator, HasParent<"LetExprOp">]> {
-  let summary = "Yield bound values to let expression body";
+  let summary = "Yield bound value from a binding region";
   let description = [{
-    Terminates the bindings region of a let expression and yields
-    the bound values as inputs to the body region's block arguments.
+    Terminates a binding region of a let expression and yields
+    the bound value as input to the body region's corresponding block argument.
 
     Example:
     ```mlir
-    polang_ast.yield.bindings %x, %y : !polang.integer<64, signed>, !polang.integer<64, signed>
+    polang_ast.yield.binding %x : !polang.integer<64, signed>
     ```
   }];
 
-  let arguments = (ins Variadic<PolangAST_AnyTypeOrVar>:$values);
+  let arguments = (ins PolangAST_AnyTypeOrVar:$value);
 
-  let assemblyFormat = "($values^ `:` type($values))? attr-dict";
+  let assemblyFormat = "$value `:` type($value) attr-dict";
 }
 
 //===----------------------------------------------------------------------===//
@@ -438,14 +438,14 @@ def PolangAST_LetExprOp : PolangAST_Op<"let_expr", [RecursiveMemoryEffects]> {
   let summary = "Let-in expression with variable bindings";
   let description = [{
     A let expression with separate regions for bindings and body.
-    The bindings region contains var_bind operations and ends with yield.bindings.
-    The body region receives bound values as block arguments.
+    The bindings region contains a var_bind operation and ends with yield.binding.
+    The body region receives the bound value as a block argument.
 
     Example:
     ```mlir
     %result = polang_ast.let_expr -> !polang.integer<64, signed> {
       %x = polang_ast.var_bind "x" = %val : !polang.integer<64, signed>
-      polang_ast.yield.bindings %x : !polang.integer<64, signed>
+      polang_ast.yield.binding %x : !polang.integer<64, signed>
     } do {
     ^bb0(%x_arg: !polang.integer<64, signed>):
       polang_ast.yield %x_arg : !polang.integer<64, signed>
@@ -470,7 +470,7 @@ def PolangAST_VarBindOp : PolangAST_Op<"var_bind",
   let summary = "Variable binding in let expression";
   let description = [{
     Binds a value to a variable name within a let expression.
-    Produces the bound value as an SSA result for use with yield.bindings.
+    Produces the bound value as an SSA result for use with yield.binding.
 
     Example:
     ```mlir
