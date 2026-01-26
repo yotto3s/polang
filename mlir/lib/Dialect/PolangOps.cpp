@@ -22,13 +22,17 @@ using namespace polang;
 
 namespace {
 /// Check if two types are compatible for verification purposes.
-/// Types are compatible if they are equal OR if either is a type variable.
-/// Type variables will be resolved by the type inference pass.
+/// Types are compatible if they are equal OR if either is a type variable
+/// or type parameter. Type variables will be resolved by type inference,
+/// and type parameters will be resolved by monomorphization.
 bool typesAreCompatible(Type t1, Type t2) {
   if (t1 == t2) {
     return true;
   }
-  if (isa<TypeVarType>(t1) || isa<TypeVarType>(t2)) {
+  if (llvm::isa<TypeVarType>(t1) || llvm::isa<TypeVarType>(t2)) {
+    return true;
+  }
+  if (llvm::isa<TypeParamType>(t1) || llvm::isa<TypeParamType>(t2)) {
     return true;
   }
   return false;
@@ -177,12 +181,16 @@ LogicalResult IfOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult ReturnOp::verify() {
-  auto funcOp = dyn_cast<FuncOp>((*this)->getParentOp());
-  if (!funcOp) {
-    return emitOpError("must be inside a polang.func");
-  }
+  auto* parentOp = (*this)->getParentOp();
+  llvm::ArrayRef<Type> resultTypes;
 
-  auto resultTypes = funcOp.getResultTypes();
+  if (auto funcOp = dyn_cast<FuncOp>(parentOp)) {
+    resultTypes = funcOp.getResultTypes();
+  } else if (auto genericFuncOp = dyn_cast<GenericFuncOp>(parentOp)) {
+    resultTypes = genericFuncOp.getResultTypes();
+  } else {
+    return emitOpError("must be inside a polang.func or polang.generic_func");
+  }
 
   if (getValue()) {
     if (resultTypes.empty()) {
@@ -426,6 +434,330 @@ ParseResult ConstantFloatOp::parse(OpAsmParser& parser,
   result.addAttribute("value", attr);
   result.addTypes(resultType);
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// GenericFuncOp
+//===----------------------------------------------------------------------===//
+
+void GenericFuncOp::print(OpAsmPrinter& p) {
+  p << " @" << getSymName() << "<";
+
+  // Print type parameters with constraints
+  auto typeParams = getTypeParams();
+  auto constraints = getConstraints();
+  for (size_t i = 0; i < typeParams.size(); ++i) {
+    if (i > 0) {
+      p << ", ";
+    }
+    auto name = llvm::cast<StringAttr>(typeParams[i]).getValue();
+    p << name;
+    auto constraint = llvm::cast<TypeParamKindAttr>(constraints[i]).getValue();
+    if (constraint != TypeParamKind::Any) {
+      p << ": " << stringifyTypeParamKind(constraint);
+    }
+  }
+  p << ">";
+
+  // Print function signature using MLIR's function printing utility
+  function_interface_impl::printFunctionSignature(
+      p, *this, getFunctionType().getInputs(), /*isVariadic=*/false,
+      getFunctionType().getResults());
+
+  // Print body
+  p << " ";
+  p.printRegion(getBody(), /*printEntryBlockArgs=*/false);
+
+  // Print optional attributes
+  function_interface_impl::printFunctionAttributes(
+      p, *this,
+      {getSymNameAttrName(), getFunctionTypeAttrName(), getTypeParamsAttrName(),
+       getConstraintsAttrName(), getArgAttrsAttrName(), getResAttrsAttrName()});
+}
+
+ParseResult GenericFuncOp::parse(OpAsmParser& parser, OperationState& result) {
+  StringAttr nameAttr;
+  SmallVector<Attribute> typeParamAttrs;
+  SmallVector<Attribute> constraintAttrs;
+
+  // Parse function name
+  if (parser.parseSymbolName(nameAttr, getSymNameAttrName(result.name),
+                             result.attributes)) {
+    return failure();
+  }
+
+  // Parse type parameters: <T, N: numeric, ...>
+  if (parser.parseLess()) {
+    return failure();
+  }
+
+  do {
+    StringRef paramName;
+    if (parser.parseKeyword(&paramName)) {
+      return failure();
+    }
+    typeParamAttrs.push_back(parser.getBuilder().getStringAttr(paramName));
+
+    // Parse optional constraint
+    TypeParamKind constraint = TypeParamKind::Any;
+    if (succeeded(parser.parseOptionalColon())) {
+      StringRef constraintStr;
+      if (parser.parseKeyword(&constraintStr)) {
+        return failure();
+      }
+      auto maybeConstraint = symbolizeTypeParamKind(constraintStr);
+      if (!maybeConstraint) {
+        return parser.emitError(parser.getCurrentLocation(),
+                                "invalid type parameter constraint");
+      }
+      constraint = *maybeConstraint;
+    }
+    constraintAttrs.push_back(
+        TypeParamKindAttr::get(parser.getContext(), constraint));
+  } while (succeeded(parser.parseOptionalComma()));
+
+  if (parser.parseGreater()) {
+    return failure();
+  }
+
+  result.addAttribute(getTypeParamsAttrName(result.name),
+                      parser.getBuilder().getArrayAttr(typeParamAttrs));
+  result.addAttribute(getConstraintsAttrName(result.name),
+                      parser.getBuilder().getArrayAttr(constraintAttrs));
+
+  // Parse function signature
+  SmallVector<OpAsmParser::Argument> args;
+  SmallVector<Type> resultTypes;
+  SmallVector<DictionaryAttr> resultAttrs;
+  bool isVariadic = false;
+
+  if (function_interface_impl::parseFunctionSignature(
+          parser, /*allowVariadic=*/false, args, isVariadic, resultTypes,
+          resultAttrs)) {
+    return failure();
+  }
+
+  SmallVector<Type> argTypes;
+  for (auto& arg : args) {
+    argTypes.push_back(arg.type);
+  }
+  auto funcType = parser.getBuilder().getFunctionType(argTypes, resultTypes);
+  result.addAttribute(getFunctionTypeAttrName(result.name),
+                      TypeAttr::get(funcType));
+
+  // Parse function body
+  auto* body = result.addRegion();
+  if (parser.parseRegion(*body, args)) {
+    return failure();
+  }
+
+  // Parse optional attributes
+  if (parser.parseOptionalAttrDictWithKeyword(result.attributes)) {
+    return failure();
+  }
+
+  return success();
+}
+
+LogicalResult GenericFuncOp::verify() {
+  auto typeParams = getTypeParams();
+  auto constraints = getConstraints();
+
+  // Check that we have at least one type parameter
+  if (typeParams.empty()) {
+    return emitOpError(
+        "generic function must have at least one type parameter");
+  }
+
+  // Check that type_params and constraints have the same size
+  if (typeParams.size() != constraints.size()) {
+    return emitOpError("type_params and constraints must have the same size");
+  }
+
+  // Check for duplicate type parameter names
+  llvm::SmallDenseSet<llvm::StringRef> seenNames;
+  for (auto param : typeParams) {
+    auto name = llvm::cast<StringAttr>(param).getValue();
+    if (!seenNames.insert(name).second) {
+      return emitOpError("duplicate type parameter name '") << name << "'";
+    }
+  }
+
+  // Collect all declared type parameter names
+  llvm::SmallDenseSet<llvm::StringRef> declaredParams;
+  for (auto param : typeParams) {
+    declaredParams.insert(llvm::cast<StringAttr>(param).getValue());
+  }
+
+  // Check that all TypeParamTypes in the function signature reference declared
+  // type parameters
+  auto funcType = getFunctionType();
+  auto checkType = [&](Type type) -> LogicalResult {
+    if (auto paramType = llvm::dyn_cast<TypeParamType>(type)) {
+      if (!declaredParams.contains(paramType.getName())) {
+        return emitOpError("use of undeclared type parameter '")
+               << paramType.getName() << "'";
+      }
+    }
+    return success();
+  };
+
+  for (Type inputType : funcType.getInputs()) {
+    if (failed(checkType(inputType))) {
+      return failure();
+    }
+  }
+  for (Type resultType : funcType.getResults()) {
+    if (failed(checkType(resultType))) {
+      return failure();
+    }
+  }
+
+  return success();
+}
+
+llvm::SmallVector<llvm::StringRef> GenericFuncOp::getTypeParamNames() {
+  llvm::SmallVector<llvm::StringRef> names;
+  for (auto param : getTypeParams()) {
+    names.push_back(llvm::cast<StringAttr>(param).getValue());
+  }
+  return names;
+}
+
+TypeParamKind GenericFuncOp::getConstraintAt(unsigned index) {
+  return llvm::cast<TypeParamKindAttr>(getConstraints()[index]).getValue();
+}
+
+std::optional<TypeParamKind>
+GenericFuncOp::getConstraintFor(llvm::StringRef name) {
+  auto typeParams = getTypeParams();
+  for (size_t i = 0; i < typeParams.size(); ++i) {
+    if (llvm::cast<StringAttr>(typeParams[i]).getValue() == name) {
+      return getConstraintAt(i);
+    }
+  }
+  return std::nullopt;
+}
+
+bool GenericFuncOp::hasTypeParam(llvm::StringRef name) {
+  for (auto param : getTypeParams()) {
+    if (llvm::cast<StringAttr>(param).getValue() == name) {
+      return true;
+    }
+  }
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
+// SpecializedFuncOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult SpecializedFuncOp::verify() {
+  // Look up the generic function
+  auto* parentOp = (*this)->getParentOp();
+  auto* symbolTableOp = parentOp;
+  while (symbolTableOp && !symbolTableOp->hasTrait<OpTrait::SymbolTable>()) {
+    symbolTableOp = symbolTableOp->getParentOp();
+  }
+
+  if (!symbolTableOp) {
+    return emitOpError("could not find symbol table");
+  }
+
+  auto genericOp =
+      SymbolTable::lookupSymbolIn(symbolTableOp, getGenericFuncAttr());
+  if (!genericOp) {
+    return emitOpError("references undefined generic function '")
+           << getGenericFunc() << "'";
+  }
+
+  auto genericFuncOp = dyn_cast<GenericFuncOp>(genericOp);
+  if (!genericFuncOp) {
+    return emitOpError("'")
+           << getGenericFunc() << "' is not a generic function";
+  }
+
+  // Check type argument count matches type parameter count
+  auto typeArgs = getTypeArgs();
+  unsigned numTypeParams = genericFuncOp.getNumTypeParams();
+  if (typeArgs.size() != numTypeParams) {
+    return emitOpError("expects ")
+           << numTypeParams << " type argument(s) but got " << typeArgs.size();
+  }
+
+  // Check that each type argument satisfies its constraint
+  for (size_t i = 0; i < typeArgs.size(); ++i) {
+    auto typeArg = llvm::cast<TypeAttr>(typeArgs[i]).getValue();
+    auto constraint = genericFuncOp.getConstraintAt(i);
+    auto paramName =
+        llvm::cast<StringAttr>(genericFuncOp.getTypeParams()[i]).getValue();
+
+    // Check constraint satisfaction
+    bool satisfies = false;
+    switch (constraint) {
+    case TypeParamKind::Any:
+      satisfies = llvm::isa<polang::IntegerType>(typeArg) ||
+                  llvm::isa<polang::FloatType>(typeArg) ||
+                  llvm::isa<BoolType>(typeArg);
+      break;
+    case TypeParamKind::Numeric:
+      satisfies = llvm::isa<polang::IntegerType>(typeArg) ||
+                  llvm::isa<polang::FloatType>(typeArg);
+      break;
+    case TypeParamKind::Integer:
+      satisfies = llvm::isa<polang::IntegerType>(typeArg);
+      break;
+    case TypeParamKind::Float:
+      satisfies = llvm::isa<polang::FloatType>(typeArg);
+      break;
+    }
+
+    if (!satisfies) {
+      return emitOpError("type argument ")
+             << typeArg << " does not satisfy '"
+             << stringifyTypeParamKind(constraint)
+             << "' constraint for type parameter '" << paramName << "'";
+    }
+  }
+
+  return success();
+}
+
+FunctionType SpecializedFuncOp::getSpecializedType(GenericFuncOp genericOp) {
+  auto typeArgs = getTypeArgs();
+  auto genericType = genericOp.getFunctionType();
+
+  // Build a mapping from type parameter names to concrete types
+  llvm::StringMap<Type> typeMap;
+  auto typeParams = genericOp.getTypeParams();
+  for (size_t i = 0; i < typeParams.size(); ++i) {
+    auto name = llvm::cast<StringAttr>(typeParams[i]).getValue();
+    auto concreteType = llvm::cast<TypeAttr>(typeArgs[i]).getValue();
+    typeMap[name] = concreteType;
+  }
+
+  // Substitute types in function signature
+  auto substituteType = [&](Type type) -> Type {
+    if (auto paramType = llvm::dyn_cast<TypeParamType>(type)) {
+      auto it = typeMap.find(paramType.getName());
+      if (it != typeMap.end()) {
+        return it->second;
+      }
+    }
+    return type;
+  };
+
+  SmallVector<Type> inputTypes;
+  for (Type inputType : genericType.getInputs()) {
+    inputTypes.push_back(substituteType(inputType));
+  }
+
+  SmallVector<Type> resultTypes;
+  for (Type resultType : genericType.getResults()) {
+    resultTypes.push_back(substituteType(resultType));
+  }
+
+  return FunctionType::get(getContext(), inputTypes, resultTypes);
 }
 
 //===----------------------------------------------------------------------===//

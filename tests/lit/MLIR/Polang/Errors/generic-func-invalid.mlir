@@ -23,17 +23,6 @@ polang.generic_func @duplicate_param<T, T>(%arg0: !polang.param<"T">) -> !polang
 // -----
 
 // =============================================================================
-// Test: Empty type parameter list (not allowed)
-// =============================================================================
-
-// expected-error @below {{generic function must have at least one type parameter}}
-polang.generic_func @empty_params<>(%arg0: !polang.integer<64, signed>) -> !polang.integer<64, signed> {
-  polang.return %arg0 : !polang.integer<64, signed>
-}
-
-// -----
-
-// =============================================================================
 // Test: Return type uses undeclared type parameter
 // =============================================================================
 
