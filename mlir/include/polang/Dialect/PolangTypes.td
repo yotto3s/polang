@@ -48,6 +48,31 @@ def Polang_TypeVarKind : I32EnumAttr<"TypeVarKind", "type variable kind", [
 }
 
 //===----------------------------------------------------------------------===//
+// TypeParamKind enum for explicit generic type parameter constraints
+//===----------------------------------------------------------------------===//
+
+def Polang_TypeParamKind_Any : I32EnumAttrCase<"Any", 0, "any">;
+def Polang_TypeParamKind_Numeric : I32EnumAttrCase<"Numeric", 1, "numeric">;
+def Polang_TypeParamKind_Integer : I32EnumAttrCase<"Integer", 2, "integer">;
+def Polang_TypeParamKind_Float : I32EnumAttrCase<"Float", 3, "float">;
+
+def Polang_TypeParamKind : I32EnumAttr<"TypeParamKind",
+    "type parameter constraint kind", [
+    Polang_TypeParamKind_Any,
+    Polang_TypeParamKind_Numeric,
+    Polang_TypeParamKind_Integer,
+    Polang_TypeParamKind_Float
+]> {
+  let cppNamespace = "::polang";
+}
+
+def Polang_TypeParamKindAttr : EnumAttr<Polang_Dialect, Polang_TypeParamKind,
+    "type_param_kind">;
+
+def Polang_TypeParamKindArrayAttr : TypedArrayAttrBase<Polang_TypeParamKindAttr,
+    "array of type parameter constraint kinds">;
+
+//===----------------------------------------------------------------------===//
 // Parameterized numeric types
 //===----------------------------------------------------------------------===//
 
@@ -133,6 +158,47 @@ def Polang_TypeVarType : Polang_Type<"TypeVar", "typevar"> {
   }];
 }
 
+def Polang_TypeParamType : Polang_Type<"TypeParam", "param"> {
+  let summary = "Named type parameter for explicit generics";
+  let description = [{
+    Represents a named type parameter in a generic function definition.
+    Unlike TypeVarType (which uses numeric IDs for type inference),
+    TypeParamType uses string names matching the source-level syntax.
+
+    The optional `constraint` parameter restricts what concrete types
+    can be substituted:
+    - `any` (default): Any type is allowed
+    - `numeric`: Only integer or float types
+    - `integer`: Only integer types
+    - `float`: Only float types
+
+    Examples:
+    ```mlir
+    !polang.param<"T">           ; unconstrained type parameter
+    !polang.param<"N", numeric>  ; must be integer or float
+    !polang.param<"I", integer>  ; must be integer
+    !polang.param<"F", float>    ; must be float
+    ```
+  }];
+
+  let parameters = (ins
+    StringRefParameter<"name">:$name,
+    DefaultValuedParameter<"TypeParamKind", "TypeParamKind::Any">:$constraint
+  );
+
+  let hasCustomAssemblyFormat = 1;
+
+  let extraClassDeclaration = [{
+    /// Check if a concrete type satisfies this parameter's constraint.
+    bool satisfiesConstraint(mlir::Type concreteType) const;
+
+    bool isAny() const { return getConstraint() == TypeParamKind::Any; }
+    bool isNumeric() const { return getConstraint() == TypeParamKind::Numeric; }
+    bool isIntegerKind() const { return getConstraint() == TypeParamKind::Integer; }
+    bool isFloatKind() const { return getConstraint() == TypeParamKind::Float; }
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Type constraints
 //===----------------------------------------------------------------------===//
@@ -143,28 +209,59 @@ def Polang_AnyNumericType : AnyTypeOf<[Polang_IntegerType, Polang_FloatType],
 def Polang_AnyType : AnyTypeOf<[Polang_IntegerType, Polang_FloatType, Polang_BoolType],
     "any Polang type">;
 
-// Type constraints that include type variables (for use before type inference)
+// Type constraints that include type variables and type parameters
+// (for use before type inference or specialization)
 def Polang_AnyNumericOrVar : AnyTypeOf<[
-    Polang_IntegerType, Polang_FloatType, Polang_TypeVarType
-], "Polang numeric type or type variable">;
+    Polang_IntegerType, Polang_FloatType, Polang_TypeVarType, Polang_TypeParamType
+], "Polang numeric type, type variable, or type parameter">;
 
 def Polang_AnyTypeOrVar : AnyTypeOf<[
-    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_TypeVarType
-], "any Polang type or type variable">;
+    Polang_IntegerType, Polang_FloatType, Polang_BoolType,
+    Polang_TypeVarType, Polang_TypeParamType
+], "any Polang type, type variable, or type parameter">;
 
-// Bool or type variable (for if conditions before type inference)
+// Bool or type variable/parameter (for if conditions before type inference)
 def Polang_BoolOrTypeVar : AnyTypeOf<[
-    Polang_BoolType, Polang_TypeVarType
-], "bool or type variable">;
+    Polang_BoolType, Polang_TypeVarType, Polang_TypeParamType
+], "bool, type variable, or type parameter">;
 
-// Integer or type variable (for integer constants before type inference)
+// Integer or type variable/parameter (for integer constants before type inference)
 def Polang_IntegerOrTypeVar : AnyTypeOf<[
-    Polang_IntegerType, Polang_TypeVarType
-], "integer or type variable">;
+    Polang_IntegerType, Polang_TypeVarType, Polang_TypeParamType
+], "integer, type variable, or type parameter">;
 
-// Float or type variable (for float constants before type inference)
+// Float or type variable/parameter (for float constants before type inference)
 def Polang_FloatOrTypeVar : AnyTypeOf<[
-    Polang_FloatType, Polang_TypeVarType
-], "float or type variable">;
+    Polang_FloatType, Polang_TypeVarType, Polang_TypeParamType
+], "float, type variable, or type parameter">;
+
+//===----------------------------------------------------------------------===//
+// Type constraints that include type parameters (for explicit generics)
+//===----------------------------------------------------------------------===//
+
+// Numeric or type parameter (for generic numeric operations)
+def Polang_NumericOrParam : AnyTypeOf<[
+    Polang_IntegerType, Polang_FloatType, Polang_TypeParamType
+], "Polang numeric type or type parameter">;
+
+// Any Polang type or type parameter
+def Polang_AnyOrParam : AnyTypeOf<[
+    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_TypeParamType
+], "any Polang type or type parameter">;
+
+// Bool or type parameter
+def Polang_BoolOrParam : AnyTypeOf<[
+    Polang_BoolType, Polang_TypeParamType
+], "bool or type parameter">;
+
+// Integer or type parameter
+def Polang_IntegerOrParam : AnyTypeOf<[
+    Polang_IntegerType, Polang_TypeParamType
+], "integer or type parameter">;
+
+// Float or type parameter
+def Polang_FloatOrParam : AnyTypeOf<[
+    Polang_FloatType, Polang_TypeParamType
+], "float or type parameter">;
 
 #endif // POLANG_TYPES_TD
