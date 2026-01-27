@@ -19,6 +19,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -66,6 +67,24 @@ public:
         return mlir::IntegerType::get(ctx, 64);
       }
       llvm_unreachable("Unknown TypeVarKind");
+    });
+    // Handle type parameters that weren't substituted - apply defaults based on
+    // constraint (for explicit generics)
+    addConversion([](TypeParamType type) -> Type {
+      auto* ctx = type.getContext();
+      switch (type.getConstraint()) {
+      case TypeParamKind::Integer:
+        // Default integer type parameters to i64
+        return mlir::IntegerType::get(ctx, 64);
+      case TypeParamKind::Float:
+        // Default float type parameters to f64
+        return Float64Type::get(ctx);
+      case TypeParamKind::Numeric:
+      case TypeParamKind::Any:
+        // Generic type params default to i64
+        return mlir::IntegerType::get(ctx, 64);
+      }
+      llvm_unreachable("Unknown TypeParamKind");
     });
   }
 };
@@ -495,6 +514,122 @@ struct FuncOpLowering : public OpConversionPattern<FuncOp> {
   }
 };
 
+/// Lower SpecializedFuncOp by looking up the GenericFuncOp and cloning its body
+/// with type parameters substituted by concrete types.
+/// Creates func.func directly with standard types.
+struct SpecializedFuncOpLowering
+    : public OpConversionPattern<SpecializedFuncOp> {
+  using OpConversionPattern<SpecializedFuncOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(SpecializedFuncOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    (void)adaptor;
+
+    // Look up the generic function
+    auto genericFunc = SymbolTable::lookupNearestSymbolFrom<GenericFuncOp>(
+        op, op.getGenericFuncAttr());
+    if (!genericFunc) {
+      return op.emitError("could not find generic function '")
+             << op.getGenericFunc() << "'";
+    }
+
+    // Build mapping from type parameter names to concrete polang types
+    llvm::StringMap<Type> typeParamMap;
+    ArrayAttr typeArgs = op.getTypeArgs();
+    ArrayAttr typeParams = genericFunc.getTypeParams();
+
+    for (size_t i = 0; i < typeParams.size() && i < typeArgs.size(); ++i) {
+      StringRef paramName = cast<StringAttr>(typeParams[i]).getValue();
+      Type concreteType = cast<TypeAttr>(typeArgs[i]).getValue();
+      typeParamMap[paramName] = concreteType;
+    }
+
+    // Get the specialized function type with standard MLIR types
+    auto genericFuncType = genericFunc.getFunctionType();
+    const auto* typeConverter = getTypeConverter();
+    SmallVector<Type> argTypes;
+    SmallVector<Type> resultTypes;
+
+    // Convert argument types: TypeParamType -> polang type -> standard type
+    for (Type inputType : genericFuncType.getInputs()) {
+      Type polangType = substituteTypeParams(inputType, typeParamMap);
+      argTypes.push_back(typeConverter->convertType(polangType));
+    }
+
+    // Convert result types: TypeParamType -> polang type -> standard type
+    for (Type resultType : genericFuncType.getResults()) {
+      Type polangType = substituteTypeParams(resultType, typeParamMap);
+      resultTypes.push_back(typeConverter->convertType(polangType));
+    }
+
+    // Create func.func directly with standard types
+    auto newFuncType = rewriter.getFunctionType(argTypes, resultTypes);
+    auto funcOp = rewriter.create<func::FuncOp>(op.getLoc(), op.getSymName(),
+                                                newFuncType);
+
+    // Clone the body from the generic function
+    IRMapping mapping;
+    genericFunc.getBody().cloneInto(&funcOp.getBody(), mapping);
+
+    // Update block argument types to standard types
+    if (!funcOp.getBody().empty()) {
+      Block& entry = funcOp.getBody().front();
+      for (size_t i = 0; i < entry.getNumArguments() && i < argTypes.size();
+           ++i) {
+        entry.getArgument(i).setType(argTypes[i]);
+      }
+    }
+
+    // Convert body operations from polang to standard
+    convertBodyOps(funcOp, typeParamMap, *typeConverter, rewriter);
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+
+private:
+  /// Substitute TypeParamType with concrete polang types based on the mapping.
+  Type substituteTypeParams(Type type,
+                            const llvm::StringMap<Type>& typeParamMap) const {
+    if (auto paramType = dyn_cast<TypeParamType>(type)) {
+      auto it = typeParamMap.find(paramType.getName());
+      if (it != typeParamMap.end()) {
+        return it->second;
+      }
+    }
+    return type;
+  }
+
+  /// Convert operations in the function body from polang to standard ops.
+  void convertBodyOps(func::FuncOp func,
+                      const llvm::StringMap<Type>& /*typeParamMap*/,
+                      const TypeConverter& /*typeConverter*/,
+                      ConversionPatternRewriter& rewriter) const {
+    // Collect polang ops to convert
+    SmallVector<Operation*> opsToConvert;
+    func.walk([&](Operation* op) {
+      if (isa<func::FuncOp>(op)) {
+        return;
+      }
+      // Only convert polang dialect ops
+      if (op->getDialect() && op->getDialect()->getNamespace() == "polang") {
+        opsToConvert.push_back(op);
+      }
+    });
+
+    // Convert each operation
+    for (Operation* op : opsToConvert) {
+      rewriter.setInsertionPoint(op);
+
+      if (auto returnOp = dyn_cast<ReturnOp>(op)) {
+        rewriter.replaceOpWithNewOp<func::ReturnOp>(op, returnOp.getOperands());
+      }
+      // Add more op conversions as needed
+    }
+  }
+};
+
 struct CallOpLowering : public OpConversionPattern<CallOp> {
   using OpConversionPattern<CallOp>::OpConversionPattern;
 
@@ -642,6 +777,13 @@ struct PolangToStandardPass
                            scf::SCFDialect, memref::MemRefDialect,
                            LLVM::LLVMDialect>();
     target.addIllegalDialect<PolangDialect>();
+    // GenericFuncOp is legal - it will be erased in a cleanup step.
+    // We also need to mark ops inside GenericFuncOp as legal, otherwise
+    // the conversion will try to convert them and fail on TypeParamType.
+    target.addLegalOp<GenericFuncOp>();
+    target.addDynamicallyLegalOp<ReturnOp>([](ReturnOp op) {
+      return op->getParentOfType<GenericFuncOp>() != nullptr;
+    });
 
     PolangTypeConverter typeConverter;
     RewritePatternSet patterns(&getContext());
@@ -649,13 +791,24 @@ struct PolangToStandardPass
     patterns.add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
                  ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
                  MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
-                 FuncOpLowering, CallOpLowering, ReturnOpLowering, IfOpLowering,
-                 YieldOpLowering, AllocaOpLowering, PrintOpLowering>(
-        typeConverter, &getContext());
+                 FuncOpLowering, SpecializedFuncOpLowering, CallOpLowering,
+                 ReturnOpLowering, IfOpLowering, YieldOpLowering,
+                 AllocaOpLowering, PrintOpLowering>(typeConverter,
+                                                    &getContext());
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {
       signalPassFailure();
+      return;
+    }
+
+    // Cleanup: erase any remaining GenericFuncOps
+    // These are templates that were used to create SpecializedFuncOps
+    SmallVector<GenericFuncOp> genericFuncsToErase;
+    getOperation().walk(
+        [&](GenericFuncOp op) { genericFuncsToErase.push_back(op); });
+    for (auto op : genericFuncsToErase) {
+      op.erase();
     }
   }
 };

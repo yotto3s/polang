@@ -28,15 +28,30 @@ set(LLVM_TARGET_DEFINITIONS include/polang/Transforms/Passes.td)
 mlir_tablegen(include/polang/Transforms/Passes.h.inc -gen-pass-decls -name PolangTransforms)
 add_public_tablegen_target(PolangTransformsPassIncGen)
 
+# AST Dialect TableGen
+set(LLVM_TARGET_DEFINITIONS include/polang/Dialect/PolangASTOps.td)
+mlir_tablegen(include/polang/Dialect/PolangASTOps.h.inc -gen-op-decls -dialect=polang_ast)
+mlir_tablegen(include/polang/Dialect/PolangASTOps.cpp.inc -gen-op-defs -dialect=polang_ast)
+mlir_tablegen(include/polang/Dialect/PolangASTDialect.h.inc -gen-dialect-decls -dialect=polang_ast)
+mlir_tablegen(include/polang/Dialect/PolangASTDialect.cpp.inc -gen-dialect-defs -dialect=polang_ast)
+add_public_tablegen_target(PolangASTOpsIncGen)
+
+set(LLVM_TARGET_DEFINITIONS include/polang/Dialect/PolangASTTypes.td)
+mlir_tablegen(include/polang/Dialect/PolangASTTypes.h.inc -gen-typedef-decls --typedefs-dialect=polang_ast)
+mlir_tablegen(include/polang/Dialect/PolangASTTypes.cpp.inc -gen-typedef-defs --typedefs-dialect=polang_ast)
+add_public_tablegen_target(PolangASTTypesIncGen)
+
 add_subdirectory(lib/Dialect)
 add_subdirectory(lib/Conversion)
 add_subdirectory(lib/MLIRGen)
 add_subdirectory(lib/Transforms)
+add_subdirectory(tools)
 
 # Combined MLIR library
 add_library(PolangMLIR INTERFACE)
 target_link_libraries(PolangMLIR INTERFACE
   PolangDialect
+  PolangASTDialect
   PolangConversion
   PolangMLIRGen
   PolangTransforms

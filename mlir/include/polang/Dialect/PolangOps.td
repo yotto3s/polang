@@ -9,6 +9,7 @@
 
 include "polang/Dialect/PolangDialect.td"
 include "polang/Dialect/PolangTypes.td"
+include "polang/Dialect/PolangEnums.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
@@ -254,22 +255,8 @@ def Polang_CastOp : Polang_Op<"cast", [Pure]> {
 
 //===----------------------------------------------------------------------===//
 // Comparison operations
+// CmpPredicate enum is defined in PolangEnums.td (shared with AST dialect)
 //===----------------------------------------------------------------------===//
-
-def Polang_CmpPredicateEQ  : I64EnumAttrCase<"eq", 0>;
-def Polang_CmpPredicateNE  : I64EnumAttrCase<"ne", 1>;
-def Polang_CmpPredicateLT  : I64EnumAttrCase<"lt", 2>;
-def Polang_CmpPredicateLE  : I64EnumAttrCase<"le", 3>;
-def Polang_CmpPredicateGT  : I64EnumAttrCase<"gt", 4>;
-def Polang_CmpPredicateGE  : I64EnumAttrCase<"ge", 5>;
-
-def Polang_CmpPredicate : I64EnumAttr<
-    "CmpPredicate", "comparison predicate",
-    [Polang_CmpPredicateEQ, Polang_CmpPredicateNE,
-     Polang_CmpPredicateLT, Polang_CmpPredicateLE,
-     Polang_CmpPredicateGT, Polang_CmpPredicateGE]> {
-  let cppNamespace = "::polang";
-}
 
 def Polang_CmpOp : Polang_Op<"cmp", [
     Pure,
@@ -364,27 +351,40 @@ def Polang_CallOp : Polang_Op<"call", [
   let summary = "Function call";
   let description = [{
     Calls a function with the given arguments.
+    For generic functions, type arguments can be provided.
 
-    Example:
+    Examples:
     ```mlir
+    // Regular function call
     %0 = polang.call @add(%a, %b) : (!polang.integer<64, signed>, !polang.integer<64, signed>) -> !polang.integer<64, signed>
+
+    // Generic function call with type arguments
+    %1 = polang.call @identity<[!polang.integer<64, signed>]>(%x) : (!polang.integer<64, signed>) -> !polang.integer<64, signed>
     ```
   }];
 
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<Polang_AnyTypeOrVar>:$operands);
+  let arguments = (ins
+    FlatSymbolRefAttr:$callee,
+    OptionalAttr<TypeArrayAttr>:$type_args,
+    Variadic<Polang_AnyTypeOrVar>:$operands
+  );
   let results = (outs Optional<Polang_AnyTypeOrVar>:$result);
 
-  let assemblyFormat = [{
-    $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
-  }];
+  let hasCustomAssemblyFormat = 1;
 
   let builders = [
     OpBuilder<(ins "llvm::StringRef":$callee, "mlir::TypeRange":$results,
+                   CArg<"mlir::ValueRange", "{}">:$operands)>,
+    OpBuilder<(ins "llvm::StringRef":$callee, "mlir::ArrayAttr":$typeArgs,
+                   "mlir::TypeRange":$results,
                    CArg<"mlir::ValueRange", "{}">:$operands)>
   ];
 
   let extraClassDeclaration = [{
     mlir::FunctionType getCalleeType();
+
+    /// Check if this is a generic function call (has type arguments).
+    bool isGenericCall() { return getTypeArgs().has_value(); }
   }];
 
   let hasVerifier = 1;
@@ -393,7 +393,7 @@ def Polang_CallOp : Polang_Op<"call", [
 def Polang_ReturnOp : Polang_Op<"return", [
     Pure,
     Terminator,
-    ParentOneOf<["FuncOp"]>
+    ParentOneOf<["FuncOp", "GenericFuncOp"]>
   ]> {
   let summary = "Return from function";
   let description = [{
@@ -421,6 +421,118 @@ def Polang_ReturnOp : Polang_Op<"return", [
   ];
 
   let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Generic function operations
+//===----------------------------------------------------------------------===//
+
+def Polang_GenericFuncOp : Polang_Op<"generic_func", [
+    IsolatedFromAbove,
+    FunctionOpInterface,
+    Symbol
+  ]> {
+  let summary = "Generic function definition with type parameters";
+  let description = [{
+    Defines a generic (polymorphic) function with explicit type parameters.
+    Type parameters can have constraints (any, numeric, integer, float).
+
+    Example:
+    ```mlir
+    polang.generic_func @identity<T>(%arg0: !polang.param<"T">) -> !polang.param<"T"> {
+      polang.return %arg0 : !polang.param<"T">
+    }
+
+    polang.generic_func @add<T: numeric>(%a: !polang.param<"T", numeric>, %b: !polang.param<"T", numeric>) -> !polang.param<"T", numeric> {
+      %r = polang.add %a, %b : !polang.param<"T", numeric>, !polang.param<"T", numeric> -> !polang.param<"T", numeric>
+      polang.return %r : !polang.param<"T", numeric>
+    }
+    ```
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttrOf<FunctionType>:$function_type,
+    StrArrayAttr:$type_params,
+    Polang_TypeParamKindArrayAttr:$constraints,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+  let regions = (region AnyRegion:$body);
+
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // FunctionOpInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Returns the argument types of this function.
+    llvm::ArrayRef<mlir::Type> getArgumentTypes() {
+      return getFunctionType().getInputs();
+    }
+
+    /// Returns the result types of this function.
+    llvm::ArrayRef<mlir::Type> getResultTypes() {
+      return getFunctionType().getResults();
+    }
+
+    mlir::Region *getCallableRegion() { return &getBody(); }
+
+    //===------------------------------------------------------------------===//
+    // Type parameter methods
+    //===------------------------------------------------------------------===//
+
+    /// Get the number of type parameters.
+    unsigned getNumTypeParams() {
+      return getTypeParams().size();
+    }
+
+    /// Get the type parameter names as a vector of StringRef.
+    llvm::SmallVector<llvm::StringRef> getTypeParamNames();
+
+    /// Get the constraint for a type parameter by index.
+    TypeParamKind getConstraintAt(unsigned index);
+
+    /// Get the constraint for a type parameter by name.
+    std::optional<TypeParamKind> getConstraintFor(llvm::StringRef name);
+
+    /// Check if a name is a declared type parameter.
+    bool hasTypeParam(llvm::StringRef name);
+  }];
+}
+
+def Polang_SpecializedFuncOp : Polang_Op<"specialized_func", [Symbol]> {
+  let summary = "Specialized (monomorphized) function reference";
+  let description = [{
+    References a generic function with concrete type arguments.
+    This operation is used during monomorphization to record which
+    concrete types a generic function should be specialized to.
+
+    Example:
+    ```mlir
+    polang.specialized_func @identity$i64 from @identity<[!polang.integer<64, signed>]>
+    polang.specialized_func @add$f64 from @add<[!polang.float<64>]>
+    ```
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    FlatSymbolRefAttr:$generic_func,
+    TypeArrayAttr:$type_args
+  );
+
+  let assemblyFormat = [{
+    $sym_name `from` $generic_func `<` $type_args `>` attr-dict
+  }];
+
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    /// Get the specialized function type by substituting type arguments.
+    mlir::FunctionType getSpecializedType(GenericFuncOp genericOp);
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -467,15 +579,78 @@ def Polang_IfOp : Polang_Op<"if", [
 def Polang_YieldOp : Polang_Op<"yield", [
     Pure,
     Terminator,
-    ParentOneOf<["IfOp"]>
+    ParentOneOf<["IfOp", "LetExprOp"]>
   ]> {
   let summary = "Yield value from region";
   let description = [{
-    Yields a value from a region (if-then-else branches).
+    Yields a value from a region (if-then-else branches, let expressions).
 
     Example:
     ```mlir
     polang.yield %0 : !polang.integer<64, signed>
+    ```
+  }];
+
+  let arguments = (ins Polang_AnyTypeOrVar:$value);
+
+  let assemblyFormat = "$value `:` type($value) attr-dict";
+}
+
+//===----------------------------------------------------------------------===//
+// Let expression operations
+//===----------------------------------------------------------------------===//
+
+def Polang_LetExprOp : Polang_Op<"let_expr", [RecursiveMemoryEffects]> {
+  let summary = "Let-in expression with separate binding regions";
+  let description = [{
+    A let expression with separate regions for each binding and a body.
+    Each binding region computes a value independently and yields it via
+    yield.binding. The body region receives bound values as block arguments.
+
+    Binding regions are isolated from each other, enabling parallel evaluation.
+
+    Example:
+    ```mlir
+    %result = polang.let_expr ["x", "y"] -> !polang.integer<64, signed>
+      binding {
+        polang.yield.binding %val1 : !polang.integer<64, signed>
+      }
+      binding {
+        polang.yield.binding %val2 : !polang.integer<64, signed>
+      }
+      body {
+      ^bb0(%x: !polang.integer<64, signed>, %y: !polang.integer<64, signed>):
+        %sum = polang.add %x, %y : ...
+        polang.yield %sum : !polang.integer<64, signed>
+      }
+    ```
+  }];
+
+  let arguments = (ins StrArrayAttr:$var_names);
+  let results = (outs Polang_AnyTypeOrVar:$result);
+  // Body must come first since MLIR requires variadic regions to be last
+  let regions = (region
+    SizedRegion<1>:$body,
+    VariadicRegion<SizedRegion<1>>:$bindings
+  );
+
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+}
+
+def Polang_YieldBindingOp : Polang_Op<"yield.binding", [
+    Pure,
+    Terminator,
+    HasParent<"LetExprOp">
+  ]> {
+  let summary = "Yield bound value from a binding region";
+  let description = [{
+    Terminates a binding region of a let expression and yields
+    the bound value as input to the body region's corresponding block argument.
+
+    Example:
+    ```mlir
+    polang.yield.binding %x : !polang.integer<64, signed>
     ```
   }];
 

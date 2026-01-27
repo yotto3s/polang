@@ -38,4 +38,37 @@ def Monomorphization : Pass<"polang-monomorphize", "mlir::ModuleOp"> {
   let dependentDialects = ["polang::PolangDialect"];
 }
 
+def NameResolution : Pass<"polang-resolve-names", "mlir::ModuleOp"> {
+  let summary = "Resolve variable references to SSA values";
+  let description = [{
+    This pass resolves polang_ast.var_ref operations to their corresponding
+    SSA values. It builds a scope table from function arguments and let
+    bindings, then replaces var_ref ops with the appropriate SSA values.
+
+    For variables referenced from outer scopes (captures), the pass:
+    1. Detects the capture
+    2. Adds the variable name to the function's captures attribute
+    3. Emits an error for undefined variables
+  }];
+
+  let dependentDialects = ["polang::ast::PolangASTDialect"];
+}
+
+def TypeCheck : Pass<"polang-type-check", "mlir::ModuleOp"> {
+  let summary = "Validate type correctness of AST dialect IR";
+  let description = [{
+    This pass validates semantic correctness after name resolution.
+    It checks:
+    - Binary operation types are compatible
+    - If conditions are boolean
+    - If branch types are compatible
+    - Function call arity matches
+    - Return types match function signatures
+
+    Type variables are skipped (handled by type inference).
+  }];
+
+  let dependentDialects = ["polang::ast::PolangASTDialect"];
+}
+
 #endif // POLANG_TRANSFORMS_PASSES_TD

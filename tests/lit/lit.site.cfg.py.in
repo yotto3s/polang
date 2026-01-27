@@ -10,6 +10,7 @@ config.polang_obj_root = "@POLANG_OBJ_ROOT@"
 config.polang_src_root = "@POLANG_SRC_ROOT@"
 config.polang_compiler_path = "@POLANG_COMPILER_PATH@"
 config.polang_repl_path = "@POLANG_REPL_PATH@"
+config.polang_opt_path = "@POLANG_OPT_PATH@"
 config.filecheck_path = "@FILECHECK_PATH@"
 config.not_path = "@NOT_PATH@"
 

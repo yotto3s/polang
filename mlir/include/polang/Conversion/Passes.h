@@ -19,6 +19,9 @@
 
 namespace polang {
 
+/// Creates a pass to convert AST dialect to Polang dialect.
+std::unique_ptr<mlir::Pass> createASTToPolangPass();
+
 /// Creates a pass to lower Polang dialect to standard dialects.
 std::unique_ptr<mlir::Pass> createPolangToStandardPass();
 

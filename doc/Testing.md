@@ -320,7 +320,8 @@ Memory and undefined behavior checking with 2 configurations:
 #### Known Issues: ASan False Positives with MLIR Tests
 
 The MLIR unit tests (`mlir_verifier_test`, `type_inference_pass_test`, `conversion_pass_test`)
-are excluded from the ASan preset due to false positive "use-after-poison" errors.
+and lit tests (`polang-lit-tests`) are excluded from the ASan preset due to false positive
+"use-after-poison" errors.
 
 **Root cause:** LLVM's `BumpPtrAllocator` (header-only template in `llvm/Support/Allocator.h`)
 calls `__asan_poison_memory_region()` / `__asan_unpoison_memory_region()` to annotate slab
@@ -329,6 +330,9 @@ However, the pre-installed MLIR static libraries (`/usr/lib/llvm-20/lib/libMLIR*
 without ASan, so their instantiations of the same template have these as no-ops. The linker
 produces a binary where slabs get poisoned but individual allocations are never unpoisoned,
 triggering false "use-after-poison" errors during `MLIRContext` construction.
+
+The lit tests are excluded because the `polang-opt` tool (used by `MLIR/AST/*.mlir` tests)
+also creates an `MLIRContext` and triggers the same false positive.
 
 These tests still run in all other presets (clang-debug, gcc-debug, etc.) ensuring full coverage.
 

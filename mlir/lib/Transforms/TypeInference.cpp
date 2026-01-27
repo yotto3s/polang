@@ -12,6 +12,7 @@
 #include "polang/Dialect/PolangOps.h"
 #include "polang/Dialect/PolangTypes.h"
 #include "polang/Transforms/Passes.h"
+#include "polang/Transforms/TypeInferenceUtils.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -34,31 +35,6 @@ using namespace polang;
 
 namespace {
 
-//===----------------------------------------------------------------------===//
-// Helper functions for polymorphism detection and type defaulting
-//===----------------------------------------------------------------------===//
-
-/// Check if a type contains any type variables
-bool containsTypeVar(Type type) { return isa<TypeVarType>(type); }
-
-/// Apply default type for a type variable based on its kind.
-/// Returns the resolved type (either the original if not a type var,
-/// or the default type based on the kind).
-Type applyTypeVarDefault(Type type, MLIRContext* ctx) {
-  if (auto typeVar = dyn_cast<TypeVarType>(type)) {
-    switch (typeVar.getKind()) {
-    case TypeVarKind::Integer:
-      return polang::IntegerType::get(ctx, 64, Signedness::Signed);
-    case TypeVarKind::Float:
-      return polang::FloatType::get(ctx, 64);
-    case TypeVarKind::Any:
-      // Leave as type var - may be polymorphic
-      return type;
-    }
-  }
-  return type;
-}
-
 /// Check if a function has any type variables in its signature.
 /// The entry function (__polang_entry) is never considered polymorphic.
 bool isPolymorphicFunction(FuncOp func) {
@@ -75,116 +51,6 @@ bool isPolymorphicFunction(FuncOp func) {
   return llvm::any_of(funcType.getResults(),
                       [](Type result) { return containsTypeVar(result); });
 }
-
-//===----------------------------------------------------------------------===//
-// Substitution - Maps type variables to types
-//===----------------------------------------------------------------------===//
-
-class Substitution {
-public:
-  void bind(uint64_t var, Type type) { bindings[var] = type; }
-
-  [[nodiscard]] Type lookup(uint64_t var) const {
-    auto it = bindings.find(var);
-    return it != bindings.end() ? it->second : Type();
-  }
-
-  [[nodiscard]] bool contains(uint64_t var) const {
-    return bindings.contains(var);
-  }
-
-  /// Apply substitution to a type, recursively resolving type variables
-  [[nodiscard]] Type apply(Type type) const {
-    if (auto typeVar = dyn_cast<TypeVarType>(type)) {
-      Type bound = lookup(typeVar.getId());
-      if (bound) {
-        // Recursively apply in case bound type contains more type vars
-        return apply(bound);
-      }
-      return type;
-    }
-    // For now, only type variables can be substituted.
-    // Function types will need recursive substitution (see issue #9).
-    return type;
-  }
-
-  /// Compose two substitutions: (this . other)(t) = this(other(t))
-  [[nodiscard]] Substitution compose(const Substitution& other) const {
-    Substitution result;
-    // Apply this substitution to all types in other
-    for (const auto& [var, type] : other.bindings) {
-      result.bindings[var] = apply(type);
-    }
-    // Add bindings from this that aren't in other
-    for (const auto& [var, type] : bindings) {
-      if (!result.contains(var)) {
-        result.bindings[var] = type;
-      }
-    }
-    return result;
-  }
-
-  void dump() const {
-    for (const auto& [var, type] : bindings) {
-      llvm::errs() << "  typevar<" << var << "> = " << type << "\n";
-    }
-  }
-
-private:
-  llvm::DenseMap<uint64_t, Type> bindings;
-};
-
-//===----------------------------------------------------------------------===//
-// Unifier - Implements the unification algorithm
-//===----------------------------------------------------------------------===//
-
-class Unifier {
-public:
-  /// Unify two types, returning true on success
-  bool unify(Type t1, Type t2, Substitution& subst) {
-    // Apply current substitution first
-    Type s1 = subst.apply(t1);
-    Type s2 = subst.apply(t2);
-
-    // Same type - trivially unifiable
-    if (s1 == s2) {
-      return true;
-    }
-
-    // Left is type variable
-    if (auto var1 = dyn_cast<TypeVarType>(s1)) {
-      return unifyVar(var1.getId(), s2, subst);
-    }
-
-    // Right is type variable
-    if (auto var2 = dyn_cast<TypeVarType>(s2)) {
-      return unifyVar(var2.getId(), s1, subst);
-    }
-
-    // Both are concrete types but different - cannot unify
-    return false;
-  }
-
-private:
-  /// Check if type variable occurs in type (prevents infinite types)
-  [[nodiscard]] bool occursIn(uint64_t var, Type type) const {
-    if (auto typeVar = dyn_cast<TypeVarType>(type)) {
-      return typeVar.getId() == var;
-    }
-    // Function types will need recursive occurs check (see issue #9).
-    return false;
-  }
-
-  /// Unify a type variable with a type
-  bool unifyVar(uint64_t var, Type type, Substitution& subst) {
-    // Occurs check - prevent infinite types
-    if (occursIn(var, type)) {
-      return false;
-    }
-    subst.bind(var, type);
-    return true;
-  }
-};
 
 //===----------------------------------------------------------------------===//
 // TypeInferencePass - Main pass implementation
