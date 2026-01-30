@@ -1,15 +1,13 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
-; Test recursive function with type inference via monomorphization.
+; Test recursive function. The AST-level TypeChecker resolves the parameter
+; type from context (n == 0 and n - 1 constrain n to integer).
 
-; Polymorphic template function
-; CHECK: {{.*}}polang.func @countdown(%{{.*}}: !polang.typevar{{.*}}) -> !polang.integer<64, signed>{{.*}}
+; Monomorphic function with concrete types
+; CHECK: {{.*}}polang.func @countdown(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 
-; Monomorphized version for int parameter
-; CHECK: {{.*}}polang.func @countdown$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
-
-; Verify recursive call in monomorphized version
-; CHECK: {{.*}}polang.call @countdown$i64{{.*}}
+; Verify recursive call uses the same function name
+; CHECK: {{.*}}polang.call @countdown{{.*}}
 
 let countdown(n) = if n == 0 then 0 else countdown(n - 1)
 countdown(5)

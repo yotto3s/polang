@@ -5,8 +5,8 @@
 ; Specialized version for double
 ; CHECK-DAG: {{.*}}polang.func @identity$f64(%{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}}
 
-; Original polymorphic function is preserved
-; CHECK-DAG: {{.*}}polang.func @identity(%{{.*}}: !polang.typevar{{.*}}) -> !polang.typevar{{.*}} attributes {polang.polymorphic}{{.*}}
+; Original generic function is erased
+; CHECK-NOT: polang.generic_func
 
 let identity(x) = x
 identity(3.14)

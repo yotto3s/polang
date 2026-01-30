@@ -7,8 +7,8 @@
 ; CHECK-DAG: {{.*}}polang.func @identity$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 ; CHECK-DAG: {{.*}}polang.func @identity$bool(%{{.*}}: !polang.bool) -> !polang.bool{{.*}}
 
-; Original polymorphic function is preserved and marked
-; CHECK-DAG: {{.*}}polang.func @identity(%{{.*}}: !polang.typevar{{.*}}) -> !polang.typevar{{.*}} attributes {polang.polymorphic}{{.*}}
+; Original generic function is erased
+; CHECK-NOT: polang.generic_func
 
 let identity(x) = x
 ; Call with int and bool to create both specialized versions

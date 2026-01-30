@@ -1,16 +1,13 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
 ; Test function with type inference from comparison.
-; Parameter type is inferred via monomorphization at call site.
+; The AST-level TypeChecker resolves the parameter type from context (x == 0
+; constrains x to integer), so the function is emitted as monomorphic.
 
-; Polymorphic template function
-; CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.typevar{{.*}}) -> !polang.bool{{.*}}
+; Monomorphic function with concrete types (resolved by AST TypeChecker)
+; CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.integer<64, signed>) -> !polang.bool{{.*}}
 
-; Monomorphized version for int parameter
-; CHECK: {{.*}}polang.func @is_zero$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.bool{{.*}}
-
-; Verify comparison operation exists in monomorphized version
-; (the second operand may still be a type variable from the cloned body)
+; Verify comparison operation with concrete types
 ; CHECK: {{.*}}polang.cmp eq{{.*}}!polang.integer<64, signed>{{.*}}
 
 let is_zero(x) = x == 0

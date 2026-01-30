@@ -823,10 +823,13 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
 void TypeChecker::inferFunction(
     NFunctionDeclaration& node, const std::string& funcName,
     const std::map<std::string, std::string>& savedLocals) {
-  // Check if function has any untyped parameters
+  // Check if function has any untyped or type-parameter parameters
+  // (type params like 'a may be left from a previous TypeChecker run in the
+  // REPL, where the accumulated AST is re-checked)
   bool hasUntypedParams = false;
   for (const auto& arg : node.arguments) {
-    if (arg->type == nullptr) {
+    if (arg->type == nullptr ||
+        polang::isTypeParameter(arg->type->getTypeName())) {
       hasUntypedParams = true;
       break;
     }
@@ -843,8 +846,10 @@ void TypeChecker::inferFunction(
   std::vector<std::string> paramTypes;
   for (const auto& arg : node.arguments) {
     paramNames.insert(arg->id->name);
-    if (arg->type == nullptr) {
+    if (arg->type == nullptr ||
+        polang::isTypeParameter(arg->type->getTypeName())) {
       // Assign fresh unification variable instead of TYPEVAR
+      // (also handles re-checking where type params like 'a are already set)
       std::string uniVar = polang::freshUnificationVar();
       paramUniVars[arg->id->name] = uniVar;
       localTypes[arg->id->name] = uniVar;
