@@ -642,18 +642,24 @@ def Polang_GlobalOp : Polang_Op<"global", [Symbol]> {
     Declares a module-level global variable with a name and type.
     Used in the REPL for cross-module variable persistence.
 
+    When `is_external` is set, the global is an extern declaration
+    (defined in a previously compiled module; JIT resolves the symbol).
+    Otherwise, this is a definition with zero initialization.
+
     Example:
     ```mlir
     polang.global @x : !polang.integer<64, signed>
+    polang.global @y {is_external} : !polang.integer<64, signed>
     ```
   }];
 
   let arguments = (ins
     SymbolNameAttr:$sym_name,
-    TypeAttr:$type
+    TypeAttr:$type,
+    UnitAttr:$is_external
   );
 
-  let assemblyFormat = "$sym_name `:` $type attr-dict";
+  let hasCustomAssemblyFormat = 1;
 }
 
 def Polang_GlobalStoreOp : Polang_Op<"global.store", [

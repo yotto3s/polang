@@ -487,6 +487,15 @@ struct FuncOpLowering : public OpConversionPattern<FuncOp> {
     auto newFunc = rewriter.create<func::FuncOp>(op.getLoc(), op.getSymName(),
                                                  newFuncType);
 
+    // If the FuncOp has no body (extern declaration), set private visibility
+    // and skip body conversion. This happens in incremental mode for
+    // previously compiled functions.
+    if (op.getBody().empty()) {
+      newFunc.setVisibility(SymbolTable::Visibility::Private);
+      rewriter.eraseOp(op);
+      return success();
+    }
+
     rewriter.inlineRegionBefore(op.getBody(), newFunc.getBody(), newFunc.end());
     if (failed(rewriter.convertRegionTypes(&newFunc.getBody(), *typeConverter,
                                            &signatureConversion))) {
@@ -598,10 +607,23 @@ struct GlobalOpLowering : public OpConversionPattern<GlobalOp> {
       return failure();
     }
 
-    // Create an LLVM global with zero initializer
+    // Always use External linkage for JIT cross-module visibility.
+    // If is_external: no initializer (declaration — JIT resolves from
+    // previous dylib). Otherwise: zero initializer (definition — this
+    // module owns the storage).
+    Attribute initializer;
+    if (!op.getIsExternal()) {
+      // Create zero initializer for definitions
+      if (auto intTy = dyn_cast<mlir::IntegerType>(elementType)) {
+        initializer = rewriter.getIntegerAttr(intTy, 0);
+      } else if (auto floatTy = dyn_cast<mlir::FloatType>(elementType)) {
+        initializer = rewriter.getFloatAttr(floatTy, 0.0);
+      }
+    }
+
     rewriter.replaceOpWithNewOp<LLVM::GlobalOp>(
-        op, elementType, /*isConstant=*/false, LLVM::Linkage::Internal,
-        op.getSymName(), Attribute());
+        op, elementType, /*isConstant=*/false, LLVM::Linkage::External,
+        op.getSymName(), initializer);
     return success();
   }
 };

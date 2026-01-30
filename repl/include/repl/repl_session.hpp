@@ -10,6 +10,7 @@ class TypeChecker;
 
 namespace polang {
 class JITSession;
+struct CompiledSymbols;
 } // namespace polang
 
 // Result of evaluating an expression
@@ -49,8 +50,8 @@ public:
 private:
   bool initialized = false;
 
-  // Accumulated AST from previous successful evaluations
-  std::unique_ptr<NBlock> accumulatedAst;
+  // Registry of previously compiled symbols for incremental compilation
+  std::unique_ptr<polang::CompiledSymbols> compiledSymbols;
 
   // Persistent type checker across evaluations
   std::unique_ptr<TypeChecker> typeChecker;
@@ -60,6 +61,9 @@ private:
 
   // Evaluation counter for unique entry function names
   int evalCounter = 0;
+
+  // Update compiled symbols after a successful evaluation
+  void updateCompiledSymbols(NBlock& newAst);
 };
 
 #endif // POLANG_REPL_SESSION_HPP

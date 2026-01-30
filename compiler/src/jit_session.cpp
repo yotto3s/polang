@@ -51,6 +51,8 @@ struct JITSession::Impl {
   int moduleCounter = 0;
   // Track the most recent JITDylib for symbol lookup
   llvm::orc::JITDylib* latestDylib = nullptr;
+  // Track all previous dylibs for link order
+  std::vector<llvm::orc::JITDylib*> allDylibs;
 };
 
 JITSession::JITSession() : impl(std::make_unique<Impl>()) {}
@@ -69,6 +71,7 @@ bool JITSession::initialize(std::string& error) {
 
   impl->jit = std::move(*jitExpected);
   impl->latestDylib = &impl->jit->getMainJITDylib();
+  impl->allDylibs.push_back(impl->latestDylib);
   return true;
 }
 
@@ -111,14 +114,18 @@ bool JITSession::addModule(mlir::OwningOpRef<mlir::ModuleOp>& module,
 
   auto& newDylib = *expectedDylib;
 
-  // Link the new dylib against the previous one so it can see prior symbols
-  newDylib.addToLinkOrder(*impl->latestDylib);
+  // Link the new dylib against ALL previous dylibs so it can resolve
+  // symbols from any prior evaluation (link order is not transitive).
+  for (auto* dylib : impl->allDylibs) {
+    newDylib.addToLinkOrder(*dylib);
+  }
 
   if (auto err = impl->jit->addIRModule(newDylib, std::move(tsm))) {
     error = "Failed to add module to JIT: " + llvm::toString(std::move(err));
     return false;
   }
 
+  impl->allDylibs.push_back(&newDylib);
   impl->latestDylib = &newDylib;
   return true;
 }

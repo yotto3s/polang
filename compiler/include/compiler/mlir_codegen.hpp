@@ -8,7 +8,9 @@
 #define POLANG_COMPILER_MLIR_CODEGEN_HPP
 
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace mlir {
@@ -25,6 +27,12 @@ class raw_ostream;
 class NBlock;
 
 namespace polang {
+
+struct CompiledSymbols;
+
+/// Optional reference to compiled symbols for incremental compilation.
+using OptCompiledSymbols =
+    std::optional<std::reference_wrapper<const CompiledSymbols>>;
 
 /// MLIR-based code generation context.
 /// Generates MLIR from AST, lowers to LLVM dialect, and can execute via JIT.
@@ -45,7 +53,8 @@ public:
   bool generateCode(const NBlock& ast, bool emitTypeVars = false,
                     bool skipTypeCheck = false,
                     const std::string& inferredType = "",
-                    const std::string& entryFuncName = "");
+                    const std::string& entryFuncName = "",
+                    OptCompiledSymbols compiledSymbols = std::nullopt);
 
   /// Run type inference pass to resolve type variables.
   /// Must be called after generateCode() when emitTypeVars was true.

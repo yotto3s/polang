@@ -9,6 +9,7 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
 #include "compiler/mlir_codegen.hpp"
+#include "compiler/compiled_symbols.hpp"
 
 #include "polang/Conversion/Passes.h"
 #include "polang/Dialect/PolangDialect.h"
@@ -92,14 +93,15 @@ bool MLIRCodeGenContext::initializeContext() {
 bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars,
                                       bool skipTypeCheck,
                                       const std::string& inferredType,
-                                      const std::string& entryFuncName) {
+                                      const std::string& entryFuncName,
+                                      OptCompiledSymbols compiledSymbols) {
   if (!initializeContext()) {
     error = "Failed to initialize MLIR context";
     return false;
   }
 
   auto moduleRef = mlirGen(*context, ast, emitTypeVars, skipTypeCheck,
-                           inferredType, entryFuncName);
+                           inferredType, entryFuncName, compiledSymbols);
   if (!moduleRef) {
     error = "Failed to generate MLIR from AST";
     return false;

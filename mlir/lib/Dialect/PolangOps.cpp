@@ -996,6 +996,53 @@ LogicalResult LetExprOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// GlobalOp
+//===----------------------------------------------------------------------===//
+
+ParseResult GlobalOp::parse(OpAsmParser& parser, OperationState& result) {
+  StringAttr nameAttr;
+  if (parser.parseSymbolName(nameAttr, SymbolTable::getSymbolAttrName(),
+                             result.attributes)) {
+    return failure();
+  }
+
+  // Parse optional {is_external}
+  if (succeeded(parser.parseOptionalLBrace())) {
+    if (parser.parseKeyword("is_external") || parser.parseRBrace()) {
+      return failure();
+    }
+    result.addAttribute("is_external", parser.getBuilder().getUnitAttr());
+  }
+
+  if (parser.parseColon()) {
+    return failure();
+  }
+
+  TypeAttr typeAttr;
+  if (parser.parseAttribute(typeAttr, "type", result.attributes)) {
+    return failure();
+  }
+
+  if (parser.parseOptionalAttrDict(result.attributes)) {
+    return failure();
+  }
+
+  return success();
+}
+
+void GlobalOp::print(OpAsmPrinter& p) {
+  p << ' ';
+  p.printSymbolName(getSymName());
+  if (getIsExternal()) {
+    p << " {is_external}";
+  }
+  p << " : " << getType();
+  SmallVector<StringRef> elidedAttrs = {SymbolTable::getSymbolAttrName(),
+                                        "type", "is_external"};
+  p.printOptionalAttrDict((*this)->getAttrs(), elidedAttrs);
+}
+
+//===----------------------------------------------------------------------===//
 // GlobalStoreOp
 //===----------------------------------------------------------------------===//
 
