@@ -636,6 +636,71 @@ def Polang_YieldBindingOp : Polang_Op<"yield.binding", [
 // Variable operations
 //===----------------------------------------------------------------------===//
 
+def Polang_GlobalOp : Polang_Op<"global", [Symbol]> {
+  let summary = "Global variable declaration";
+  let description = [{
+    Declares a module-level global variable with a name and type.
+    Used in the REPL for cross-module variable persistence.
+
+    Example:
+    ```mlir
+    polang.global @x : !polang.integer<64, signed>
+    ```
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttr:$type
+  );
+
+  let assemblyFormat = "$sym_name `:` $type attr-dict";
+}
+
+def Polang_GlobalStoreOp : Polang_Op<"global.store", [
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>
+  ]> {
+  let summary = "Store a value into a global variable";
+  let description = [{
+    Stores a value into a previously declared global variable.
+
+    Example:
+    ```mlir
+    polang.global.store @x, %value : !polang.integer<64, signed>
+    ```
+  }];
+
+  let arguments = (ins
+    FlatSymbolRefAttr:$global_name,
+    Polang_AnyTypeOrParam:$value
+  );
+
+  let assemblyFormat = "$global_name `,` $value `:` type($value) attr-dict";
+
+  let hasVerifier = 1;
+}
+
+def Polang_GlobalLoadOp : Polang_Op<"global.load", [
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+    Pure
+  ]> {
+  let summary = "Load a value from a global variable";
+  let description = [{
+    Loads the current value from a previously declared global variable.
+
+    Example:
+    ```mlir
+    %v = polang.global.load @x : !polang.integer<64, signed>
+    ```
+  }];
+
+  let arguments = (ins FlatSymbolRefAttr:$global_name);
+  let results = (outs Polang_AnyTypeOrParam:$result);
+
+  let assemblyFormat = "$global_name `:` type($result) attr-dict";
+
+  let hasVerifier = 1;
+}
+
 def Polang_AllocaOp : Polang_Op<"alloca"> {
   let summary = "Allocate stack memory for a variable";
   let description = [{

@@ -582,6 +582,81 @@ struct YieldOpLowering : public OpConversionPattern<YieldOp> {
 // Variable Operations Lowering
 //===----------------------------------------------------------------------===//
 
+//===----------------------------------------------------------------------===//
+// Global Variable Operations Lowering
+//===----------------------------------------------------------------------===//
+
+struct GlobalOpLowering : public OpConversionPattern<GlobalOp> {
+  using OpConversionPattern<GlobalOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(GlobalOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    (void)adaptor;
+    auto elementType = getTypeConverter()->convertType(op.getType());
+    if (!elementType) {
+      return failure();
+    }
+
+    // Create an LLVM global with zero initializer
+    rewriter.replaceOpWithNewOp<LLVM::GlobalOp>(
+        op, elementType, /*isConstant=*/false, LLVM::Linkage::Internal,
+        op.getSymName(), Attribute());
+    return success();
+  }
+};
+
+struct GlobalStoreOpLowering : public OpConversionPattern<GlobalStoreOp> {
+  using OpConversionPattern<GlobalStoreOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(GlobalStoreOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    auto loc = op.getLoc();
+
+    // Get the converted value type
+    auto valueType = getTypeConverter()->convertType(op.getValue().getType());
+    if (!valueType) {
+      return failure();
+    }
+
+    // Get address of the global
+    auto ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+    auto addressOf =
+        rewriter.create<LLVM::AddressOfOp>(loc, ptrType, op.getGlobalName());
+
+    // Store the value
+    rewriter.replaceOpWithNewOp<LLVM::StoreOp>(op, adaptor.getValue(),
+                                               addressOf);
+    return success();
+  }
+};
+
+struct GlobalLoadOpLowering : public OpConversionPattern<GlobalLoadOp> {
+  using OpConversionPattern<GlobalLoadOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(GlobalLoadOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    (void)adaptor;
+    auto loc = op.getLoc();
+
+    auto resultType = getTypeConverter()->convertType(op.getResult().getType());
+    if (!resultType) {
+      return failure();
+    }
+
+    // Get address of the global
+    auto ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+    auto addressOf =
+        rewriter.create<LLVM::AddressOfOp>(loc, ptrType, op.getGlobalName());
+
+    // Load the value
+    rewriter.replaceOpWithNewOp<LLVM::LoadOp>(op, resultType, addressOf);
+    return success();
+  }
+};
+
 struct AllocaOpLowering : public OpConversionPattern<AllocaOp> {
   using OpConversionPattern<AllocaOp>::OpConversionPattern;
 
@@ -654,7 +729,8 @@ struct PolangToStandardPass
                  MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
                  GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
                  CallOpLowering, ReturnOpLowering, IfOpLowering,
-                 YieldOpLowering, AllocaOpLowering, PrintOpLowering>(
+                 YieldOpLowering, GlobalOpLowering, GlobalStoreOpLowering,
+                 GlobalLoadOpLowering, AllocaOpLowering, PrintOpLowering>(
         typeConverter, &getContext());
 
     if (failed(applyPartialConversion(getOperation(), target,

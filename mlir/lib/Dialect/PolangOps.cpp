@@ -994,3 +994,37 @@ LogicalResult LetExprOp::verify() {
 
   return success();
 }
+
+//===----------------------------------------------------------------------===//
+// GlobalStoreOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult GlobalStoreOp::verify() { return success(); }
+
+LogicalResult
+GlobalStoreOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
+  auto globalOp =
+      symbolTable.lookupNearestSymbolFrom<GlobalOp>(*this, getGlobalNameAttr());
+  if (!globalOp) {
+    return emitOpError("references undefined global '")
+           << getGlobalName() << "'";
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// GlobalLoadOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult GlobalLoadOp::verify() { return success(); }
+
+LogicalResult
+GlobalLoadOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
+  auto globalOp =
+      symbolTable.lookupNearestSymbolFrom<GlobalOp>(*this, getGlobalNameAttr());
+  if (!globalOp) {
+    return emitOpError("references undefined global '")
+           << getGlobalName() << "'";
+  }
+  return success();
+}
