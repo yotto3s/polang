@@ -11,6 +11,7 @@ add_library(PolangParser STATIC
     src/parser_api.cpp
     src/node.cpp
     src/type_checker.cpp
+    src/type_inference.cpp
     src/ast_printer.cpp
     src/operator_utils.cpp
     src/error_reporter.cpp
