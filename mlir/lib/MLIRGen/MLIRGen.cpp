@@ -20,6 +20,7 @@
 // clang-format on
 #include "parser/polang_types.hpp"
 #include "parser/type_checker.hpp"
+#include "parser/type_inference.hpp"
 #include "parser/visitor.hpp"
 
 using polang::TypeNames;
@@ -221,9 +222,71 @@ public:
       }
     }
 
-    auto callOp = builder.create<CallOp>(loc(node.loc), funcName,
-                                         TypeRange{resultTy}, args);
-    result = callOp.getResult();
+    // Check if this is a polymorphic instantiation
+    if (!node.typeBindings.empty()) {
+      // Build type param names and type bindings for InstantiateOp
+      // Use the function's type param order from genericFunctionTypeParams
+      SmallVector<StringRef> typeParamNames;
+      SmallVector<Type> typeBindingTypes;
+
+      auto paramIt = genericFunctionTypeParams.find(funcName);
+      if (paramIt != genericFunctionTypeParams.end()) {
+        // Use the function's declared type param order
+        for (const auto& tp : paramIt->second) {
+          auto bindingIt = node.typeBindings.find(tp);
+          if (bindingIt != node.typeBindings.end()) {
+            // Strip leading quote for MLIR storage
+            StringRef paramName(tp);
+            if (paramName.starts_with("'")) {
+              paramName = paramName.drop_front(1);
+            }
+            typeParamNames.push_back(paramName);
+            Type bindingType = getPolangType(*bindingIt->second);
+            if (!bindingType) {
+              result = nullptr;
+              return;
+            }
+            typeBindingTypes.push_back(bindingType);
+          }
+        }
+      } else {
+        // Fallback: iterate typeBindings map directly
+        for (const auto& [paramName, typeSpec] : node.typeBindings) {
+          StringRef name(paramName);
+          if (name.starts_with("'")) {
+            name = name.drop_front(1);
+          }
+          typeParamNames.push_back(name);
+          Type bindingType = getPolangType(*typeSpec);
+          if (!bindingType) {
+            result = nullptr;
+            return;
+          }
+          typeBindingTypes.push_back(bindingType);
+        }
+      }
+
+      // Resolve result type: if it's a TypeParamType, substitute with the
+      // concrete binding so the InstantiateOp produces a concrete type
+      if (auto paramType = dyn_cast<TypeParamType>(resultTy)) {
+        StringRef paramName = paramType.getName();
+        for (size_t i = 0; i < typeParamNames.size(); ++i) {
+          if (typeParamNames[i] == paramName) {
+            resultTy = typeBindingTypes[i];
+            break;
+          }
+        }
+      }
+
+      auto instantiateOp = builder.create<InstantiateOp>(
+          loc(node.loc), funcName, TypeRange{resultTy}, args, typeParamNames,
+          typeBindingTypes);
+      result = instantiateOp.getResult();
+    } else {
+      auto callOp = builder.create<CallOp>(loc(node.loc), funcName,
+                                           TypeRange{resultTy}, args);
+      result = callOp.getResult();
+    }
   }
 
   void visit(const NBinaryOperator& node) override {
@@ -424,10 +487,10 @@ public:
     // Get mangled function name (includes module path)
     const std::string funcName = mangledName(node.id->name);
 
-    // Build function type with type variables for untyped parameters
+    // Build function type
     SmallVector<Type> argTypes;
     std::vector<std::string> argNames;
-    std::vector<Type> argMLIRTypes; // Track MLIR types including type vars
+    std::vector<Type> argMLIRTypes;
 
     for (const auto& arg : node.arguments) {
       Type argType = getTypeOrFresh(arg->type.get());
@@ -449,7 +512,7 @@ public:
     // Store captures for call site (using mangled name)
     functionCaptures[funcName] = captureNames;
 
-    // Return type - use type variable if not specified
+    // Return type
     Type returnType = getTypeOrFresh(node.type.get());
     if (node.type != nullptr) {
       functionReturnTypes[funcName] = node.type;
@@ -458,20 +521,76 @@ public:
 
     auto funcType = builder.getFunctionType(argTypes, {returnType});
 
+    // Determine if the function is truly generic: typeParams is non-empty AND
+    // at least one argument or the return type uses TypeParamType.
+    // The AST TypeChecker may resolve all type params to concrete types
+    // (e.g., in let-in expressions), leaving typeParams set but no actual
+    // type parameters in the signature.
+    bool isGeneric = !node.typeParams.empty();
+    if (isGeneric) {
+      bool hasTypeParam = isa<TypeParamType>(returnType);
+      if (!hasTypeParam) {
+        for (const auto& ty : argTypes) {
+          if (isa<TypeParamType>(ty)) {
+            hasTypeParam = true;
+            break;
+          }
+        }
+      }
+      isGeneric = hasTypeParam;
+    }
+
     // Create function at module level
     builder.setInsertionPointToEnd(module.getBody());
 
-    // Convert captureNames to ArrayRef<StringRef>
     SmallVector<StringRef> captureRefs;
     for (const auto& name : captureNames) {
       captureRefs.push_back(name);
     }
 
-    auto funcOp = builder.create<FuncOp>(loc(node.loc), funcName, funcType,
-                                         ArrayRef<StringRef>(captureRefs));
+    Block* entryBlock = nullptr;
 
-    // Create entry block with arguments
-    Block* entryBlock = funcOp.addEntryBlock();
+    if (isGeneric) {
+      // Build type param names (strip leading quote for MLIR storage)
+      SmallVector<StringRef> typeParamRefs;
+      for (const auto& tp : node.typeParams) {
+        // Type params are stored as "'a" in AST, strip to "a" for MLIR
+        if (tp.size() >= 2 && tp[0] == '\'') {
+          typeParamRefs.push_back(StringRef(tp).drop_front(1));
+        } else {
+          typeParamRefs.push_back(tp);
+        }
+      }
+
+      // Build trait bounds strings (one per type param, empty if no bound)
+      SmallVector<std::string> boundStrings;
+      SmallVector<StringRef> boundRefs;
+      for (const auto& tp : node.typeParams) {
+        auto boundIt = node.typeParamBounds.find(tp);
+        if (boundIt != node.typeParamBounds.end() && !boundIt->second.empty()) {
+          // Use the strongest bound (take first for now)
+          boundStrings.push_back(traitBoundToString(*boundIt->second.begin()));
+        } else {
+          boundStrings.emplace_back("");
+        }
+      }
+      for (const auto& bs : boundStrings) {
+        boundRefs.push_back(bs);
+      }
+
+      auto genericFuncOp = builder.create<GenericFuncOp>(
+          loc(node.loc), funcName, funcType, typeParamRefs, boundRefs,
+          ArrayRef<StringRef>(captureRefs));
+      entryBlock = genericFuncOp.addEntryBlock();
+
+      // Store type params info for call-site lookup
+      genericFunctionTypeParams[funcName] = node.typeParams;
+    } else {
+      auto funcOp = builder.create<FuncOp>(loc(node.loc), funcName, funcType,
+                                           ArrayRef<StringRef>(captureRefs));
+      entryBlock = funcOp.addEntryBlock();
+    }
+
     builder.setInsertionPointToStart(entryBlock);
 
     // RAII scope guard clears and restores symbol tables for function body
@@ -503,8 +622,7 @@ public:
     // Generate function body
     node.block->accept(*this);
 
-    // Add return - NOLINTNEXTLINE(bugprone-branch-clone) - different op
-    // signatures
+    // Add return
     if (result) {
       builder.create<ReturnOp>(loc(node.block->loc), result);
     } else {
@@ -650,6 +768,8 @@ private:
       functionReturnMLIRTypes; // Function return types as MLIR types
   std::map<std::string, std::string>
       importedSymbols; // local name -> mangled name
+  std::map<std::string, std::vector<std::string>>
+      genericFunctionTypeParams; // func name -> type param names (e.g. "'a")
 
   /// RAII helper class for scoped symbol table management.
   /// Automatically saves and restores symbol tables when entering/exiting

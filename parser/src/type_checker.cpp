@@ -263,7 +263,8 @@ void TypeChecker::visit(const NMethodCall& node) {
         if (!isGenericType(paramTypes[i]) &&
             paramTypes[i] != TypeNames::UNKNOWN &&
             paramTypes[i] != TypeNames::TYPEVAR &&
-            !polang::isTypeParameter(paramTypes[i])) {
+            !polang::isTypeParameter(paramTypes[i]) &&
+            !polang::isUnificationVar(paramTypes[i])) {
           propagateTypeToSource(node.arguments[i].get(), paramTypes[i]);
           node.arguments[i]->accept(*this);
           argTypes[i] = inferredType;
@@ -271,6 +272,14 @@ void TypeChecker::visit(const NMethodCall& node) {
       }
 
       for (std::size_t i = 0; i < argTypes.size(); ++i) {
+        // If either type is a unification variable, unify instead of strict
+        // compatibility check. This handles cases like polymorphic wrappers
+        // calling monomorphic functions, and recursive calls.
+        if (polang::isUnificationVar(argTypes[i]) ||
+            polang::isUnificationVar(paramTypes[i])) {
+          unifier.unify(argTypes[i], paramTypes[i], subst);
+          continue;
+        }
         if (argTypes[i] != TypeNames::UNKNOWN &&
             paramTypes[i] != TypeNames::UNKNOWN &&
             argTypes[i] != TypeNames::TYPEVAR &&

@@ -12,6 +12,7 @@
 #include "polang/Dialect/PolangTypes.h"
 
 #include "mlir/IR/BuiltinTypes.h"
+#include "llvm/ADT/StringRef.h"
 
 #pragma GCC diagnostic pop
 
@@ -28,6 +29,14 @@ PolangTypeConverter::PolangTypeConverter(MLIRContext* ctx) : context(ctx) {}
 
 Type PolangTypeConverter::freshTypeVar(TypeVarKind kind) {
   return TypeVarType::get(context, nextTypeVarId++, kind);
+}
+
+Type PolangTypeConverter::getTypeParamType(llvm::StringRef name) {
+  // Strip the leading quote if present (e.g., "'a" -> "a")
+  if (name.starts_with("'")) {
+    name = name.drop_front(1);
+  }
+  return TypeParamType::get(context, name);
 }
 
 Type PolangTypeConverter::getTypeOrFresh(const NTypeSpec* typeAnnotation) {
@@ -51,6 +60,12 @@ Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
   }
 
   const std::string& typeName = named->name;
+
+  // Handle type parameters ('a, 'b, etc.)
+  if (typeName.size() >= 2 && typeName[0] == '\'') {
+    return getTypeParamType(typeName);
+  }
+
   const TypeMetadata meta = getTypeMetadata(typeName);
 
   switch (meta.kind) {

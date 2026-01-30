@@ -457,10 +457,15 @@ private:
 
     // Now rebuild operations that have type variable results
     // We need to do this carefully to update all uses
-    // Skip operations inside polymorphic functions
+    // Skip operations inside polymorphic functions and generic functions
     module.walk([&](Operation* op) {
       // Skip function ops (handled above)
       if (isa<FuncOp>(op)) {
+        return;
+      }
+
+      // Skip GenericFuncOp and all operations inside it
+      if (isa<GenericFuncOp>(op) || op->getParentOfType<GenericFuncOp>()) {
         return;
       }
 

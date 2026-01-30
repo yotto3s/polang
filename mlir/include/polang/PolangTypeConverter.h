@@ -29,6 +29,10 @@ public:
   /// Generate a fresh type variable with optional kind constraint.
   [[nodiscard]] mlir::Type freshTypeVar(TypeVarKind kind = TypeVarKind::Any);
 
+  /// Get a TypeParamType for a named type parameter (e.g., "'a" ->
+  /// type_param<"a">).
+  [[nodiscard]] mlir::Type getTypeParamType(llvm::StringRef name);
+
   /// Get a Polang type from annotation, or a fresh type variable if none.
   [[nodiscard]] mlir::Type getTypeOrFresh(const NTypeSpec* typeAnnotation);
 
