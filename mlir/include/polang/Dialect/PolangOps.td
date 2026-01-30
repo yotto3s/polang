@@ -255,7 +255,7 @@ def Polang_CastOp : Polang_Op<"cast", [Pure]> {
 
 //===----------------------------------------------------------------------===//
 // Comparison operations
-// CmpPredicate enum is defined in PolangEnums.td (shared with AST dialect)
+// CmpPredicate enum is defined in PolangEnums.td
 //===----------------------------------------------------------------------===//
 
 def Polang_CmpOp : Polang_Op<"cmp", [

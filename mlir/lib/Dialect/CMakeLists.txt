@@ -17,5 +17,3 @@ add_mlir_dialect_library(PolangDialect
   MLIRSupport
   MLIRFuncDialect
 )
-
-add_subdirectory(AST)

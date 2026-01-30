@@ -67,12 +67,12 @@ FileCheck-based tests organized by output type:
 | Directory | Count | Description |
 |-----------|-------|-------------|
 | `AST/` | 18 | AST dump verification (`--dump-ast`) |
-| `MLIR/` | 39 | Polang dialect MLIR output (`--emit-mlir`) |
+| `MLIR/` | 41 | Polang dialect MLIR output (`--emit-mlir`) |
 | `LLVMIR/` | 16 | LLVM IR generation |
 | `Execution/` | 55 | REPL execution results |
 | `Errors/` | 15 | Error message verification |
 
-**Total: 143 lit tests**
+**Total: 145 lit tests**
 
 ## Writing Lit Tests
 
@@ -331,7 +331,7 @@ without ASan, so their instantiations of the same template have these as no-ops.
 produces a binary where slabs get poisoned but individual allocations are never unpoisoned,
 triggering false "use-after-poison" errors during `MLIRContext` construction.
 
-The lit tests are excluded because the `polang-opt` tool (used by `MLIR/AST/*.mlir` tests)
+The lit tests are excluded because the `polang-opt` tool
 also creates an `MLIRContext` and triggers the same false positive.
 
 These tests still run in all other presets (clang-debug, gcc-debug, etc.) ensuring full coverage.

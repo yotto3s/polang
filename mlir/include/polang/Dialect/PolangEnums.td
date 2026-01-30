@@ -1,6 +1,6 @@
 //===- PolangEnums.td - Polang enum definitions -----*- tablegen -*-===//
 //
-// Enum definitions shared between Polang and PolangAST dialects.
+// Polang enum definitions.
 //
 //===----------------------------------------------------------------------===//
 
