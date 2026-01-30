@@ -52,19 +52,21 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   const size_t previousStatementCount =
       accumulatedAst ? accumulatedAst->statements.size() : 0;
 
-  // Merge new statements into accumulated AST
-  if (!accumulatedAst) {
-    accumulatedAst = std::make_unique<NBlock>();
-  }
-  for (auto& stmt : newAst->statements) {
-    accumulatedAst->statements.push_back(std::move(stmt));
+  // Initialize persistent TypeChecker on first evaluation
+  if (!typeChecker) {
+    typeChecker = std::make_unique<TypeChecker>();
   }
 
-  // Type check the combined AST
-  const auto errors = polang_check_types(*accumulatedAst);
+  // Snapshot TypeChecker state for rollback on error
+  const auto snapshot = typeChecker->saveState();
+
+  // Incrementally type-check only the new statements
+  const bool isFirstEval = (previousStatementCount == 0);
+  const auto errors = isFirstEval ? typeChecker->check(*newAst)
+                                  : typeChecker->checkIncremental(*newAst);
   if (!errors.empty()) {
-    // Rollback: remove newly added statements on error
-    accumulatedAst->statements.resize(previousStatementCount);
+    // Rollback TypeChecker state on error
+    typeChecker->restoreState(snapshot);
     std::string errMsg;
     for (const auto& err : errors) {
       errMsg += err.message;
@@ -73,6 +75,14 @@ EvalResult ReplSession::evaluate(const std::string& input) {
       }
     }
     return EvalResult::error(errMsg);
+  }
+
+  // Merge new statements into accumulated AST (still needed for MLIRGen)
+  if (!accumulatedAst) {
+    accumulatedAst = std::make_unique<NBlock>();
+  }
+  for (auto& stmt : newAst->statements) {
+    accumulatedAst->statements.push_back(std::move(stmt));
   }
 
   // Check if the last statement is an expression (should print result)
@@ -95,6 +105,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     std::cerr << "MLIR generation failed: " << codegenCtx.getError() << "\n";
     // Rollback on failure
     accumulatedAst->statements.resize(previousStatementCount);
+    typeChecker->restoreState(snapshot);
     return EvalResult::error("Code generation failed");
   }
 
@@ -102,6 +113,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   if (!codegenCtx.runTypeInference()) {
     std::cerr << "Type inference failed: " << codegenCtx.getError() << "\n";
     accumulatedAst->statements.resize(previousStatementCount);
+    typeChecker->restoreState(snapshot);
     return EvalResult::error("Type inference failed");
   }
 
@@ -114,12 +126,14 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     std::cerr << "Lowering to standard failed: " << codegenCtx.getError()
               << "\n";
     accumulatedAst->statements.resize(previousStatementCount);
+    typeChecker->restoreState(snapshot);
     return EvalResult::error("Code generation failed");
   }
 
   if (!codegenCtx.lowerToLLVM()) {
     std::cerr << "Lowering to LLVM failed: " << codegenCtx.getError() << "\n";
     accumulatedAst->statements.resize(previousStatementCount);
+    typeChecker->restoreState(snapshot);
     return EvalResult::error("Code generation failed");
   }
 
@@ -128,6 +142,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   if (!codegenCtx.runCode(result)) {
     std::cerr << "JIT execution failed: " << codegenCtx.getError() << "\n";
     accumulatedAst->statements.resize(previousStatementCount);
+    typeChecker->restoreState(snapshot);
     return EvalResult::error("Execution failed");
   }
 

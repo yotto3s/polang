@@ -25,6 +25,17 @@ struct TypeCheckError {
       : message(std::move(msg)), line(l), column(c) {}
 };
 
+// Snapshot of TypeChecker state for rollback on error
+struct TypeCheckerSnapshot {
+  std::map<std::string, std::string> localTypes;
+  std::map<std::string, std::string> functionReturnTypes;
+  std::map<std::string, std::vector<std::string>> functionParamTypes;
+  std::map<std::string, polang::TypeScheme> functionSchemes;
+  std::map<std::string, std::set<std::string>> moduleExports;
+  std::map<std::string, std::string> moduleAliases;
+  std::map<std::string, std::string> importedSymbols;
+};
+
 class TypeChecker : public Visitor {
 public:
   TypeChecker();
@@ -63,8 +74,18 @@ public:
   // Check if there were any errors
   [[nodiscard]] bool hasErrors() const noexcept { return !errors.empty(); }
 
-  // Check an AST and return errors
+  // Check an AST and return errors (resets all state)
   [[nodiscard]] std::vector<TypeCheckError> check(const NBlock& ast);
+
+  // Incrementally check new statements, preserving persistent environment
+  [[nodiscard]] std::vector<TypeCheckError>
+  checkIncremental(const NBlock& newStatements);
+
+  // Save current state for rollback on error
+  [[nodiscard]] TypeCheckerSnapshot saveState() const;
+
+  // Restore state from a snapshot
+  void restoreState(const TypeCheckerSnapshot& snapshot);
 
 private:
   std::string inferredType;

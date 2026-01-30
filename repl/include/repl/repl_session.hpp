@@ -6,6 +6,7 @@
 #include <string>
 
 class NBlock;
+class TypeChecker;
 
 // Result of evaluating an expression
 struct EvalResult {
@@ -46,6 +47,9 @@ private:
 
   // Accumulated AST from previous successful evaluations
   std::unique_ptr<NBlock> accumulatedAst;
+
+  // Persistent type checker across evaluations
+  std::unique_ptr<TypeChecker> typeChecker;
 };
 
 #endif // POLANG_REPL_SESSION_HPP

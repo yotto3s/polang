@@ -168,6 +168,40 @@ std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   return errors;
 }
 
+std::vector<TypeCheckError>
+TypeChecker::checkIncremental(const NBlock& newStatements) {
+  // Clear transient state but preserve persistent environment
+  // (localTypes, functionReturnTypes, functionParamTypes, functionSchemes)
+  errors.clear();
+  subst = polang::Substitution();
+  traitConstraints = polang::TraitConstraints();
+  polang::resetUnificationVarCounter();
+  newStatements.accept(*this);
+  return errors;
+}
+
+TypeCheckerSnapshot TypeChecker::saveState() const {
+  TypeCheckerSnapshot snapshot;
+  snapshot.localTypes = localTypes;
+  snapshot.functionReturnTypes = functionReturnTypes;
+  snapshot.functionParamTypes = functionParamTypes;
+  snapshot.functionSchemes = functionSchemes;
+  snapshot.moduleExports = moduleExports;
+  snapshot.moduleAliases = moduleAliases;
+  snapshot.importedSymbols = importedSymbols;
+  return snapshot;
+}
+
+void TypeChecker::restoreState(const TypeCheckerSnapshot& snapshot) {
+  localTypes = snapshot.localTypes;
+  functionReturnTypes = snapshot.functionReturnTypes;
+  functionParamTypes = snapshot.functionParamTypes;
+  functionSchemes = snapshot.functionSchemes;
+  moduleExports = snapshot.moduleExports;
+  moduleAliases = snapshot.moduleAliases;
+  importedSymbols = snapshot.importedSymbols;
+}
+
 void TypeChecker::reportError(const std::string& message) {
   errors.emplace_back(message);
   auto* reporter = ErrorReporter::current();
@@ -823,9 +857,11 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
 void TypeChecker::inferFunction(
     NFunctionDeclaration& node, const std::string& funcName,
     const std::map<std::string, std::string>& savedLocals) {
-  // Check if function has any untyped or type-parameter parameters
-  // (type params like 'a may be left from a previous TypeChecker run in the
-  // REPL, where the accumulated AST is re-checked)
+  // Check if function has any untyped or type-parameter parameters.
+  // Type params like 'a may be left from a previous TypeChecker run
+  // (e.g. MLIRGen's internal TypeChecker re-checking the accumulated AST).
+  // This workaround will be removed in Phase 2 when MLIRGen no longer
+  // runs its own TypeChecker.
   bool hasUntypedParams = false;
   for (const auto& arg : node.arguments) {
     if (arg->type == nullptr ||
@@ -849,7 +885,6 @@ void TypeChecker::inferFunction(
     if (arg->type == nullptr ||
         polang::isTypeParameter(arg->type->getTypeName())) {
       // Assign fresh unification variable instead of TYPEVAR
-      // (also handles re-checking where type params like 'a are already set)
       std::string uniVar = polang::freshUnificationVar();
       paramUniVars[arg->id->name] = uniVar;
       localTypes[arg->id->name] = uniVar;
