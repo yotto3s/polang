@@ -57,7 +57,7 @@ def Polang_ConstantIntegerOp : Polang_Op<"constant.integer", [Pure]> {
   }];
 
   let arguments = (ins Polang_AnyIntegerAttr:$value);
-  let results = (outs Polang_IntegerOrTypeVar:$result);
+  let results = (outs AnyTypeOf<[Polang_IntegerType, Polang_TypeVarType, Polang_TypeParamType]>:$result);
 
   let hasCustomAssemblyFormat = 1;
 
@@ -99,7 +99,7 @@ def Polang_ConstantFloatOp : Polang_Op<"constant.float", [Pure]> {
   }];
 
   let arguments = (ins Polang_AnyFloatAttr:$value);
-  let results = (outs Polang_FloatOrTypeVar:$result);
+  let results = (outs AnyTypeOf<[Polang_FloatType, Polang_TypeVarType, Polang_TypeParamType]>:$result);
 
   let hasCustomAssemblyFormat = 1;
 
@@ -167,8 +167,8 @@ class Polang_ArithOp<string mnemonic> : Polang_Op<mnemonic, [
     // to allow type variables. Result type is specified explicitly in MLIRGen.
     // Custom verifier uses typesAreCompatible() to allow type vars.
   ]> {
-  let arguments = (ins Polang_AnyNumericOrVar:$lhs, Polang_AnyNumericOrVar:$rhs);
-  let results = (outs Polang_AnyNumericOrVar:$result);
+  let arguments = (ins Polang_AnyNumericOrVarOrParam:$lhs, Polang_AnyNumericOrVarOrParam:$rhs);
+  let results = (outs Polang_AnyNumericOrVarOrParam:$result);
   // Print all types since they may differ during type inference
   let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($lhs) `,` type($rhs) `->` type($result)";
 
@@ -245,8 +245,8 @@ def Polang_CastOp : Polang_Op<"cast", [Pure]> {
     ```
   }];
 
-  let arguments = (ins Polang_AnyNumericOrVar:$input);
-  let results = (outs Polang_AnyNumericOrVar:$result);
+  let arguments = (ins Polang_AnyNumericOrVarOrParam:$input);
+  let results = (outs Polang_AnyNumericOrVarOrParam:$result);
 
   let assemblyFormat = "$input `:` type($input) `->` type($result) attr-dict";
 
@@ -276,8 +276,8 @@ def Polang_CmpOp : Polang_Op<"cmp", [
 
   let arguments = (ins
     Polang_CmpPredicate:$predicate,
-    Polang_AnyNumericOrVar:$lhs,
-    Polang_AnyNumericOrVar:$rhs
+    Polang_AnyNumericOrVarOrParam:$lhs,
+    Polang_AnyNumericOrVarOrParam:$rhs
   );
   let results = (outs Polang_BoolType:$result);
 
@@ -358,8 +358,8 @@ def Polang_CallOp : Polang_Op<"call", [
     ```
   }];
 
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<Polang_AnyTypeOrVar>:$operands);
-  let results = (outs Optional<Polang_AnyTypeOrVar>:$result);
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<Polang_AnyTypeOrVarOrParam>:$operands);
+  let results = (outs Optional<Polang_AnyTypeOrVarOrParam>:$result);
 
   let assemblyFormat = [{
     $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
@@ -377,10 +377,108 @@ def Polang_CallOp : Polang_Op<"call", [
   let hasVerifier = 1;
 }
 
+def Polang_GenericFuncOp : Polang_Op<"generic_func", [
+    IsolatedFromAbove,
+    FunctionOpInterface,
+    Symbol
+  ]> {
+  let summary = "Generic function definition with type parameters";
+  let description = [{
+    Defines a polymorphic function with named type parameters and optional
+    trait bounds. Type parameters use ML-style naming ('a, 'b, etc.).
+
+    Example:
+    ```mlir
+    polang.generic_func @add<'a: Numeric>(%x: !polang.type_param<"a">, %y: !polang.type_param<"a">)
+        -> !polang.type_param<"a"> {
+      %0 = polang.add %x, %y : !polang.type_param<"a">, !polang.type_param<"a"> -> !polang.type_param<"a">
+      polang.return %0 : !polang.type_param<"a">
+    }
+    ```
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs,
+    StrArrayAttr:$type_params,
+    OptionalAttr<StrArrayAttr>:$type_param_bounds,
+    OptionalAttr<StrArrayAttr>:$captures
+  );
+  let regions = (region AnyRegion:$body);
+
+  let builders = [
+    OpBuilder<(ins "llvm::StringRef":$name, "mlir::FunctionType":$type,
+                   "llvm::ArrayRef<llvm::StringRef>":$typeParams,
+                   CArg<"llvm::ArrayRef<llvm::StringRef>", "{}">:$typeParamBounds,
+                   CArg<"llvm::ArrayRef<llvm::StringRef>", "{}">:$captures)>
+  ];
+
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // FunctionOpInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Returns the argument types of this function.
+    llvm::ArrayRef<mlir::Type> getArgumentTypes() {
+      return getFunctionType().getInputs();
+    }
+
+    /// Returns the result types of this function.
+    llvm::ArrayRef<mlir::Type> getResultTypes() {
+      return getFunctionType().getResults();
+    }
+
+    mlir::Region *getCallableRegion() { return &getBody(); }
+  }];
+
+  let hasCustomAssemblyFormat = 1;
+}
+
+def Polang_InstantiateOp : Polang_Op<"instantiate", [
+    DeclareOpInterfaceMethods<CallOpInterface>,
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>
+  ]> {
+  let summary = "Instantiate a generic function with concrete types";
+  let description = [{
+    Calls a generic function with concrete type bindings for its type parameters.
+
+    Example:
+    ```mlir
+    %0 = polang.instantiate @identity<'a = !polang.integer<64, signed>>(%arg)
+        : (!polang.integer<64, signed>) -> !polang.integer<64, signed>
+    ```
+  }];
+
+  let arguments = (ins
+    FlatSymbolRefAttr:$callee,
+    StrArrayAttr:$type_param_names,
+    TypeArrayAttr:$type_bindings,
+    Variadic<Polang_AnyTypeOrVarOrParam>:$operands
+  );
+  let results = (outs Optional<Polang_AnyTypeOrVarOrParam>:$result);
+
+  let hasCustomAssemblyFormat = 1;
+
+  let builders = [
+    OpBuilder<(ins "llvm::StringRef":$callee, "mlir::TypeRange":$results,
+                   "mlir::ValueRange":$operands,
+                   "llvm::ArrayRef<llvm::StringRef>":$typeParamNames,
+                   "llvm::ArrayRef<mlir::Type>":$typeBindings)>
+  ];
+
+  let extraClassDeclaration = [{
+    mlir::FunctionType getCalleeType();
+  }];
+
+  let hasVerifier = 1;
+}
+
 def Polang_ReturnOp : Polang_Op<"return", [
     Pure,
     Terminator,
-    ParentOneOf<["FuncOp"]>
+    ParentOneOf<["FuncOp", "GenericFuncOp"]>
   ]> {
   let summary = "Return from function";
   let description = [{
@@ -392,7 +490,7 @@ def Polang_ReturnOp : Polang_Op<"return", [
     ```
   }];
 
-  let arguments = (ins Optional<Polang_AnyTypeOrVar>:$value);
+  let arguments = (ins Optional<Polang_AnyTypeOrVarOrParam>:$value);
 
   let assemblyFormat = "($value^ `:` type($value))? attr-dict";
 
@@ -433,7 +531,7 @@ def Polang_IfOp : Polang_Op<"if", [
   }];
 
   let arguments = (ins Polang_BoolOrTypeVar:$condition);
-  let results = (outs Polang_AnyTypeOrVar:$result);
+  let results = (outs Polang_AnyTypeOrVarOrParam:$result);
   let regions = (region
     SizedRegion<1>:$thenRegion,
     SizedRegion<1>:$elseRegion
@@ -466,7 +564,7 @@ def Polang_YieldOp : Polang_Op<"yield", [
     ```
   }];
 
-  let arguments = (ins Polang_AnyTypeOrVar:$value);
+  let arguments = (ins Polang_AnyTypeOrVarOrParam:$value);
 
   let assemblyFormat = "$value `:` type($value) attr-dict";
 }
@@ -502,7 +600,7 @@ def Polang_LetExprOp : Polang_Op<"let_expr", [RecursiveMemoryEffects]> {
   }];
 
   let arguments = (ins StrArrayAttr:$var_names);
-  let results = (outs Polang_AnyTypeOrVar:$result);
+  let results = (outs Polang_AnyTypeOrVarOrParam:$result);
   // Body must come first since MLIR requires variadic regions to be last
   let regions = (region
     SizedRegion<1>:$body,
@@ -529,7 +627,7 @@ def Polang_YieldBindingOp : Polang_Op<"yield.binding", [
     ```
   }];
 
-  let arguments = (ins Polang_AnyTypeOrVar:$value);
+  let arguments = (ins Polang_AnyTypeOrVarOrParam:$value);
 
   let assemblyFormat = "$value `:` type($value) attr-dict";
 }
@@ -574,7 +672,7 @@ def Polang_PrintOp : Polang_Op<"print"> {
     ```
   }];
 
-  let arguments = (ins Polang_AnyTypeOrVar:$value);
+  let arguments = (ins Polang_AnyTypeOrVarOrParam:$value);
 
   let assemblyFormat = "$value `:` type($value) attr-dict";
 }

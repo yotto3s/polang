@@ -159,8 +159,7 @@ private:
   std::map<std::string, polang::TypeScheme> functionSchemes;
 
   // Infer a function: assign unification vars, collect constraints, resolve
-  void inferFunction(NFunctionDeclaration& node,
-                     const std::string& funcName,
+  void inferFunction(NFunctionDeclaration& node, const std::string& funcName,
                      const std::map<std::string, std::string>& savedLocals);
 
   // Instantiate a polymorphic function at a call site
@@ -169,8 +168,7 @@ private:
                        const std::vector<std::string>& argTypes);
 
   // Resolve defaults for constrained unification vars
-  [[nodiscard]] std::string
-  resolveWithDefaults(const std::string& type) const;
+  [[nodiscard]] std::string resolveWithDefaults(const std::string& type) const;
 };
 
 #endif // POLANG_TYPE_CHECKER_HPP

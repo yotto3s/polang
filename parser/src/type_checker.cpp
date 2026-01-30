@@ -299,9 +299,9 @@ void TypeChecker::instantiateCall(NMethodCall& node,
                                   const polang::TypeScheme& scheme,
                                   const std::vector<std::string>& argTypes) {
   if (argTypes.size() != scheme.paramTypes.size()) {
-    reportError(
-        formatArgCountError(funcName, scheme.paramTypes.size(), argTypes.size()),
-        node.loc);
+    reportError(formatArgCountError(funcName, scheme.paramTypes.size(),
+                                    argTypes.size()),
+                node.loc);
     inferredType = TypeNames::UNKNOWN;
     return;
   }
@@ -488,8 +488,7 @@ void TypeChecker::visit(const NIfExpression& node) {
   const std::string condType = inferredType;
 
   if (condType != TypeNames::UNKNOWN && condType != TypeNames::BOOL &&
-      condType != TypeNames::TYPEVAR &&
-      !polang::isUnificationVar(condType)) {
+      condType != TypeNames::TYPEVAR && !polang::isUnificationVar(condType)) {
     reportError("If condition must be bool, got " + condType, node.loc);
   }
 
@@ -580,8 +579,8 @@ void TypeChecker::typeCheckLetBindings(
       // Collect the final param types for addLetBindingsToScope
       std::vector<std::string> paramTypes;
       for (const auto& arg : func->arguments) {
-        paramTypes.emplace_back(
-            arg->type != nullptr ? arg->type->getTypeName() : TypeNames::TYPEVAR);
+        paramTypes.emplace_back(arg->type != nullptr ? arg->type->getTypeName()
+                                                     : TypeNames::TYPEVAR);
       }
       funcParams.push_back(paramTypes);
 
@@ -808,8 +807,8 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   inferFunction(mutableNode, funcName, savedLocals);
 
   localTypes = savedLocals;
-  inferredType = node.type != nullptr ? node.type->getTypeName()
-                                      : TypeNames::TYPEVAR;
+  inferredType =
+      node.type != nullptr ? node.type->getTypeName() : TypeNames::TYPEVAR;
 }
 
 void TypeChecker::inferFunction(
@@ -882,10 +881,10 @@ void TypeChecker::inferFunction(
       const std::string declReturnType = node.type->getTypeName();
       if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR &&
           !areTypesCompatible(bodyType, declReturnType)) {
-        reportError(
-            polang::formatFuncReturnTypeError(
-                node.id->name, declReturnType, resolveGenericToDefault(bodyType)),
-            node.loc);
+        reportError(polang::formatFuncReturnTypeError(
+                        node.id->name, declReturnType,
+                        resolveGenericToDefault(bodyType)),
+                    node.loc);
       }
       functionReturnTypes[funcName] = declReturnType;
     }
@@ -937,10 +936,9 @@ void TypeChecker::inferFunction(
     } else {
       const std::string declReturnType = node.type->getTypeName();
       if (!areTypesCompatible(resolvedBodyType, declReturnType)) {
-        reportError(
-            polang::formatFuncReturnTypeError(
-                node.id->name, declReturnType, resolvedBodyType),
-            node.loc);
+        reportError(polang::formatFuncReturnTypeError(
+                        node.id->name, declReturnType, resolvedBodyType),
+                    node.loc);
       }
       functionReturnTypes[funcName] = declReturnType;
     }

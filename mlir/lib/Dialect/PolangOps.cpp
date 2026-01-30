@@ -31,6 +31,9 @@ bool typesAreCompatible(Type t1, Type t2) {
   if (isa<TypeVarType>(t1) || isa<TypeVarType>(t2)) {
     return true;
   }
+  if (isa<TypeParamType>(t1) || isa<TypeParamType>(t2)) {
+    return true;
+  }
   return false;
 }
 } // namespace
@@ -81,6 +84,435 @@ void FuncOp::print(OpAsmPrinter& p) {
   function_interface_impl::printFunctionOp(
       p, *this, /*isVariadic=*/false, getFunctionTypeAttrName(),
       getArgAttrsAttrName(), getResAttrsAttrName());
+}
+
+//===----------------------------------------------------------------------===//
+// GenericFuncOp
+//===----------------------------------------------------------------------===//
+
+void GenericFuncOp::build(OpBuilder& builder, OperationState& state,
+                          StringRef name, FunctionType type,
+                          ArrayRef<StringRef> typeParams,
+                          ArrayRef<StringRef> typeParamBounds,
+                          ArrayRef<StringRef> captures) {
+  state.addAttribute(SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(name));
+  state.addAttribute(getFunctionTypeAttrName(state.name), TypeAttr::get(type));
+
+  SmallVector<Attribute> paramAttrs;
+  for (StringRef param : typeParams) {
+    paramAttrs.push_back(builder.getStringAttr(param));
+  }
+  state.addAttribute(getTypeParamsAttrName(state.name),
+                     builder.getArrayAttr(paramAttrs));
+
+  if (!typeParamBounds.empty()) {
+    SmallVector<Attribute> boundAttrs;
+    for (StringRef bound : typeParamBounds) {
+      boundAttrs.push_back(builder.getStringAttr(bound));
+    }
+    state.addAttribute(getTypeParamBoundsAttrName(state.name),
+                       builder.getArrayAttr(boundAttrs));
+  }
+
+  if (!captures.empty()) {
+    SmallVector<Attribute> captureAttrs;
+    for (StringRef capture : captures) {
+      captureAttrs.push_back(builder.getStringAttr(capture));
+    }
+    state.addAttribute(getCapturesAttrName(state.name),
+                       builder.getArrayAttr(captureAttrs));
+  }
+
+  state.addRegion();
+}
+
+/// Parse type parameters: <a, b: Numeric>
+/// Type param names are bare identifiers in the textual MLIR format.
+/// They correspond to ML-style 'a, 'b names stored internally.
+static ParseResult
+parseTypeParams(OpAsmParser& parser,
+                SmallVectorImpl<std::string>& typeParamNames,
+                SmallVectorImpl<std::string>& typeParamBounds) {
+  if (parser.parseLess()) {
+    return failure();
+  }
+
+  auto parseOneParam = [&]() -> ParseResult {
+    StringRef nameRef;
+    if (parser.parseKeyword(&nameRef)) {
+      return failure();
+    }
+    typeParamNames.push_back(nameRef.str());
+
+    // Parse optional bound: ": Numeric"
+    std::string bound;
+    if (succeeded(parser.parseOptionalColon())) {
+      StringRef boundRef;
+      if (parser.parseKeyword(&boundRef)) {
+        return failure();
+      }
+      bound = boundRef.str();
+    }
+    typeParamBounds.push_back(bound);
+    return success();
+  };
+
+  if (parseOneParam()) {
+    return failure();
+  }
+  while (succeeded(parser.parseOptionalComma())) {
+    if (parseOneParam()) {
+      return failure();
+    }
+  }
+
+  return parser.parseGreater();
+}
+
+ParseResult GenericFuncOp::parse(OpAsmParser& parser, OperationState& result) {
+  // Parse the function name
+  StringAttr nameAttr;
+  if (parser.parseSymbolName(nameAttr, SymbolTable::getSymbolAttrName(),
+                             result.attributes)) {
+    return failure();
+  }
+
+  // Parse type parameters <'a, 'b: Numeric>
+  SmallVector<std::string> typeParamNames;
+  SmallVector<std::string> typeParamBounds;
+  if (parseTypeParams(parser, typeParamNames, typeParamBounds)) {
+    return failure();
+  }
+
+  auto& builder = parser.getBuilder();
+  SmallVector<Attribute> paramAttrs;
+  for (const auto& name : typeParamNames) {
+    paramAttrs.push_back(builder.getStringAttr(name));
+  }
+  result.addAttribute(getTypeParamsAttrName(result.name),
+                      builder.getArrayAttr(paramAttrs));
+
+  // Only add bounds if at least one is non-empty
+  bool hasBounds = llvm::any_of(
+      typeParamBounds, [](const std::string& b) { return !b.empty(); });
+  if (hasBounds) {
+    SmallVector<Attribute> boundAttrs;
+    for (const auto& bound : typeParamBounds) {
+      boundAttrs.push_back(builder.getStringAttr(bound));
+    }
+    result.addAttribute(getTypeParamBoundsAttrName(result.name),
+                        builder.getArrayAttr(boundAttrs));
+  }
+
+  // Parse the function signature (args, return type)
+  SmallVector<OpAsmParser::Argument> args;
+  SmallVector<Type> resultTypes;
+  SmallVector<DictionaryAttr> resultAttrs;
+  bool isVariadic = false;
+
+  if (function_interface_impl::parseFunctionSignature(
+          parser, /*allowVariadic=*/false, args, isVariadic, resultTypes,
+          resultAttrs)) {
+    return failure();
+  }
+
+  // Build function type from parsed args and results
+  SmallVector<Type> argTypes;
+  for (const auto& arg : args) {
+    argTypes.push_back(arg.type);
+  }
+  auto funcType = builder.getFunctionType(argTypes, resultTypes);
+  result.addAttribute(getFunctionTypeAttrName(result.name),
+                      TypeAttr::get(funcType));
+
+  // Parse optional attributes
+  if (parser.parseOptionalAttrDictWithKeyword(result.attributes)) {
+    return failure();
+  }
+
+  // Add arg/result attributes
+  SmallVector<Attribute> argAttrs;
+  for (const auto& arg : args) {
+    auto namedAttrList = arg.attrs.getValue();
+    argAttrs.push_back(
+        namedAttrList.empty()
+            ? DictionaryAttr()
+            : DictionaryAttr::get(parser.getContext(), namedAttrList));
+  }
+  if (!llvm::all_of(argAttrs, [](Attribute a) { return !a; })) {
+    result.addAttribute(getArgAttrsAttrName(result.name),
+                        builder.getArrayAttr(argAttrs));
+  }
+  if (!resultAttrs.empty() &&
+      !llvm::all_of(resultAttrs, [](DictionaryAttr a) { return !a; })) {
+    SmallVector<Attribute> resAttrVec(resultAttrs.begin(), resultAttrs.end());
+    result.addAttribute(getResAttrsAttrName(result.name),
+                        builder.getArrayAttr(resAttrVec));
+  }
+
+  // Parse body
+  auto* body = result.addRegion();
+  if (parser.parseRegion(*body, args)) {
+    return failure();
+  }
+  if (body->empty()) {
+    body->push_back(new Block());
+  }
+
+  return success();
+}
+
+void GenericFuncOp::print(OpAsmPrinter& p) {
+  // Print function name
+  p << " ";
+  p.printSymbolName(getSymName());
+
+  // Print type parameters <a, b: Numeric>
+  auto typeParams = getTypeParams();
+  auto typeParamBounds = getTypeParamBounds();
+  p << "<";
+  for (size_t i = 0; i < typeParams.size(); ++i) {
+    if (i > 0) {
+      p << ", ";
+    }
+    p << cast<StringAttr>(typeParams[i]).getValue();
+    if (typeParamBounds) {
+      auto bound = cast<StringAttr>((*typeParamBounds)[i]).getValue();
+      if (!bound.empty()) {
+        p << ": " << bound;
+      }
+    }
+  }
+  p << ">";
+
+  // Print function signature (args, return type, body)
+  auto funcType = getFunctionType();
+  function_interface_impl::printFunctionSignature(
+      p, *this, funcType.getInputs(), /*isVariadic=*/false,
+      funcType.getResults());
+
+  // Print attributes (excluding known ones)
+  function_interface_impl::printFunctionAttributes(
+      p, *this,
+      {getFunctionTypeAttrName(), getArgAttrsAttrName(), getResAttrsAttrName(),
+       getTypeParamsAttrName(), getTypeParamBoundsAttrName(),
+       getCapturesAttrName()});
+
+  // Print body
+  p << ' ';
+  p.printRegion(getBody(), /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/true);
+}
+
+//===----------------------------------------------------------------------===//
+// InstantiateOp
+//===----------------------------------------------------------------------===//
+
+void InstantiateOp::build(OpBuilder& builder, OperationState& state,
+                          StringRef callee, TypeRange results,
+                          ValueRange operands,
+                          ArrayRef<StringRef> typeParamNames,
+                          ArrayRef<Type> typeBindings) {
+  state.addOperands(operands);
+  state.addAttribute("callee",
+                     SymbolRefAttr::get(builder.getContext(), callee));
+  state.addTypes(results);
+
+  SmallVector<Attribute> nameAttrs;
+  for (StringRef name : typeParamNames) {
+    nameAttrs.push_back(builder.getStringAttr(name));
+  }
+  state.addAttribute(getTypeParamNamesAttrName(state.name),
+                     builder.getArrayAttr(nameAttrs));
+
+  SmallVector<Attribute> typeAttrs;
+  for (Type t : typeBindings) {
+    typeAttrs.push_back(TypeAttr::get(t));
+  }
+  state.addAttribute(getTypeBindingsAttrName(state.name),
+                     builder.getArrayAttr(typeAttrs));
+}
+
+CallInterfaceCallable InstantiateOp::getCallableForCallee() {
+  return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+}
+
+void InstantiateOp::setCalleeFromCallable(CallInterfaceCallable callee) {
+  (*this)->setAttr("callee", llvm::cast<SymbolRefAttr>(callee));
+}
+
+Operation::operand_range InstantiateOp::getArgOperands() {
+  return getOperands();
+}
+
+MutableOperandRange InstantiateOp::getArgOperandsMutable() {
+  return getOperandsMutable();
+}
+
+FunctionType InstantiateOp::getCalleeType() {
+  return FunctionType::get(getContext(), getOperandTypes(), getResultTypes());
+}
+
+/// Parse type bindings: <a = !polang.integer<64, signed>, b = !polang.bool>
+/// Type param names are bare identifiers in the textual MLIR format.
+static ParseResult
+parseTypeBindings(OpAsmParser& parser,
+                  SmallVectorImpl<std::string>& typeParamNames,
+                  SmallVectorImpl<Type>& typeBindings) {
+  if (parser.parseLess()) {
+    return failure();
+  }
+
+  auto parseOneBinding = [&]() -> ParseResult {
+    StringRef nameRef;
+    if (parser.parseKeyword(&nameRef)) {
+      return failure();
+    }
+    typeParamNames.push_back(nameRef.str());
+
+    // Parse = type
+    if (parser.parseEqual()) {
+      return failure();
+    }
+    Type type;
+    if (parser.parseType(type)) {
+      return failure();
+    }
+    typeBindings.push_back(type);
+    return success();
+  };
+
+  if (parseOneBinding()) {
+    return failure();
+  }
+  while (succeeded(parser.parseOptionalComma())) {
+    if (parseOneBinding()) {
+      return failure();
+    }
+  }
+
+  return parser.parseGreater();
+}
+
+ParseResult InstantiateOp::parse(OpAsmParser& parser, OperationState& result) {
+  // Parse callee
+  FlatSymbolRefAttr calleeAttr;
+  if (parser.parseAttribute(calleeAttr, "callee", result.attributes)) {
+    return failure();
+  }
+
+  // Parse type bindings <'a = !polang.integer<64, signed>>
+  SmallVector<std::string> typeParamNames;
+  SmallVector<Type> typeBindings;
+  if (parseTypeBindings(parser, typeParamNames, typeBindings)) {
+    return failure();
+  }
+
+  auto& builder = parser.getBuilder();
+  SmallVector<Attribute> nameAttrs;
+  for (const auto& name : typeParamNames) {
+    nameAttrs.push_back(builder.getStringAttr(name));
+  }
+  result.addAttribute(InstantiateOp::getTypeParamNamesAttrName(result.name),
+                      builder.getArrayAttr(nameAttrs));
+
+  SmallVector<Attribute> typeAttrs;
+  for (Type t : typeBindings) {
+    typeAttrs.push_back(TypeAttr::get(t));
+  }
+  result.addAttribute(InstantiateOp::getTypeBindingsAttrName(result.name),
+                      builder.getArrayAttr(typeAttrs));
+
+  // Parse operands
+  SmallVector<OpAsmParser::UnresolvedOperand> operands;
+  if (parser.parseLParen()) {
+    return failure();
+  }
+  if (parser.parseOptionalRParen()) {
+    if (parser.parseOperandList(operands) || parser.parseRParen()) {
+      return failure();
+    }
+  }
+
+  // Parse optional attributes
+  if (parser.parseOptionalAttrDict(result.attributes)) {
+    return failure();
+  }
+
+  // Parse functional type : (operand types) -> result types
+  FunctionType funcType;
+  if (parser.parseColonType(funcType)) {
+    return failure();
+  }
+
+  // Resolve operands
+  if (parser.resolveOperands(operands, funcType.getInputs(),
+                             parser.getCurrentLocation(), result.operands)) {
+    return failure();
+  }
+
+  result.addTypes(funcType.getResults());
+  return success();
+}
+
+void InstantiateOp::print(OpAsmPrinter& p) {
+  p << " @" << getCallee();
+
+  // Print type bindings <a = !polang.integer<64, signed>>
+  auto names = getTypeParamNames();
+  auto bindings = getTypeBindings();
+  p << "<";
+  for (size_t i = 0; i < names.size(); ++i) {
+    if (i > 0) {
+      p << ", ";
+    }
+    p << cast<StringAttr>(names[i]).getValue() << " = ";
+    p.printType(cast<TypeAttr>(bindings[i]).getValue());
+  }
+  p << ">";
+
+  // Print operands
+  p << "(";
+  p.printOperands(getOperands());
+  p << ")";
+
+  p.printOptionalAttrDict(
+      (*this)->getAttrs(),
+      /*elidedAttrs=*/{"callee", "type_param_names", "type_bindings"});
+  p << " : ";
+  p.printFunctionalType(getOperandTypes(), getResultTypes());
+}
+
+LogicalResult InstantiateOp::verify() {
+  // Check that type_param_names and type_bindings have the same size
+  if (getTypeParamNames().size() != getTypeBindings().size()) {
+    return emitOpError("type_param_names count (")
+           << getTypeParamNames().size() << ") must match type_bindings count ("
+           << getTypeBindings().size() << ")";
+  }
+  return success();
+}
+
+LogicalResult
+InstantiateOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
+  auto genericFuncOp = symbolTable.lookupNearestSymbolFrom<GenericFuncOp>(
+      *this, getCalleeAttr());
+  if (!genericFuncOp) {
+    return emitOpError("references undefined generic function '")
+           << getCallee() << "'";
+  }
+
+  auto funcType = genericFuncOp.getFunctionType();
+
+  // Check argument count
+  if (getOperands().size() != funcType.getNumInputs()) {
+    return emitOpError("generic function '")
+           << getCallee() << "' expects " << funcType.getNumInputs()
+           << " argument(s) but got " << getOperands().size();
+  }
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -177,12 +609,16 @@ LogicalResult IfOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult ReturnOp::verify() {
-  auto funcOp = dyn_cast<FuncOp>((*this)->getParentOp());
-  if (!funcOp) {
-    return emitOpError("must be inside a polang.func");
-  }
+  auto* parentOp = (*this)->getParentOp();
+  ArrayRef<Type> resultTypes;
 
-  auto resultTypes = funcOp.getResultTypes();
+  if (auto funcOp = dyn_cast<FuncOp>(parentOp)) {
+    resultTypes = funcOp.getResultTypes();
+  } else if (auto genericFuncOp = dyn_cast<GenericFuncOp>(parentOp)) {
+    resultTypes = genericFuncOp.getResultTypes();
+  } else {
+    return emitOpError("must be inside a polang.func or polang.generic_func");
+  }
 
   if (getValue()) {
     if (resultTypes.empty()) {
@@ -212,13 +648,21 @@ LogicalResult CallOp::verify() {
 }
 
 LogicalResult CallOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
+  FunctionType funcType;
   auto funcOp =
       symbolTable.lookupNearestSymbolFrom<FuncOp>(*this, getCalleeAttr());
-  if (!funcOp) {
-    return emitOpError("references undefined function '") << getCallee() << "'";
+  if (funcOp) {
+    funcType = funcOp.getFunctionType();
+  } else {
+    // Also check for GenericFuncOp
+    auto genericFuncOp = symbolTable.lookupNearestSymbolFrom<GenericFuncOp>(
+        *this, getCalleeAttr());
+    if (!genericFuncOp) {
+      return emitOpError("references undefined function '")
+             << getCallee() << "'";
+    }
+    funcType = genericFuncOp.getFunctionType();
   }
-
-  auto funcType = funcOp.getFunctionType();
 
   // Check argument count
   if (getOperands().size() != funcType.getNumInputs()) {
@@ -373,9 +817,10 @@ ParseResult ConstantIntegerOp::parse(OpAsmParser& parser,
   unsigned width = 64; // Default width for type variables
   if (auto intType = dyn_cast<polang::IntegerType>(resultType)) {
     width = intType.getWidth();
-  } else if (!isa<TypeVarType>(resultType)) {
-    return parser.emitError(parser.getNameLoc(),
-                            "expected polang.integer or typevar type");
+  } else if (!isa<TypeVarType, TypeParamType>(resultType)) {
+    return parser.emitError(
+        parser.getNameLoc(),
+        "expected polang.integer, typevar, or type_param type");
   }
   auto attr = IntegerAttr::get(
       mlir::IntegerType::get(parser.getContext(), width), value);
@@ -418,9 +863,10 @@ ParseResult ConstantFloatOp::parse(OpAsmParser& parser,
     } else {
       attrType = Float64Type::get(parser.getContext());
     }
-  } else if (!isa<TypeVarType>(resultType)) {
-    return parser.emitError(parser.getNameLoc(),
-                            "expected polang.float or typevar type");
+  } else if (!isa<TypeVarType, TypeParamType>(resultType)) {
+    return parser.emitError(
+        parser.getNameLoc(),
+        "expected polang.float, typevar, or type_param type");
   }
   auto attr = FloatAttr::get(attrType, value);
   result.addAttribute("value", attr);

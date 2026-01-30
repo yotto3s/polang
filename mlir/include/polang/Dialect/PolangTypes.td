@@ -101,6 +101,17 @@ def Polang_BoolType : Polang_Type<"Bool", "bool"> {
   }];
 }
 
+def Polang_TypeParamType : Polang_Type<"TypeParam", "type_param"> {
+  let summary = "Named type parameter for generic functions";
+  let description = [{
+    Represents a named type parameter in a generic function template.
+    Uses ML-style naming convention ('a, 'b, etc.).
+    Example: !polang.type_param<"a">
+  }];
+  let parameters = (ins StringRefParameter<"">:$name);
+  let assemblyFormat = "`<` $name `>`";
+}
+
 def Polang_TypeVarType : Polang_Type<"TypeVar", "typevar"> {
   let summary = "Type variable for polymorphic type inference";
   let description = [{
@@ -166,5 +177,25 @@ def Polang_IntegerOrTypeVar : AnyTypeOf<[
 def Polang_FloatOrTypeVar : AnyTypeOf<[
     Polang_FloatType, Polang_TypeVarType
 ], "float or type variable">;
+
+// Type constraints that include type parameters (for generic functions)
+def Polang_AnyNumericOrParam : AnyTypeOf<[
+    Polang_IntegerType, Polang_FloatType, Polang_TypeParamType
+], "Polang numeric type or type parameter">;
+
+def Polang_AnyTypeOrParam : AnyTypeOf<[
+    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_TypeParamType
+], "any Polang type or type parameter">;
+
+// Numeric, type variable, or type parameter (for ops that must accept all three)
+def Polang_AnyNumericOrVarOrParam : AnyTypeOf<[
+    Polang_IntegerType, Polang_FloatType, Polang_TypeVarType, Polang_TypeParamType
+], "Polang numeric type, type variable, or type parameter">;
+
+// Any type, type variable, or type parameter (for ops that must accept all three)
+def Polang_AnyTypeOrVarOrParam : AnyTypeOf<[
+    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_TypeVarType,
+    Polang_TypeParamType
+], "any Polang type, type variable, or type parameter">;
 
 #endif // POLANG_TYPES_TD
