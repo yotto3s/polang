@@ -50,6 +50,11 @@ public:
     addConversion([](BoolType type) {
       return mlir::IntegerType::get(type.getContext(), 1);
     });
+    // Handle type parameters that weren't resolved by monomorphization.
+    // Default to i64 as fallback (should not be reached in normal flow).
+    addConversion([](TypeParamType type) -> Type {
+      return mlir::IntegerType::get(type.getContext(), 64);
+    });
     // Handle type variables that weren't resolved - apply defaults based on
     // kind
     addConversion([](TypeVarType type) -> Type {
@@ -448,6 +453,35 @@ struct CmpOpLowering : public OpConversionPattern<CmpOp> {
 // Function Lowering
 //===----------------------------------------------------------------------===//
 
+struct GenericFuncOpLowering : public OpConversionPattern<GenericFuncOp> {
+  using OpConversionPattern<GenericFuncOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(GenericFuncOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    (void)adaptor;
+    // GenericFuncOp should have been monomorphized already.
+    // Erase any remaining instances as a safety net.
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+struct InstantiateOpLowering : public OpConversionPattern<InstantiateOp> {
+  using OpConversionPattern<InstantiateOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(InstantiateOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    (void)adaptor;
+    (void)rewriter;
+    // InstantiateOp should have been replaced by CallOp during
+    // monomorphization. If we reach here, something went wrong.
+    return op.emitOpError(
+        "was not resolved during monomorphization; this is a compiler bug");
+  }
+};
+
 struct FuncOpLowering : public OpConversionPattern<FuncOp> {
   using OpConversionPattern<FuncOp>::OpConversionPattern;
 
@@ -649,7 +683,8 @@ struct PolangToStandardPass
     patterns.add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
                  ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
                  MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
-                 FuncOpLowering, CallOpLowering, ReturnOpLowering, IfOpLowering,
+                 GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
+                 CallOpLowering, ReturnOpLowering, IfOpLowering,
                  YieldOpLowering, AllocaOpLowering, PrintOpLowering>(
         typeConverter, &getContext());
 
