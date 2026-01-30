@@ -8,6 +8,10 @@
 class NBlock;
 class TypeChecker;
 
+namespace polang {
+class JITSession;
+} // namespace polang
+
 // Result of evaluating an expression
 struct EvalResult {
   bool success;
@@ -50,6 +54,12 @@ private:
 
   // Persistent type checker across evaluations
   std::unique_ptr<TypeChecker> typeChecker;
+
+  // Persistent JIT session across evaluations
+  std::unique_ptr<polang::JITSession> jitSession;
+
+  // Evaluation counter for unique entry function names
+  int evalCounter = 0;
 };
 
 #endif // POLANG_REPL_SESSION_HPP

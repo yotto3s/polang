@@ -28,11 +28,13 @@ namespace polang {
 /// already have their types set by an external TypeChecker).
 /// If inferredType is non-empty, it is used as the return type of the
 /// entry function instead of running the internal TypeChecker.
-mlir::OwningOpRef<mlir::ModuleOp> mlirGen(mlir::MLIRContext& context,
-                                          const NBlock& moduleAST,
-                                          bool emitTypeVars = false,
-                                          bool skipTypeCheck = false,
-                                          const std::string& inferredType = "");
+/// If entryFuncName is non-empty, the entry function is named accordingly
+/// instead of the default "__polang_entry".
+mlir::OwningOpRef<mlir::ModuleOp>
+mlirGen(mlir::MLIRContext& context, const NBlock& moduleAST,
+        bool emitTypeVars = false, bool skipTypeCheck = false,
+        const std::string& inferredType = "",
+        const std::string& entryFuncName = "");
 
 } // namespace polang
 

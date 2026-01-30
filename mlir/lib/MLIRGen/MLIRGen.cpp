@@ -61,10 +61,13 @@ public:
   MLIRGenVisitor(MLIRContext& context, bool /*emitTypeVars*/ = false,
                  bool skipTypeCheck = false,
                  std::string externalInferredType = "",
+                 std::string entryFuncName = "",
                  std::string filename = "<source>")
       : builder(&context), typeConverter(&context),
         skipTypeCheck(skipTypeCheck),
         externalInferredType(std::move(externalInferredType)),
+        entryFuncName(entryFuncName.empty() ? "__polang_entry"
+                                            : std::move(entryFuncName)),
         sourceFilename(std::move(filename)) {
     // Create a new module
     module = ModuleOp::create(builder.getUnknownLoc());
@@ -734,6 +737,7 @@ private:
   TypeChecker typeChecker;
   bool skipTypeCheck;
   std::string externalInferredType;
+  std::string entryFuncName;
   std::string sourceFilename;
 
   // Track whether any errors occurred during MLIR generation
@@ -903,7 +907,7 @@ private:
 
     builder.setInsertionPointToEnd(module.getBody());
     auto entryFunc =
-        builder.create<FuncOp>(loc(block.loc), "__polang_entry", funcType);
+        builder.create<FuncOp>(loc(block.loc), entryFuncName, funcType);
 
     // Create entry block
     Block* entryBlock = entryFunc.addEntryBlock();
@@ -941,11 +945,13 @@ private:
 mlir::OwningOpRef<mlir::ModuleOp>
 polang::mlirGen(mlir::MLIRContext& context, const NBlock& moduleAST,
                 bool emitTypeVars, bool skipTypeCheck,
-                const std::string& inferredType) {
+                const std::string& inferredType,
+                const std::string& entryFuncName) {
   // Register the Polang dialect
   context.getOrLoadDialect<PolangDialect>();
 
-  MLIRGenVisitor generator(context, emitTypeVars, skipTypeCheck, inferredType);
+  MLIRGenVisitor generator(context, emitTypeVars, skipTypeCheck, inferredType,
+                           entryFuncName);
   ModuleOp module = generator.generate(moduleAST);
   if (!module) {
     return nullptr;

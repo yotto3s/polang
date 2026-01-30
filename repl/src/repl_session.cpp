@@ -5,10 +5,13 @@
 #include "repl/repl_session.hpp"
 #include "repl/input_checker.hpp"
 
+#include "compiler/jit_session.hpp"
 #include "compiler/mlir_codegen.hpp"
 #include "parser/node.hpp"
 #include "parser/parser_api.hpp"
 #include "parser/type_checker.hpp"
+
+#include "mlir/IR/BuiltinOps.h"
 
 #include <llvm/Support/TargetSelect.h>
 
@@ -28,6 +31,14 @@ bool ReplSession::initialize() {
 
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
+
+  // Initialize persistent JIT session
+  jitSession = std::make_unique<polang::JITSession>();
+  std::string jitError;
+  if (!jitSession->initialize(jitError)) {
+    std::cerr << "JIT initialization failed: " << jitError << "\n";
+    return false;
+  }
 
   initialized = true;
   return true;
@@ -98,13 +109,18 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     }
   }
 
+  // Generate unique entry function name for this evaluation
+  const std::string entryFuncName =
+      "__polang_eval_" + std::to_string(evalCounter);
+
   // Generate code using MLIR backend - always emit type variables.
   // Skip internal type checking since the persistent TypeChecker already ran.
   polang::MLIRCodeGenContext codegenCtx;
   const std::string inferredType = typeChecker->getInferredType();
 
   if (!codegenCtx.generateCode(*accumulatedAst, /*emitTypeVars=*/true,
-                               /*skipTypeCheck=*/true, inferredType)) {
+                               /*skipTypeCheck=*/true, inferredType,
+                               entryFuncName)) {
     std::cerr << "MLIR generation failed: " << codegenCtx.getError() << "\n";
     // Rollback on failure
     accumulatedAst->statements.resize(previousStatementCount);
@@ -122,7 +138,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
 
   // Get resolved type from MLIR (after type inference, before lowering)
   if (lastIsExpression) {
-    resultType = codegenCtx.getResolvedReturnType();
+    resultType = codegenCtx.getResolvedReturnType(entryFuncName);
   }
 
   if (!codegenCtx.lowerToStandard()) {
@@ -140,16 +156,26 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     return EvalResult::error("Code generation failed");
   }
 
-  // Execute with JIT
+  // Add compiled module to persistent JIT and execute
+  auto mlirModule = codegenCtx.takeModule();
+  std::string jitError;
+  if (!jitSession->addModule(mlirModule, jitError)) {
+    std::cerr << "JIT module addition failed: " << jitError << "\n";
+    accumulatedAst->statements.resize(previousStatementCount);
+    typeChecker->restoreState(snapshot);
+    return EvalResult::error("JIT compilation failed");
+  }
+
   int64_t result = 0;
-  if (!codegenCtx.runCode(result)) {
-    std::cerr << "JIT execution failed: " << codegenCtx.getError() << "\n";
+  if (!jitSession->execute(entryFuncName, result, jitError, resultType)) {
+    std::cerr << "JIT execution failed: " << jitError << "\n";
     accumulatedAst->statements.resize(previousStatementCount);
     typeChecker->restoreState(snapshot);
     return EvalResult::error("Execution failed");
   }
 
-  // Success - keep the merged AST (already merged above)
+  // Success — increment eval counter
+  ++evalCounter;
 
   // Only return a value if the last statement was an expression
   if (lastIsExpression) {

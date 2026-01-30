@@ -91,14 +91,15 @@ bool MLIRCodeGenContext::initializeContext() {
 
 bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars,
                                       bool skipTypeCheck,
-                                      const std::string& inferredType) {
+                                      const std::string& inferredType,
+                                      const std::string& entryFuncName) {
   if (!initializeContext()) {
     error = "Failed to initialize MLIR context";
     return false;
   }
 
-  auto moduleRef =
-      mlirGen(*context, ast, emitTypeVars, skipTypeCheck, inferredType);
+  auto moduleRef = mlirGen(*context, ast, emitTypeVars, skipTypeCheck,
+                           inferredType, entryFuncName);
   if (!moduleRef) {
     error = "Failed to generate MLIR from AST";
     return false;
@@ -267,13 +268,14 @@ std::string typeToString(Type type) {
 
 } // namespace
 
-std::string MLIRCodeGenContext::getResolvedReturnType() const {
+std::string
+MLIRCodeGenContext::getResolvedReturnType(const std::string& funcName) const {
   if (!module || !*module) {
     return "unknown";
   }
 
-  // Find the __polang_entry function
-  auto entryFunc = (*module)->lookupSymbol<polang::FuncOp>("__polang_entry");
+  // Find the entry function
+  auto entryFunc = (*module)->lookupSymbol<polang::FuncOp>(funcName);
   if (!entryFunc) {
     return "unknown";
   }
@@ -284,6 +286,13 @@ std::string MLIRCodeGenContext::getResolvedReturnType() const {
   }
 
   return typeToString(funcType.getResult(0));
+}
+
+OwningOpRef<ModuleOp> MLIRCodeGenContext::takeModule() {
+  if (!module || !*module) {
+    return nullptr;
+  }
+  return std::move(*module);
 }
 
 } // namespace polang

@@ -40,10 +40,12 @@ public:
   /// has types set by an external TypeChecker).
   /// If inferredType is non-empty, it is used as the return type of the
   /// entry function instead of running the internal TypeChecker.
+  /// If entryFuncName is non-empty, the entry function is named accordingly.
   /// Returns true on success.
   bool generateCode(const NBlock& ast, bool emitTypeVars = false,
                     bool skipTypeCheck = false,
-                    const std::string& inferredType = "");
+                    const std::string& inferredType = "",
+                    const std::string& entryFuncName = "");
 
   /// Run type inference pass to resolve type variables.
   /// Must be called after generateCode() when emitTypeVars was true.
@@ -69,10 +71,14 @@ public:
   /// Returns the result of the main function.
   bool runCode(int64_t& result);
 
-  /// Get the resolved return type name of the entry function.
+  /// Get the resolved return type name of an entry function.
   /// Must be called after runTypeInference().
   /// Returns "int", "double", "bool", or "unknown".
-  [[nodiscard]] std::string getResolvedReturnType() const;
+  [[nodiscard]] std::string
+  getResolvedReturnType(const std::string& funcName = "__polang_entry") const;
+
+  /// Take ownership of the MLIR module (for external JIT execution).
+  [[nodiscard]] mlir::OwningOpRef<mlir::ModuleOp> takeModule();
 
   /// Get the last error message.
   [[nodiscard]] const std::string& getError() const { return error; }
