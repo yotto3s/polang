@@ -427,3 +427,129 @@ ParseResult ConstantFloatOp::parse(OpAsmParser& parser,
   result.addTypes(resultType);
   return success();
 }
+
+//===----------------------------------------------------------------------===//
+// LetExprOp
+//===----------------------------------------------------------------------===//
+
+void LetExprOp::print(OpAsmPrinter& p) {
+  p << " ";
+  p.printAttribute(getVarNamesAttr());
+  p << " -> " << getResult().getType();
+
+  for (Region& binding : getBindings()) {
+    p << "\n  binding ";
+    p.printRegion(binding, /*printEntryBlockArgs=*/false);
+  }
+
+  p << "\n  body ";
+  p.printRegion(getBody(), /*printEntryBlockArgs=*/true);
+  p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"var_names"});
+}
+
+ParseResult LetExprOp::parse(OpAsmParser& parser, OperationState& result) {
+  ArrayAttr varNamesAttr;
+  Type resultType;
+
+  if (parser.parseAttribute(varNamesAttr, "var_names", result.attributes) ||
+      parser.parseArrow() || parser.parseType(resultType)) {
+    return failure();
+  }
+  result.addTypes(resultType);
+
+  size_t numBindings = varNamesAttr.size();
+  SmallVector<std::unique_ptr<Region>> bindingRegions;
+  for (size_t i = 0; i < numBindings; ++i) {
+    if (parser.parseKeyword("binding")) {
+      return failure();
+    }
+    auto bindingRegion = std::make_unique<Region>();
+    if (parser.parseRegion(*bindingRegion, /*arguments=*/{}, /*argTypes=*/{})) {
+      return failure();
+    }
+    if (bindingRegion->empty()) {
+      bindingRegion->push_back(new Block());
+    }
+    bindingRegions.push_back(std::move(bindingRegion));
+  }
+
+  if (parser.parseKeyword("body")) {
+    return failure();
+  }
+  Region* body = result.addRegion();
+  if (parser.parseRegion(*body)) {
+    return failure();
+  }
+  if (body->empty()) {
+    body->push_back(new Block());
+  }
+
+  for (auto& bindingRegion : bindingRegions) {
+    Region* binding = result.addRegion();
+    binding->takeBody(*bindingRegion);
+  }
+
+  return parser.parseOptionalAttrDict(result.attributes);
+}
+
+LogicalResult LetExprOp::verify() {
+  if (getBindings().empty()) {
+    return emitOpError("must have at least one binding region");
+  }
+
+  if (getBindings().size() != getVarNames().size()) {
+    return emitOpError("number of binding regions (")
+           << getBindings().size() << ") must match var_names count ("
+           << getVarNames().size() << ")";
+  }
+
+  SmallVector<Type> bindingTypes;
+  for (auto [idx, binding] : llvm::enumerate(getBindings())) {
+    if (binding.empty() || binding.front().empty()) {
+      return emitOpError("binding region #") << idx << " must not be empty";
+    }
+
+    auto* terminator = binding.front().getTerminator();
+    auto yieldBinding = dyn_cast<YieldBindingOp>(terminator);
+    if (!yieldBinding) {
+      return emitOpError("binding region #")
+             << idx << " must end with polang.yield.binding";
+    }
+    bindingTypes.push_back(yieldBinding.getValue().getType());
+  }
+
+  if (getBody().empty() || getBody().front().empty()) {
+    return emitOpError("body region must not be empty");
+  }
+
+  Block& bodyEntry = getBody().front();
+  if (bodyEntry.getNumArguments() != bindingTypes.size()) {
+    return emitOpError("body block argument count (")
+           << bodyEntry.getNumArguments() << ") doesn't match binding count ("
+           << bindingTypes.size() << ")";
+  }
+  for (auto [idx, pair] :
+       llvm::enumerate(llvm::zip(bodyEntry.getArguments(), bindingTypes))) {
+    auto [blockArg, yieldType] = pair;
+    if (!typesAreCompatible(blockArg.getType(), yieldType)) {
+      return emitOpError("body block argument #")
+             << idx << " type " << blockArg.getType()
+             << " doesn't match binding yield type " << yieldType;
+    }
+  }
+
+  auto* bodyTerminator = getBody().front().getTerminator();
+  auto yieldOp = dyn_cast<YieldOp>(bodyTerminator);
+  if (!yieldOp) {
+    return emitOpError("body must end with polang.yield");
+  }
+
+  if (!typesAreCompatible(yieldOp.getValue().getType(),
+                          getResult().getType())) {
+    return emitOpError("yield type ")
+           << yieldOp.getValue().getType() << " doesn't match result type "
+           << getResult().getType();
+  }
+
+  return success();
+}

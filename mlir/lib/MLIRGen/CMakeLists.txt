@@ -1,6 +1,7 @@
 add_mlir_library(PolangMLIRGen
   MLIRGen.cpp
   PolangTypeConverter.cpp
+  PolangLocations.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}/mlir/include/polang

@@ -212,7 +212,7 @@
       },
       "filter": {
         "exclude": {
-          "name": "VerifierTest|TypeInferencePassTest|ConversionPassTest"
+          "name": "VerifierTest|TypeInferencePassTest|ConversionPassTest|polang-lit-tests"
         }
       },
       "environment": {

@@ -32,6 +32,7 @@ add_subdirectory(lib/Dialect)
 add_subdirectory(lib/Conversion)
 add_subdirectory(lib/MLIRGen)
 add_subdirectory(lib/Transforms)
+add_subdirectory(tools)
 
 # Combined MLIR library
 add_library(PolangMLIR INTERFACE)

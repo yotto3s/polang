@@ -10,7 +10,7 @@ import lit.util
 config.name = "Polang"
 
 # File extensions for test files
-config.suffixes = [".po"]
+config.suffixes = [".po", ".mlir"]
 
 # Test format - ShTest allows RUN: lines with shell commands
 config.test_format = lit.formats.ShTest(not lit.util.which("bash"))
@@ -24,6 +24,7 @@ config.test_exec_root = config.polang_obj_root
 # Tool substitutions - these are replaced in RUN: lines
 config.substitutions.append(("%polang_compiler", config.polang_compiler_path))
 config.substitutions.append(("%polang_repl", config.polang_repl_path))
+config.substitutions.append(("%polang_opt", config.polang_opt_path))
 config.substitutions.append(("%FileCheck", config.filecheck_path + " --match-full-lines"))
 config.substitutions.append(("%not", config.not_path))
 
