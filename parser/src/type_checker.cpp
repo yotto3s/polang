@@ -4,9 +4,11 @@
 #include <parser/node.hpp>
 #include <parser/operator_utils.hpp>
 #include <parser/polang_types.hpp>
+#include <parser/type_inference.hpp>
 #include "parser.hpp"  // Must be after node.hpp for token constants
 // clang-format on
 
+#include <algorithm>
 #include <iostream>
 #include <set>
 
@@ -158,6 +160,10 @@ std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   localTypes.clear();
   functionReturnTypes.clear();
   functionParamTypes.clear();
+  functionSchemes.clear();
+  subst = polang::Substitution();
+  traitConstraints = polang::TraitConstraints();
+  polang::resetUnificationVarCounter();
   ast.accept(*this);
   return errors;
 }
@@ -206,7 +212,12 @@ void TypeChecker::visit(const NIdentifier& node) {
     inferredType = TypeNames::UNKNOWN;
     return;
   }
-  inferredType = localTypes[node.name];
+  std::string type = localTypes[node.name];
+  // Resolve through substitution if it's a unification var
+  if (polang::isUnificationVar(type)) {
+    type = subst.apply(type);
+  }
+  inferredType = type;
 }
 
 void TypeChecker::visit(const NQualifiedName& node) {
@@ -229,6 +240,14 @@ void TypeChecker::visit(const NMethodCall& node) {
     argTypes.push_back(inferredType);
   }
 
+  // Check if this is a polymorphic function call
+  auto schemeIt = functionSchemes.find(funcName);
+  if (schemeIt != functionSchemes.end()) {
+    auto& mutableNode = const_cast<NMethodCall&>(node);
+    instantiateCall(mutableNode, funcName, schemeIt->second, argTypes);
+    return;
+  }
+
   const auto paramIt = functionParamTypes.find(funcName);
   if (paramIt != functionParamTypes.end()) {
     const auto& paramTypes = paramIt->second;
@@ -243,11 +262,9 @@ void TypeChecker::visit(const NMethodCall& node) {
       for (std::size_t i = 0; i < argTypes.size(); ++i) {
         if (!isGenericType(paramTypes[i]) &&
             paramTypes[i] != TypeNames::UNKNOWN &&
-            paramTypes[i] != TypeNames::TYPEVAR) {
-          // Try to propagate - if the argument source is in unresolvedGenerics,
-          // it will be resolved; otherwise nothing happens
+            paramTypes[i] != TypeNames::TYPEVAR &&
+            !polang::isTypeParameter(paramTypes[i])) {
           propagateTypeToSource(node.arguments[i].get(), paramTypes[i]);
-          // Re-evaluate the argument type after propagation
           node.arguments[i]->accept(*this);
           argTypes[i] = inferredType;
         }
@@ -258,6 +275,7 @@ void TypeChecker::visit(const NMethodCall& node) {
             paramTypes[i] != TypeNames::UNKNOWN &&
             argTypes[i] != TypeNames::TYPEVAR &&
             paramTypes[i] != TypeNames::TYPEVAR &&
+            !polang::isTypeParameter(paramTypes[i]) &&
             !areTypesCompatible(argTypes[i], paramTypes[i])) {
           reportError("Function '" + funcName + "' argument " +
                           std::to_string(i + 1) + " expects " + paramTypes[i] +
@@ -276,11 +294,95 @@ void TypeChecker::visit(const NMethodCall& node) {
   }
 }
 
+void TypeChecker::instantiateCall(NMethodCall& node,
+                                  const std::string& funcName,
+                                  const polang::TypeScheme& scheme,
+                                  const std::vector<std::string>& argTypes) {
+  if (argTypes.size() != scheme.paramTypes.size()) {
+    reportError(
+        formatArgCountError(funcName, scheme.paramTypes.size(), argTypes.size()),
+        node.loc);
+    inferredType = TypeNames::UNKNOWN;
+    return;
+  }
+
+  // Create fresh unification vars for each type parameter
+  polang::Substitution callSubst;
+  polang::Unifier callUnifier;
+  std::map<std::string, std::string> typeParamToUniVar;
+  for (const auto& tp : scheme.typeParams) {
+    std::string uv = polang::freshUnificationVar();
+    typeParamToUniVar[tp] = uv;
+    callSubst.bind(tp, uv);
+  }
+
+  // Unify argument types with instantiated parameter types
+  for (size_t i = 0; i < argTypes.size(); ++i) {
+    std::string instantiatedParam = callSubst.apply(scheme.paramTypes[i]);
+    std::string resolvedArg = resolveWithDefaults(argTypes[i]);
+    if (resolvedArg == TypeNames::UNKNOWN) {
+      continue;
+    }
+    if (!callUnifier.unify(instantiatedParam, resolvedArg, callSubst)) {
+      reportError("Function '" + funcName + "' argument " +
+                      std::to_string(i + 1) + ": type mismatch",
+                  node.loc);
+      inferredType = TypeNames::UNKNOWN;
+      return;
+    }
+  }
+
+  // Resolve all type param bindings to concrete types
+  node.typeBindings.clear();
+  for (const auto& tp : scheme.typeParams) {
+    std::string resolved = callSubst.apply(tp);
+    resolved = resolveWithDefaults(resolved);
+
+    // Validate trait bounds
+    auto boundsIt = scheme.paramBounds.find(tp);
+    if (boundsIt != scheme.paramBounds.end()) {
+      if (!polang::TraitConstraints::satisfies(resolved, boundsIt->second)) {
+        reportError("Function '" + funcName + "': type " + resolved +
+                        " does not satisfy trait bounds for " + tp,
+                    node.loc);
+      }
+    }
+
+    node.typeBindings[tp] = makeTypeSpec(resolved);
+  }
+
+  // Resolve return type
+  std::string resolvedReturn = callSubst.apply(scheme.returnType);
+  resolvedReturn = resolveWithDefaults(resolvedReturn);
+  inferredType = resolvedReturn;
+}
+
 void TypeChecker::checkArithmeticBinaryOp(const NBinaryOperator& node,
                                           const std::string& lhsType,
                                           const std::string& rhsType) {
   const bool lhsIsTypevar = lhsType == TypeNames::TYPEVAR;
   const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
+  const bool lhsIsUniVar = polang::isUnificationVar(lhsType);
+  const bool rhsIsUniVar = polang::isUnificationVar(rhsType);
+
+  // If either is a unification variable, try to unify and add Numeric bound
+  if (lhsIsUniVar || rhsIsUniVar) {
+    if (lhsIsUniVar) {
+      traitConstraints.addBound(lhsType, polang::TraitBound::Numeric);
+    }
+    if (rhsIsUniVar) {
+      traitConstraints.addBound(rhsType, polang::TraitBound::Numeric);
+    }
+    // Try to unify lhs and rhs types
+    if (!unifier.unify(lhsType, rhsType, subst)) {
+      reportError("Type mismatch in '" + operatorToString(node.op) +
+                      "': cannot unify operand types",
+                  node.loc);
+    }
+    // Result type is the unified type
+    inferredType = subst.apply(lhsType);
+    return;
+  }
 
   if (!lhsIsTypevar && !rhsIsTypevar && !areTypesCompatible(lhsType, rhsType)) {
     reportError("Type mismatch in '" + operatorToString(node.op) +
@@ -302,6 +404,24 @@ void TypeChecker::checkComparisonBinaryOp(const NBinaryOperator& node,
                                           const std::string& rhsType) {
   const bool lhsIsTypevar = lhsType == TypeNames::TYPEVAR;
   const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
+  const bool lhsIsUniVar = polang::isUnificationVar(lhsType);
+  const bool rhsIsUniVar = polang::isUnificationVar(rhsType);
+
+  // If either is a unification variable, add Numeric bound and unify
+  if (lhsIsUniVar || rhsIsUniVar) {
+    if (lhsIsUniVar) {
+      traitConstraints.addBound(lhsType, polang::TraitBound::Numeric);
+    }
+    if (rhsIsUniVar) {
+      traitConstraints.addBound(rhsType, polang::TraitBound::Numeric);
+    }
+    if (!unifier.unify(lhsType, rhsType, subst)) {
+      reportError("Type mismatch in comparison: cannot unify operand types",
+                  node.loc);
+    }
+    inferredType = TypeNames::BOOL;
+    return;
+  }
 
   if (!lhsIsTypevar && !rhsIsTypevar && !areTypesCompatible(lhsType, rhsType)) {
     reportError(
@@ -368,8 +488,14 @@ void TypeChecker::visit(const NIfExpression& node) {
   const std::string condType = inferredType;
 
   if (condType != TypeNames::UNKNOWN && condType != TypeNames::BOOL &&
-      condType != TypeNames::TYPEVAR) {
+      condType != TypeNames::TYPEVAR &&
+      !polang::isUnificationVar(condType)) {
     reportError("If condition must be bool, got " + condType, node.loc);
+  }
+
+  // If condition is a unification var, unify it with bool
+  if (polang::isUnificationVar(condType)) {
+    unifier.unify(condType, TypeNames::BOOL, subst);
   }
 
   node.thenExpr->accept(*this);
@@ -377,6 +503,17 @@ void TypeChecker::visit(const NIfExpression& node) {
 
   node.elseExpr->accept(*this);
   const std::string elseType = inferredType;
+
+  // Handle unification vars in branch types
+  const bool thenIsUniVar = polang::isUnificationVar(thenType);
+  const bool elseIsUniVar = polang::isUnificationVar(elseType);
+
+  if (thenIsUniVar || elseIsUniVar) {
+    // Unify the two branch types
+    unifier.unify(thenType, elseType, subst);
+    inferredType = subst.apply(thenType);
+    return;
+  }
 
   if (thenType != TypeNames::UNKNOWN && elseType != TypeNames::UNKNOWN &&
       thenType != TypeNames::TYPEVAR && elseType != TypeNames::TYPEVAR &&
@@ -430,72 +567,23 @@ void TypeChecker::typeCheckLetBindings(
 
       const auto funcSavedLocals = localTypes;
 
-      std::set<std::string> paramNames;
+      // For let-bound functions, we need to make sibling types available
+      // for capture resolution. Create a merged locals map.
+      std::map<std::string, std::string> mergedLocals = savedLocals;
+      for (const auto& [name, type] : siblingTypes) {
+        mergedLocals[name] = type;
+      }
+
+      // Use inferFunction to handle both monomorphic and polymorphic cases
+      inferFunction(mutableFunc, func->id->name, mergedLocals);
+
+      // Collect the final param types for addLetBindingsToScope
       std::vector<std::string> paramTypes;
       for (const auto& arg : func->arguments) {
-        paramNames.insert(arg->id->name);
-        if (arg->type == nullptr) {
-          auto& mutableArg = const_cast<NVariableDeclaration&>(*arg);
-          mutableArg.type = makeTypeSpec(TypeNames::TYPEVAR);
-          localTypes[arg->id->name] = TypeNames::TYPEVAR;
-          paramTypes.emplace_back(TypeNames::TYPEVAR);
-        } else {
-          localTypes[arg->id->name] = arg->type->getTypeName();
-          paramTypes.emplace_back(arg->type->getTypeName());
-        }
+        paramTypes.emplace_back(
+            arg->type != nullptr ? arg->type->getTypeName() : TypeNames::TYPEVAR);
       }
-
       funcParams.push_back(paramTypes);
-
-      const std::set<std::string> freeVars =
-          collectFreeVariables(*func->block, paramNames);
-
-      mutableFunc.captures.clear();
-      for (const auto& varName : freeVars) {
-        std::string varType;
-        bool found = false;
-
-        // Cache iterator to avoid repeated lookups
-        auto localIt = savedLocals.find(varName);
-        if (localIt != savedLocals.end()) {
-          varType = localIt->second;
-          found = true;
-        } else {
-          auto siblingIt = siblingTypes.find(varName);
-          if (siblingIt != siblingTypes.end()) {
-            varType = siblingIt->second;
-            found = true;
-          }
-        }
-
-        if (found) {
-          // Mutability is now encoded in the type (e.g., "mut i64")
-          mutableFunc.captures.emplace_back(
-              makeTypeSpec(varType), std::make_unique<NIdentifier>(varName));
-
-          localTypes[varName] = varType;
-        }
-      }
-
-      func->block->accept(*this);
-      const std::string bodyType = inferredType;
-
-      if (func->type == nullptr) {
-        if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR) {
-          // Resolve generic types to defaults for function return type
-          std::string resolvedBodyType = resolveGenericToDefault(bodyType);
-          mutableFunc.type = makeTypeSpec(resolvedBodyType);
-        } else {
-          mutableFunc.type = makeTypeSpec(TypeNames::TYPEVAR);
-        }
-      } else if (bodyType != TypeNames::UNKNOWN &&
-                 bodyType != TypeNames::TYPEVAR &&
-                 !areTypesCompatible(bodyType, func->type->getTypeName())) {
-        reportError("Function '" + func->id->name + "' declared to return " +
-                        func->type->getTypeName() + " but body has type " +
-                        resolveGenericToDefault(bodyType),
-                    func->loc);
-      }
 
       bindingTypes.emplace_back(TypeNames::FUNCTION);
 
@@ -715,69 +803,222 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   auto& mutableNode = const_cast<NFunctionDeclaration&>(node);
 
   const std::string funcName = mangledName(node.id->name);
-
   const auto savedLocals = localTypes;
+
+  inferFunction(mutableNode, funcName, savedLocals);
+
+  localTypes = savedLocals;
+  inferredType = node.type != nullptr ? node.type->getTypeName()
+                                      : TypeNames::TYPEVAR;
+}
+
+void TypeChecker::inferFunction(
+    NFunctionDeclaration& node, const std::string& funcName,
+    const std::map<std::string, std::string>& savedLocals) {
+  // Check if function has any untyped parameters
+  bool hasUntypedParams = false;
+  for (const auto& arg : node.arguments) {
+    if (arg->type == nullptr) {
+      hasUntypedParams = true;
+      break;
+    }
+  }
+
+  // Save HM state for this function scope
+  const auto savedSubst = subst;
+  const auto savedTraitConstraints = traitConstraints;
+
+  // Map from param name -> unification var (for untyped params)
+  std::map<std::string, std::string> paramUniVars;
 
   std::set<std::string> paramNames;
   std::vector<std::string> paramTypes;
   for (const auto& arg : node.arguments) {
     paramNames.insert(arg->id->name);
     if (arg->type == nullptr) {
-      auto& mutableArg = const_cast<NVariableDeclaration&>(*arg);
-      mutableArg.type = makeTypeSpec(TypeNames::TYPEVAR);
-      localTypes[arg->id->name] = TypeNames::TYPEVAR;
-      paramTypes.emplace_back(TypeNames::TYPEVAR);
+      // Assign fresh unification variable instead of TYPEVAR
+      std::string uniVar = polang::freshUnificationVar();
+      paramUniVars[arg->id->name] = uniVar;
+      localTypes[arg->id->name] = uniVar;
+      paramTypes.emplace_back(uniVar);
     } else {
       localTypes[arg->id->name] = arg->type->getTypeName();
       paramTypes.emplace_back(arg->type->getTypeName());
     }
   }
 
+  // Collect free variables (captures)
   const std::set<std::string> freeVars =
       collectFreeVariables(*node.block, paramNames);
 
-  mutableNode.captures.clear();
+  node.captures.clear();
   for (const auto& varName : freeVars) {
     const auto typeIt = savedLocals.find(varName);
     if (typeIt != savedLocals.end()) {
-      // Mutability is now encoded in the type (e.g., "mut i64")
-      mutableNode.captures.emplace_back(makeTypeSpec(typeIt->second),
-                                        std::make_unique<NIdentifier>(varName));
-
+      node.captures.emplace_back(makeTypeSpec(typeIt->second),
+                                 std::make_unique<NIdentifier>(varName));
       localTypes[varName] = typeIt->second;
     }
   }
 
   functionParamTypes[funcName] = paramTypes;
 
+  // Type-check function body
   node.block->accept(*this);
-  const std::string bodyType = inferredType;
+  std::string bodyType = inferredType;
 
-  if (node.type == nullptr) {
-    if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR) {
-      // Resolve generic types to defaults for function return type
-      std::string resolvedBodyType = resolveGenericToDefault(bodyType);
-      mutableNode.type = makeTypeSpec(resolvedBodyType);
-      functionReturnTypes[funcName] = resolvedBodyType;
+  if (!hasUntypedParams) {
+    // Monomorphic function — same as before
+    if (node.type == nullptr) {
+      if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR) {
+        std::string resolvedBodyType = resolveGenericToDefault(bodyType);
+        node.type = makeTypeSpec(resolvedBodyType);
+        functionReturnTypes[funcName] = resolvedBodyType;
+      } else {
+        node.type = makeTypeSpec(TypeNames::TYPEVAR);
+        functionReturnTypes[funcName] = TypeNames::TYPEVAR;
+      }
     } else {
-      mutableNode.type = makeTypeSpec(TypeNames::TYPEVAR);
-      functionReturnTypes[funcName] = TypeNames::TYPEVAR;
-    }
-  } else {
-    const std::string declReturnType = node.type->getTypeName();
-
-    if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR &&
-        !areTypesCompatible(bodyType, declReturnType)) {
-      reportError(formatFuncReturnTypeError(node.id->name, declReturnType,
-                                            resolveGenericToDefault(bodyType)),
-                  node.loc);
+      const std::string declReturnType = node.type->getTypeName();
+      if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR &&
+          !areTypesCompatible(bodyType, declReturnType)) {
+        reportError(
+            polang::formatFuncReturnTypeError(
+                node.id->name, declReturnType, resolveGenericToDefault(bodyType)),
+            node.loc);
+      }
+      functionReturnTypes[funcName] = declReturnType;
     }
 
-    functionReturnTypes[funcName] = declReturnType;
+    // Restore HM state
+    subst = savedSubst;
+    traitConstraints = savedTraitConstraints;
+    return;
   }
 
-  localTypes = savedLocals;
-  inferredType = node.type != nullptr ? node.type->getTypeName() : bodyType;
+  // Polymorphic function — resolve what we can via substitution
+  // Apply substitution to resolve any unification vars that were unified with
+  // concrete types during body type-checking
+  std::string resolvedBodyType = subst.apply(bodyType);
+
+  // Resolve params through substitution
+  std::vector<std::string> resolvedParamTypes;
+  for (const auto& pt : paramTypes) {
+    resolvedParamTypes.push_back(subst.apply(pt));
+  }
+
+  // Check which unification vars remain unresolved (= truly polymorphic)
+  // Collect the set of unification vars that are still unresolved
+  std::set<std::string> unresolvedVars;
+  for (const auto& rpt : resolvedParamTypes) {
+    if (polang::isUnificationVar(rpt)) {
+      unresolvedVars.insert(rpt);
+    }
+  }
+  if (polang::isUnificationVar(resolvedBodyType)) {
+    unresolvedVars.insert(resolvedBodyType);
+  }
+
+  if (unresolvedVars.empty()) {
+    // All vars resolved to concrete types — function is monomorphic
+    // Apply defaults for generic types
+    for (size_t i = 0; i < resolvedParamTypes.size(); ++i) {
+      resolvedParamTypes[i] = resolveWithDefaults(resolvedParamTypes[i]);
+      auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
+      mutableArg.type = makeTypeSpec(resolvedParamTypes[i]);
+    }
+    resolvedBodyType = resolveWithDefaults(resolvedBodyType);
+
+    functionParamTypes[funcName] = resolvedParamTypes;
+
+    if (node.type == nullptr) {
+      node.type = makeTypeSpec(resolvedBodyType);
+      functionReturnTypes[funcName] = resolvedBodyType;
+    } else {
+      const std::string declReturnType = node.type->getTypeName();
+      if (!areTypesCompatible(resolvedBodyType, declReturnType)) {
+        reportError(
+            polang::formatFuncReturnTypeError(
+                node.id->name, declReturnType, resolvedBodyType),
+            node.loc);
+      }
+      functionReturnTypes[funcName] = declReturnType;
+    }
+  } else {
+    // Some vars remain unresolved — function is polymorphic
+    // Name the type parameters 'a, 'b, 'c, ...
+    std::map<std::string, std::string> uniVarToTypeParam;
+    char paramChar = 'a';
+    for (const auto& uv : unresolvedVars) {
+      std::string typeParam = std::string("'") + paramChar;
+      uniVarToTypeParam[uv] = typeParam;
+      ++paramChar;
+    }
+
+    // Build type params and bounds
+    node.typeParams.clear();
+    node.typeParamBounds.clear();
+    for (const auto& [uv, tp] : uniVarToTypeParam) {
+      node.typeParams.push_back(tp);
+      auto bounds = traitConstraints.getBounds(uv);
+      if (!bounds.empty()) {
+        node.typeParamBounds[tp] = bounds;
+      }
+    }
+
+    // Rewrite param types: replace unification vars with type params
+    for (size_t i = 0; i < resolvedParamTypes.size(); ++i) {
+      auto it = uniVarToTypeParam.find(resolvedParamTypes[i]);
+      if (it != uniVarToTypeParam.end()) {
+        resolvedParamTypes[i] = it->second;
+      } else {
+        resolvedParamTypes[i] = resolveWithDefaults(resolvedParamTypes[i]);
+      }
+      auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
+      mutableArg.type = makeTypeSpec(resolvedParamTypes[i]);
+    }
+
+    // Rewrite return type
+    auto retIt = uniVarToTypeParam.find(resolvedBodyType);
+    if (retIt != uniVarToTypeParam.end()) {
+      resolvedBodyType = retIt->second;
+    } else {
+      resolvedBodyType = resolveWithDefaults(resolvedBodyType);
+    }
+
+    functionParamTypes[funcName] = resolvedParamTypes;
+
+    if (node.type == nullptr) {
+      node.type = makeTypeSpec(resolvedBodyType);
+      functionReturnTypes[funcName] = resolvedBodyType;
+    } else {
+      functionReturnTypes[funcName] = node.type->getTypeName();
+    }
+
+    // Store type scheme for polymorphic instantiation
+    polang::TypeScheme scheme;
+    scheme.typeParams = node.typeParams;
+    for (const auto& [tp, bounds] : node.typeParamBounds) {
+      scheme.paramBounds[tp] = bounds;
+    }
+    scheme.paramTypes = resolvedParamTypes;
+    scheme.returnType = resolvedBodyType;
+    functionSchemes[funcName] = scheme;
+  }
+
+  // Restore HM state
+  subst = savedSubst;
+  traitConstraints = savedTraitConstraints;
+}
+
+std::string TypeChecker::resolveWithDefaults(const std::string& type) const {
+  if (polang::isGenericIntegerType(type)) {
+    return TypeNames::I64;
+  }
+  if (polang::isGenericFloatType(type)) {
+    return TypeNames::F64;
+  }
+  return resolveGenericToDefault(type);
 }
 
 void TypeChecker::visit(const NModuleDeclaration& node) {

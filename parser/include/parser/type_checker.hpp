@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include <parser/type_inference.hpp>
 #include <parser/visitor.hpp>
 
 class Node;
@@ -149,6 +150,27 @@ private:
   void propagateTypeToSource(const NExpression* expr,
                              const std::string& targetType);
   void resolveRemainingGenerics();
+
+  // HM type inference infrastructure
+  polang::Substitution subst;
+  polang::Unifier unifier;
+  polang::TraitConstraints traitConstraints;
+  // Map function name -> type scheme (for polymorphic functions)
+  std::map<std::string, polang::TypeScheme> functionSchemes;
+
+  // Infer a function: assign unification vars, collect constraints, resolve
+  void inferFunction(NFunctionDeclaration& node,
+                     const std::string& funcName,
+                     const std::map<std::string, std::string>& savedLocals);
+
+  // Instantiate a polymorphic function at a call site
+  void instantiateCall(NMethodCall& node, const std::string& funcName,
+                       const polang::TypeScheme& scheme,
+                       const std::vector<std::string>& argTypes);
+
+  // Resolve defaults for constrained unification vars
+  [[nodiscard]] std::string
+  resolveWithDefaults(const std::string& type) const;
 };
 
 #endif // POLANG_TYPE_CHECKER_HPP
