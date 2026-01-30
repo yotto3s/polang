@@ -55,9 +55,12 @@ polang/
 │   ├── CMakeLists.txt
 │   ├── src/
 │   │   ├── main.cpp            # Compiler entry point
-│   │   └── mlir_codegen.cpp    # MLIR-based code generation
+│   │   ├── mlir_codegen.cpp    # MLIR-based code generation
+│   │   └── jit_session.cpp     # Persistent JIT session (LLJIT)
 │   └── include/compiler/
-│       └── mlir_codegen.hpp    # MLIR code generation header
+│       ├── mlir_codegen.hpp    # MLIR code generation header
+│       ├── jit_session.hpp     # Persistent JIT session header
+│       └── compiled_symbols.hpp # Compiled symbol tracking
 ├── repl/                       # REPL application
 │   ├── CMakeLists.txt
 │   ├── src/
@@ -157,12 +160,25 @@ The compiler application that produces LLVM IR.
 
 ### 4. REPL (`repl/`)
 
-Interactive read-eval-print loop with JIT execution.
+Interactive read-eval-print loop with persistent JIT execution.
 
 - **Features**:
   - Multi-line input for incomplete expressions
   - Variable and function persistence across evaluations
-  - LLVM OrcJIT for code execution
+  - Persistent TypeChecker with incremental checking and snapshot/rollback
+  - Persistent LLJIT session with per-evaluation JITDylibs
+  - Per-evaluation entry functions (`__polang_eval_0`, `__polang_eval_1`, ...)
+
+- **REPL Evaluation Pipeline**:
+  1. Parse new input into AST
+  2. Snapshot TypeChecker state (for rollback on error)
+  3. Incrementally type-check only new statements (`checkIncremental`)
+  4. Merge into accumulated AST
+  5. Generate MLIR with `skipTypeCheck=true` (uses persistent TypeChecker results)
+  6. Run monomorphization pass
+  7. Lower to standard dialects → LLVM dialect
+  8. Add compiled module to persistent JIT (new JITDylib per eval)
+  9. Execute per-eval entry function and return result
 
 ## Compilation Pipeline
 
