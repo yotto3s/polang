@@ -59,8 +59,12 @@ makeTypeSpec(const std::string& typeName) {
 class MLIRGenVisitor : public Visitor {
 public:
   MLIRGenVisitor(MLIRContext& context, bool /*emitTypeVars*/ = false,
+                 bool skipTypeCheck = false,
+                 std::string externalInferredType = "",
                  std::string filename = "<source>")
       : builder(&context), typeConverter(&context),
+        skipTypeCheck(skipTypeCheck),
+        externalInferredType(std::move(externalInferredType)),
         sourceFilename(std::move(filename)) {
     // Create a new module
     module = ModuleOp::create(builder.getUnknownLoc());
@@ -73,13 +77,15 @@ public:
 
   /// Generate MLIR for the given AST block
   ModuleOp generate(const NBlock& block) {
-    // Always run type checker for error detection (undefined vars, etc.)
-    // Return value intentionally ignored since we check hasErrors() directly
-    (void)typeChecker.check(block);
+    if (!skipTypeCheck) {
+      // Run type checker for error detection (undefined vars, etc.)
+      // Return value intentionally ignored since we check hasErrors() directly
+      (void)typeChecker.check(block);
 
-    // If type checker found errors, fail early
-    if (typeChecker.hasErrors()) {
-      return nullptr;
+      // If type checker found errors, fail early
+      if (typeChecker.hasErrors()) {
+        return nullptr;
+      }
     }
 
     // Generate the main function that wraps the top-level code
@@ -726,6 +732,8 @@ private:
   PolangTypeConverter typeConverter;
   ModuleOp module;
   TypeChecker typeChecker;
+  bool skipTypeCheck;
+  std::string externalInferredType;
   std::string sourceFilename;
 
   // Track whether any errors occurred during MLIR generation
@@ -869,8 +877,11 @@ private:
   }
 
   void generateMainFunction(const NBlock& block) {
-    // Get the inferred return type from the type checker
-    std::string inferredType = typeChecker.getInferredType();
+    // Get the inferred return type: use external type if provided,
+    // otherwise fall back to internal type checker
+    std::string inferredType = !externalInferredType.empty()
+                                   ? externalInferredType
+                                   : typeChecker.getInferredType();
 
     // Use type checker's type if it's concrete, otherwise use default i64
     Type returnType;
@@ -927,13 +938,14 @@ private:
 
 } // namespace
 
-mlir::OwningOpRef<mlir::ModuleOp> polang::mlirGen(mlir::MLIRContext& context,
-                                                  const NBlock& moduleAST,
-                                                  bool emitTypeVars) {
+mlir::OwningOpRef<mlir::ModuleOp>
+polang::mlirGen(mlir::MLIRContext& context, const NBlock& moduleAST,
+                bool emitTypeVars, bool skipTypeCheck,
+                const std::string& inferredType) {
   // Register the Polang dialect
   context.getOrLoadDialect<PolangDialect>();
 
-  MLIRGenVisitor generator(context, emitTypeVars);
+  MLIRGenVisitor generator(context, emitTypeVars, skipTypeCheck, inferredType);
   ModuleOp module = generator.generate(moduleAST);
   if (!module) {
     return nullptr;

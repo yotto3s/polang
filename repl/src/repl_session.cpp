@@ -98,10 +98,13 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     }
   }
 
-  // Generate code using MLIR backend - always emit type variables
+  // Generate code using MLIR backend - always emit type variables.
+  // Skip internal type checking since the persistent TypeChecker already ran.
   polang::MLIRCodeGenContext codegenCtx;
+  const std::string inferredType = typeChecker->getInferredType();
 
-  if (!codegenCtx.generateCode(*accumulatedAst, true)) {
+  if (!codegenCtx.generateCode(*accumulatedAst, /*emitTypeVars=*/true,
+                               /*skipTypeCheck=*/true, inferredType)) {
     std::cerr << "MLIR generation failed: " << codegenCtx.getError() << "\n";
     // Rollback on failure
     accumulatedAst->statements.resize(previousStatementCount);

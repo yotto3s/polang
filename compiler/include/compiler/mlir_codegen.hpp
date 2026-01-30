@@ -36,8 +36,14 @@ public:
   /// Generate MLIR from the given AST.
   /// If emitTypeVars is true, untyped positions will emit type variables
   /// for polymorphic type inference at the MLIR level.
+  /// If skipTypeCheck is true, type checking is skipped (assumes AST already
+  /// has types set by an external TypeChecker).
+  /// If inferredType is non-empty, it is used as the return type of the
+  /// entry function instead of running the internal TypeChecker.
   /// Returns true on success.
-  bool generateCode(const NBlock& ast, bool emitTypeVars = false);
+  bool generateCode(const NBlock& ast, bool emitTypeVars = false,
+                    bool skipTypeCheck = false,
+                    const std::string& inferredType = "");
 
   /// Run type inference pass to resolve type variables.
   /// Must be called after generateCode() when emitTypeVars was true.

@@ -89,13 +89,16 @@ bool MLIRCodeGenContext::initializeContext() {
   return true;
 }
 
-bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars) {
+bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars,
+                                      bool skipTypeCheck,
+                                      const std::string& inferredType) {
   if (!initializeContext()) {
     error = "Failed to initialize MLIR context";
     return false;
   }
 
-  auto moduleRef = mlirGen(*context, ast, emitTypeVars);
+  auto moduleRef =
+      mlirGen(*context, ast, emitTypeVars, skipTypeCheck, inferredType);
   if (!moduleRef) {
     error = "Failed to generate MLIR from AST";
     return false;

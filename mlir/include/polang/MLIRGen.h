@@ -8,6 +8,7 @@
 #define POLANG_MLIRGEN_H
 
 #include <memory>
+#include <string>
 
 namespace mlir {
 class MLIRContext;
@@ -23,9 +24,15 @@ namespace polang {
 /// Returns nullptr on failure.
 /// If emitTypeVars is true, untyped positions will emit type variables
 /// for polymorphic type inference at the MLIR level.
+/// If skipTypeCheck is true, type checking is skipped (assumes AST nodes
+/// already have their types set by an external TypeChecker).
+/// If inferredType is non-empty, it is used as the return type of the
+/// entry function instead of running the internal TypeChecker.
 mlir::OwningOpRef<mlir::ModuleOp> mlirGen(mlir::MLIRContext& context,
                                           const NBlock& moduleAST,
-                                          bool emitTypeVars = false);
+                                          bool emitTypeVars = false,
+                                          bool skipTypeCheck = false,
+                                          const std::string& inferredType = "");
 
 } // namespace polang
 
