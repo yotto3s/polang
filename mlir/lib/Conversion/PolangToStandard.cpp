@@ -55,23 +55,6 @@ public:
     addConversion([](TypeParamType type) -> Type {
       return mlir::IntegerType::get(type.getContext(), 64);
     });
-    // Handle type variables that weren't resolved - apply defaults based on
-    // kind
-    addConversion([](TypeVarType type) -> Type {
-      auto* ctx = type.getContext();
-      switch (type.getKind()) {
-      case TypeVarKind::Integer:
-        // Default integer type variables to i64
-        return mlir::IntegerType::get(ctx, 64);
-      case TypeVarKind::Float:
-        // Default float type variables to f64
-        return Float64Type::get(ctx);
-      case TypeVarKind::Any:
-        // Generic type vars default to i64 (legacy behavior)
-        return mlir::IntegerType::get(ctx, 64);
-      }
-      llvm_unreachable("Unknown TypeVarKind");
-    });
   }
 };
 
@@ -92,10 +75,6 @@ struct ConstantIntegerOpLowering
 
     if (auto polangType = dyn_cast<polang::IntegerType>(resultType)) {
       width = polangType.getWidth();
-    } else if (auto typeVar = dyn_cast<TypeVarType>(resultType)) {
-      // Type variable - use default width based on kind
-      // Integer kind defaults to 64, which is already set
-      (void)typeVar;
     }
 
     auto intType = rewriter.getIntegerType(width);
@@ -122,9 +101,6 @@ struct ConstantFloatOpLowering : public OpConversionPattern<ConstantFloatOp> {
       } else {
         floatType = rewriter.getF64Type();
       }
-    } else if (auto typeVar = dyn_cast<TypeVarType>(resultType)) {
-      // Type variable - float kind defaults to f64
-      (void)typeVar;
     }
 
     // getValue() returns APFloat from the attribute
@@ -489,13 +465,6 @@ struct FuncOpLowering : public OpConversionPattern<FuncOp> {
   matchAndRewrite(FuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
     (void)adaptor; // Unused, but required by MLIR interface
-    // Skip polymorphic functions - they are templates that should not be
-    // lowered. Only their specialized (monomorphized) versions are lowered.
-    if (op->hasAttr("polang.polymorphic")) {
-      rewriter.eraseOp(op);
-      return success();
-    }
-
     auto funcType = op.getFunctionType();
     TypeConverter::SignatureConversion signatureConversion(
         funcType.getNumInputs());

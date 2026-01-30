@@ -66,11 +66,6 @@ public:
     module = ModuleOp::create(builder.getUnknownLoc());
   }
 
-  /// Generate a fresh type variable with optional kind constraint
-  Type freshTypeVar(TypeVarKind kind = TypeVarKind::Any) {
-    return typeConverter.freshTypeVar(kind);
-  }
-
   /// Get a Polang type from annotation, or a fresh type variable if none
   Type getTypeOrFresh(const NTypeSpec* typeAnnotation) {
     return typeConverter.getTypeOrFresh(typeAnnotation);
@@ -111,15 +106,16 @@ public:
 
   // Expression Visitor implementations
   void visit(const NInteger& node) override {
-    // Create type variable constrained to integer types
-    auto type = freshTypeVar(TypeVarKind::Integer);
+    // Use default i64 type - AST-level type checker resolves concrete types
+    auto type = getDefaultType();
     result = builder.create<ConstantIntegerOp>(loc(node.loc), type, node.value);
     resultType = std::make_shared<const NNamedType>(TypeNames::GENERIC_INT);
   }
 
   void visit(const NDouble& node) override {
-    // Create type variable constrained to float types
-    auto type = freshTypeVar(TypeVarKind::Float);
+    // Use default f64 type - AST-level type checker resolves concrete types
+    auto type =
+        polang::FloatType::get(builder.getContext(), DEFAULT_FLOAT_WIDTH);
     result = builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
     resultType = std::make_shared<const NNamedType>(TypeNames::GENERIC_FLOAT);
   }
@@ -216,8 +212,8 @@ public:
         }
         resultType = funcRetTypeIt->second;
       } else {
-        // Function not found - generate fresh type var for unknown function
-        resultTy = freshTypeVar();
+        // Function not found - use default type for unknown function
+        resultTy = getDefaultType();
         resultType = std::make_shared<const NNamedType>(TypeNames::UNKNOWN);
       }
     }
@@ -876,12 +872,12 @@ private:
     // Get the inferred return type from the type checker
     std::string inferredType = typeChecker.getInferredType();
 
-    // Use type checker's type if it's concrete, otherwise use type variable
+    // Use type checker's type if it's concrete, otherwise use default i64
     Type returnType;
     if (inferredType == TypeNames::UNKNOWN ||
         inferredType == TypeNames::TYPEVAR || isGenericType(inferredType)) {
-      // Type is unknown or generic - use type variable for MLIR inference
-      returnType = freshTypeVar();
+      // Type is unknown or generic - use default i64
+      returnType = getDefaultType();
     } else {
       // Type checker found a concrete type - use it
       auto typeSpec = makeTypeSpec(inferredType);

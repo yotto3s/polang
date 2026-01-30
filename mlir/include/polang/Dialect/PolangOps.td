@@ -57,7 +57,7 @@ def Polang_ConstantIntegerOp : Polang_Op<"constant.integer", [Pure]> {
   }];
 
   let arguments = (ins Polang_AnyIntegerAttr:$value);
-  let results = (outs AnyTypeOf<[Polang_IntegerType, Polang_TypeVarType, Polang_TypeParamType]>:$result);
+  let results = (outs AnyTypeOf<[Polang_IntegerType, Polang_TypeParamType]>:$result);
 
   let hasCustomAssemblyFormat = 1;
 
@@ -69,7 +69,7 @@ def Polang_ConstantIntegerOp : Polang_Op<"constant.integer", [Pure]> {
             $_builder.getIntegerAttr(
                 $_builder.getIntegerType(width, isSigned), value));
     }]>,
-    // Builder for type variables (before type inference)
+    // Builder for type parameters (generic functions)
     OpBuilder<(ins "mlir::Type":$type, "int64_t":$value), [{
       if (auto intType = ::llvm::dyn_cast<IntegerType>(type)) {
         unsigned width = intType.getWidth();
@@ -78,7 +78,7 @@ def Polang_ConstantIntegerOp : Polang_Op<"constant.integer", [Pure]> {
               $_builder.getIntegerAttr(
                   $_builder.getIntegerType(width, isSigned), value));
       } else {
-        // For type variables, use i64 attribute (actual type resolved later)
+        // For type parameters, use i64 attribute (actual type resolved later)
         build($_builder, $_state, type,
               $_builder.getIntegerAttr($_builder.getI64Type(), value));
       }
@@ -99,7 +99,7 @@ def Polang_ConstantFloatOp : Polang_Op<"constant.float", [Pure]> {
   }];
 
   let arguments = (ins Polang_AnyFloatAttr:$value);
-  let results = (outs AnyTypeOf<[Polang_FloatType, Polang_TypeVarType, Polang_TypeParamType]>:$result);
+  let results = (outs AnyTypeOf<[Polang_FloatType, Polang_TypeParamType]>:$result);
 
   let hasCustomAssemblyFormat = 1;
 
@@ -114,7 +114,7 @@ def Polang_ConstantFloatOp : Polang_Op<"constant.float", [Pure]> {
               $_builder.getF64FloatAttr(value));
       }
     }]>,
-    // Builder for type variables (before type inference)
+    // Builder for type parameters (generic functions)
     OpBuilder<(ins "mlir::Type":$type, "double":$value), [{
       if (auto floatType = ::llvm::dyn_cast<FloatType>(type)) {
         unsigned width = floatType.getWidth();
@@ -126,7 +126,7 @@ def Polang_ConstantFloatOp : Polang_Op<"constant.float", [Pure]> {
                 $_builder.getF64FloatAttr(value));
         }
       } else {
-        // For type variables, use f64 attribute (actual type resolved later)
+        // For type parameters, use f64 attribute (actual type resolved later)
         build($_builder, $_state, type, $_builder.getF64FloatAttr(value));
       }
     }]>
@@ -167,8 +167,8 @@ class Polang_ArithOp<string mnemonic> : Polang_Op<mnemonic, [
     // to allow type variables. Result type is specified explicitly in MLIRGen.
     // Custom verifier uses typesAreCompatible() to allow type vars.
   ]> {
-  let arguments = (ins Polang_AnyNumericOrVarOrParam:$lhs, Polang_AnyNumericOrVarOrParam:$rhs);
-  let results = (outs Polang_AnyNumericOrVarOrParam:$result);
+  let arguments = (ins Polang_AnyNumericOrParam:$lhs, Polang_AnyNumericOrParam:$rhs);
+  let results = (outs Polang_AnyNumericOrParam:$result);
   // Print all types since they may differ during type inference
   let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($lhs) `,` type($rhs) `->` type($result)";
 
@@ -245,8 +245,8 @@ def Polang_CastOp : Polang_Op<"cast", [Pure]> {
     ```
   }];
 
-  let arguments = (ins Polang_AnyNumericOrVarOrParam:$input);
-  let results = (outs Polang_AnyNumericOrVarOrParam:$result);
+  let arguments = (ins Polang_AnyNumericOrParam:$input);
+  let results = (outs Polang_AnyNumericOrParam:$result);
 
   let assemblyFormat = "$input `:` type($input) `->` type($result) attr-dict";
 
@@ -276,8 +276,8 @@ def Polang_CmpOp : Polang_Op<"cmp", [
 
   let arguments = (ins
     Polang_CmpPredicate:$predicate,
-    Polang_AnyNumericOrVarOrParam:$lhs,
-    Polang_AnyNumericOrVarOrParam:$rhs
+    Polang_AnyNumericOrParam:$lhs,
+    Polang_AnyNumericOrParam:$rhs
   );
   let results = (outs Polang_BoolType:$result);
 
@@ -358,8 +358,8 @@ def Polang_CallOp : Polang_Op<"call", [
     ```
   }];
 
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<Polang_AnyTypeOrVarOrParam>:$operands);
-  let results = (outs Optional<Polang_AnyTypeOrVarOrParam>:$result);
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<Polang_AnyTypeOrParam>:$operands);
+  let results = (outs Optional<Polang_AnyTypeOrParam>:$result);
 
   let assemblyFormat = [{
     $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
@@ -455,9 +455,9 @@ def Polang_InstantiateOp : Polang_Op<"instantiate", [
     FlatSymbolRefAttr:$callee,
     StrArrayAttr:$type_param_names,
     TypeArrayAttr:$type_bindings,
-    Variadic<Polang_AnyTypeOrVarOrParam>:$operands
+    Variadic<Polang_AnyTypeOrParam>:$operands
   );
-  let results = (outs Optional<Polang_AnyTypeOrVarOrParam>:$result);
+  let results = (outs Optional<Polang_AnyTypeOrParam>:$result);
 
   let hasCustomAssemblyFormat = 1;
 
@@ -490,7 +490,7 @@ def Polang_ReturnOp : Polang_Op<"return", [
     ```
   }];
 
-  let arguments = (ins Optional<Polang_AnyTypeOrVarOrParam>:$value);
+  let arguments = (ins Optional<Polang_AnyTypeOrParam>:$value);
 
   let assemblyFormat = "($value^ `:` type($value))? attr-dict";
 
@@ -530,8 +530,8 @@ def Polang_IfOp : Polang_Op<"if", [
     ```
   }];
 
-  let arguments = (ins Polang_BoolOrTypeVar:$condition);
-  let results = (outs Polang_AnyTypeOrVarOrParam:$result);
+  let arguments = (ins Polang_BoolType:$condition);
+  let results = (outs Polang_AnyTypeOrParam:$result);
   let regions = (region
     SizedRegion<1>:$thenRegion,
     SizedRegion<1>:$elseRegion
@@ -564,7 +564,7 @@ def Polang_YieldOp : Polang_Op<"yield", [
     ```
   }];
 
-  let arguments = (ins Polang_AnyTypeOrVarOrParam:$value);
+  let arguments = (ins Polang_AnyTypeOrParam:$value);
 
   let assemblyFormat = "$value `:` type($value) attr-dict";
 }
@@ -600,7 +600,7 @@ def Polang_LetExprOp : Polang_Op<"let_expr", [RecursiveMemoryEffects]> {
   }];
 
   let arguments = (ins StrArrayAttr:$var_names);
-  let results = (outs Polang_AnyTypeOrVarOrParam:$result);
+  let results = (outs Polang_AnyTypeOrParam:$result);
   // Body must come first since MLIR requires variadic regions to be last
   let regions = (region
     SizedRegion<1>:$body,
@@ -627,7 +627,7 @@ def Polang_YieldBindingOp : Polang_Op<"yield.binding", [
     ```
   }];
 
-  let arguments = (ins Polang_AnyTypeOrVarOrParam:$value);
+  let arguments = (ins Polang_AnyTypeOrParam:$value);
 
   let assemblyFormat = "$value `:` type($value) attr-dict";
 }
@@ -672,7 +672,7 @@ def Polang_PrintOp : Polang_Op<"print"> {
     ```
   }];
 
-  let arguments = (ins Polang_AnyTypeOrVarOrParam:$value);
+  let arguments = (ins Polang_AnyTypeOrParam:$value);
 
   let assemblyFormat = "$value `:` type($value) attr-dict";
 }

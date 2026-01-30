@@ -22,13 +22,10 @@ using namespace polang;
 
 namespace {
 /// Check if two types are compatible for verification purposes.
-/// Types are compatible if they are equal OR if either is a type variable.
-/// Type variables will be resolved by the type inference pass.
+/// Types are compatible if they are equal OR if either is a type parameter.
+/// Type parameters will be resolved by the monomorphization pass.
 bool typesAreCompatible(Type t1, Type t2) {
   if (t1 == t2) {
-    return true;
-  }
-  if (isa<TypeVarType>(t1) || isa<TypeVarType>(t2)) {
     return true;
   }
   if (isa<TypeParamType>(t1) || isa<TypeParamType>(t2)) {
@@ -744,8 +741,8 @@ LogicalResult CastOp::verify() {
   Type inputType = getInput().getType();
   Type resultType = getResult().getType();
 
-  // Allow type variables - they will be resolved by type inference pass
-  if (isa<TypeVarType>(inputType) || isa<TypeVarType>(resultType)) {
+  // Allow type parameters - they will be resolved by monomorphization
+  if (isa<TypeParamType>(inputType) || isa<TypeParamType>(resultType)) {
     return success();
   }
 
@@ -814,13 +811,12 @@ ParseResult ConstantIntegerOp::parse(OpAsmParser& parser,
   }
 
   // Create the IntegerAttr with the appropriate bit width
-  unsigned width = 64; // Default width for type variables
+  unsigned width = 64; // Default width for type parameters
   if (auto intType = dyn_cast<polang::IntegerType>(resultType)) {
     width = intType.getWidth();
-  } else if (!isa<TypeVarType, TypeParamType>(resultType)) {
-    return parser.emitError(
-        parser.getNameLoc(),
-        "expected polang.integer, typevar, or type_param type");
+  } else if (!isa<TypeParamType>(resultType)) {
+    return parser.emitError(parser.getNameLoc(),
+                            "expected polang.integer or type_param type");
   }
   auto attr = IntegerAttr::get(
       mlir::IntegerType::get(parser.getContext(), width), value);
@@ -863,10 +859,9 @@ ParseResult ConstantFloatOp::parse(OpAsmParser& parser,
     } else {
       attrType = Float64Type::get(parser.getContext());
     }
-  } else if (!isa<TypeVarType, TypeParamType>(resultType)) {
-    return parser.emitError(
-        parser.getNameLoc(),
-        "expected polang.float, typevar, or type_param type");
+  } else if (!isa<TypeParamType>(resultType)) {
+    return parser.emitError(parser.getNameLoc(),
+                            "expected polang.float or type_param type");
   }
   auto attr = FloatAttr::get(attrType, value);
   result.addAttribute("value", attr);

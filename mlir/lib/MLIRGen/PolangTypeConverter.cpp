@@ -27,10 +27,6 @@ using namespace polang;
 
 PolangTypeConverter::PolangTypeConverter(MLIRContext* ctx) : context(ctx) {}
 
-Type PolangTypeConverter::freshTypeVar(TypeVarKind kind) {
-  return TypeVarType::get(context, nextTypeVarId++, kind);
-}
-
 Type PolangTypeConverter::getTypeParamType(llvm::StringRef name) {
   // Strip the leading quote if present (e.g., "'a" -> "a")
   if (name.starts_with("'")) {
@@ -47,8 +43,8 @@ Type PolangTypeConverter::getTypeOrFresh(const NTypeSpec* typeAnnotation) {
     }
     return ty;
   }
-  // No annotation - always emit type variable for polymorphic inference
-  return freshTypeVar();
+  // No annotation - use default type (AST-level inference handles resolution)
+  return getDefaultType();
 }
 
 Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
@@ -71,7 +67,9 @@ Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
   switch (meta.kind) {
   case TypeKind::Integer:
     if (meta.isGeneric) {
-      return freshTypeVar(TypeVarKind::Integer);
+      // Generic integer defaults to i64
+      return polang::IntegerType::get(context, DEFAULT_INT_WIDTH,
+                                      Signedness::Signed);
     }
     return polang::IntegerType::get(context, meta.width,
                                     meta.isSigned() ? Signedness::Signed
@@ -79,7 +77,8 @@ Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
 
   case TypeKind::Float:
     if (meta.isGeneric) {
-      return freshTypeVar(TypeVarKind::Float);
+      // Generic float defaults to f64
+      return polang::FloatType::get(context, DEFAULT_FLOAT_WIDTH);
     }
     return polang::FloatType::get(context, meta.width);
 
@@ -87,11 +86,9 @@ Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
     return BoolType::get(context);
 
   case TypeKind::TypeVar:
-    return freshTypeVar();
-
   case TypeKind::Function:
   case TypeKind::Unknown:
-    // Default to i64 for unknown types
+    // Default to i64 for unresolved/unknown types
     return getDefaultType();
   }
 

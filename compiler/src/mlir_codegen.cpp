@@ -113,18 +113,9 @@ bool MLIRCodeGenContext::runTypeInference() {
 
   PassManager pm(context.get());
 
-  // Add the type inference pass - collects constraints and resolves types
-  // for non-polymorphic functions. Polymorphic functions are preserved
-  // with type variables. Also computes resolved arg/return types for calls
-  // to polymorphic functions (stored as attributes for monomorphization).
-  pm.addPass(polang::createTypeInferencePass());
-
   // Add the monomorphization pass - creates specialized versions of
   // polymorphic functions for each unique call signature.
   pm.addPass(polang::createMonomorphizationPass());
-
-  // Note: We don't run canonicalization here to preserve all operations
-  // for debugging/testing. Canonicalization happens in later lowering stages.
 
   if (failed(pm.run(**module))) {
     error = "Type inference failed";

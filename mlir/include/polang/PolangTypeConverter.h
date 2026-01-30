@@ -13,7 +13,6 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Types.h"
 
-#include <cstdint>
 #include <string>
 
 class NTypeSpec;
@@ -25,9 +24,6 @@ namespace polang {
 class PolangTypeConverter {
 public:
   explicit PolangTypeConverter(mlir::MLIRContext* ctx);
-
-  /// Generate a fresh type variable with optional kind constraint.
-  [[nodiscard]] mlir::Type freshTypeVar(TypeVarKind kind = TypeVarKind::Any);
 
   /// Get a TypeParamType for a named type parameter (e.g., "'a" ->
   /// type_param<"a">).
@@ -47,7 +43,6 @@ public:
 
 private:
   mlir::MLIRContext* context;
-  uint64_t nextTypeVarId = 0;
 };
 
 } // namespace polang
