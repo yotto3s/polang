@@ -45,24 +45,16 @@ Parameterized floating-point type with configurable width.
 |-------------|-----------|-----------|-------------|
 | `bool` | `!polang.bool` | `i1` | Boolean true/false |
 
-### Type Variable Type
+### Type Parameter Type
 
-Type variables represent unknown types that are resolved during type inference.
+Type parameters represent named type variables in generic function templates. They use ML-style naming convention ('a, 'b, etc.) and are resolved during monomorphization when concrete types are known from call sites.
 
 | MLIR Type | Description |
 |-----------|-------------|
-| `!polang.typevar<id>` | Unconstrained type variable |
-| `!polang.typevar<id, any>` | Can unify with any type (default) |
-| `!polang.typevar<id, integer>` | Must resolve to an integer type |
-| `!polang.typevar<id, float>` | Must resolve to a float type |
+| `!polang.type_param<"a">` | Named type parameter "a" |
+| `!polang.type_param<"b">` | Named type parameter "b" |
 
-**Type Variable Kinds:**
-
-| Kind | Description | Default Resolution |
-|------|-------------|-------------------|
-| `any` | No constraint | `i64` |
-| `integer` | Must be integer type (i8-i64, u8-u64) | `i64` |
-| `float` | Must be float type (f32, f64) | `f64` |
+Type parameters appear in `polang.generic_func` signatures and are bound to concrete types by `polang.instantiate` operations at call sites.
 
 ## Operations
 
@@ -217,6 +209,116 @@ Yields a value from a region (used within if-then-else branches).
 polang.yield %0 : !polang.integer<64, signed>
 ```
 
+### Generic Function Operations
+
+#### `polang.generic_func`
+
+Defines a polymorphic function with named type parameters and optional trait bounds. Type parameters use ML-style naming ('a, 'b, etc.).
+
+```mlir
+polang.generic_func @identity<a>(%arg0: !polang.type_param<"a">) -> !polang.type_param<"a"> {
+  polang.return %arg0 : !polang.type_param<"a">
+}
+```
+
+**Attributes:**
+- `sym_name` - Function name (symbol)
+- `function_type` - Function type signature
+- `type_params` - List of type parameter names (e.g., `["a", "b"]`)
+- `type_param_bounds` - Optional bounds for type parameters
+- `captures` - Optional list of captured variable names (for closures)
+
+#### `polang.instantiate`
+
+Calls a generic function with concrete type bindings for its type parameters.
+
+```mlir
+%0 = polang.instantiate @identity<a = !polang.integer<64, signed>>(%x) : (!polang.integer<64, signed>) -> !polang.integer<64, signed>
+```
+
+**Attributes:**
+- `callee` - Symbol reference to the generic function
+- `type_param_names` - Names of type parameters being bound
+- `type_bindings` - Concrete types to bind to each parameter
+
+### Let Expression Operations
+
+#### `polang.let_expr`
+
+A let expression with separate regions for each binding and a body. Each binding region computes a value independently and yields it via `polang.yield.binding`. The body region receives bound values as block arguments.
+
+```mlir
+%0 = polang.let_expr ["x", "y"] {
+^bb0(%x: !polang.integer<64, signed>, %y: !polang.integer<64, signed>):
+  %sum = polang.add %x, %y : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+  polang.yield %sum : !polang.integer<64, signed>
+} bindings {
+  %a = polang.constant.integer 10 : !polang.integer<64, signed>
+  polang.yield.binding %a : !polang.integer<64, signed>
+} {
+  %b = polang.constant.integer 20 : !polang.integer<64, signed>
+  polang.yield.binding %b : !polang.integer<64, signed>
+}
+```
+
+**Attributes:**
+- `var_names` - Array of binding variable names
+
+#### `polang.yield.binding`
+
+Terminates a binding region of a let expression and yields the bound value as input to the body region's corresponding block argument.
+
+```mlir
+polang.yield.binding %0 : !polang.integer<64, signed>
+```
+
+### Global Variable Operations
+
+#### `polang.global`
+
+Declares a module-level global variable. Used in the REPL for cross-module variable persistence. When `is_external` is set, the global is an extern declaration (defined in a previously compiled module; JIT resolves the symbol).
+
+```mlir
+polang.global @x : !polang.integer<64, signed>
+polang.global @y : !polang.float<64> is_external
+```
+
+**Attributes:**
+- `sym_name` - Global variable name
+- `type` - Type of the global variable
+- `is_external` - Unit attribute marking extern declarations
+
+#### `polang.global.store`
+
+Stores a value into a previously declared global variable.
+
+```mlir
+polang.global.store @x, %val : !polang.integer<64, signed>
+```
+
+#### `polang.global.load`
+
+Loads the current value from a previously declared global variable.
+
+```mlir
+%0 = polang.global.load @x : !polang.integer<64, signed>
+```
+
+### Memory Operations
+
+#### `polang.alloca`
+
+Allocates stack memory for a variable.
+
+```mlir
+%0 = polang.alloca "x", mutable : !polang.integer<64, signed> -> memref<1xi64>
+```
+
+**Attributes:**
+- `name` - Variable name
+- `elementType` - Type of the allocated element
+- `isMutable` - Unit attribute marking mutable allocation
+
 ### Debug Operations
 
 #### `polang.print`
@@ -246,46 +348,16 @@ The Polang dialect uses custom verifiers to catch type errors during compilation
 
 ### Type Inference Pass (`polang-type-inference`)
 
-Performs Hindley-Milner style type inference to resolve type variables.
+Resolves type parameters in `polang.generic_func` operations by analyzing `polang.instantiate` call sites. The pass infers concrete types for each type parameter based on the argument types at the call site.
 
-**Pipeline:**
-1. **Collect constraints** from operations:
-   - Return statements: return value must match function return type
-   - Arithmetic operations: operands and result must have same type
-   - Call sites: argument types must match parameter types
-
-2. **Solve constraints** using unification algorithm:
-   - Type variables can be bound to concrete types or other type variables
-   - Occurs check prevents infinite types
-
-3. **Apply substitution** to resolve all type variables:
-   - Function signatures updated with concrete types
-   - Operations rebuilt with resolved types
-
-**Example transformation:**
-
-Before:
-```mlir
-polang.func @identity(%arg0: !polang.typevar<0>) -> !polang.typevar<1> {
-  polang.return %arg0 : !polang.typevar<0>
-}
-%0 = polang.call @identity(%x) : (!polang.integer<64, signed>) -> !polang.typevar<1>
-```
-
-After:
-```mlir
-polang.func @identity(%arg0: !polang.integer<64, signed>) -> !polang.integer<64, signed> {
-  polang.return %arg0 : !polang.integer<64, signed>
-}
-%0 = polang.call @identity(%x) : (!polang.integer<64, signed>) -> !polang.integer<64, signed>
-```
+Type inference occurs primarily at the AST level via the TypeChecker's Hindley-Milner unification. The MLIR-level pass handles residual type parameter resolution for generic functions.
 
 ### Monomorphization Pass (`polang-monomorphize`)
 
 Specializes polymorphic functions for each unique set of concrete type arguments.
 
 **Process:**
-1. Identify polymorphic functions (those with type variables or marked `polang.polymorphic`)
+1. Identify generic functions (`polang.generic_func` with type parameters)
 2. Analyze call sites to collect concrete type combinations
 3. Create specialized function copies for each combination
 4. Update calls to use specialized versions
@@ -334,6 +406,12 @@ Lowers Polang dialect operations to standard MLIR dialects (arith, func, scf, me
 | `polang.return` | `func.return` |
 | `polang.if` | `scf.if` |
 | `polang.yield` | `scf.yield` |
+| `polang.generic_func` | Erased (must be monomorphized first) |
+| `polang.instantiate` | Erased (replaced by `polang.call` during monomorphization) |
+| `polang.global` | `llvm.mlir.global` |
+| `polang.global.store` | `llvm.mlir.addressof` + `llvm.store` |
+| `polang.global.load` | `llvm.mlir.addressof` + `llvm.load` |
+| `polang.alloca` | `memref.alloca` |
 
 **Type Lowering:**
 
@@ -353,25 +431,33 @@ mlir/
 │   │   ├── PolangDialect.td    # Dialect definition
 │   │   ├── PolangOps.td        # Operation definitions
 │   │   ├── PolangTypes.td      # Type definitions
+│   │   ├── PolangEnums.td      # Enum definitions
+│   │   ├── PolangLocations.h   # Custom location types
 │   │   └── Passes.h            # Dialect pass declarations
 │   ├── Conversion/
 │   │   └── Passes.h            # Lowering pass declarations
 │   ├── Transforms/
 │   │   ├── Passes.h            # Transform pass declarations
 │   │   └── Passes.td           # TableGen pass definitions
-│   └── MLIRGen.h               # AST to MLIR interface
-└── lib/
-    ├── Dialect/
-    │   ├── PolangDialect.cpp   # Dialect implementation
-    │   ├── PolangOps.cpp       # Operation implementations (verifiers)
-    │   └── PolangTypes.cpp     # Type implementations
-    ├── Conversion/
-    │   └── PolangToStandard.cpp # Lowering pass
-    ├── Transforms/
-    │   ├── TypeInference.cpp   # Type inference pass
-    │   └── Monomorphization.cpp # Monomorphization pass
-    └── MLIRGen/
-        └── MLIRGen.cpp         # AST to MLIR visitor
+│   ├── MLIRGen.h               # AST to MLIR interface
+│   └── PolangTypeConverter.h   # Polang-to-standard type converter
+├── lib/
+│   ├── Dialect/
+│   │   ├── PolangDialect.cpp       # Dialect implementation
+│   │   ├── PolangOps.cpp           # Operation implementations (verifiers)
+│   │   ├── PolangTypes.cpp         # Type implementations
+│   │   └── PolangTypeInference.cpp # Type inference pass
+│   ├── Conversion/
+│   │   └── PolangToStandard.cpp    # Lowering pass
+│   ├── Transforms/
+│   │   └── Monomorphization.cpp    # Monomorphization pass
+│   └── MLIRGen/
+│       ├── MLIRGen.cpp             # AST to MLIR visitor
+│       ├── PolangLocations.cpp     # Custom location implementations
+│       └── PolangTypeConverter.cpp # Type converter implementation
+└── tools/
+    └── polang-opt/
+        └── polang-opt.cpp          # MLIR round-trip testing tool
 ```
 
 ## Related Documentation

@@ -146,8 +146,8 @@ Custom MLIR dialect that closely mirrors Polang language semantics.
   - Integer: `!polang.integer<width, signedness>` (e.g., `!polang.integer<64, signed>` for `i64`)
   - Float: `!polang.float<width>` (e.g., `!polang.float<64>` for `f64`)
   - Boolean: `!polang.bool`
-  - Type variable: `!polang.typevar<id, kind>` (e.g., `!polang.typevar<0, Integer>`)
-- **Operations**: Constants, arithmetic, comparisons, control flow, functions
+  - Type parameter: `!polang.type_param<"name">` (e.g., `!polang.type_param<"a">`)
+- **Operations**: Constants, arithmetic, comparisons, control flow, functions, generics, globals
 - **Passes**: Type inference, monomorphization, lowering to standard dialects
 
 ### 3. Compiler (`compiler/`)
@@ -206,10 +206,10 @@ Source Code (.po)
 ┌─────────────────┐
 │   MLIRGen       │  mlir/lib/MLIRGen/MLIRGen.cpp
 └────────┬────────┘  (uses FileLineColLoc for MLIR ops)
-         │ Polang Dialect MLIR (with type variables)
+         │ Polang Dialect MLIR (with type parameters)
          ▼
 ┌─────────────────┐
-│ Type Inference  │  mlir/lib/Transforms/TypeInference.cpp
+│ Type Inference  │  mlir/lib/Dialect/PolangTypeInference.cpp
 └────────┬────────┘
          │ Polang Dialect MLIR (types resolved)
          ▼
@@ -249,18 +249,18 @@ This provides:
 
 ### MLIR Verification
 
-The Polang dialect uses custom verifiers to catch type errors during compilation while supporting type variables for polymorphism:
+The Polang dialect uses custom verifiers to catch type errors during compilation while supporting type parameters for polymorphism:
 
 | Operation | Verification |
 |-----------|--------------|
-| `polang.add`, `polang.sub`, `polang.mul`, `polang.div` | Custom verifier ensures operands and result have compatible types (allows type variables) |
+| `polang.add`, `polang.sub`, `polang.mul`, `polang.div` | Custom verifier ensures operands and result have compatible types (allows type parameters) |
 | `polang.cmp` | Custom verifier ensures operands have compatible types |
 | `polang.if` | Verifies condition is `!polang.bool`, both branches yield same type |
 | `polang.return` | Verifies return value matches function signature |
 | `polang.call` | Verifies function exists, arity matches, and argument types match |
 | `polang.ref.store` | Verifies reference is mutable |
 
-Type variables are resolved by the type inference pass before lowering to standard dialects.
+Type parameters are resolved by the type inference and monomorphization passes before lowering to standard dialects.
 
 ### Types
 
@@ -289,20 +289,16 @@ Type variables are resolved by the type inference pass before lowering to standa
 | Polang Type | MLIR Type | Lowers To |
 |-------------|-----------|-----------|
 | `bool` | `!polang.bool` | `i1` |
-| (type variable) | `!polang.typevar<id, kind>` | (resolved by type inference) |
+| (type parameter) | `!polang.type_param<"name">` | (resolved by monomorphization) |
 
-#### Type Variables
+#### Type Parameters
 
-Type variables (`!polang.typevar<id, kind>`) represent unknown types during the initial MLIR generation phase. They are used for:
+Type parameters (`!polang.type_param<"name">`) represent named type variables in generic function templates. They use ML-style naming ('a, 'b, etc.) and are used for:
 
-- Function parameters without explicit type annotations
+- Function parameters without explicit type annotations in `polang.generic_func`
 - Return types that depend on polymorphic parameters
 
-Type variables have two components:
-- **id**: A unique numeric identifier (e.g., `0`, `1`, `2`)
-- **kind**: A constraint on what types it can resolve to (`Any`, `Integer`, or `Float`)
-
-Type variables are resolved by the type inference pass before lowering to standard dialects. Unresolved type variables default to `i64` for `Integer` kind and `f64` for `Float` kind.
+Type parameters are resolved during monomorphization when concrete types are known from `polang.instantiate` call sites.
 
 ### Operations
 
@@ -425,46 +421,31 @@ module {
 
 ### Stage 2: Type Inference Pass
 
-The `TypeInferencePass` resolves type variables using Hindley-Milner style unification. This pass:
-
-1. **Collects constraints** from:
-   - Function return statements (return value type must match function return type)
-   - Arithmetic operations (operands and result must have the same type)
-   - Call sites (argument types must match parameter types)
-
-2. **Unifies types** using the standard unification algorithm:
-   - Type variables can be bound to concrete types or other type variables
-   - Occurs check prevents infinite types
-   - Constraints are solved to produce a substitution mapping
-
-3. **Applies substitution** to resolve all type variables:
-   - Function signatures are updated with concrete types
-   - Operations are rebuilt with resolved types
-   - Block arguments are updated to match new types
+Type inference occurs primarily at the AST level via the TypeChecker's Hindley-Milner unification algorithm (`parser/src/type_checker.cpp`). The MLIR-level `TypeInferencePass` (`mlir/lib/Dialect/PolangTypeInference.cpp`) handles residual type parameter resolution for generic functions by analyzing `polang.instantiate` call sites.
 
 **Example:**
 
-Before type inference:
+Before type inference and monomorphization:
 ```mlir
-polang.func @identity(%arg0: !polang.typevar<0>) -> !polang.typevar<1> {
-  polang.return %arg0 : !polang.typevar<0>
+polang.generic_func @identity<a>(%arg0: !polang.type_param<"a">) -> !polang.type_param<"a"> {
+  polang.return %arg0 : !polang.type_param<"a">
 }
-polang.func @__polang_entry() -> !polang.int {
-  %0 = polang.constant.int 42 : !polang.int
-  %1 = polang.call @identity(%0) : (!polang.int) -> !polang.typevar<1>
-  polang.return %1 : !polang.typevar<1>
+polang.func @__polang_entry() -> !polang.integer<64, signed> {
+  %0 = polang.constant.integer 42 : !polang.integer<64, signed>
+  %1 = polang.instantiate @identity<a = !polang.integer<64, signed>>(%0) : (!polang.integer<64, signed>) -> !polang.integer<64, signed>
+  polang.return %1 : !polang.integer<64, signed>
 }
 ```
 
-After type inference:
+After monomorphization:
 ```mlir
-polang.func @identity(%arg0: !polang.int) -> !polang.int {
-  polang.return %arg0 : !polang.int
+polang.func @identity$i64(%arg0: !polang.integer<64, signed>) -> !polang.integer<64, signed> {
+  polang.return %arg0 : !polang.integer<64, signed>
 }
-polang.func @__polang_entry() -> !polang.int {
-  %0 = polang.constant.int 42 : !polang.int
-  %1 = polang.call @identity(%0) : (!polang.int) -> !polang.int
-  polang.return %1 : !polang.int
+polang.func @__polang_entry() -> !polang.integer<64, signed> {
+  %0 = polang.constant.integer 42 : !polang.integer<64, signed>
+  %1 = polang.call @identity$i64(%0) : (!polang.integer<64, signed>) -> !polang.integer<64, signed>
+  polang.return %1 : !polang.integer<64, signed>
 }
 ```
 
@@ -663,27 +644,34 @@ mlir/
 │   ├── Dialect/
 │   │   ├── PolangDialect.td    # Dialect definition
 │   │   ├── PolangOps.td        # Operation definitions
-│   │   ├── PolangTypes.td      # Type definitions (including TypeVarType)
-│   │   ├── Passes.h            # Dialect pass declarations
-│   │   └── *.h                 # Generated headers
+│   │   ├── PolangTypes.td      # Type definitions (including TypeParamType)
+│   │   ├── PolangEnums.td      # Enum definitions
+│   │   ├── PolangLocations.h   # Custom location types
+│   │   └── Passes.h            # Dialect pass declarations
 │   ├── Conversion/
 │   │   └── Passes.h            # Lowering pass declarations
 │   ├── Transforms/
 │   │   ├── Passes.h            # Transform pass declarations
 │   │   └── Passes.td           # TableGen pass definitions
-│   └── MLIRGen.h               # AST to MLIR interface
-└── lib/
-    ├── Dialect/
-    │   ├── PolangDialect.cpp   # Dialect implementation
-    │   ├── PolangOps.cpp       # Operation implementations (includes verifiers)
-    │   └── PolangTypes.cpp     # Type implementations
-    ├── Conversion/
-    │   └── PolangToStandard.cpp # Lowering pass
-    ├── Transforms/
-    │   ├── TypeInference.cpp   # Type inference pass (unification algorithm)
-    │   └── Monomorphization.cpp # Monomorphization pass (function specialization)
-    └── MLIRGen/
-        └── MLIRGen.cpp         # AST to MLIR visitor
+│   ├── MLIRGen.h               # AST to MLIR interface
+│   └── PolangTypeConverter.h   # Polang-to-standard type converter
+├── lib/
+│   ├── Dialect/
+│   │   ├── PolangDialect.cpp       # Dialect implementation
+│   │   ├── PolangOps.cpp           # Operation implementations (includes verifiers)
+│   │   ├── PolangTypes.cpp         # Type implementations
+│   │   └── PolangTypeInference.cpp # Type inference pass
+│   ├── Conversion/
+│   │   └── PolangToStandard.cpp    # Lowering pass
+│   ├── Transforms/
+│   │   └── Monomorphization.cpp    # Monomorphization pass (function specialization)
+│   └── MLIRGen/
+│       ├── MLIRGen.cpp             # AST to MLIR visitor
+│       ├── PolangLocations.cpp     # Custom location implementations
+│       └── PolangTypeConverter.cpp # Type converter implementation
+└── tools/
+    └── polang-opt/
+        └── polang-opt.cpp          # MLIR round-trip testing tool
 ```
 
 ## Related Documentation
