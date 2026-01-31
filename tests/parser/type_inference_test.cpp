@@ -240,9 +240,9 @@ TEST(TraitConstraintsTest, SatisfiesMultipleBounds) {
 // ============== TraitBound string conversion Tests ==============
 
 TEST(TraitBoundTest, ToString) {
-  EXPECT_EQ(traitBoundToString(TraitBound::Numeric), "Numeric");
-  EXPECT_EQ(traitBoundToString(TraitBound::Integer), "Integer");
-  EXPECT_EQ(traitBoundToString(TraitBound::Float), "Float");
+  EXPECT_STREQ(traitBoundToString(TraitBound::Numeric), "Numeric");
+  EXPECT_STREQ(traitBoundToString(TraitBound::Integer), "Integer");
+  EXPECT_STREQ(traitBoundToString(TraitBound::Float), "Float");
 }
 
 TEST(TraitBoundTest, FromString) {

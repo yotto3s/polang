@@ -385,9 +385,14 @@ void TypeChecker::instantiateCall(NMethodCall& node,
     auto boundsIt = scheme.paramBounds.find(tp);
     if (boundsIt != scheme.paramBounds.end()) {
       if (!polang::TraitConstraints::satisfies(resolved, boundsIt->second)) {
-        reportError("Function '" + funcName + "': type " + resolved +
-                        " does not satisfy trait bounds for " + tp,
-                    node.loc);
+        std::string msg;
+        msg += "Function '";
+        msg += funcName;
+        msg += "': type ";
+        msg += resolved;
+        msg += " does not satisfy trait bounds for ";
+        msg += tp;
+        reportError(msg, node.loc);
       }
     }
 
@@ -951,6 +956,7 @@ void TypeChecker::inferFunction(
 
   // Resolve params through substitution
   std::vector<std::string> resolvedParamTypes;
+  resolvedParamTypes.reserve(paramTypes.size());
   for (const auto& pt : paramTypes) {
     resolvedParamTypes.push_back(subst.apply(pt));
   }

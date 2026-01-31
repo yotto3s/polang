@@ -156,11 +156,11 @@ bool JITSession::execute(const std::string& entryName, int64_t& result,
   } else if (resultType == "f32") {
     auto entryFn = sym->toPtr<float (*)()>();
     float val = entryFn();
-    double dval = static_cast<double>(val);
+    auto dval = static_cast<double>(val);
     std::memcpy(&result, &dval, sizeof(dval));
   } else if (resultType == "bool" || resultType == "i8" || resultType == "u8") {
     auto entryFn = sym->toPtr<int8_t (*)()>();
-    result = static_cast<int64_t>(entryFn());
+    result = static_cast<int64_t>(static_cast<unsigned char>(entryFn()));
   } else if (resultType == "i16" || resultType == "u16") {
     auto entryFn = sym->toPtr<int16_t (*)()>();
     result = static_cast<int64_t>(entryFn());

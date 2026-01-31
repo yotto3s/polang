@@ -905,7 +905,7 @@ ParseResult LetExprOp::parse(OpAsmParser& parser, OperationState& result) {
       return failure();
     }
     auto bindingRegion = std::make_unique<Region>();
-    if (parser.parseRegion(*bindingRegion, /*arguments=*/{}, /*argTypes=*/{})) {
+    if (parser.parseRegion(*bindingRegion, /*arguments=*/{})) {
       return failure();
     }
     if (bindingRegion->empty()) {

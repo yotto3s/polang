@@ -797,6 +797,7 @@ private:
 
   /// Access compiled symbols (only valid when isIncremental())
   [[nodiscard]] const CompiledSymbols& symbols() const {
+    assert(compiledSymbols.has_value() && "symbols() requires incremental mode");
     return compiledSymbols->get();
   }
 
