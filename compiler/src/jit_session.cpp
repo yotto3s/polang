@@ -133,6 +133,7 @@ bool JITSession::execute(const std::string& entryName, JitResult& result,
                          std::string& error, const std::string& resultType) {
   if (!impl->jit) {
     error = "JIT not initialized";
+    result = std::monostate{};
     return false;
   }
 
@@ -141,6 +142,7 @@ bool JITSession::execute(const std::string& entryName, JitResult& result,
   if (!sym) {
     error = "Failed to find entry function '" + entryName +
             "': " + llvm::toString(sym.takeError());
+    result = std::monostate{};
     return false;
   }
 

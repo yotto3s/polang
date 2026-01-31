@@ -29,7 +29,7 @@ struct EvalResult {
   static EvalResult ok() { return {true, std::monostate{}, "void", ""}; }
 
   static EvalResult withValue(polang::JitResult val, const std::string& t) {
-    return {true, std::move(val), t, ""};
+    return {true, val, t, ""};
   }
 
   static EvalResult error(const std::string& msg) {
