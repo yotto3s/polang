@@ -39,7 +39,7 @@ ASTPrinter::DepthScope::~DepthScope() noexcept {
   printer.depthHasMore.pop_back();
 }
 
-void ASTPrinter::visit(const NNamedType& node) {
+void ASTPrinter::visit(const NNamedType& /*node*/) {
   // Types are printed via getTypeName() in parent visitors
 }
 

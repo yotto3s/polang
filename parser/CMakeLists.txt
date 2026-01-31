@@ -23,4 +23,8 @@ target_include_directories(PolangParser PUBLIC
     ${PROJECT_SOURCE_DIR}
 )
 
-target_compile_options(PolangParser PRIVATE -Wno-error)
+set_source_files_properties(
+    ${CMAKE_CURRENT_BINARY_DIR}/parser.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/lexer.cpp
+    PROPERTIES COMPILE_OPTIONS "-Wno-error"
+)

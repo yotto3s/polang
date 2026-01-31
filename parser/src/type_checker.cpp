@@ -50,10 +50,10 @@ public:
     return referencedNonLocals;
   }
 
-  void visit(const NNamedType& node) override {}
-  void visit(const NInteger& node) override {}
-  void visit(const NDouble& node) override {}
-  void visit(const NBoolean& node) override {}
+  void visit(const NNamedType& /*node*/) override {}
+  void visit(const NInteger& /*node*/) override {}
+  void visit(const NDouble& /*node*/) override {}
+  void visit(const NBoolean& /*node*/) override {}
 
   void visit(const NIdentifier& node) override {
     if (localNames.find(node.name) == localNames.end()) {
@@ -61,7 +61,7 @@ public:
     }
   }
 
-  void visit(const NQualifiedName& node) override {}
+  void visit(const NQualifiedName& /*node*/) override {}
 
   void visit(const NMethodCall& node) override {
     for (const auto& arg : node.arguments) {
@@ -128,8 +128,8 @@ public:
     localNames.insert(node.id->name);
   }
 
-  void visit(const NModuleDeclaration& node) override {}
-  void visit(const NImportStatement& node) override {}
+  void visit(const NModuleDeclaration& /*node*/) override {}
+  void visit(const NImportStatement& /*node*/) override {}
 
 private:
   std::set<std::string> localNames;
@@ -228,15 +228,15 @@ void TypeChecker::reportError(const std::string& message,
   }
 }
 
-void TypeChecker::visit(const NInteger& node) {
+void TypeChecker::visit(const NInteger& /*node*/) {
   inferredType = TypeNames::GENERIC_INT;
 }
 
-void TypeChecker::visit(const NDouble& node) {
+void TypeChecker::visit(const NDouble& /*node*/) {
   inferredType = TypeNames::GENERIC_FLOAT;
 }
 
-void TypeChecker::visit(const NBoolean& node) {
+void TypeChecker::visit(const NBoolean& /*node*/) {
   inferredType = TypeNames::BOOL;
 }
 
