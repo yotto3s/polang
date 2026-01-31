@@ -50,35 +50,35 @@ public:
   /// entry function instead of running the internal TypeChecker.
   /// If entryFuncName is non-empty, the entry function is named accordingly.
   /// Returns true on success.
-  bool generateCode(const NBlock& ast, bool emitTypeVars = false,
-                    bool skipTypeCheck = false,
-                    const std::string& inferredType = "",
-                    const std::string& entryFuncName = "",
-                    OptCompiledSymbols compiledSymbols = std::nullopt);
+  [[nodiscard]] bool
+  generateCode(const NBlock& ast, bool emitTypeVars = false,
+               bool skipTypeCheck = false, const std::string& inferredType = "",
+               const std::string& entryFuncName = "",
+               OptCompiledSymbols compiledSymbols = std::nullopt);
 
   /// Run type inference pass to resolve type variables.
   /// Must be called after generateCode() when emitTypeVars was true.
-  bool runTypeInference();
+  [[nodiscard]] bool runTypeInference();
 
   /// Lower the Polang dialect to standard dialects.
   /// Must be called after generateCode().
-  bool lowerToStandard();
+  [[nodiscard]] bool lowerToStandard();
 
   /// Lower standard dialects to LLVM dialect.
   /// Must be called after lowerToStandard().
-  bool lowerToLLVM();
+  [[nodiscard]] bool lowerToLLVM();
 
   /// Print the current MLIR module.
   void printMLIR(llvm::raw_ostream& os);
 
   /// Convert to LLVM IR and print.
   /// Must be called after lowerToLLVM().
-  bool printLLVMIR(llvm::raw_ostream& os);
+  [[nodiscard]] bool printLLVMIR(llvm::raw_ostream& os);
 
   /// Execute the code via JIT and return the result.
   /// Must be called after lowerToLLVM().
   /// Returns the result of the main function.
-  bool runCode(int64_t& result);
+  [[nodiscard]] bool runCode(int64_t& result);
 
   /// Get the resolved return type name of an entry function.
   /// Must be called after runTypeInference().
@@ -98,7 +98,7 @@ private:
   std::unique_ptr<mlir::OwningOpRef<mlir::ModuleOp>> module;
   std::string error;
 
-  bool initializeContext();
+  [[nodiscard]] bool initializeContext();
 };
 
 } // namespace polang
