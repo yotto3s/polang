@@ -276,10 +276,13 @@ polang.yield.binding %0 : !polang.integer<64, signed>
 
 #### `polang.global`
 
-Declares a module-level global variable. Used in the REPL for cross-module variable persistence. When `is_external` is set, the global is an extern declaration (defined in a previously compiled module; JIT resolves the symbol). Initialization is handled by `polang.global.store` in the entry function body.
+Declares a module-level global variable. Used in the REPL for cross-module variable persistence. When `is_external` is set, the global is an extern declaration (defined in a previously compiled module; JIT resolves the symbol). Non-external globals may have an optional initializer region that computes the initial value.
 
 ```mlir
-polang.global @x : !polang.integer<64, signed>
+polang.global @x : !polang.integer<64, signed> {
+  %v = polang.constant.int 42 : !polang.integer<64, signed>
+  polang.yield.global %v : !polang.integer<64, signed>
+}
 polang.global @y {is_external} : !polang.integer<64, signed>
 ```
 
@@ -289,7 +292,7 @@ polang.global @y {is_external} : !polang.integer<64, signed>
 - `is_external` - Unit attribute marking extern declarations
 
 **Regions:**
-- `initializer` - Optional region (terminated by `polang.yield.global`), reserved for future use
+- `initializer` - Optional region (terminated by `polang.yield.global`) that computes the initial value
 
 #### `polang.yield.global`
 
@@ -297,14 +300,6 @@ Yields the initial value from a `polang.global` initializer region.
 
 ```mlir
 polang.yield.global %v : !polang.integer<64, signed>
-```
-
-#### `polang.global.store`
-
-Stores a value into a previously declared global variable.
-
-```mlir
-polang.global.store @x = %v : !polang.integer<64, signed>
 ```
 
 #### `polang.global.load`
@@ -405,9 +400,7 @@ Lowers Polang dialect operations to standard MLIR dialects (arith, func, scf, me
 | `polang.generic_func` | Erased (must be monomorphized first) |
 | `polang.instantiate` | Erased (replaced by `polang.call` during monomorphization) |
 | `polang.global` | `memref.global` (0-d memref) |
-| `polang.global.store` | `memref.get_global` + `memref.store` |
 | `polang.global.load` | `memref.get_global` + `memref.load` |
-| `polang.yield.global` | Erased (safety pattern) |
 
 **Type Lowering:**
 

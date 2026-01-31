@@ -1,5 +1,4 @@
 add_mlir_library(PolangTransforms
-  InlineGlobalInitializers.cpp
   Monomorphization.cpp
 
   ADDITIONAL_HEADER_DIRS

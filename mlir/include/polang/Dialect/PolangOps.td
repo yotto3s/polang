@@ -690,31 +690,6 @@ def Polang_YieldGlobalOp : Polang_Op<"yield.global", [
   let assemblyFormat = "$value `:` type($value) attr-dict";
 }
 
-def Polang_GlobalStoreOp : Polang_Op<"global.store", [
-    DeclareOpInterfaceMethods<SymbolUserOpInterface>
-  ]> {
-  let summary = "Store a value into a global variable";
-  let description = [{
-    Stores a value into a previously declared global variable.
-    This op is produced by the InlineGlobalInitializersPass when
-    it inlines GlobalOp initializer regions into the entry function.
-
-    Example:
-    ```mlir
-    polang.global.store @x, %value : !polang.integer<64, signed>
-    ```
-  }];
-
-  let arguments = (ins
-    FlatSymbolRefAttr:$global_name,
-    Polang_AnyTypeOrParam:$value
-  );
-
-  let assemblyFormat = "$global_name `,` $value `:` type($value) attr-dict";
-
-  let hasVerifier = 1;
-}
-
 def Polang_GlobalLoadOp : Polang_Op<"global.load", [
     DeclareOpInterfaceMethods<SymbolUserOpInterface>,
     Pure

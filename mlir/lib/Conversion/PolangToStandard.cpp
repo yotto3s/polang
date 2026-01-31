@@ -635,44 +635,6 @@ struct GlobalOpLowering : public OpConversionPattern<GlobalOp> {
   }
 };
 
-/// Safety lowering for YieldGlobalOp — should be unreachable after
-/// the init region inlining pre-step. Erases if encountered.
-struct YieldGlobalOpLowering : public OpConversionPattern<YieldGlobalOp> {
-  using OpConversionPattern<YieldGlobalOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(YieldGlobalOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter& rewriter) const override {
-    (void)adaptor;
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
-
-struct GlobalStoreOpLowering : public OpConversionPattern<GlobalStoreOp> {
-  using OpConversionPattern<GlobalStoreOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(GlobalStoreOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter& rewriter) const override {
-    auto loc = op.getLoc();
-
-    // Get the converted value type for the memref element type
-    auto valueType = getTypeConverter()->convertType(op.getValue().getType());
-    if (!valueType) {
-      return failure();
-    }
-
-    // Lower to memref.get_global + memref.store (0-d memref)
-    auto memrefType = MemRefType::get({}, valueType);
-    auto getGlobal = rewriter.create<memref::GetGlobalOp>(loc, memrefType,
-                                                          op.getGlobalName());
-    rewriter.replaceOpWithNewOp<memref::StoreOp>(op, adaptor.getValue(),
-                                                 getGlobal, ValueRange{});
-    return success();
-  }
-};
-
 struct GlobalLoadOpLowering : public OpConversionPattern<GlobalLoadOp> {
   using OpConversionPattern<GlobalLoadOp>::OpConversionPattern;
 
@@ -734,7 +696,125 @@ struct PolangToStandardPass
                     memref::MemRefDialect, LLVM::LLVMDialect>();
   }
 
+  /// Record of a global's init function created by the pre-step.
+  struct InitFuncRecord {
+    std::string globalName;
+    std::string initFuncName;
+  };
+
+  /// Pre-step: extract init regions from GlobalOps into polang::FuncOps.
+  /// Returns records for the post-step. After this, all GlobalOps have
+  /// empty init regions and can be lowered by the normal conversion pattern.
+  SmallVector<InitFuncRecord> extractGlobalInitRegions(ModuleOp moduleOp) {
+    SmallVector<InitFuncRecord> records;
+    OpBuilder builder(&getContext());
+
+    for (auto globalOp :
+         llvm::make_early_inc_range(moduleOp.getOps<GlobalOp>())) {
+      if (globalOp.getInitializer().empty()) {
+        continue;
+      }
+
+      std::string globalName = globalOp.getSymName().str();
+      std::string initFuncName = "__polang_init_" + globalName;
+      Type globalType = globalOp.getType();
+
+      // Create polang::FuncOp that returns the init value
+      auto funcType = builder.getFunctionType({}, {globalType});
+      builder.setInsertionPoint(globalOp);
+      auto initFunc =
+          builder.create<FuncOp>(globalOp.getLoc(), initFuncName, funcType);
+
+      // Move init region into the FuncOp body
+      initFunc.getBody().takeBody(globalOp.getInitializer());
+
+      // Replace YieldGlobalOp terminator with polang::ReturnOp
+      auto& funcBlock = initFunc.getBody().front();
+      auto yieldOp = cast<YieldGlobalOp>(funcBlock.getTerminator());
+      builder.setInsertionPoint(yieldOp);
+      builder.create<ReturnOp>(yieldOp.getLoc(), yieldOp.getValue());
+      yieldOp.erase();
+
+      records.push_back({globalName, initFuncName});
+    }
+
+    return records;
+  }
+
+  /// Post-step: transform converted init functions to void (store inside)
+  /// and insert calls in the entry function.
+  void finalizeGlobalInitFunctions(ModuleOp moduleOp,
+                                   const SmallVector<InitFuncRecord>& records) {
+    if (records.empty()) {
+      return;
+    }
+
+    auto* ctx = &getContext();
+    OpBuilder builder(ctx);
+
+    // Phase A: Transform each init function to store + void return
+    for (const auto& record : records) {
+      auto initFunc = moduleOp.lookupSymbol<func::FuncOp>(record.initFuncName);
+      if (!initFunc) {
+        continue;
+      }
+
+      // Find the return op in the function
+      auto& funcBlock = initFunc.getBody().front();
+      auto returnOp = cast<func::ReturnOp>(funcBlock.getTerminator());
+      Value retVal = returnOp.getOperand(0);
+      Type valType = retVal.getType();
+
+      // Insert memref.get_global + memref.store before the return
+      builder.setInsertionPoint(returnOp);
+      auto memrefType = MemRefType::get({}, valType);
+      auto getGlobal = builder.create<memref::GetGlobalOp>(
+          returnOp.getLoc(), memrefType, record.globalName);
+      builder.create<memref::StoreOp>(returnOp.getLoc(), retVal, getGlobal,
+                                      ValueRange{});
+
+      // Replace return with void return
+      builder.setInsertionPoint(returnOp);
+      builder.create<func::ReturnOp>(returnOp.getLoc());
+      returnOp.erase();
+
+      // Update function type to void
+      initFunc.setFunctionType(FunctionType::get(ctx, {}, {}));
+
+      // Set private visibility (these are internal helpers)
+      initFunc.setVisibility(SymbolTable::Visibility::Private);
+    }
+
+    // Phase B: Insert calls in entry function (in module order)
+    // Find the entry function: last func::FuncOp with a non-empty body
+    // that is not an init function.
+    func::FuncOp entryFunc;
+    for (auto func : moduleOp.getOps<func::FuncOp>()) {
+      if (!func.getBody().empty() &&
+          !func.getSymName().starts_with("__polang_init_")) {
+        entryFunc = func;
+      }
+    }
+    if (!entryFunc) {
+      return;
+    }
+
+    auto& entryBlock = entryFunc.getBody().front();
+    builder.setInsertionPointToStart(&entryBlock);
+
+    for (const auto& record : records) {
+      builder.create<func::CallOp>(entryFunc.getLoc(), record.initFuncName,
+                                   TypeRange{});
+    }
+  }
+
   void runOnOperation() override {
+    auto moduleOp = getOperation();
+
+    // Pre-step: extract init regions into polang::FuncOps
+    auto initRecords = extractGlobalInitRegions(moduleOp);
+
+    // Main conversion
     ConversionTarget target(getContext());
 
     target.addLegalDialect<arith::ArithDialect, func::FuncDialect,
@@ -745,19 +825,22 @@ struct PolangToStandardPass
     PolangTypeConverter typeConverter;
     RewritePatternSet patterns(&getContext());
 
-    patterns.add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
-                 ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
-                 MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
-                 GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
-                 CallOpLowering, ReturnOpLowering, IfOpLowering,
-                 YieldOpLowering, GlobalOpLowering, YieldGlobalOpLowering,
-                 GlobalStoreOpLowering, GlobalLoadOpLowering, PrintOpLowering>(
-        typeConverter, &getContext());
+    patterns
+        .add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
+             ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
+             MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
+             GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
+             CallOpLowering, ReturnOpLowering, IfOpLowering, YieldOpLowering,
+             GlobalOpLowering, GlobalLoadOpLowering, PrintOpLowering>(
+            typeConverter, &getContext());
 
-    if (failed(applyPartialConversion(getOperation(), target,
-                                      std::move(patterns)))) {
+    if (failed(applyPartialConversion(moduleOp, target, std::move(patterns)))) {
       signalPassFailure();
+      return;
     }
+
+    // Post-step: finalize init functions and insert calls
+    finalizeGlobalInitFunctions(moduleOp, initRecords);
   }
 };
 

@@ -462,49 +462,70 @@ public:
     // Get mangled variable name (includes module path)
     const std::string varName = mangledName(node.id->name);
 
-    // Determine the type - prefer type annotation from type checker
-    std::shared_ptr<const NTypeSpec> typeSpec =
-        node.type != nullptr
-            ? node.type
-            : std::make_shared<const NNamedType>(TypeNames::I64);
-    Value initValue = nullptr;
-    if (node.assignmentExpr != nullptr) {
-      // Evaluate the assignment expression
-      node.assignmentExpr->accept(*this);
-      initValue = result;
-
-      // Only use resultType if we don't have a type annotation
-      // The type checker sets node.type with resolved types
-      if (node.type == nullptr && resultType) {
-        typeSpec = std::move(resultType);
-      }
-    }
-
     // In incremental mode, top-level variables become globals.
     // Nested scopes (let-expression bindings, closures) use normal SSA values.
     if (isIncremental() && isInsideEntryFunction && nestedScopeDepth == 0) {
+      // Determine the type - prefer type annotation from type checker
+      std::shared_ptr<const NTypeSpec> typeSpec =
+          node.type != nullptr
+              ? node.type
+              : std::make_shared<const NNamedType>(TypeNames::I64);
+
       Type mlirType = getPolangType(*typeSpec);
       if (!mlirType) {
         return;
       }
 
-      // Emit GlobalOp declaration at module level (no initializer region).
-      // The init expression stays in the entry function because it may
-      // reference SSA values from previously defined variables.
+      // Emit GlobalOp at module level
+      GlobalOp globalOp;
       {
         OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointToStart(module.getBody());
-        builder.create<GlobalOp>(loc(node.loc), llvm::StringRef(varName),
-                                 mlirType, /*is_external=*/false);
+        globalOp = builder.create<GlobalOp>(loc(node.loc),
+                                            llvm::StringRef(varName), mlirType,
+                                            /*is_external=*/false);
       }
 
-      // Emit init expression + store in the entry function body
+      // If there's an init expression, generate it inside the GlobalOp's
+      // initializer region
       if (node.assignmentExpr != nullptr) {
+        auto& initRegion = globalOp.getInitializer();
+        auto* initBlock = builder.createBlock(&initRegion);
+
+        // Save and clear immutableValues entries for same-eval globals
+        // so that references inside the init region emit fresh
+        // GlobalLoadOp ops instead of using SSA values from the entry
+        // function (which aren't available in the init region).
+        std::map<std::string, Value> savedImmutableForInit;
+        for (const auto& name : currentEvalGlobals) {
+          auto it = immutableValues.find(name);
+          if (it != immutableValues.end()) {
+            savedImmutableForInit[name] = it->second;
+            immutableValues.erase(it);
+          }
+        }
+
+        builder.setInsertionPointToStart(initBlock);
         node.assignmentExpr->accept(*this);
+
         if (result) {
-          builder.create<GlobalStoreOp>(loc(node.loc), varName, result);
+          builder.create<YieldGlobalOp>(loc(node.loc), result);
+        }
+
+        // Restore saved immutableValues entries
+        for (const auto& [name, val] : savedImmutableForInit) {
+          immutableValues[name] = val;
         }
       }
+
+      // Restore builder to end of entry function body
+      builder.setInsertionPointToEnd(
+          &module.getBody()->back().getRegion(0).front());
+
+      // Track this global for SSA dominance handling in subsequent
+      // init regions
+      currentEvalGlobals.insert(varName);
+      currentEvalGlobalTypes[varName] = mlirType;
 
       // Emit GlobalLoadOp and cache for use later in this eval
       auto loadOp = builder.create<GlobalLoadOp>(builder.getUnknownLoc(),
@@ -515,6 +536,21 @@ public:
       result = loadOp.getResult();
       resultType = typeSpec;
       return;
+    }
+
+    // Non-incremental path: evaluate expression and use SSA value directly
+    std::shared_ptr<const NTypeSpec> typeSpec =
+        node.type != nullptr
+            ? node.type
+            : std::make_shared<const NNamedType>(TypeNames::I64);
+    Value initValue = nullptr;
+    if (node.assignmentExpr != nullptr) {
+      node.assignmentExpr->accept(*this);
+      initValue = result;
+
+      if (node.type == nullptr && resultType) {
+        typeSpec = std::move(resultType);
+      }
     }
 
     // All variables are immutable - store SSA value directly
@@ -784,6 +820,10 @@ private:
   int nestedScopeDepth = 0; // Tracks let-expression/function nesting
   std::set<std::string> emittedExternalGlobals; // Track emitted global decls
   std::set<std::string> emittedExternFuncs;     // Track emitted func decls
+  std::set<std::string> currentEvalGlobals; // Globals defined in current eval
+  std::map<std::string, Type>
+      currentEvalGlobalTypes; // Types of current-eval globals (for init
+                              // regions)
 
   /// Check if we are in incremental mode
   [[nodiscard]] bool isIncremental() const {
@@ -894,6 +934,16 @@ private:
     auto argIt = argValues.find(name);
     if (argIt != argValues.end()) {
       return argIt->second;
+    }
+
+    // Check current-eval globals (for use inside init regions where
+    // the entry function's SSA values are not available)
+    auto evalGlobalIt = currentEvalGlobalTypes.find(name);
+    if (evalGlobalIt != currentEvalGlobalTypes.end()) {
+      return builder
+          .create<GlobalLoadOp>(builder.getUnknownLoc(), evalGlobalIt->second,
+                                name)
+          .getResult();
     }
 
     // In incremental mode, check previously compiled globals
