@@ -1,5 +1,6 @@
 #include "repl/repl_session.hpp"
 
+#include <cassert>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -16,29 +17,35 @@
 #endif
 
 // Print the result of an evaluation
-static void printResult(const EvalResult& result) {
+static void printResult(const EvalResult& result) noexcept {
   if (!result.success || !result.hasValue()) {
     return;
   }
 
-  std::visit(
-      [&](auto&& val) {
-        using T = std::decay_t<decltype(val)>;
-        if constexpr (std::is_same_v<T, std::monostate>) {
-          // No value
-        } else if constexpr (std::is_same_v<T, bool>) {
-          std::cout << (val ? "true" : "false") << " : bool\n";
-        } else if constexpr (std::is_same_v<T, double>) {
-          std::cout << val << " : " << result.type << "\n";
-        } else if constexpr (std::is_same_v<T, float>) {
-          std::cout << static_cast<double>(val) << " : " << result.type << "\n";
-        } else {
-          // int64_t, int8_t, int16_t — all printed as integer
-          std::cout << static_cast<int64_t>(val) << " : " << result.type
-                    << "\n";
-        }
-      },
-      result.value);
+  try {
+    std::visit(
+        [&](auto&& val) {
+          using T = std::decay_t<decltype(val)>;
+          if constexpr (std::is_same_v<T, std::monostate>) {
+            // No value
+          } else if constexpr (std::is_same_v<T, bool>) {
+            std::cout << (val ? "true" : "false") << " : bool\n";
+          } else if constexpr (std::is_same_v<T, double>) {
+            std::cout << val << " : " << result.type << "\n";
+          } else if constexpr (std::is_same_v<T, float>) {
+            std::cout << static_cast<double>(val) << " : " << result.type
+                      << "\n";
+          } else {
+            // int64_t, int8_t, int16_t — all printed as integer
+            std::cout << static_cast<int64_t>(val) << " : " << result.type
+                      << "\n";
+          }
+        },
+        result.value);
+  } catch (...) {
+    // unreachable
+    assert(false);
+  }
 }
 
 // Read input with multi-line support for incomplete expressions
@@ -71,8 +78,6 @@ static std::string readInput(std::istream& in, bool interactive) {
   return buffer;
 }
 
-// NOLINTNEXTLINE(bugprone-exception-escape) - std::visit on trivially-copyable
-// variant won't throw
 int main(int argc, char** argv) {
   ReplSession session;
 

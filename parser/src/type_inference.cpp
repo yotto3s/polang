@@ -63,8 +63,8 @@ void Substitution::bind(const std::string& var, const std::string& type) {
 std::string Substitution::apply(const std::string& type) const {
   std::string current = type;
   // Follow the chain of bindings (with loop protection)
-  static constexpr int kMaxSubstitutionDepth = 100;
-  int limit = kMaxSubstitutionDepth;
+  static constexpr int MAX_SUBSTITUTION_DEPTH = 100;
+  int limit = MAX_SUBSTITUTION_DEPTH;
   while (limit-- > 0) {
     auto it = bindings.find(current);
     if (it == bindings.end()) {
