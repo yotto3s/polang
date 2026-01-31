@@ -517,7 +517,7 @@ public:
       return;
     }
 
-    // All variables are immutable - store SSA value directly (no alloca needed)
+    // All variables are immutable - store SSA value directly
     immutableValues[varName] = initValue;
     typeTable[varName] = typeSpec;
 

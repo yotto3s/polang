@@ -315,21 +315,6 @@ Loads the current value from a previously declared global variable.
 %0 = polang.global.load @x : !polang.integer<64, signed>
 ```
 
-### Memory Operations
-
-#### `polang.alloca`
-
-Allocates stack memory for a variable.
-
-```mlir
-%0 = polang.alloca "x", mutable : !polang.integer<64, signed> -> memref<1xi64>
-```
-
-**Attributes:**
-- `name` - Variable name
-- `elementType` - Type of the allocated element
-- `isMutable` - Unit attribute marking mutable allocation
-
 ### Debug Operations
 
 #### `polang.print`
@@ -423,7 +408,6 @@ Lowers Polang dialect operations to standard MLIR dialects (arith, func, scf, me
 | `polang.global.store` | `memref.get_global` + `memref.store` |
 | `polang.global.load` | `memref.get_global` + `memref.load` |
 | `polang.yield.global` | Erased (safety pattern) |
-| `polang.alloca` | `memref.alloca` |
 
 **Type Lowering:**
 

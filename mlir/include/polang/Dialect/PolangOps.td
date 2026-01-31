@@ -737,27 +737,6 @@ def Polang_GlobalLoadOp : Polang_Op<"global.load", [
   let hasVerifier = 1;
 }
 
-def Polang_AllocaOp : Polang_Op<"alloca"> {
-  let summary = "Allocate stack memory for a variable";
-  let description = [{
-    Allocates memory on the stack for a variable.
-
-    Example:
-    ```mlir
-    %0 = polang.alloca "x" : !polang.integer<64, signed> -> memref<!polang.integer<64, signed>>
-    ```
-  }];
-
-  let arguments = (ins
-    StrAttr:$name,
-    TypeAttr:$elementType,
-    UnitAttr:$isMutable
-  );
-  let results = (outs AnyType:$result);
-
-  let assemblyFormat = "$name (`,` `mutable` $isMutable^)? `:` $elementType `->` type($result) attr-dict";
-}
-
 //===----------------------------------------------------------------------===//
 // Print operation (for debugging/output)
 //===----------------------------------------------------------------------===//

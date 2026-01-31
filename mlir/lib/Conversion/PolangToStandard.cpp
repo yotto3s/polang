@@ -696,24 +696,6 @@ struct GlobalLoadOpLowering : public OpConversionPattern<GlobalLoadOp> {
   }
 };
 
-struct AllocaOpLowering : public OpConversionPattern<AllocaOp> {
-  using OpConversionPattern<AllocaOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(AllocaOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter& rewriter) const override {
-    (void)adaptor; // Unused, but required by MLIR interface
-    auto elementType = getTypeConverter()->convertType(op.getElementType());
-    if (!elementType) {
-      return failure();
-    }
-
-    auto memRefType = MemRefType::get({}, elementType);
-    rewriter.replaceOpWithNewOp<memref::AllocaOp>(op, memRefType);
-    return success();
-  }
-};
-
 //===----------------------------------------------------------------------===//
 // Print Operation Lowering
 //===----------------------------------------------------------------------===//
@@ -763,15 +745,14 @@ struct PolangToStandardPass
     PolangTypeConverter typeConverter;
     RewritePatternSet patterns(&getContext());
 
-    patterns
-        .add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
-             ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
-             MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
-             GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
-             CallOpLowering, ReturnOpLowering, IfOpLowering, YieldOpLowering,
-             GlobalOpLowering, YieldGlobalOpLowering, GlobalStoreOpLowering,
-             GlobalLoadOpLowering, AllocaOpLowering, PrintOpLowering>(
-            typeConverter, &getContext());
+    patterns.add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
+                 ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
+                 MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
+                 GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
+                 CallOpLowering, ReturnOpLowering, IfOpLowering,
+                 YieldOpLowering, GlobalOpLowering, YieldGlobalOpLowering,
+                 GlobalStoreOpLowering, GlobalLoadOpLowering, PrintOpLowering>(
+        typeConverter, &getContext());
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {

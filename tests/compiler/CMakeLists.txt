@@ -41,7 +41,7 @@ set_target_properties(mlir_verifier_test PROPERTIES
 )
 gtest_discover_tests(mlir_verifier_test)
 
-# PolangToStandard conversion pass unit tests (AllocaOp, PrintOp lowering)
+# PolangToStandard conversion pass unit tests (PrintOp lowering)
 add_executable(conversion_pass_test conversion_pass_test.cpp)
 target_include_directories(conversion_pass_test PRIVATE
     ${PROJECT_SOURCE_DIR}/mlir/include

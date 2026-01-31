@@ -1,7 +1,7 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
 ; Test let-expression binding
-; Immutable variables use SSA values directly (no alloca)
+; Immutable variables use SSA values directly
 ; CHECK:      polang.func @__polang_entry() -> !polang.integer<64, signed> {
 ; CHECK-NEXT:   %{{[0-9]+}} = polang.constant.integer 1 : !polang.integer<64, signed>
 ; CHECK-NEXT:   %{{[0-9]+}} = polang.constant.integer 1 : !polang.integer<64, signed>

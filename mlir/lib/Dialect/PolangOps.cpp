@@ -783,8 +783,7 @@ LogicalResult CmpOp::verify() {
 
 // Note: LoadOp does not implement InferTypeOpInterface because the memref
 // element type is the LLVM type (i64), not the Polang type (!polang.int).
-// The Polang type is stored in AllocaOp's elementType attribute, which requires
-// walking to the defining op. MLIRGen already specifies the type explicitly.
+// MLIRGen already specifies the type explicitly.
 
 //===----------------------------------------------------------------------===//
 // ConstantIntegerOp custom print/parse
