@@ -644,11 +644,15 @@ def Polang_GlobalOp : Polang_Op<"global", [Symbol]> {
 
     When `is_external` is set, the global is an extern declaration
     (defined in a previously compiled module; JIT resolves the symbol).
-    Otherwise, this is a definition with zero initialization.
+    Otherwise, this is a definition. Non-external globals may have an
+    optional initializer region that computes the initial value.
 
     Example:
     ```mlir
-    polang.global @x : !polang.integer<64, signed>
+    polang.global @x : !polang.integer<64, signed> {
+      %v = polang.constant 42 : !polang.integer<64, signed>
+      polang.yield.global %v : !polang.integer<64, signed>
+    }
     polang.global @y {is_external} : !polang.integer<64, signed>
     ```
   }];
@@ -659,7 +663,31 @@ def Polang_GlobalOp : Polang_Op<"global", [Symbol]> {
     UnitAttr:$is_external
   );
 
+  let regions = (region MaxSizedRegion<1>:$initializer);
+
   let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+}
+
+def Polang_YieldGlobalOp : Polang_Op<"yield.global", [
+    Pure,
+    Terminator,
+    HasParent<"GlobalOp">
+  ]> {
+  let summary = "Yield initial value from a global initializer region";
+  let description = [{
+    Terminates the initializer region of a GlobalOp and yields
+    the initial value for the global variable.
+
+    Example:
+    ```mlir
+    polang.yield.global %v : !polang.integer<64, signed>
+    ```
+  }];
+
+  let arguments = (ins Polang_AnyTypeOrParam:$value);
+
+  let assemblyFormat = "$value `:` type($value) attr-dict";
 }
 
 def Polang_GlobalStoreOp : Polang_Op<"global.store", [
@@ -668,6 +696,8 @@ def Polang_GlobalStoreOp : Polang_Op<"global.store", [
   let summary = "Store a value into a global variable";
   let description = [{
     Stores a value into a previously declared global variable.
+    This op is produced by the InlineGlobalInitializersPass when
+    it inlines GlobalOp initializer regions into the entry function.
 
     Example:
     ```mlir

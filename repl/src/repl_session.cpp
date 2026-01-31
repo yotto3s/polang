@@ -114,8 +114,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   // (empty on first eval, populated on subsequent evals)
   polang::OptCompiledSymbols optSymbols = std::cref(*compiledSymbols);
 
-  if (!codegenCtx.generateCode(*newAst, /*emitTypeVars=*/true,
-                               /*skipTypeCheck=*/true, inferredType,
+  if (!codegenCtx.generateCode(*newAst, /*emitTypeVars=*/true, inferredType,
                                entryFuncName, optSymbols)) {
     std::cerr << "MLIR generation failed: " << codegenCtx.getError() << "\n";
     typeChecker->restoreState(snapshot);
@@ -156,7 +155,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     return EvalResult::error("JIT compilation failed");
   }
 
-  int64_t result = 0;
+  polang::JitResult result;
   if (!jitSession->execute(entryFuncName, result, jitError, resultType)) {
     std::cerr << "JIT execution failed: " << jitError << "\n";
     typeChecker->restoreState(snapshot);
@@ -169,7 +168,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
 
   // Only return a value if the last statement was an expression
   if (lastIsExpression) {
-    return EvalResult::value(result, resultType);
+    return EvalResult::withValue(result, resultType);
   }
   return EvalResult::ok();
 }

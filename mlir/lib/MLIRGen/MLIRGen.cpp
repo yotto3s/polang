@@ -19,7 +19,6 @@
 #include "parser.hpp"  // Must be after node.hpp for bison union types
 // clang-format on
 #include "parser/polang_types.hpp"
-#include "parser/type_checker.hpp"
 #include "parser/type_inference.hpp"
 #include "parser/visitor.hpp"
 
@@ -62,14 +61,11 @@ makeTypeSpec(const std::string& typeName) {
 class MLIRGenVisitor : public Visitor {
 public:
   MLIRGenVisitor(MLIRContext& context, bool /*emitTypeVars*/ = false,
-                 bool skipTypeCheck = false,
-                 std::string externalInferredType = "",
-                 std::string entryFuncName = "",
+                 std::string inferredType = "", std::string entryFuncName = "",
                  std::string filename = "<source>",
                  OptCompiledSymbols compiledSymbols = std::nullopt)
       : builder(&context), typeConverter(&context),
-        skipTypeCheck(skipTypeCheck),
-        externalInferredType(std::move(externalInferredType)),
+        inferredType(std::move(inferredType)),
         entryFuncName(entryFuncName.empty() ? "__polang_entry"
                                             : std::move(entryFuncName)),
         sourceFilename(std::move(filename)), compiledSymbols(compiledSymbols) {
@@ -84,17 +80,6 @@ public:
 
   /// Generate MLIR for the given AST block
   ModuleOp generate(const NBlock& block) {
-    if (!skipTypeCheck) {
-      // Run type checker for error detection (undefined vars, etc.)
-      // Return value intentionally ignored since we check hasErrors() directly
-      (void)typeChecker.check(block);
-
-      // If type checker found errors, fail early
-      if (typeChecker.hasErrors()) {
-        return nullptr;
-      }
-    }
-
     // In incremental mode, populate extern declarations from previous evals
     if (isIncremental()) {
       populateFromCompiledSymbols();
@@ -450,6 +435,10 @@ public:
     // RAII scope guard automatically saves/restores symbol tables
     SymbolTableScope scope(*this);
 
+    // Track nesting so that let-bindings use local SSA values,
+    // not GlobalOps, even in incremental mode.
+    ++nestedScopeDepth;
+
     // Process bindings
     for (const auto& binding : node.bindings) {
       if (binding->isFunction) {
@@ -461,6 +450,8 @@ public:
 
     // Evaluate body
     node.body->accept(*this);
+
+    --nestedScopeDepth;
   }
 
   void visit(const NExpressionStatement& node) override {
@@ -489,25 +480,30 @@ public:
       }
     }
 
-    // In incremental mode, top-level variables become globals
-    if (isIncremental() && isInsideEntryFunction) {
+    // In incremental mode, top-level variables become globals.
+    // Nested scopes (let-expression bindings, closures) use normal SSA values.
+    if (isIncremental() && isInsideEntryFunction && nestedScopeDepth == 0) {
       Type mlirType = getPolangType(*typeSpec);
       if (!mlirType) {
         return;
       }
 
-      // Emit GlobalOp definition at module level
+      // Emit GlobalOp declaration at module level (no initializer region).
+      // The init expression stays in the entry function because it may
+      // reference SSA values from previously defined variables.
       {
         OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointToStart(module.getBody());
         builder.create<GlobalOp>(loc(node.loc), llvm::StringRef(varName),
-                                 mlirType,
-                                 /*is_external=*/false);
+                                 mlirType, /*is_external=*/false);
       }
 
-      // Emit GlobalStoreOp at current insertion point (inside entry function)
-      if (initValue) {
-        builder.create<GlobalStoreOp>(loc(node.loc), varName, initValue);
+      // Emit init expression + store in the entry function body
+      if (node.assignmentExpr != nullptr) {
+        node.assignmentExpr->accept(*this);
+        if (result) {
+          builder.create<GlobalStoreOp>(loc(node.loc), varName, result);
+        }
       }
 
       // Emit GlobalLoadOp and cache for use later in this eval
@@ -778,15 +774,14 @@ private:
   OpBuilder builder;
   PolangTypeConverter typeConverter;
   ModuleOp module;
-  TypeChecker typeChecker;
-  bool skipTypeCheck;
-  std::string externalInferredType;
+  std::string inferredType;
   std::string entryFuncName;
   std::string sourceFilename;
 
   // Incremental compilation support
   OptCompiledSymbols compiledSymbols;
   bool isInsideEntryFunction = false;
+  int nestedScopeDepth = 0; // Tracks let-expression/function nesting
   std::set<std::string> emittedExternalGlobals; // Track emitted global decls
   std::set<std::string> emittedExternFuncs;     // Track emitted func decls
 
@@ -1113,13 +1108,8 @@ private:
   }
 
   void generateMainFunction(const NBlock& block) {
-    // Get the inferred return type: use external type if provided,
-    // otherwise fall back to internal type checker
-    std::string inferredType = !externalInferredType.empty()
-                                   ? externalInferredType
-                                   : typeChecker.getInferredType();
-
-    // Use type checker's type if it's concrete, otherwise use default i64
+    // Use type checker's inferred type if it's concrete, otherwise use default
+    // i64
     Type returnType;
     if (inferredType == TypeNames::UNKNOWN ||
         inferredType == TypeNames::TYPEVAR || isGenericType(inferredType)) {
@@ -1177,15 +1167,16 @@ private:
 
 } // namespace
 
-mlir::OwningOpRef<mlir::ModuleOp> polang::mlirGen(
-    mlir::MLIRContext& context, const NBlock& moduleAST, bool emitTypeVars,
-    bool skipTypeCheck, const std::string& inferredType,
-    const std::string& entryFuncName, OptCompiledSymbols compiledSymbols) {
+mlir::OwningOpRef<mlir::ModuleOp>
+polang::mlirGen(mlir::MLIRContext& context, const NBlock& moduleAST,
+                bool emitTypeVars, const std::string& inferredType,
+                const std::string& entryFuncName,
+                OptCompiledSymbols compiledSymbols) {
   // Register the Polang dialect
   context.getOrLoadDialect<PolangDialect>();
 
-  MLIRGenVisitor generator(context, emitTypeVars, skipTypeCheck, inferredType,
-                           entryFuncName, "<source>", compiledSymbols);
+  MLIRGenVisitor generator(context, emitTypeVars, inferredType, entryFuncName,
+                           "<source>", compiledSymbols);
   ModuleOp module = generator.generate(moduleAST);
   if (!module) {
     return nullptr;

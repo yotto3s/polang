@@ -25,7 +25,6 @@
 
 #pragma GCC diagnostic pop
 
-#include <cstring>
 #include <mutex>
 
 using namespace mlir;
@@ -130,7 +129,7 @@ bool JITSession::addModule(mlir::OwningOpRef<mlir::ModuleOp>& module,
   return true;
 }
 
-bool JITSession::execute(const std::string& entryName, int64_t& result,
+bool JITSession::execute(const std::string& entryName, JitResult& result,
                          std::string& error, const std::string& resultType) {
   if (!impl->jit) {
     error = "JIT not initialized";
@@ -151,19 +150,19 @@ bool JITSession::execute(const std::string& entryName, int64_t& result,
   // with the correct return type to avoid garbage in upper bits.
   if (resultType == "f64") {
     auto entryFn = sym->toPtr<double (*)()>();
-    double val = entryFn();
-    std::memcpy(&result, &val, sizeof(val));
+    result = entryFn();
   } else if (resultType == "f32") {
     auto entryFn = sym->toPtr<float (*)()>();
-    float val = entryFn();
-    auto dval = static_cast<double>(val);
-    std::memcpy(&result, &dval, sizeof(dval));
-  } else if (resultType == "bool" || resultType == "i8" || resultType == "u8") {
+    result = entryFn();
+  } else if (resultType == "bool") {
     auto entryFn = sym->toPtr<int8_t (*)()>();
-    result = static_cast<int64_t>(static_cast<unsigned char>(entryFn()));
+    result = static_cast<bool>(entryFn());
+  } else if (resultType == "i8" || resultType == "u8") {
+    auto entryFn = sym->toPtr<int8_t (*)()>();
+    result = entryFn();
   } else if (resultType == "i16" || resultType == "u16") {
     auto entryFn = sym->toPtr<int16_t (*)()>();
-    result = static_cast<int64_t>(entryFn());
+    result = entryFn();
   } else if (resultType == "i32" || resultType == "u32") {
     auto entryFn = sym->toPtr<int32_t (*)()>();
     result = static_cast<int64_t>(entryFn());

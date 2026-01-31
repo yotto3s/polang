@@ -91,7 +91,6 @@ bool MLIRCodeGenContext::initializeContext() {
 }
 
 bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars,
-                                      bool skipTypeCheck,
                                       const std::string& inferredType,
                                       const std::string& entryFuncName,
                                       OptCompiledSymbols compiledSymbols) {
@@ -100,8 +99,8 @@ bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars,
     return false;
   }
 
-  auto moduleRef = mlirGen(*context, ast, emitTypeVars, skipTypeCheck,
-                           inferredType, entryFuncName, compiledSymbols);
+  auto moduleRef = mlirGen(*context, ast, emitTypeVars, inferredType,
+                           entryFuncName, compiledSymbols);
   if (!moduleRef) {
     error = "Failed to generate MLIR from AST";
     return false;

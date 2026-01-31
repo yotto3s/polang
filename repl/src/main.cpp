@@ -1,10 +1,10 @@
 #include "repl/repl_session.hpp"
 
-#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <variant>
 
 // Cross-platform terminal detection
 #ifdef _WIN32
@@ -17,27 +17,28 @@
 
 // Print the result of an evaluation
 static void printResult(const EvalResult& result) {
-  if (!result.success) {
-    // Error already printed to stderr by parser/type checker
+  if (!result.success || !result.hasValue()) {
     return;
   }
 
-  if (!result.hasValue) {
-    // No value to print (void result)
-    return;
-  }
-
-  // Float types: f32, f64
-  if (result.type == "f64" || result.type == "f32") {
-    double d = 0;
-    std::memcpy(&d, &result.rawValue, sizeof(double));
-    std::cout << d << " : " << result.type << "\n";
-  } else if (result.type == "bool") {
-    std::cout << (result.rawValue != 0 ? "true" : "false") << " : bool\n";
-  } else {
-    // Integer types: i8, i16, i32, i64, u8, u16, u32, u64
-    std::cout << result.rawValue << " : " << result.type << "\n";
-  }
+  std::visit(
+      [&](auto&& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, std::monostate>) {
+          // No value
+        } else if constexpr (std::is_same_v<T, bool>) {
+          std::cout << (val ? "true" : "false") << " : bool\n";
+        } else if constexpr (std::is_same_v<T, double>) {
+          std::cout << val << " : " << result.type << "\n";
+        } else if constexpr (std::is_same_v<T, float>) {
+          std::cout << static_cast<double>(val) << " : " << result.type << "\n";
+        } else {
+          // int64_t, int8_t, int16_t — all printed as integer
+          std::cout << static_cast<int64_t>(val) << " : " << result.type
+                    << "\n";
+        }
+      },
+      result.value);
 }
 
 // Read input with multi-line support for incomplete expressions
@@ -70,6 +71,7 @@ static std::string readInput(std::istream& in, bool interactive) {
   return buffer;
 }
 
+// NOLINTNEXTLINE(bugprone-exception-escape) - std::visit on trivially-copyable variant won't throw
 int main(int argc, char** argv) {
   ReplSession session;
 

@@ -1,7 +1,8 @@
 #ifndef POLANG_JIT_SESSION_HPP
 #define POLANG_JIT_SESSION_HPP
 
-#include <cstdint>
+#include "compiler/jit_result.hpp"
+
 #include <memory>
 #include <string>
 
@@ -29,10 +30,10 @@ public:
   [[nodiscard]] bool addModule(mlir::OwningOpRef<mlir::ModuleOp>& module,
                                std::string& error);
 
-  /// Execute a function by name, returning its result as i64.
-  /// For float types, pass resultType ("f32" or "f64") so the JIT uses
-  /// the correct calling convention and bit-casts the result to i64.
-  [[nodiscard]] bool execute(const std::string& entryName, int64_t& result,
+  /// Execute a function by name, returning its result as a type-safe variant.
+  /// The resultType string determines which concrete type to extract from the
+  /// JIT return value (e.g., "f64", "f32", "bool", "i8", "i16", "i64").
+  [[nodiscard]] bool execute(const std::string& entryName, JitResult& result,
                              std::string& error,
                              const std::string& resultType = "i64");
 

@@ -19,6 +19,10 @@
 
 namespace polang {
 
+/// Create a pass to inline GlobalOp initializer regions into the entry
+/// function. Must run before monomorphization.
+std::unique_ptr<mlir::Pass> createInlineGlobalInitializersPass();
+
 /// Create a pass to monomorphize polymorphic functions.
 std::unique_ptr<mlir::Pass> createMonomorphizationPass();
 

@@ -173,12 +173,11 @@ Interactive read-eval-print loop with persistent JIT execution.
   1. Parse new input into AST
   2. Snapshot TypeChecker state (for rollback on error)
   3. Incrementally type-check only new statements (`checkIncremental`)
-  4. Merge into accumulated AST
-  5. Generate MLIR with `skipTypeCheck=true` (uses persistent TypeChecker results)
-  6. Run monomorphization pass
-  7. Lower to standard dialects → LLVM dialect
-  8. Add compiled module to persistent JIT (new JITDylib per eval)
-  9. Execute per-eval entry function and return result
+  4. Generate MLIR from new AST with `CompiledSymbols` for extern declarations
+  5. Run monomorphization pass
+  6. Lower to standard dialects → LLVM dialect
+  7. Add compiled module to persistent JIT (new JITDylib per eval)
+  8. Execute per-eval entry function and return result
 
 ## Compilation Pipeline
 

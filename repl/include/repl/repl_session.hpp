@@ -1,9 +1,11 @@
 #ifndef POLANG_REPL_SESSION_HPP
 #define POLANG_REPL_SESSION_HPP
 
-#include <cstdint>
+#include "compiler/jit_result.hpp"
+
 #include <memory>
 #include <string>
+#include <variant>
 
 class NBlock;
 class TypeChecker;
@@ -16,19 +18,22 @@ struct CompiledSymbols;
 // Result of evaluating an expression
 struct EvalResult {
   bool success;
-  bool hasValue;
-  int64_t rawValue;
-  std::string type; // "int", "double", "bool", "void"
+  polang::JitResult value;
+  std::string type; // "i64", "f64", "f32", "bool", "void"
   std::string errorMessage;
 
-  static EvalResult ok() { return {true, false, 0, "void", ""}; }
+  [[nodiscard]] bool hasValue() const {
+    return !std::holds_alternative<std::monostate>(value);
+  }
 
-  static EvalResult value(int64_t val, const std::string& t) {
-    return {true, true, val, t, ""};
+  static EvalResult ok() { return {true, std::monostate{}, "void", ""}; }
+
+  static EvalResult withValue(polang::JitResult val, const std::string& t) {
+    return {true, std::move(val), t, ""};
   }
 
   static EvalResult error(const std::string& msg) {
-    return {false, false, 0, "", msg};
+    return {false, std::monostate{}, "", msg};
   }
 };
 

@@ -607,23 +607,44 @@ struct GlobalOpLowering : public OpConversionPattern<GlobalOp> {
       return failure();
     }
 
-    // Always use External linkage for JIT cross-module visibility.
-    // If is_external: no initializer (declaration — JIT resolves from
-    // previous dylib). Otherwise: zero initializer (definition — this
-    // module owns the storage).
-    Attribute initializer;
+    // Lower to memref.global with 0-d memref type.
+    // finalize-memref-to-llvm (already in the pipeline) handles the rest.
+    auto memrefType = MemRefType::get({}, elementType);
+
+    // External globals: no initial_value, public visibility
+    // Non-external: zero-initializer, public visibility
+    Attribute initialValue;
     if (!op.getIsExternal()) {
-      // Create zero initializer for definitions
       if (auto intTy = dyn_cast<mlir::IntegerType>(elementType)) {
-        initializer = rewriter.getIntegerAttr(intTy, 0);
+        initialValue =
+            DenseElementsAttr::get(RankedTensorType::get({}, intTy),
+                                   rewriter.getIntegerAttr(intTy, 0));
       } else if (auto floatTy = dyn_cast<mlir::FloatType>(elementType)) {
-        initializer = rewriter.getFloatAttr(floatTy, 0.0);
+        initialValue =
+            DenseElementsAttr::get(RankedTensorType::get({}, floatTy),
+                                   rewriter.getFloatAttr(floatTy, 0.0));
       }
     }
 
-    rewriter.replaceOpWithNewOp<LLVM::GlobalOp>(
-        op, elementType, /*isConstant=*/false, LLVM::Linkage::External,
-        op.getSymName(), initializer);
+    auto memrefGlobal = rewriter.replaceOpWithNewOp<memref::GlobalOp>(
+        op, op.getSymName(),
+        /*sym_visibility=*/rewriter.getStringAttr("public"), memrefType,
+        initialValue, /*constant=*/false, /*alignment=*/IntegerAttr());
+    (void)memrefGlobal;
+    return success();
+  }
+};
+
+/// Safety lowering for YieldGlobalOp — should be unreachable after
+/// the init region inlining pre-step. Erases if encountered.
+struct YieldGlobalOpLowering : public OpConversionPattern<YieldGlobalOp> {
+  using OpConversionPattern<YieldGlobalOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(YieldGlobalOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    (void)adaptor;
+    rewriter.eraseOp(op);
     return success();
   }
 };
@@ -636,20 +657,18 @@ struct GlobalStoreOpLowering : public OpConversionPattern<GlobalStoreOp> {
                   ConversionPatternRewriter& rewriter) const override {
     auto loc = op.getLoc();
 
-    // Get the converted value type
+    // Get the converted value type for the memref element type
     auto valueType = getTypeConverter()->convertType(op.getValue().getType());
     if (!valueType) {
       return failure();
     }
 
-    // Get address of the global
-    auto ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-    auto addressOf =
-        rewriter.create<LLVM::AddressOfOp>(loc, ptrType, op.getGlobalName());
-
-    // Store the value
-    rewriter.replaceOpWithNewOp<LLVM::StoreOp>(op, adaptor.getValue(),
-                                               addressOf);
+    // Lower to memref.get_global + memref.store (0-d memref)
+    auto memrefType = MemRefType::get({}, valueType);
+    auto getGlobal = rewriter.create<memref::GetGlobalOp>(loc, memrefType,
+                                                          op.getGlobalName());
+    rewriter.replaceOpWithNewOp<memref::StoreOp>(op, adaptor.getValue(),
+                                                 getGlobal, ValueRange{});
     return success();
   }
 };
@@ -668,13 +687,11 @@ struct GlobalLoadOpLowering : public OpConversionPattern<GlobalLoadOp> {
       return failure();
     }
 
-    // Get address of the global
-    auto ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-    auto addressOf =
-        rewriter.create<LLVM::AddressOfOp>(loc, ptrType, op.getGlobalName());
-
-    // Load the value
-    rewriter.replaceOpWithNewOp<LLVM::LoadOp>(op, resultType, addressOf);
+    // Lower to memref.get_global + memref.load (0-d memref, empty indices)
+    auto memrefType = MemRefType::get({}, resultType);
+    auto getGlobal = rewriter.create<memref::GetGlobalOp>(loc, memrefType,
+                                                          op.getGlobalName());
+    rewriter.replaceOpWithNewOp<memref::LoadOp>(op, getGlobal, ValueRange{});
     return success();
   }
 };
@@ -746,14 +763,15 @@ struct PolangToStandardPass
     PolangTypeConverter typeConverter;
     RewritePatternSet patterns(&getContext());
 
-    patterns.add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
-                 ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
-                 MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
-                 GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
-                 CallOpLowering, ReturnOpLowering, IfOpLowering,
-                 YieldOpLowering, GlobalOpLowering, GlobalStoreOpLowering,
-                 GlobalLoadOpLowering, AllocaOpLowering, PrintOpLowering>(
-        typeConverter, &getContext());
+    patterns
+        .add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
+             ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
+             MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
+             GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
+             CallOpLowering, ReturnOpLowering, IfOpLowering, YieldOpLowering,
+             GlobalOpLowering, YieldGlobalOpLowering, GlobalStoreOpLowering,
+             GlobalLoadOpLowering, AllocaOpLowering, PrintOpLowering>(
+            typeConverter, &getContext());
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {

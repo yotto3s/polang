@@ -44,15 +44,13 @@ public:
   /// Generate MLIR from the given AST.
   /// If emitTypeVars is true, untyped positions will emit type variables
   /// for polymorphic type inference at the MLIR level.
-  /// If skipTypeCheck is true, type checking is skipped (assumes AST already
-  /// has types set by an external TypeChecker).
   /// If inferredType is non-empty, it is used as the return type of the
-  /// entry function instead of running the internal TypeChecker.
+  /// entry function.
   /// If entryFuncName is non-empty, the entry function is named accordingly.
   /// Returns true on success.
   [[nodiscard]] bool
   generateCode(const NBlock& ast, bool emitTypeVars = false,
-               bool skipTypeCheck = false, const std::string& inferredType = "",
+               const std::string& inferredType = "",
                const std::string& entryFuncName = "",
                OptCompiledSymbols compiledSymbols = std::nullopt);
 

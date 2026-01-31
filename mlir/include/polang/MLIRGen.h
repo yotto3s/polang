@@ -32,10 +32,8 @@ using OptCompiledSymbols =
 /// Returns nullptr on failure.
 /// If emitTypeVars is true, untyped positions will emit type variables
 /// for polymorphic type inference at the MLIR level.
-/// If skipTypeCheck is true, type checking is skipped (assumes AST nodes
-/// already have their types set by an external TypeChecker).
 /// If inferredType is non-empty, it is used as the return type of the
-/// entry function instead of running the internal TypeChecker.
+/// entry function.
 /// If entryFuncName is non-empty, the entry function is named accordingly
 /// instead of the default "__polang_entry".
 /// If compiledSymbols is provided, incremental mode is used: extern
@@ -43,8 +41,7 @@ using OptCompiledSymbols =
 /// new statements generate MLIR code.
 mlir::OwningOpRef<mlir::ModuleOp>
 mlirGen(mlir::MLIRContext& context, const NBlock& moduleAST,
-        bool emitTypeVars = false, bool skipTypeCheck = false,
-        const std::string& inferredType = "",
+        bool emitTypeVars = false, const std::string& inferredType = "",
         const std::string& entryFuncName = "",
         OptCompiledSymbols compiledSymbols = std::nullopt);
 

@@ -131,23 +131,23 @@ TEST(IsInputIncomplete, WhitespaceOnly) {
 TEST(EvalResult, OkFactory) {
   const auto result = EvalResult::ok();
   EXPECT_TRUE(result.success);
-  EXPECT_FALSE(result.hasValue);
+  EXPECT_FALSE(result.hasValue());
   EXPECT_EQ(result.type, "void");
   EXPECT_TRUE(result.errorMessage.empty());
 }
 
 TEST(EvalResult, ValueFactory) {
-  const auto result = EvalResult::value(42, "int");
+  const auto result = EvalResult::withValue(int64_t{42}, "i64");
   EXPECT_TRUE(result.success);
-  EXPECT_TRUE(result.hasValue);
-  EXPECT_EQ(result.rawValue, 42);
-  EXPECT_EQ(result.type, "int");
+  EXPECT_TRUE(result.hasValue());
+  EXPECT_EQ(std::get<int64_t>(result.value), 42);
+  EXPECT_EQ(result.type, "i64");
   EXPECT_TRUE(result.errorMessage.empty());
 }
 
 TEST(EvalResult, ErrorFactory) {
   const auto result = EvalResult::error("test error message");
   EXPECT_FALSE(result.success);
-  EXPECT_FALSE(result.hasValue);
+  EXPECT_FALSE(result.hasValue());
   EXPECT_EQ(result.errorMessage, "test error message");
 }

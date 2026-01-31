@@ -9,6 +9,19 @@
 
 include "mlir/Pass/PassBase.td"
 
+def InlineGlobalInitializers
+    : Pass<"polang-inline-global-initializers", "mlir::ModuleOp"> {
+  let summary = "Inline GlobalOp initializer regions into the entry function";
+  let description = [{
+    This pass moves the contents of GlobalOp initializer regions into the
+    entry function body, replacing YieldGlobalOp terminators with
+    GlobalStoreOp. Must run before monomorphization so that ops inside
+    init regions (e.g., LetExprOp bindings) don't cause symbol conflicts.
+  }];
+
+  let dependentDialects = ["polang::PolangDialect"];
+}
+
 def Monomorphization : Pass<"polang-monomorphize", "mlir::ModuleOp"> {
   let summary = "Monomorphize polymorphic functions";
   let description = [{

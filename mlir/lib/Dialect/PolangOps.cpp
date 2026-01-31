@@ -1027,6 +1027,13 @@ ParseResult GlobalOp::parse(OpAsmParser& parser, OperationState& result) {
     return failure();
   }
 
+  // Parse optional initializer region
+  auto* region = result.addRegion();
+  auto parseResult = parser.parseOptionalRegion(*region);
+  if (parseResult.has_value() && failed(*parseResult)) {
+    return failure();
+  }
+
   return success();
 }
 
@@ -1040,6 +1047,50 @@ void GlobalOp::print(OpAsmPrinter& p) {
   SmallVector<StringRef> elidedAttrs = {SymbolTable::getSymbolAttrName(),
                                         "type", "is_external"};
   p.printOptionalAttrDict((*this)->getAttrs(), elidedAttrs);
+
+  // Print initializer region if present
+  if (!getInitializer().empty()) {
+    p << ' ';
+    p.printRegion(getInitializer());
+  }
+}
+
+LogicalResult GlobalOp::verify() {
+  if (getIsExternal()) {
+    // External globals must not have an initializer region
+    if (!getInitializer().empty()) {
+      return emitOpError("external global must not have an initializer region");
+    }
+    return success();
+  }
+
+  // Non-external globals with an initializer must have exactly one block
+  if (!getInitializer().empty()) {
+    auto& region = getInitializer();
+    if (!region.hasOneBlock()) {
+      return emitOpError("initializer region must have exactly one block");
+    }
+
+    // Block must end with YieldGlobalOp
+    auto& block = region.front();
+    if (block.empty()) {
+      return emitOpError("initializer block must not be empty");
+    }
+    auto yieldOp = dyn_cast<YieldGlobalOp>(block.getTerminator());
+    if (!yieldOp) {
+      return emitOpError("initializer block must terminate with "
+                         "'polang.yield.global'");
+    }
+
+    // Yielded type must match GlobalOp's type
+    if (yieldOp.getValue().getType() != getType()) {
+      return emitOpError("yielded type ")
+             << yieldOp.getValue().getType() << " doesn't match global type "
+             << getType();
+    }
+  }
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
