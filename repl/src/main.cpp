@@ -71,7 +71,8 @@ static std::string readInput(std::istream& in, bool interactive) {
   return buffer;
 }
 
-// NOLINTNEXTLINE(bugprone-exception-escape) - std::visit on trivially-copyable variant won't throw
+// NOLINTNEXTLINE(bugprone-exception-escape) - std::visit on trivially-copyable
+// variant won't throw
 int main(int argc, char** argv) {
   ReplSession session;
 
