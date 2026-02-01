@@ -109,14 +109,36 @@ public:
 
   // Expression Visitor implementations
   void visit(const NInteger& node) override {
-    // Use default i64 type - AST-level type checker resolves concrete types
+    // If there's an expected integer type from a variable declaration
+    // annotation, use it instead of the default i64.
+    if (expectedLiteralType != nullptr) {
+      const auto meta = getTypeMetadata(expectedLiteralType->getTypeName());
+      if (meta.isInteger()) {
+        auto type = getPolangType(*expectedLiteralType);
+        result =
+            builder.create<ConstantIntegerOp>(loc(node.loc), type, node.value);
+        resultType = expectedLiteralType;
+        return;
+      }
+    }
     auto type = getDefaultType();
     result = builder.create<ConstantIntegerOp>(loc(node.loc), type, node.value);
     resultType = std::make_shared<const NNamedType>(TypeNames::GENERIC_INT);
   }
 
   void visit(const NDouble& node) override {
-    // Use default f64 type - AST-level type checker resolves concrete types
+    // If there's an expected float type from a variable declaration annotation,
+    // use it instead of the default f64.
+    if (expectedLiteralType != nullptr) {
+      const auto meta = getTypeMetadata(expectedLiteralType->getTypeName());
+      if (meta.isFloat()) {
+        auto type = polang::FloatType::get(builder.getContext(), meta.width);
+        result =
+            builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
+        resultType = expectedLiteralType;
+        return;
+      }
+    }
     auto type =
         polang::FloatType::get(builder.getContext(), DEFAULT_FLOAT_WIDTH);
     result = builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
@@ -506,7 +528,10 @@ public:
         }
 
         builder.setInsertionPointToStart(initBlock);
-        node.assignmentExpr->accept(*this);
+        {
+          ExpectedTypeScope scope(*this, node.type);
+          node.assignmentExpr->accept(*this);
+        }
 
         if (result) {
           builder.create<YieldGlobalOp>(loc(node.loc), result);
@@ -545,7 +570,10 @@ public:
             : std::make_shared<const NNamedType>(TypeNames::I64);
     Value initValue = nullptr;
     if (node.assignmentExpr != nullptr) {
-      node.assignmentExpr->accept(*this);
+      {
+        ExpectedTypeScope scope(*this, node.type);
+        node.assignmentExpr->accept(*this);
+      }
       initValue = result;
 
       if (node.type == nullptr && resultType) {
@@ -844,6 +872,10 @@ private:
   Value result;
   std::shared_ptr<const NTypeSpec> resultType;
 
+  // Expected type for literal expressions (set by variable declarations with
+  // type annotations to propagate the annotation type to literal visitors)
+  std::shared_ptr<const NTypeSpec> expectedLiteralType;
+
   // Module path for name mangling (e.g., ["Math", "Internal"])
   std::vector<std::string> currentModulePath;
 
@@ -909,6 +941,23 @@ private:
     std::map<std::string, Type> savedTypeVarTable;
     std::map<std::string, Value> savedArgValues;
     std::map<std::string, Value> savedImmutableValues;
+  };
+
+  /// RAII helper to set expectedLiteralType for the duration of a scope.
+  /// Saves the current value and restores it on destruction.
+  class ExpectedTypeScope {
+  public:
+    ExpectedTypeScope(MLIRGenVisitor& v, std::shared_ptr<const NTypeSpec> type)
+        : visitor(v), saved(std::move(v.expectedLiteralType)) {
+      visitor.expectedLiteralType = std::move(type);
+    }
+    ~ExpectedTypeScope() { visitor.expectedLiteralType = std::move(saved); }
+    ExpectedTypeScope(const ExpectedTypeScope&) = delete;
+    ExpectedTypeScope& operator=(const ExpectedTypeScope&) = delete;
+
+  private:
+    MLIRGenVisitor& visitor;
+    std::shared_ptr<const NTypeSpec> saved;
   };
 
   /// Create MLIR location from source location

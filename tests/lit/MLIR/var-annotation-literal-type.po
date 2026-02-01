@@ -2,10 +2,11 @@
 
 ; Test that type annotations propagate to literal MLIR types
 
-; CHECK: polang.constant.integer 5 : !polang.integer<32, signed>
+; CHECK:      module {
+; CHECK-NEXT:   polang.func @__polang_entry() -> !polang.float<32> {
+; CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 5 : !polang.integer<32, signed>
+; CHECK-NEXT:     %{{[0-9]+}} = polang.constant.float {{.*}} : !polang.float<32>
 let x: i32 = 5
-
-; CHECK: polang.constant.float {{.*}} : !polang.float<32>
 let y: f32 = 3.0
 
 y
