@@ -786,13 +786,16 @@ struct PolangToStandardPass
     }
 
     // Phase B: Insert calls in entry function (in module order)
-    // Find the entry function: last func::FuncOp with a non-empty body
-    // that is not an init function.
+    // Find the entry function by name convention:
+    //   - REPL: __polang_eval_N
+    //   - Compiler: __polang_entry
     func::FuncOp entryFunc;
     for (auto func : moduleOp.getOps<func::FuncOp>()) {
+      auto name = func.getSymName();
       if (!func.getBody().empty() &&
-          !func.getSymName().starts_with("__polang_init_")) {
+          (name.starts_with("__polang_eval_") || name == "__polang_entry")) {
         entryFunc = func;
+        break;
       }
     }
     if (!entryFunc) {
