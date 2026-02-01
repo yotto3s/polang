@@ -155,8 +155,8 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     return EvalResult::error("JIT compilation failed");
   }
 
-  polang::JitResult result;
-  if (!jitSession->execute(entryFuncName, result, jitError, resultType)) {
+  const auto result = jitSession->execute(entryFuncName, jitError, resultType);
+  if (!result.has_value()) {
     std::cerr << "JIT execution failed: " << jitError << "\n";
     typeChecker->restoreState(snapshot);
     return EvalResult::error("Execution failed");
@@ -168,7 +168,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
 
   // Only return a value if the last statement was an expression
   if (lastIsExpression) {
-    return EvalResult::withValue(result, resultType);
+    return EvalResult::withValue(result.value(), resultType);
   }
   return EvalResult::ok();
 }

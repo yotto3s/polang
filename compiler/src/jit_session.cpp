@@ -129,12 +129,12 @@ bool JITSession::addModule(mlir::OwningOpRef<mlir::ModuleOp>& module,
   return true;
 }
 
-bool JITSession::execute(const std::string& entryName, JitResult& result,
-                         std::string& error, const std::string& resultType) {
+std::optional<JitResult> JITSession::execute(const std::string& entryName,
+                                             std::string& error,
+                                             const std::string& resultType) {
   if (!impl->jit) {
     error = "JIT not initialized";
-    result = std::monostate{};
-    return false;
+    return std::monostate{};
   }
 
   // Look up the entry function in the latest dylib
@@ -142,8 +142,7 @@ bool JITSession::execute(const std::string& entryName, JitResult& result,
   if (!sym) {
     error = "Failed to find entry function '" + entryName +
             "': " + llvm::toString(sym.takeError());
-    result = std::monostate{};
-    return false;
+    return std::monostate{};
   }
 
   // Use the correct function pointer type based on the return type.
@@ -152,27 +151,30 @@ bool JITSession::execute(const std::string& entryName, JitResult& result,
   // with the correct return type to avoid garbage in upper bits.
   if (resultType == "f64") {
     auto entryFn = sym->toPtr<double (*)()>();
-    result = entryFn();
-  } else if (resultType == "f32") {
-    auto entryFn = sym->toPtr<float (*)()>();
-    result = entryFn();
-  } else if (resultType == "bool") {
-    auto entryFn = sym->toPtr<int8_t (*)()>();
-    result = static_cast<bool>(entryFn());
-  } else if (resultType == "i8" || resultType == "u8") {
-    auto entryFn = sym->toPtr<int8_t (*)()>();
-    result = entryFn();
-  } else if (resultType == "i16" || resultType == "u16") {
-    auto entryFn = sym->toPtr<int16_t (*)()>();
-    result = entryFn();
-  } else if (resultType == "i32" || resultType == "u32") {
-    auto entryFn = sym->toPtr<int32_t (*)()>();
-    result = static_cast<int64_t>(entryFn());
-  } else {
-    auto entryFn = sym->toPtr<int64_t (*)()>();
-    result = entryFn();
+    return entryFn();
   }
-  return true;
+  if (resultType == "f32") {
+    auto entryFn = sym->toPtr<float (*)()>();
+    return entryFn();
+  }
+  if (resultType == "bool") {
+    auto entryFn = sym->toPtr<int8_t (*)()>();
+    return static_cast<bool>(entryFn());
+  }
+  if (resultType == "i8" || resultType == "u8") {
+    auto entryFn = sym->toPtr<int8_t (*)()>();
+    return entryFn();
+  }
+  if (resultType == "i16" || resultType == "u16") {
+    auto entryFn = sym->toPtr<int16_t (*)()>();
+    return entryFn();
+  }
+  if (resultType == "i32" || resultType == "u32") {
+    auto entryFn = sym->toPtr<int32_t (*)()>();
+    return static_cast<int64_t>(entryFn());
+  }
+  auto entryFn = sym->toPtr<int64_t (*)()>();
+  return entryFn();
 }
 
 } // namespace polang

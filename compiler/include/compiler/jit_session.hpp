@@ -4,6 +4,7 @@
 #include "compiler/jit_result.hpp"
 
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace mlir {
@@ -33,9 +34,9 @@ public:
   /// Execute a function by name, returning its result as a type-safe variant.
   /// The resultType string determines which concrete type to extract from the
   /// JIT return value (e.g., "f64", "f32", "bool", "i8", "i16", "i64").
-  [[nodiscard]] bool execute(const std::string& entryName, JitResult& result,
-                             std::string& error,
-                             const std::string& resultType = "i64");
+  [[nodiscard]] std::optional<JitResult>
+  execute(const std::string& entryName, std::string& error,
+          const std::string& resultType = "i64");
 
 private:
   struct Impl;
