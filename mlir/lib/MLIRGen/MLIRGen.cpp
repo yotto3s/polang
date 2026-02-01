@@ -19,7 +19,6 @@
 #include "parser.hpp"  // Must be after node.hpp for bison union types
 // clang-format on
 #include "parser/polang_types.hpp"
-#include "parser/type_checker.hpp"
 #include "parser/type_inference.hpp"
 #include "parser/visitor.hpp"
 
@@ -36,8 +35,11 @@ using polang::TypeNames;
 
 #pragma GCC diagnostic pop
 
+#include "compiler/compiled_symbols.hpp"
+
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -59,9 +61,14 @@ makeTypeSpec(const std::string& typeName) {
 class MLIRGenVisitor : public Visitor {
 public:
   MLIRGenVisitor(MLIRContext& context, bool /*emitTypeVars*/ = false,
-                 std::string filename = "<source>")
+                 std::string inferredType = "", std::string entryFuncName = "",
+                 std::string filename = "<source>",
+                 OptCompiledSymbols compiledSymbols = std::nullopt)
       : builder(&context), typeConverter(&context),
-        sourceFilename(std::move(filename)) {
+        inferredType(std::move(inferredType)),
+        entryFuncName(entryFuncName.empty() ? "__polang_entry"
+                                            : std::move(entryFuncName)),
+        sourceFilename(std::move(filename)), compiledSymbols(compiledSymbols) {
     // Create a new module
     module = ModuleOp::create(builder.getUnknownLoc());
   }
@@ -73,13 +80,9 @@ public:
 
   /// Generate MLIR for the given AST block
   ModuleOp generate(const NBlock& block) {
-    // Always run type checker for error detection (undefined vars, etc.)
-    // Return value intentionally ignored since we check hasErrors() directly
-    (void)typeChecker.check(block);
-
-    // If type checker found errors, fail early
-    if (typeChecker.hasErrors()) {
-      return nullptr;
+    // In incremental mode, populate extern declarations from previous evals
+    if (isIncremental()) {
+      populateFromCompiledSymbols();
     }
 
     // Generate the main function that wraps the top-level code
@@ -106,14 +109,36 @@ public:
 
   // Expression Visitor implementations
   void visit(const NInteger& node) override {
-    // Use default i64 type - AST-level type checker resolves concrete types
+    // If there's an expected integer type from a variable declaration
+    // annotation, use it instead of the default i64.
+    if (expectedLiteralType != nullptr) {
+      const auto meta = getTypeMetadata(expectedLiteralType->getTypeName());
+      if (meta.isInteger()) {
+        auto type = getPolangType(*expectedLiteralType);
+        result =
+            builder.create<ConstantIntegerOp>(loc(node.loc), type, node.value);
+        resultType = expectedLiteralType;
+        return;
+      }
+    }
     auto type = getDefaultType();
     result = builder.create<ConstantIntegerOp>(loc(node.loc), type, node.value);
     resultType = std::make_shared<const NNamedType>(TypeNames::GENERIC_INT);
   }
 
   void visit(const NDouble& node) override {
-    // Use default f64 type - AST-level type checker resolves concrete types
+    // If there's an expected float type from a variable declaration annotation,
+    // use it instead of the default f64.
+    if (expectedLiteralType != nullptr) {
+      const auto meta = getTypeMetadata(expectedLiteralType->getTypeName());
+      if (meta.isFloat()) {
+        auto type = polang::FloatType::get(builder.getContext(), meta.width);
+        result =
+            builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
+        resultType = expectedLiteralType;
+        return;
+      }
+    }
     auto type =
         polang::FloatType::get(builder.getContext(), DEFAULT_FLOAT_WIDTH);
     result = builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
@@ -217,6 +242,9 @@ public:
         resultType = std::make_shared<const NNamedType>(TypeNames::UNKNOWN);
       }
     }
+
+    // In incremental mode, emit extern FuncOp declaration if needed
+    emitExternFuncDecl(funcName);
 
     // Check if this is a polymorphic instantiation
     if (!node.typeBindings.empty()) {
@@ -429,6 +457,10 @@ public:
     // RAII scope guard automatically saves/restores symbol tables
     SymbolTableScope scope(*this);
 
+    // Track nesting so that let-bindings use local SSA values,
+    // not GlobalOps, even in incremental mode.
+    ++nestedScopeDepth;
+
     // Process bindings
     for (const auto& binding : node.bindings) {
       if (binding->isFunction) {
@@ -440,6 +472,8 @@ public:
 
     // Evaluate body
     node.body->accept(*this);
+
+    --nestedScopeDepth;
   }
 
   void visit(const NExpressionStatement& node) override {
@@ -450,25 +484,104 @@ public:
     // Get mangled variable name (includes module path)
     const std::string varName = mangledName(node.id->name);
 
-    // Determine the type - prefer type annotation from type checker
+    // In incremental mode, top-level variables become globals.
+    // Nested scopes (let-expression bindings, closures) use normal SSA values.
+    if (isIncremental() && isInsideEntryFunction && nestedScopeDepth == 0) {
+      // Determine the type - prefer type annotation from type checker
+      std::shared_ptr<const NTypeSpec> typeSpec =
+          node.type != nullptr
+              ? node.type
+              : std::make_shared<const NNamedType>(TypeNames::I64);
+
+      Type mlirType = getPolangType(*typeSpec);
+      if (!mlirType) {
+        return;
+      }
+
+      // Emit GlobalOp at module level
+      GlobalOp globalOp;
+      {
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(module.getBody());
+        globalOp = builder.create<GlobalOp>(loc(node.loc),
+                                            llvm::StringRef(varName), mlirType,
+                                            /*is_external=*/false);
+      }
+
+      // If there's an init expression, generate it inside the GlobalOp's
+      // initializer region
+      if (node.assignmentExpr != nullptr) {
+        auto& initRegion = globalOp.getInitializer();
+        auto* initBlock = builder.createBlock(&initRegion);
+
+        // Save and clear immutableValues entries for same-eval globals
+        // so that references inside the init region emit fresh
+        // GlobalLoadOp ops instead of using SSA values from the entry
+        // function (which aren't available in the init region).
+        std::map<std::string, Value> savedImmutableForInit;
+        for (const auto& name : currentEvalGlobals) {
+          auto it = immutableValues.find(name);
+          if (it != immutableValues.end()) {
+            savedImmutableForInit[name] = it->second;
+            immutableValues.erase(it);
+          }
+        }
+
+        builder.setInsertionPointToStart(initBlock);
+        {
+          ExpectedTypeScope scope(*this, node.type);
+          node.assignmentExpr->accept(*this);
+        }
+
+        if (result) {
+          builder.create<YieldGlobalOp>(loc(node.loc), result);
+        }
+
+        // Restore saved immutableValues entries
+        for (const auto& [name, val] : savedImmutableForInit) {
+          immutableValues[name] = val;
+        }
+      }
+
+      // Restore builder to end of entry function body
+      builder.setInsertionPointToEnd(
+          &module.getBody()->back().getRegion(0).front());
+
+      // Track this global for SSA dominance handling in subsequent
+      // init regions
+      currentEvalGlobals.insert(varName);
+      currentEvalGlobalTypes[varName] = mlirType;
+
+      // Emit GlobalLoadOp and cache for use later in this eval
+      auto loadOp = builder.create<GlobalLoadOp>(builder.getUnknownLoc(),
+                                                 mlirType, varName);
+      immutableValues[varName] = loadOp.getResult();
+      typeTable[varName] = typeSpec;
+
+      result = loadOp.getResult();
+      resultType = typeSpec;
+      return;
+    }
+
+    // Non-incremental path: evaluate expression and use SSA value directly
     std::shared_ptr<const NTypeSpec> typeSpec =
         node.type != nullptr
             ? node.type
             : std::make_shared<const NNamedType>(TypeNames::I64);
     Value initValue = nullptr;
     if (node.assignmentExpr != nullptr) {
-      // Evaluate the assignment expression
-      node.assignmentExpr->accept(*this);
+      {
+        ExpectedTypeScope scope(*this, node.type);
+        node.assignmentExpr->accept(*this);
+      }
       initValue = result;
 
-      // Only use resultType if we don't have a type annotation
-      // The type checker sets node.type with resolved types
       if (node.type == nullptr && resultType) {
         typeSpec = std::move(resultType);
       }
     }
 
-    // All variables are immutable - store SSA value directly (no alloca needed)
+    // All variables are immutable - store SSA value directly
     immutableValues[varName] = initValue;
     typeTable[varName] = typeSpec;
 
@@ -725,8 +838,32 @@ private:
   OpBuilder builder;
   PolangTypeConverter typeConverter;
   ModuleOp module;
-  TypeChecker typeChecker;
+  std::string inferredType;
+  std::string entryFuncName;
   std::string sourceFilename;
+
+  // Incremental compilation support
+  OptCompiledSymbols compiledSymbols;
+  bool isInsideEntryFunction = false;
+  int nestedScopeDepth = 0; // Tracks let-expression/function nesting
+  std::set<std::string> emittedExternalGlobals; // Track emitted global decls
+  std::set<std::string> emittedExternFuncs;     // Track emitted func decls
+  std::set<std::string> currentEvalGlobals; // Globals defined in current eval
+  std::map<std::string, Type>
+      currentEvalGlobalTypes; // Types of current-eval globals (for init
+                              // regions)
+
+  /// Check if we are in incremental mode
+  [[nodiscard]] bool isIncremental() const {
+    return compiledSymbols.has_value();
+  }
+
+  /// Access compiled symbols (only valid when isIncremental())
+  [[nodiscard]] const CompiledSymbols& symbols() const {
+    assert(compiledSymbols.has_value() &&
+           "symbols() requires incremental mode");
+    return compiledSymbols->get();
+  }
 
   // Track whether any errors occurred during MLIR generation
   bool hasMLIRGenErrors = false;
@@ -734,6 +871,10 @@ private:
   // Current result value and type
   Value result;
   std::shared_ptr<const NTypeSpec> resultType;
+
+  // Expected type for literal expressions (set by variable declarations with
+  // type annotations to propagate the annotation type to literal visitors)
+  std::shared_ptr<const NTypeSpec> expectedLiteralType;
 
   // Module path for name mangling (e.g., ["Math", "Internal"])
   std::vector<std::string> currentModulePath;
@@ -802,6 +943,23 @@ private:
     std::map<std::string, Value> savedImmutableValues;
   };
 
+  /// RAII helper to set expectedLiteralType for the duration of a scope.
+  /// Saves the current value and restores it on destruction.
+  class ExpectedTypeScope {
+  public:
+    ExpectedTypeScope(MLIRGenVisitor& v, std::shared_ptr<const NTypeSpec> type)
+        : visitor(v), saved(std::move(v.expectedLiteralType)) {
+      visitor.expectedLiteralType = std::move(type);
+    }
+    ~ExpectedTypeScope() { visitor.expectedLiteralType = std::move(saved); }
+    ExpectedTypeScope(const ExpectedTypeScope&) = delete;
+    ExpectedTypeScope& operator=(const ExpectedTypeScope&) = delete;
+
+  private:
+    MLIRGenVisitor& visitor;
+    std::shared_ptr<const NTypeSpec> saved;
+  };
+
   /// Create MLIR location from source location
   Location loc(const SourceLocation& srcLoc) {
     if (srcLoc.isValid()) {
@@ -825,6 +983,45 @@ private:
     auto argIt = argValues.find(name);
     if (argIt != argValues.end()) {
       return argIt->second;
+    }
+
+    // Check current-eval globals (for use inside init regions where
+    // the entry function's SSA values are not available)
+    auto evalGlobalIt = currentEvalGlobalTypes.find(name);
+    if (evalGlobalIt != currentEvalGlobalTypes.end()) {
+      return builder
+          .create<GlobalLoadOp>(builder.getUnknownLoc(), evalGlobalIt->second,
+                                name)
+          .getResult();
+    }
+
+    // In incremental mode, check previously compiled globals
+    if (isIncremental()) {
+      // Check direct global name first
+      auto globalIt = symbols().globals.find(name);
+
+      // If not found, check import mappings (e.g., "PI" → "Math$$PI")
+      std::string resolvedName = name;
+      if (globalIt == symbols().globals.end()) {
+        auto importIt = importedSymbols.find(name);
+        if (importIt != importedSymbols.end()) {
+          resolvedName = importIt->second;
+          globalIt = symbols().globals.find(resolvedName);
+        }
+      }
+
+      if (globalIt != symbols().globals.end()) {
+        // Emit external GlobalOp declaration on-demand
+        emitExternalGlobalDecl(resolvedName, globalIt->second.type);
+
+        auto globalTypeSpec = makeTypeSpec(globalIt->second.type);
+        Type mlirType = getPolangType(*globalTypeSpec);
+        auto loadOp = builder.create<GlobalLoadOp>(builder.getUnknownLoc(),
+                                                   mlirType, resolvedName);
+        immutableValues[name] = loadOp.getResult();
+        typeTable[name] = globalTypeSpec;
+        return loadOp.getResult();
+      }
     }
 
     return std::nullopt;
@@ -868,11 +1065,150 @@ private:
     return typeConverter.convertPolangType(polangType);
   }
 
-  void generateMainFunction(const NBlock& block) {
-    // Get the inferred return type from the type checker
-    std::string inferredType = typeChecker.getInferredType();
+  /// Emit an extern FuncOp declaration for a previously compiled function.
+  /// Called on-demand when the function is called in visit(NMethodCall).
+  void emitExternFuncDecl(const std::string& name) {
+    // Check if we already emitted this declaration (or the function is
+    // defined in this module)
+    if (emittedExternFuncs.count(name) != 0U) {
+      return;
+    }
+    if (!isIncremental()) {
+      return;
+    }
+    auto funcIt = symbols().functions.find(name);
+    if (funcIt == symbols().functions.end() || funcIt->second.isGeneric) {
+      return;
+    }
+    emittedExternFuncs.insert(name);
 
-    // Use type checker's type if it's concrete, otherwise use default i64
+    const auto& func = funcIt->second;
+
+    // Build function type from param types + capture types
+    SmallVector<Type> argTypes;
+    for (const auto& paramType : func.paramTypes) {
+      auto typeSpec = makeTypeSpec(paramType);
+      Type mlirType = getPolangType(*typeSpec);
+      if (!mlirType) {
+        return;
+      }
+      argTypes.push_back(mlirType);
+    }
+    for (const auto& captureType : func.captureTypes) {
+      auto typeSpec = makeTypeSpec(captureType);
+      Type mlirType = getPolangType(*typeSpec);
+      if (!mlirType) {
+        return;
+      }
+      argTypes.push_back(mlirType);
+    }
+
+    auto retTypeSpec = makeTypeSpec(func.returnType);
+    Type returnType = getPolangType(*retTypeSpec);
+    if (!returnType) {
+      return;
+    }
+
+    auto funcType = builder.getFunctionType(argTypes, {returnType});
+
+    // Emit extern FuncOp declaration at module level
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(module.getBody());
+    builder.create<FuncOp>(builder.getUnknownLoc(), name, funcType);
+  }
+
+  /// Emit an external GlobalOp declaration for a previously compiled global.
+  /// Called on-demand when a global is referenced in lookupVariable().
+  void emitExternalGlobalDecl(const std::string& name,
+                              const std::string& typeName) {
+    // Check if we already emitted this declaration
+    if (emittedExternalGlobals.count(name) != 0U) {
+      return;
+    }
+    emittedExternalGlobals.insert(name);
+
+    auto typeSpec = makeTypeSpec(typeName);
+    Type mlirType = getPolangType(*typeSpec);
+    if (!mlirType) {
+      return;
+    }
+
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(module.getBody());
+    builder.create<GlobalOp>(builder.getUnknownLoc(), llvm::StringRef(name),
+                             mlirType,
+                             /*is_external=*/true);
+  }
+
+  /// Populate module with extern declarations from previously compiled symbols.
+  /// Called in incremental mode before generating the main function.
+  void populateFromCompiledSymbols() {
+    builder.setInsertionPointToStart(module.getBody());
+
+    // Note: External GlobalOp and FuncOp declarations are emitted on-demand
+    // (in lookupVariable and visit(NMethodCall)) to avoid creating unused
+    // declarations that cause unresolved symbols in JIT dylibs.
+
+    // 2. Pre-populate function metadata (return types, captures, type params)
+    //    for each previously compiled function. FuncOp declarations are
+    //    emitted lazily when the function is actually called.
+    for (const auto& [name, func] : symbols().functions) {
+      if (func.isGeneric) {
+        // Pre-populate generic function metadata
+        genericFunctionTypeParams[name] = func.typeParams;
+        functionCaptures[name] = func.captureNames;
+        continue;
+      }
+
+      auto retTypeSpec = makeTypeSpec(func.returnType);
+      Type returnType = getPolangType(*retTypeSpec);
+      if (!returnType) {
+        continue;
+      }
+
+      // Pre-populate return type and captures (but don't emit FuncOp yet)
+      functionReturnTypes[name] = retTypeSpec;
+      functionReturnMLIRTypes[name] = returnType;
+      functionCaptures[name] = func.captureNames;
+    }
+
+    // 3. Restore import mappings (local name → mangled name)
+    for (const auto& [localName, mangledName] : symbols().importMappings) {
+      importedSymbols[localName] = mangledName;
+
+      // Copy function metadata from mangled name to local name
+      auto retIt = functionReturnTypes.find(mangledName);
+      if (retIt != functionReturnTypes.end()) {
+        functionReturnTypes[localName] = retIt->second;
+      }
+      auto retMLIRIt = functionReturnMLIRTypes.find(mangledName);
+      if (retMLIRIt != functionReturnMLIRTypes.end()) {
+        functionReturnMLIRTypes[localName] = retMLIRIt->second;
+      }
+      auto captIt = functionCaptures.find(mangledName);
+      if (captIt != functionCaptures.end()) {
+        functionCaptures[localName] = captIt->second;
+      }
+
+      // For imported variables, set up alias so lookupVariable resolves them
+      auto globalIt = symbols().globals.find(mangledName);
+      if (globalIt != symbols().globals.end()) {
+        // Register the mangled global as the canonical name
+        // and alias the local name to it
+        auto typeSpec = makeTypeSpec(globalIt->second.type);
+        typeTable[localName] = typeSpec;
+      }
+    }
+
+    // 4. Re-emit GenericFuncOps by visiting stored AST nodes
+    for (const auto& stmt : symbols().genericFuncAstNodes) {
+      stmt->accept(*this);
+    }
+  }
+
+  void generateMainFunction(const NBlock& block) {
+    // Use type checker's inferred type if it's concrete, otherwise use default
+    // i64
     Type returnType;
     if (inferredType == TypeNames::UNKNOWN ||
         inferredType == TypeNames::TYPEVAR || isGenericType(inferredType)) {
@@ -892,14 +1228,17 @@ private:
 
     builder.setInsertionPointToEnd(module.getBody());
     auto entryFunc =
-        builder.create<FuncOp>(loc(block.loc), "__polang_entry", funcType);
+        builder.create<FuncOp>(loc(block.loc), entryFuncName, funcType);
 
     // Create entry block
     Block* entryBlock = entryFunc.addEntryBlock();
     builder.setInsertionPointToStart(entryBlock);
 
-    // Generate code for the block
+    // Generate code for the block.
+    // Set flag so visit(NVariableDeclaration) emits globals for top-level vars.
+    isInsideEntryFunction = true;
     block.accept(*this);
+    isInsideEntryFunction = false;
 
     // Return the last expression value, or default value of correct type
     if (result) {
@@ -927,13 +1266,16 @@ private:
 
 } // namespace
 
-mlir::OwningOpRef<mlir::ModuleOp> polang::mlirGen(mlir::MLIRContext& context,
-                                                  const NBlock& moduleAST,
-                                                  bool emitTypeVars) {
+mlir::OwningOpRef<mlir::ModuleOp>
+polang::mlirGen(mlir::MLIRContext& context, const NBlock& moduleAST,
+                bool emitTypeVars, const std::string& inferredType,
+                const std::string& entryFuncName,
+                OptCompiledSymbols compiledSymbols) {
   // Register the Polang dialect
   context.getOrLoadDialect<PolangDialect>();
 
-  MLIRGenVisitor generator(context, emitTypeVars);
+  MLIRGenVisitor generator(context, emitTypeVars, inferredType, entryFuncName,
+                           "<source>", compiledSymbols);
   ModuleOp module = generator.generate(moduleAST);
   if (!module) {
     return nullptr;

@@ -72,13 +72,19 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  // Type checking is done inside generateCode for error detection
-  // (undefined variables, type mismatches, etc.)
+  // Run type checker for error detection (undefined variables, type mismatches)
+  TypeChecker typeChecker;
+  const auto errors = typeChecker.check(*ast);
+  if (!errors.empty()) {
+    // Errors already printed to stderr by TypeChecker
+    return 1;
+  }
+  const std::string inferredType = typeChecker.getInferredType();
 
   // MLIR backend - always emit type variables for polymorphic inference
   polang::MLIRCodeGenContext context;
 
-  if (!context.generateCode(*ast, true)) {
+  if (!context.generateCode(*ast, /*emitTypeVars=*/true, inferredType)) {
     std::cerr << "MLIR generation failed: " << context.getError() << "\n";
     return 1;
   }

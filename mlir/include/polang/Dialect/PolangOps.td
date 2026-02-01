@@ -636,25 +636,80 @@ def Polang_YieldBindingOp : Polang_Op<"yield.binding", [
 // Variable operations
 //===----------------------------------------------------------------------===//
 
-def Polang_AllocaOp : Polang_Op<"alloca"> {
-  let summary = "Allocate stack memory for a variable";
+def Polang_GlobalOp : Polang_Op<"global", [Symbol]> {
+  let summary = "Global variable declaration";
   let description = [{
-    Allocates memory on the stack for a variable.
+    Declares a module-level global variable with a name and type.
+    Used in the REPL for cross-module variable persistence.
+
+    When `is_external` is set, the global is an extern declaration
+    (defined in a previously compiled module; JIT resolves the symbol).
+    Otherwise, this is a definition. Non-external globals may have an
+    optional initializer region that computes the initial value.
 
     Example:
     ```mlir
-    %0 = polang.alloca "x" : !polang.integer<64, signed> -> memref<!polang.integer<64, signed>>
+    polang.global @x : !polang.integer<64, signed> {
+      %v = polang.constant 42 : !polang.integer<64, signed>
+      polang.yield.global %v : !polang.integer<64, signed>
+    }
+    polang.global @y {is_external} : !polang.integer<64, signed>
     ```
   }];
 
   let arguments = (ins
-    StrAttr:$name,
-    TypeAttr:$elementType,
-    UnitAttr:$isMutable
+    SymbolNameAttr:$sym_name,
+    TypeAttr:$type,
+    UnitAttr:$is_external
   );
-  let results = (outs AnyType:$result);
 
-  let assemblyFormat = "$name (`,` `mutable` $isMutable^)? `:` $elementType `->` type($result) attr-dict";
+  let regions = (region MaxSizedRegion<1>:$initializer);
+
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+}
+
+def Polang_YieldGlobalOp : Polang_Op<"yield.global", [
+    Pure,
+    Terminator,
+    HasParent<"GlobalOp">
+  ]> {
+  let summary = "Yield initial value from a global initializer region";
+  let description = [{
+    Terminates the initializer region of a GlobalOp and yields
+    the initial value for the global variable.
+
+    Example:
+    ```mlir
+    polang.yield.global %v : !polang.integer<64, signed>
+    ```
+  }];
+
+  let arguments = (ins Polang_AnyTypeOrParam:$value);
+
+  let assemblyFormat = "$value `:` type($value) attr-dict";
+}
+
+def Polang_GlobalLoadOp : Polang_Op<"global.load", [
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+    Pure
+  ]> {
+  let summary = "Load a value from a global variable";
+  let description = [{
+    Loads the current value from a previously declared global variable.
+
+    Example:
+    ```mlir
+    %v = polang.global.load @x : !polang.integer<64, signed>
+    ```
+  }];
+
+  let arguments = (ins FlatSymbolRefAttr:$global_name);
+  let results = (outs Polang_AnyTypeOrParam:$result);
+
+  let assemblyFormat = "$global_name `:` type($result) attr-dict";
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//

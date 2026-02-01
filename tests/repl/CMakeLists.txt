@@ -14,7 +14,9 @@ gtest_discover_tests(repl_test)
 
 # REPL unit tests (InputChecker - header-only, no LLVM deps)
 add_executable(repl_unit_test repl_unit_test.cpp)
-target_include_directories(repl_unit_test PRIVATE ${CMAKE_SOURCE_DIR}/repl/include)
+target_include_directories(repl_unit_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/repl/include
+    ${CMAKE_SOURCE_DIR}/compiler/include)
 target_link_libraries(repl_unit_test PRIVATE GTest::gtest_main)
 set_target_properties(repl_unit_test PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests/bin"

@@ -9,6 +9,7 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
 #include "compiler/mlir_codegen.hpp"
+#include "compiler/compiled_symbols.hpp"
 
 #include "polang/Conversion/Passes.h"
 #include "polang/Dialect/PolangDialect.h"
@@ -89,13 +90,17 @@ bool MLIRCodeGenContext::initializeContext() {
   return true;
 }
 
-bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars) {
+bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars,
+                                      const std::string& inferredType,
+                                      const std::string& entryFuncName,
+                                      OptCompiledSymbols compiledSymbols) {
   if (!initializeContext()) {
     error = "Failed to initialize MLIR context";
     return false;
   }
 
-  auto moduleRef = mlirGen(*context, ast, emitTypeVars);
+  auto moduleRef = mlirGen(*context, ast, emitTypeVars, inferredType,
+                           entryFuncName, compiledSymbols);
   if (!moduleRef) {
     error = "Failed to generate MLIR from AST";
     return false;
@@ -264,13 +269,14 @@ std::string typeToString(Type type) {
 
 } // namespace
 
-std::string MLIRCodeGenContext::getResolvedReturnType() const {
+std::string
+MLIRCodeGenContext::getResolvedReturnType(const std::string& funcName) const {
   if (!module || !*module) {
     return "unknown";
   }
 
-  // Find the __polang_entry function
-  auto entryFunc = (*module)->lookupSymbol<polang::FuncOp>("__polang_entry");
+  // Find the entry function
+  auto entryFunc = (*module)->lookupSymbol<polang::FuncOp>(funcName);
   if (!entryFunc) {
     return "unknown";
   }
@@ -281,6 +287,13 @@ std::string MLIRCodeGenContext::getResolvedReturnType() const {
   }
 
   return typeToString(funcType.getResult(0));
+}
+
+OwningOpRef<ModuleOp> MLIRCodeGenContext::takeModule() {
+  if (!module || !*module) {
+    return nullptr;
+  }
+  return std::move(*module);
 }
 
 } // namespace polang

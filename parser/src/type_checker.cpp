@@ -50,10 +50,10 @@ public:
     return referencedNonLocals;
   }
 
-  void visit(const NNamedType& node) override {}
-  void visit(const NInteger& node) override {}
-  void visit(const NDouble& node) override {}
-  void visit(const NBoolean& node) override {}
+  void visit(const NNamedType& /*node*/) override {}
+  void visit(const NInteger& /*node*/) override {}
+  void visit(const NDouble& /*node*/) override {}
+  void visit(const NBoolean& /*node*/) override {}
 
   void visit(const NIdentifier& node) override {
     if (localNames.find(node.name) == localNames.end()) {
@@ -61,7 +61,7 @@ public:
     }
   }
 
-  void visit(const NQualifiedName& node) override {}
+  void visit(const NQualifiedName& /*node*/) override {}
 
   void visit(const NMethodCall& node) override {
     for (const auto& arg : node.arguments) {
@@ -128,8 +128,8 @@ public:
     localNames.insert(node.id->name);
   }
 
-  void visit(const NModuleDeclaration& node) override {}
-  void visit(const NImportStatement& node) override {}
+  void visit(const NModuleDeclaration& /*node*/) override {}
+  void visit(const NImportStatement& /*node*/) override {}
 
 private:
   std::set<std::string> localNames;
@@ -168,6 +168,40 @@ std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   return errors;
 }
 
+std::vector<TypeCheckError>
+TypeChecker::checkIncremental(const NBlock& newStatements) {
+  // Clear transient state but preserve persistent environment
+  // (localTypes, functionReturnTypes, functionParamTypes, functionSchemes)
+  errors.clear();
+  subst = polang::Substitution();
+  traitConstraints = polang::TraitConstraints();
+  polang::resetUnificationVarCounter();
+  newStatements.accept(*this);
+  return errors;
+}
+
+TypeCheckerSnapshot TypeChecker::saveState() const {
+  TypeCheckerSnapshot snapshot;
+  snapshot.localTypes = localTypes;
+  snapshot.functionReturnTypes = functionReturnTypes;
+  snapshot.functionParamTypes = functionParamTypes;
+  snapshot.functionSchemes = functionSchemes;
+  snapshot.moduleExports = moduleExports;
+  snapshot.moduleAliases = moduleAliases;
+  snapshot.importedSymbols = importedSymbols;
+  return snapshot;
+}
+
+void TypeChecker::restoreState(const TypeCheckerSnapshot& snapshot) {
+  localTypes = snapshot.localTypes;
+  functionReturnTypes = snapshot.functionReturnTypes;
+  functionParamTypes = snapshot.functionParamTypes;
+  functionSchemes = snapshot.functionSchemes;
+  moduleExports = snapshot.moduleExports;
+  moduleAliases = snapshot.moduleAliases;
+  importedSymbols = snapshot.importedSymbols;
+}
+
 void TypeChecker::reportError(const std::string& message) {
   errors.emplace_back(message);
   auto* reporter = ErrorReporter::current();
@@ -194,15 +228,15 @@ void TypeChecker::reportError(const std::string& message,
   }
 }
 
-void TypeChecker::visit(const NInteger& node) {
+void TypeChecker::visit(const NInteger& /*node*/) {
   inferredType = TypeNames::GENERIC_INT;
 }
 
-void TypeChecker::visit(const NDouble& node) {
+void TypeChecker::visit(const NDouble& /*node*/) {
   inferredType = TypeNames::GENERIC_FLOAT;
 }
 
-void TypeChecker::visit(const NBoolean& node) {
+void TypeChecker::visit(const NBoolean& /*node*/) {
   inferredType = TypeNames::BOOL;
 }
 
@@ -351,9 +385,14 @@ void TypeChecker::instantiateCall(NMethodCall& node,
     auto boundsIt = scheme.paramBounds.find(tp);
     if (boundsIt != scheme.paramBounds.end()) {
       if (!polang::TraitConstraints::satisfies(resolved, boundsIt->second)) {
-        reportError("Function '" + funcName + "': type " + resolved +
-                        " does not satisfy trait bounds for " + tp,
-                    node.loc);
+        std::string msg;
+        msg += "Function '";
+        msg += funcName;
+        msg += "': type ";
+        msg += resolved;
+        msg += " does not satisfy trait bounds for ";
+        msg += tp;
+        reportError(msg, node.loc);
       }
     }
 
@@ -823,9 +862,11 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
 void TypeChecker::inferFunction(
     NFunctionDeclaration& node, const std::string& funcName,
     const std::map<std::string, std::string>& savedLocals) {
-  // Check if function has any untyped or type-parameter parameters
-  // (type params like 'a may be left from a previous TypeChecker run in the
-  // REPL, where the accumulated AST is re-checked)
+  // Check if function has any untyped or type-parameter parameters.
+  // Type params like 'a may be left from a previous TypeChecker run
+  // (e.g. MLIRGen's internal TypeChecker re-checking the accumulated AST).
+  // This workaround will be removed in Phase 2 when MLIRGen no longer
+  // runs its own TypeChecker.
   bool hasUntypedParams = false;
   for (const auto& arg : node.arguments) {
     if (arg->type == nullptr ||
@@ -849,7 +890,6 @@ void TypeChecker::inferFunction(
     if (arg->type == nullptr ||
         polang::isTypeParameter(arg->type->getTypeName())) {
       // Assign fresh unification variable instead of TYPEVAR
-      // (also handles re-checking where type params like 'a are already set)
       std::string uniVar = polang::freshUnificationVar();
       paramUniVars[arg->id->name] = uniVar;
       localTypes[arg->id->name] = uniVar;
@@ -916,6 +956,7 @@ void TypeChecker::inferFunction(
 
   // Resolve params through substitution
   std::vector<std::string> resolvedParamTypes;
+  resolvedParamTypes.reserve(paramTypes.size());
   for (const auto& pt : paramTypes) {
     resolvedParamTypes.push_back(subst.apply(pt));
   }

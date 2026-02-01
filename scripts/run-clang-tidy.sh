@@ -65,10 +65,19 @@ fi
 
 # Run clang-tidy in parallel
 echo "Running clang-tidy on ${#FILES[@]} files..."
-printf '%s\n' "${FILES[@]}" | xargs -P"$(nproc)" -I{} \
-    clang-tidy -p "$TEMP_BUILD_DIR" $FIX_FLAG --warnings-as-errors='*' {} 2>&1 | \
+TIDY_FAILED=0
+OUTPUT=$(printf '%s\n' "${FILES[@]}" | xargs -P"$(nproc)" -I{} \
+    clang-tidy -p "$TEMP_BUILD_DIR" $FIX_FLAG --warnings-as-errors='*' {} 2>&1) || TIDY_FAILED=$?
+
+# Filter noisy output for readability
+echo "$OUTPUT" | \
     grep -v "warnings generated" | \
     grep -v "Suppressed" | \
     grep -v "Use -header-filter" || true
+
+if [[ $TIDY_FAILED -ne 0 ]]; then
+    echo "clang-tidy found issues"
+    exit 1
+fi
 
 echo "Done."

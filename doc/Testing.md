@@ -41,6 +41,8 @@ Unit tests for the lexer, parser, and type checker.
 | `polang_types_test.cpp` | Type constant utilities |
 | `operator_utils_test.cpp` | Operator classification |
 | `error_reporter_test.cpp` | Error message formatting |
+| `type_checker_incremental_test.cpp` | Incremental type checking for REPL |
+| `type_inference_test.cpp` | Type inference and polymorphic type resolution |
 
 ### Compiler Tests (`tests/compiler/`)
 
@@ -51,7 +53,6 @@ Integration tests for the LLVM IR code generation and MLIR verifier unit tests.
 | `compiler_test.cpp` | End-to-end compilation, CLI flags, float/cast ops |
 | `mlir_verifier_test.cpp` | MLIR verifier error paths (programmatic MLIR construction) |
 | `conversion_pass_test.cpp` | Polang-to-Standard conversion pass tests |
-| `type_inference_pass_test.cpp` | Type inference pass tests |
 
 ### REPL Tests (`tests/repl/`)
 
@@ -67,12 +68,12 @@ FileCheck-based tests organized by output type:
 | Directory | Count | Description |
 |-----------|-------|-------------|
 | `AST/` | 18 | AST dump verification (`--dump-ast`) |
-| `MLIR/` | 41 | Polang dialect MLIR output (`--emit-mlir`) |
+| `MLIR/` | 46 | Polang dialect MLIR output (`--emit-mlir`) |
 | `LLVMIR/` | 16 | LLVM IR generation |
 | `Execution/` | 55 | REPL execution results |
 | `Errors/` | 15 | Error message verification |
 
-**Total: 145 lit tests**
+**Total: 150 lit tests**
 
 ## Writing Lit Tests
 
@@ -174,8 +175,12 @@ The HTML report is generated at `build/coverage_html/index.html`.
 
 ### Current Coverage
 
-- **Lines:** 88.3% (2912 of 3298 lines)
-- **Functions:** 91.2% (361 of 396 functions)
+Run the coverage build to see current metrics:
+
+```bash
+cmake --build build --target coverage
+# View build/coverage_html/index.html
+```
 
 ### Adding Coverage for New Code
 
@@ -202,12 +207,12 @@ These methods are required by MLIR's pass infrastructure for CLI tools like `mli
 | `mlir/lib/Conversion/PolangToStandard.cpp` | `PolangToStandardPass::getArgument()` | Returns pass name for CLI |
 | `mlir/lib/Conversion/PolangToStandard.cpp` | `PolangToStandardPass::getDescription()` | Returns pass description |
 | `mlir/lib/Conversion/PolangToStandard.cpp` | `registerPolangConversionPasses()` | Registers passes with MLIR CLI |
-| `mlir/lib/Transforms/TypeInference.cpp` | `TypeInferencePass::getArgument()` | Returns pass name for CLI |
-| `mlir/lib/Transforms/TypeInference.cpp` | `TypeInferencePass::getDescription()` | Returns pass description |
+| `mlir/lib/Dialect/PolangTypeInference.cpp` | `TypeInferencePass::getArgument()` | Returns pass name for CLI |
+| `mlir/lib/Dialect/PolangTypeInference.cpp` | `TypeInferencePass::getDescription()` | Returns pass description |
 | `mlir/lib/Transforms/Monomorphization.cpp` | `MonomorphizationPass::getArgument()` | Returns pass name for CLI |
 | `mlir/lib/Transforms/Monomorphization.cpp` | `MonomorphizationPass::getDescription()` | Returns pass description |
 
-### MLIR Op Interface Methods (6 functions)
+### MLIR Op Interface Methods (5 functions)
 
 Required by MLIR's `CallOpInterface` for call graph analysis, but not used since we build MLIR programmatically rather than parsing MLIR text.
 
@@ -218,18 +223,6 @@ Required by MLIR's `CallOpInterface` for call graph analysis, but not used since
 | `mlir/lib/Dialect/PolangOps.cpp` | `CallOp::getCallableForCallee()` | Call graph analysis |
 | `mlir/lib/Dialect/PolangOps.cpp` | `CallOp::getCalleeType()` | Call graph analysis |
 | `mlir/lib/Dialect/PolangOps.cpp` | `CallOp::setCalleeFromCallable()` | Call graph analysis |
-| `mlir/lib/Dialect/PolangOps.cpp` | `FuncOp::parse()` | MLIR text parsing |
-
-### MLIR Text Parsing Methods (4 functions)
-
-These `parse()` and `print()` methods implement MLIR textual format for ops/types. They are required by the MLIR framework but not exercised because Polang constructs MLIR programmatically (never parses MLIR text).
-
-| File | Function | Purpose |
-|------|----------|---------|
-| `mlir/lib/Dialect/PolangOps.cpp` | `ConstantIntegerOp::parse()` | MLIR text parsing for integer constants |
-| `mlir/lib/Dialect/PolangOps.cpp` | `ConstantFloatOp::parse()` | MLIR text parsing for float constants |
-| `mlir/lib/Dialect/PolangOps.cpp` | `FuncOp::print()` | MLIR text printing for functions |
-| `mlir/lib/Dialect/PolangTypes.cpp` | `TypeVarType::parse()` | MLIR text parsing for type variables |
 
 ### PrintOp Lowering (1 function)
 
@@ -319,7 +312,7 @@ Memory and undefined behavior checking with 2 configurations:
 
 #### Known Issues: ASan False Positives with MLIR Tests
 
-The MLIR unit tests (`mlir_verifier_test`, `type_inference_pass_test`, `conversion_pass_test`)
+The MLIR unit tests (`mlir_verifier_test`, `conversion_pass_test`)
 and lit tests (`polang-lit-tests`) are excluded from the ASan preset due to false positive
 "use-after-poison" errors.
 

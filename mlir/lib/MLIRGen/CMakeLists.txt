@@ -17,7 +17,8 @@ add_mlir_library(PolangMLIRGen
   MLIRSupport
 )
 
-# Add include directory for generated parser header
+# Add include directories for generated parser header and compiler headers
 target_include_directories(obj.PolangMLIRGen PRIVATE
   ${PROJECT_BINARY_DIR}/parser
+  ${PROJECT_SOURCE_DIR}/compiler/include
 )

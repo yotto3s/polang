@@ -1,0 +1,6 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test that f32 type annotation propagates to float literal
+; CHECK: 3{{.*}} : f32
+let y: f32 = 3.0
+y

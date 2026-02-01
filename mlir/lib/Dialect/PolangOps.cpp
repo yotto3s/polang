@@ -783,8 +783,7 @@ LogicalResult CmpOp::verify() {
 
 // Note: LoadOp does not implement InferTypeOpInterface because the memref
 // element type is the LLVM type (i64), not the Polang type (!polang.int).
-// The Polang type is stored in AllocaOp's elementType attribute, which requires
-// walking to the defining op. MLIRGen already specifies the type explicitly.
+// MLIRGen already specifies the type explicitly.
 
 //===----------------------------------------------------------------------===//
 // ConstantIntegerOp custom print/parse
@@ -905,7 +904,7 @@ ParseResult LetExprOp::parse(OpAsmParser& parser, OperationState& result) {
       return failure();
     }
     auto bindingRegion = std::make_unique<Region>();
-    if (parser.parseRegion(*bindingRegion, /*arguments=*/{}, /*argTypes=*/{})) {
+    if (parser.parseRegion(*bindingRegion, /*arguments=*/{})) {
       return failure();
     }
     if (bindingRegion->empty()) {
@@ -992,5 +991,120 @@ LogicalResult LetExprOp::verify() {
            << getResult().getType();
   }
 
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// GlobalOp
+//===----------------------------------------------------------------------===//
+
+ParseResult GlobalOp::parse(OpAsmParser& parser, OperationState& result) {
+  StringAttr nameAttr;
+  if (parser.parseSymbolName(nameAttr, SymbolTable::getSymbolAttrName(),
+                             result.attributes)) {
+    return failure();
+  }
+
+  // Parse optional {is_external}
+  if (succeeded(parser.parseOptionalLBrace())) {
+    if (parser.parseKeyword("is_external") || parser.parseRBrace()) {
+      return failure();
+    }
+    result.addAttribute("is_external", parser.getBuilder().getUnitAttr());
+  }
+
+  if (parser.parseColon()) {
+    return failure();
+  }
+
+  TypeAttr typeAttr;
+  if (parser.parseAttribute(typeAttr, "type", result.attributes)) {
+    return failure();
+  }
+
+  if (parser.parseOptionalAttrDict(result.attributes)) {
+    return failure();
+  }
+
+  // Parse optional initializer region
+  auto* region = result.addRegion();
+  auto parseResult = parser.parseOptionalRegion(*region);
+  if (parseResult.has_value() && failed(*parseResult)) {
+    return failure();
+  }
+
+  return success();
+}
+
+void GlobalOp::print(OpAsmPrinter& p) {
+  p << ' ';
+  p.printSymbolName(getSymName());
+  if (getIsExternal()) {
+    p << " {is_external}";
+  }
+  p << " : " << getType();
+  SmallVector<StringRef> elidedAttrs = {SymbolTable::getSymbolAttrName(),
+                                        "type", "is_external"};
+  p.printOptionalAttrDict((*this)->getAttrs(), elidedAttrs);
+
+  // Print initializer region if present
+  if (!getInitializer().empty()) {
+    p << ' ';
+    p.printRegion(getInitializer());
+  }
+}
+
+LogicalResult GlobalOp::verify() {
+  if (getIsExternal()) {
+    // External globals must not have an initializer region
+    if (!getInitializer().empty()) {
+      return emitOpError("external global must not have an initializer region");
+    }
+    return success();
+  }
+
+  // Non-external globals with an initializer must have exactly one block
+  if (!getInitializer().empty()) {
+    auto& region = getInitializer();
+    if (!region.hasOneBlock()) {
+      return emitOpError("initializer region must have exactly one block");
+    }
+
+    // Block must end with YieldGlobalOp
+    auto& block = region.front();
+    if (block.empty()) {
+      return emitOpError("initializer block must not be empty");
+    }
+    auto yieldOp = dyn_cast<YieldGlobalOp>(block.getTerminator());
+    if (!yieldOp) {
+      return emitOpError("initializer block must terminate with "
+                         "'polang.yield.global'");
+    }
+
+    // Yielded type must match GlobalOp's type
+    if (yieldOp.getValue().getType() != getType()) {
+      return emitOpError("yielded type ")
+             << yieldOp.getValue().getType() << " doesn't match global type "
+             << getType();
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// GlobalLoadOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult GlobalLoadOp::verify() { return success(); }
+
+LogicalResult
+GlobalLoadOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
+  auto globalOp =
+      symbolTable.lookupNearestSymbolFrom<GlobalOp>(*this, getGlobalNameAttr());
+  if (!globalOp) {
+    return emitOpError("references undefined global '")
+           << getGlobalName() << "'";
+  }
   return success();
 }

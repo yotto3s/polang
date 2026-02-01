@@ -1,0 +1,9 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test chained global variable initialization across the same eval.
+; Each global's init expression may reference previously defined globals.
+; CHECK: 13 : i64
+let x = 5
+let y = x + 3
+let z = x + y
+z
