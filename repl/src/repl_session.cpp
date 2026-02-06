@@ -121,10 +121,10 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     return EvalResult::error("Type inference failed");
   }
 
-  // Get resolved type from MLIR (after type inference, before lowering)
-  if (lastIsExpression) {
-    resultType = codegenCtx.getResolvedReturnType(entryFuncName);
-  }
+  // Get resolved type from MLIR (after type inference, before lowering).
+  // Always resolve, even for non-expression statements, so that execute()
+  // uses the correct ABI (e.g. f64 returns via xmm0, not rax).
+  resultType = codegenCtx.getResolvedReturnType(entryFuncName);
 
   if (!codegenCtx.lowerToStandard()) {
     std::cerr << "Lowering to standard failed: " << codegenCtx.getError()

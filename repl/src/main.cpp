@@ -36,7 +36,7 @@ static void printResult(const EvalResult& result) noexcept {
             std::cout << static_cast<double>(val) << " : " << result.type
                       << "\n";
           } else {
-            // int64_t, int8_t, int16_t — all printed as integer
+            // int64_t, int32_t, int8_t, int16_t — all printed as integer
             std::cout << static_cast<int64_t>(val) << " : " << result.type
                       << "\n";
           }

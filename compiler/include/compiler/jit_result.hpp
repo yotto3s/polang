@@ -8,8 +8,8 @@ namespace polang {
 
 /// Type-safe variant for JIT execution results.
 /// std::monostate represents void / no value.
-using JitResult =
-    std::variant<std::monostate, int64_t, double, float, bool, int8_t, int16_t>;
+using JitResult = std::variant<std::monostate, bool, int8_t, int16_t, int32_t,
+                               int64_t, float, double>;
 
 } // namespace polang
 

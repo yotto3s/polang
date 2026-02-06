@@ -171,7 +171,7 @@ std::optional<JitResult> JITSession::execute(const std::string& entryName,
   }
   if (resultType == "i32" || resultType == "u32") {
     auto entryFn = sym->toPtr<int32_t (*)()>();
-    return static_cast<int64_t>(entryFn());
+    return entryFn();
   }
   auto entryFn = sym->toPtr<int64_t (*)()>();
   return entryFn();
