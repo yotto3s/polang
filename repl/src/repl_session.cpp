@@ -214,9 +214,12 @@ void ReplSession::updateCompiledSymbols(NBlock& newAst) {
     compiledSymbols->functions[func.name] = func;
 
     if (func.isGeneric) {
-      // Transfer ownership: the AST node moves from newAst to persistent
-      // compiledSymbols. The source unique_ptr in newAst becomes null;
-      // newAst must not be used after updateCompiledSymbols() returns.
+      // Transfer ownership of this generic function AST node from newAst to
+      // the persistent compiledSymbols. The corresponding unique_ptr in
+      // newAst.statements becomes null, so after updateCompiledSymbols()
+      // returns, newAst remains valid but some statement entries may be null
+      // and callers must not assume that all original statements are still
+      // present.
       compiledSymbols->genericFuncAstNodes.push_back(std::move(stmt));
     }
   };
