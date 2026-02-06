@@ -25,7 +25,7 @@ struct SourceLocation {
   int column = 0;
   SourceLocation() = default;
   SourceLocation(int l, int c) : line(l), column(c) {}
-  [[nodiscard]] bool isValid() const { return line > 0; }
+  [[nodiscard]] bool isValid() const noexcept { return line > 0; }
 };
 
 // Smart pointer type aliases for owning containers
@@ -106,6 +106,12 @@ public:
   [[nodiscard]] std::string getTypeName() const override { return name; }
   void accept(Visitor &visitor) const override;
 };
+
+/// Helper to create an NTypeSpec from a type name string.
+[[nodiscard]] inline std::shared_ptr<const NTypeSpec>
+makeTypeSpec(const std::string& typeName) {
+  return std::make_shared<const NNamedType>(typeName);
+}
 
 // Capture entry for closures (owns its type and id via shared_ptr/unique_ptr)
 // Mutability is derived from the type annotation (e.g., "mut i64" prefix)

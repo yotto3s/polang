@@ -208,11 +208,6 @@ Source Code (.po)
          │ Polang Dialect MLIR (with type parameters)
          ▼
 ┌─────────────────┐
-│ Type Inference  │  mlir/lib/Dialect/PolangTypeInference.cpp
-└────────┬────────┘
-         │ Polang Dialect MLIR (types resolved)
-         ▼
-┌─────────────────┐
 │ Monomorphization│  mlir/lib/Transforms/Monomorphization.cpp
 └────────┬────────┘
          │ Polang Dialect MLIR (specialized functions)
@@ -418,9 +413,11 @@ module {
 }
 ```
 
-### Stage 2: Type Inference Pass
+### Stage 2: Monomorphization Pass
 
-Type inference occurs primarily at the AST level via the TypeChecker's Hindley-Milner unification algorithm (`parser/src/type_checker.cpp`). The MLIR-level `TypeInferencePass` (`mlir/lib/Dialect/PolangTypeInference.cpp`) handles residual type parameter resolution for generic functions by analyzing `polang.instantiate` call sites.
+Type inference is fully handled at the AST level by the TypeChecker's Hindley-Milner unification algorithm (`parser/src/type_checker.cpp`). The Monomorphization pass (`mlir/lib/Transforms/Monomorphization.cpp`) specializes generic functions by creating concrete copies for each unique type instantiation.
+
+> **Note:** A `TypeInferencePass` (`mlir/lib/Dialect/PolangTypeInference.cpp`) is registered for `polang-opt` round-trip testing but is not used in the main compilation pipeline.
 
 **Example:**
 

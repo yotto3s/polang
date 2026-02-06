@@ -31,14 +31,6 @@ using polang::resolveAllGenericsToDefault;
 using polang::resolveGenericToDefault;
 using polang::TypeNames;
 
-namespace {
-/// Helper to create an appropriate NTypeSpec from a type name string
-[[nodiscard]] std::shared_ptr<const NTypeSpec>
-makeTypeSpec(const std::string& typeName) {
-  return std::make_shared<const NNamedType>(typeName);
-}
-} // namespace
-
 /// FreeVariableCollector - A visitor that identifies free variables in an
 /// expression or block.
 class FreeVariableCollector : public Visitor {
@@ -175,7 +167,6 @@ TypeChecker::checkIncremental(const NBlock& newStatements) {
   errors.clear();
   subst = polang::Substitution();
   traitConstraints = polang::TraitConstraints();
-  polang::resetUnificationVarCounter();
   newStatements.accept(*this);
   return errors;
 }

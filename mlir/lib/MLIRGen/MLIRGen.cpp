@@ -48,12 +48,6 @@ using namespace polang;
 
 namespace {
 
-/// Helper to create an appropriate NTypeSpec from a type name string
-[[nodiscard]] std::shared_ptr<const NTypeSpec>
-makeTypeSpec(const std::string& typeName) {
-  return std::make_shared<const NNamedType>(typeName);
-}
-
 //===----------------------------------------------------------------------===//
 // MLIRGenVisitor - Generates MLIR from Polang AST
 //===----------------------------------------------------------------------===//

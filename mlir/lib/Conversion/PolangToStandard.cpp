@@ -53,6 +53,8 @@ public:
     // Handle type parameters that weren't resolved by monomorphization.
     // Default to i64 as fallback (should not be reached in normal flow).
     addConversion([](TypeParamType type) -> Type {
+      llvm::errs() << "warning: unresolved TypeParamType '" << type.getName()
+                   << "' defaulting to i64\n";
       return mlir::IntegerType::get(type.getContext(), 64);
     });
   }
