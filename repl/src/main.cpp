@@ -1,5 +1,6 @@
 #include "repl/repl_session.hpp"
 
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <sstream>
