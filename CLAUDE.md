@@ -94,6 +94,9 @@ cmake --build build -j$(nproc)
 # Run tests
 ctest --test-dir build --output-on-failure
 
+# MLIR round-trip testing tool (used by lit tests)
+./build/bin/polang-opt input.mlir
+
 # Verify examples work
 for f in example/*.po; do echo "=== $(basename $f) ==="; ./build/bin/PolangRepl "$f"; done
 ```
