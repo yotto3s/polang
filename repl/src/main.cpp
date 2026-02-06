@@ -1,6 +1,6 @@
 #include "repl/repl_session.hpp"
 
-#include <cassert>
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -43,8 +43,8 @@ static void printResult(const EvalResult& result) noexcept {
         },
         result.value);
   } catch (...) {
-    // unreachable
-    assert(false);
+    // unreachable: satisfies bugprone-exception-escape for noexcept
+    std::terminate();
   }
 }
 

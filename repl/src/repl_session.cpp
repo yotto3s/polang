@@ -14,13 +14,9 @@
 
 #include "mlir/IR/BuiltinOps.h"
 
-#include <llvm/Support/TargetSelect.h>
-
 #pragma GCC diagnostic pop
 
 #include <iostream>
-
-using namespace llvm;
 
 ReplSession::ReplSession() noexcept = default;
 ReplSession::~ReplSession() noexcept = default;
@@ -29,9 +25,6 @@ bool ReplSession::initialize() {
   if (initialized) {
     return true;
   }
-
-  InitializeNativeTarget();
-  InitializeNativeTargetAsmPrinter();
 
   // Initialize persistent JIT session
   jitSession = std::make_unique<polang::JITSession>();
@@ -221,6 +214,12 @@ void ReplSession::updateCompiledSymbols(NBlock& newAst) {
     compiledSymbols->functions[func.name] = func;
 
     if (func.isGeneric) {
+      // Transfer ownership of this generic function AST node from newAst to
+      // the persistent compiledSymbols. The corresponding unique_ptr in
+      // newAst.statements becomes null, so after updateCompiledSymbols()
+      // returns, newAst remains valid but some statement entries may be null
+      // and callers must not assume that all original statements are still
+      // present.
       compiledSymbols->genericFuncAstNodes.push_back(std::move(stmt));
     }
   };

@@ -22,7 +22,7 @@ struct EvalResult {
   std::string type; // "i64", "f64", "f32", "bool", "void"
   std::string errorMessage;
 
-  [[nodiscard]] bool hasValue() const {
+  [[nodiscard]] bool hasValue() const noexcept {
     return !std::holds_alternative<std::monostate>(value);
   }
 
