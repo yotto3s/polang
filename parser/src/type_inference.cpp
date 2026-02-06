@@ -4,7 +4,7 @@
 namespace polang {
 
 namespace {
-int unificationVarCounter = 0;
+thread_local int unificationVarCounter = 0;
 } // namespace
 
 const char* traitBoundToString(TraitBound bound) noexcept {
@@ -155,8 +155,9 @@ std::set<TraitBound> TraitConstraints::getBounds(const std::string& var) const {
   return {};
 }
 
-bool TraitConstraints::satisfies(const std::string& concreteType,
-                                 const std::set<TraitBound>& boundsSet) {
+bool TraitConstraints::satisfies(
+    const std::string& concreteType,
+    const std::set<TraitBound>& boundsSet) noexcept {
   for (TraitBound bound : boundsSet) {
     switch (bound) {
     case TraitBound::Numeric:
