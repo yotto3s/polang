@@ -12,6 +12,7 @@ public:
   static bool isInputIncomplete(const std::string& input) noexcept {
     int parenDepth = 0;
     int ifWithoutElse = 0;
+    int letWithoutIn = 0;
     int moduleDepth = 0;
     std::string lastToken;
 
@@ -75,6 +76,12 @@ public:
           if (ifWithoutElse > 0) {
             --ifWithoutElse;
           }
+        } else if (word == "let") {
+          ++letWithoutIn;
+        } else if (word == "in") {
+          if (letWithoutIn > 0) {
+            --letWithoutIn;
+          }
         } else if (word == "module") {
           ++moduleDepth;
         } else if (word == "endmodule") {
@@ -93,14 +100,16 @@ public:
     // Input is incomplete if:
     // - Unbalanced parentheses
     // - if without matching else
+    // - let without matching in
     // - module without matching endmodule
     // - Ends with 'in' keyword (let expression needs body)
     // - Ends with 'then' keyword (if expression needs else)
     // - Ends with binary operator (expression continues)
-    return parenDepth > 0 || ifWithoutElse > 0 || moduleDepth > 0 ||
-           lastToken == "in" || lastToken == "then" || lastToken == "+" ||
-           lastToken == "-" || lastToken == "*" || lastToken == "/" ||
-           lastToken == "=" || lastToken == "," || lastToken == "and";
+    return parenDepth > 0 || ifWithoutElse > 0 || letWithoutIn > 0 ||
+           moduleDepth > 0 || lastToken == "in" || lastToken == "then" ||
+           lastToken == "+" || lastToken == "-" || lastToken == "*" ||
+           lastToken == "/" || lastToken == "=" || lastToken == "," ||
+           lastToken == "and";
   }
 };
 
