@@ -473,7 +473,10 @@ At the MLIR level, type parameters in `polang.generic_func` operations are resol
 parser/
 ├── include/parser/
 │   ├── polang_types.hpp     # Type constants (INT, DOUBLE, BOOL, TYPEVAR)
-│   └── type_checker.hpp     # Type checker interface
+│   ├── type_checker.hpp     # Type checker interface
+│   └── type_inference.hpp   # Unification, substitution, trait constraints,
+│                            # and function signature types (MonoSignature,
+│                            # PolymorphicSignature, FunctionSignature variant)
 └── src/
     └── type_checker.cpp     # Type inference, error detection, capture analysis
                              # Contains: TypeChecker, FreeVariableCollector
@@ -493,6 +496,16 @@ mlir/
         └── Monomorphization.cpp     # Function specialization for call sites
 ```
 
+### Function Signature Types
+
+The type checker tracks function signatures using a `std::variant`-based type defined in `type_inference.hpp`:
+
+- **`MonoSignature`**: Concrete parameter types and return type (e.g., `(i64, i64) -> i64`)
+- **`PolymorphicSignature`**: Type-parameterised signature with trait bounds (e.g., `forall 'a:Numeric. ('a, 'a) -> 'a`)
+- **`FunctionSignature`**: `std::variant<MonoSignature, PolymorphicSignature>` — the type checker stores one entry per function in `functionSignatures`
+
+This variant design makes the monomorphic/polymorphic distinction explicit at the type level, preventing bugs from accidentally treating one as the other.
+
 ### Type Checking Flow
 
 ```
@@ -503,6 +516,7 @@ mlir/
    ├── Validates explicit type annotations
    ├── Detects errors (undefined vars, arity)
    ├── Performs Hindley-Milner type inference (unification)
+   ├── Stores function signatures in functionSignatures map
    ├── Performs capture analysis (FreeVariableCollector)
    └── Marks untyped polymorphic parameters as TYPEVAR
 

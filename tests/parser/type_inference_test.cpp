@@ -318,3 +318,40 @@ TEST(FunctionSignatureTest, VariantHoldsCorrectType) {
   EXPECT_TRUE(std::holds_alternative<PolymorphicSignature>(polySig));
   EXPECT_FALSE(std::holds_alternative<MonoSignature>(polySig));
 }
+
+TEST(FunctionSignatureTest, VariantGetTypeSafety) {
+  FunctionSignature monoSig = MonoSignature{{"i64", "bool"}, "i64"};
+
+  // std::get succeeds for the correct alternative
+  const auto& mono = std::get<MonoSignature>(monoSig);
+  EXPECT_EQ(mono.paramTypes.size(), 2u);
+  EXPECT_EQ(mono.returnType, "i64");
+
+  // std::get throws for the wrong alternative
+  EXPECT_THROW(std::get<PolymorphicSignature>(monoSig), std::bad_variant_access);
+
+  FunctionSignature polySig =
+      PolymorphicSignature{{"'a"}, {}, {"'a", "'a"}, "'a"};
+
+  const auto& poly = std::get<PolymorphicSignature>(polySig);
+  EXPECT_EQ(poly.typeParams.size(), 1u);
+  EXPECT_EQ(poly.paramTypes.size(), 2u);
+
+  EXPECT_THROW(std::get<MonoSignature>(polySig), std::bad_variant_access);
+}
+
+TEST(FunctionSignatureTest, MonoSignatureEquality) {
+  MonoSignature a{{"i64", "bool"}, "i64"};
+  MonoSignature b{{"i64", "bool"}, "i64"};
+  MonoSignature c{{"f64"}, "f64"};
+  EXPECT_EQ(a, b);
+  EXPECT_NE(a, c);
+}
+
+TEST(FunctionSignatureTest, PolymorphicSignatureEquality) {
+  PolymorphicSignature a{{"'a"}, {}, {"'a"}, "'a"};
+  PolymorphicSignature b{{"'a"}, {}, {"'a"}, "'a"};
+  PolymorphicSignature c{{"'a", "'b"}, {}, {"'a", "'b"}, "'a"};
+  EXPECT_EQ(a, b);
+  EXPECT_NE(a, c);
+}

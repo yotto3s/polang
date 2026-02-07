@@ -87,17 +87,36 @@ private:
 };
 
 /// Monomorphic function signature: concrete param types and return type.
+/// Example: (i64, i64) -> i64
 struct MonoSignature {
   std::vector<std::string> paramTypes;
   std::string returnType;
+
+  [[nodiscard]] bool operator==(const MonoSignature& other) const noexcept {
+    return paramTypes == other.paramTypes && returnType == other.returnType;
+  }
+  [[nodiscard]] bool operator!=(const MonoSignature& other) const noexcept {
+    return !(*this == other);
+  }
 };
 
 /// Polymorphic function signature: forall 'a:'Numeric, 'b. ('a, 'b) -> 'a
+/// Example: forall 'a:Numeric. ('a, 'a) -> 'a
 struct PolymorphicSignature {
   std::vector<std::string> typeParams;                     // ["'a", "'b"]
   std::map<std::string, std::set<TraitBound>> paramBounds; // {"'a": {Numeric}}
   std::vector<std::string> paramTypes; // param types (may reference params)
   std::string returnType;
+
+  [[nodiscard]] bool
+  operator==(const PolymorphicSignature& other) const noexcept {
+    return typeParams == other.typeParams && paramBounds == other.paramBounds &&
+           paramTypes == other.paramTypes && returnType == other.returnType;
+  }
+  [[nodiscard]] bool
+  operator!=(const PolymorphicSignature& other) const noexcept {
+    return !(*this == other);
+  }
 };
 
 /// A function signature is either monomorphic or polymorphic.
