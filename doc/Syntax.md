@@ -105,7 +105,7 @@ def <identifier> : <type> = <expression>
 
 - When type is omitted, it is **inferred from the initializer expression**
 - Variables must be initialized at declaration
-- **No implicit type conversion**: `let x: f64 = 42` is an error (must write `42.0`)
+- **No implicit type conversion**: `def x: f64 = 42` is an error (must write `42.0`)
 - Variables cannot be reassigned after declaration
 
 ## Functions
