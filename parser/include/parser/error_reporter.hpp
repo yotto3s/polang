@@ -120,6 +120,13 @@ formatUndeclaredVar(const std::string& varName) {
   return "Undeclared variable: " + varName;
 }
 
+/// Format an undefined function error message.
+/// @param funcName The function name
+[[nodiscard]] inline std::string
+formatUndefinedFunc(const std::string& funcName) {
+  return "Undefined function: " + funcName;
+}
+
 /// Format a function return type error message.
 /// @param funcName The function name
 /// @param declaredType The declared return type
