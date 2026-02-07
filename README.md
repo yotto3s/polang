@@ -45,10 +45,10 @@ $ ./build/bin/PolangRepl
 Polang REPL (type 'exit' or Ctrl+D to quit)
 > 1 + 2
 3 : i64
-> let x = 5
+> def x = 5
 > x * 2
 10 : i64
-> let double (n: i64): i64 = n * 2
+> def double (n: i64): i64 = n * 2
 > double(21)
 42 : i64
 > if x > 3 then true else false
@@ -58,7 +58,7 @@ true : bool
 
 **Compile to LLVM IR:**
 ```bash
-echo "let x = 42" | ./build/bin/PolangCompiler
+echo "def x = 42" | ./build/bin/PolangCompiler
 ```
 
 **Run a source file:**

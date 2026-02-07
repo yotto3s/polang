@@ -88,19 +88,19 @@ false
 
 ### Variable Declaration
 
-Variables are declared using the `let` keyword. All variables in Polang are **immutable**:
+Variables are declared using the `def` keyword. All variables in Polang are **immutable**:
 
 ```
-let x = 5           ; type inferred as i64
-let y = 3.14        ; type inferred as f64
-let z = true        ; type inferred as bool
-let w : i64 = 10    ; explicit type annotation
+def x = 5           ; type inferred as i64
+def y = 3.14        ; type inferred as f64
+def z = true        ; type inferred as bool
+def w : i64 = 10    ; explicit type annotation
 ```
 
 **Syntax:**
 ```
-let <identifier> = <expression>
-let <identifier> : <type> = <expression>
+def <identifier> = <expression>
+def <identifier> : <type> = <expression>
 ```
 
 - When type is omitted, it is **inferred from the initializer expression**
@@ -112,20 +112,20 @@ let <identifier> : <type> = <expression>
 
 ### Function Declaration
 
-Functions are declared using `let` with parameter lists:
+Functions are declared using `def` with parameter lists:
 
 ```
-let add(x: i64, y: i64): i64 = x + y   ; explicit types
-let square(n: i64) = n * n              ; return type inferred as i64
-let double(x) = x * 2                   ; parameter type inferred from body (i64)
-let half(x) = x / 2.0                   ; parameter type inferred as f64
+def add(x: i64, y: i64): i64 = x + y   ; explicit types
+def square(n: i64) = n * n              ; return type inferred as i64
+def double(x) = x * 2                   ; parameter type inferred from body (i64)
+def half(x) = x / 2.0                   ; parameter type inferred as f64
 ```
 
 **Syntax:**
 ```
-let <name>(<param>: <type>, ...): <return_type> = <expression>
-let <name>(<param>: <type>, ...) = <expression>
-let <name>(<param>, ...) = <expression>    ; types inferred
+def <name>(<param>: <type>, ...): <return_type> = <expression>
+def <name>(<param>: <type>, ...) = <expression>
+def <name>(<param>, ...) = <expression>    ; types inferred
 ```
 
 - Parameters are comma-separated within parentheses
@@ -144,10 +144,10 @@ Polang uses Hindley-Milner style type inference to determine parameter types. Wh
 **Local inference examples:**
 
 ```
-let double(x) = x * 2       ; x inferred as i64 (from * 2)
-let half(x) = x / 2.0       ; x inferred as f64 (from / 2.0)
-let is_zero(x) = x == 0     ; x inferred as i64 (from == 0)
-let add(x: i64, y) = x + y  ; y inferred as i64 (from + x)
+def double(x) = x * 2       ; x inferred as i64 (from * 2)
+def half(x) = x / 2.0       ; x inferred as f64 (from / 2.0)
+def is_zero(x) = x == 0     ; x inferred as i64 (from == 0)
+def add(x: i64, y) = x + y  ; y inferred as i64 (from + x)
 ```
 
 **Local inference rules:**
@@ -162,12 +162,12 @@ let add(x: i64, y) = x + y  ; y inferred as i64 (from + x)
 When a parameter's type cannot be determined from local usage, Polang infers it from the call site:
 
 ```
-let identity(x) = x         ; x is polymorphic (type variable)
+def identity(x) = x         ; x is polymorphic (type variable)
 identity(42)                ; x inferred as i64 from call site
 ```
 
 ```
-let unused(x) = 42          ; x is polymorphic (type variable)
+def unused(x) = 42          ; x is polymorphic (type variable)
 unused(1)                   ; x inferred as i64 from call site
 ```
 
@@ -213,9 +213,9 @@ if <condition> then <then_expr> else <else_expr>
 **Examples:**
 
 ```
-let max(a: i64, b: i64): i64 = if a > b then a else b
-let abs(x: i64): i64 = if x < 0 then 0 - x else x
-let sign(n: i64): i64 = if n > 0 then 1 else if n < 0 then 0 - 1 else 0
+def max(a: i64, b: i64): i64 = if a > b then a else b
+def abs(x: i64): i64 = if x < 0 then 0 - x else x
+def sign(n: i64): i64 = if n > 0 then 1 else if n < 0 then 0 - 1 else 0
 ```
 
 ### Let Expression
@@ -277,8 +277,8 @@ let inc(n: i64) = n + 1 in inc(41)
 Functions can capture variables from their enclosing scope:
 
 ```
-let x = 10
-let f() = x + 1   ; f captures x
+def x = 10
+def f() = x + 1   ; f captures x
 f()               ; returns 11
 ```
 
@@ -290,20 +290,20 @@ f()               ; returns 11
 
 ```
 ; Simple capture
-let multiplier = 3
-let scale(n: i64) = n * multiplier
+def multiplier = 3
+def scale(n: i64) = n * multiplier
 scale(10)  ; returns 30
 
 ; Capture in let expression
-let result =
+def result =
   let base = 100 and
       add(x: i64) = base + x
   in add(5)  ; returns 105
 
 ; Multiple captures
-let a = 1
-let b = 2
-let sum() = a + b
+def a = 1
+def b = 2
+def sum() = a + b
 sum()  ; returns 3
 ```
 
@@ -352,10 +352,10 @@ Expressions can be:
 The `as` operator converts a value from one numeric type to another. Only numeric-to-numeric conversions are allowed; boolean conversions are not permitted.
 
 ```
-let a: i64 = 1000
-let b: i32 = a as i32           ; narrow i64 to i32
-let c: f64 = a as f64           ; convert integer to float
-let d: i32 = 3.7 as i32         ; convert float to integer (truncates to 3)
+def a: i64 = 1000
+def b: i32 = a as i32           ; narrow i64 to i32
+def c: f64 = a as f64           ; convert integer to float
+def d: i32 = 3.7 as i32         ; convert float to integer (truncates to 3)
 ```
 
 See [Type Conversions](TypeSystem.md#type-conversions) for detailed conversion semantics.
@@ -382,7 +382,7 @@ Polang supports single-line comments using the semicolon (`;`), following Lisp-s
 
 ```
 ; This is a comment
-let x = 5  ; inline comment after code
+def x = 5  ; inline comment after code
 ; Comments extend to the end of the line
 ```
 
@@ -398,9 +398,9 @@ Modules are declared using the `module`/`endmodule` keywords with a Haskell-styl
 
 ```
 module Math (add, PI)
-  let PI = 3.14159
-  let add(x: i64, y: i64): i64 = x + y
-  let internal_helper(x: i64): i64 = x * 2  ; not exported
+  def PI = 3.14159
+  def add(x: i64, y: i64): i64 = x + y
+  def internal_helper(x: i64): i64 = x * 2  ; not exported
 endmodule
 ```
 
@@ -422,8 +422,8 @@ Module members are accessed using dot notation:
 
 ```
 module Math (add, PI)
-  let PI = 3.14159
-  let add(x: i64, y: i64): i64 = x + y
+  def PI = 3.14159
+  def add(x: i64, y: i64): i64 = x + y
 endmodule
 
 Math.PI              ; access exported variable
@@ -469,9 +469,9 @@ from <module> import *
 **Basic module with function and variable:**
 ```
 module Math (add, mul, PI)
-  let PI = 3.14159
-  let add(x: i64, y: i64): i64 = x + y
-  let mul(x: i64, y: i64): i64 = x * y
+  def PI = 3.14159
+  def add(x: i64, y: i64): i64 = x + y
+  def mul(x: i64, y: i64): i64 = x * y
 endmodule
 
 ; Using qualified access
@@ -486,10 +486,10 @@ mul(2, add(1, 2))            ; returns 6
 ```
 module Utils (process)
   ; Public function
-  let process(x: i64): i64 = helper(x) + helper(x)
+  def process(x: i64): i64 = helper(x) + helper(x)
 
   ; Private helper (not exported)
-  let helper(x: i64): i64 = x * 2
+  def helper(x: i64): i64 = x * 2
 endmodule
 
 Utils.process(5)   ; returns 20
@@ -500,7 +500,7 @@ Utils.helper(5)    ; ERROR: helper is not exported
 ```
 module Outer (Inner)
   module Inner (foo)
-    let foo(x: i64): i64 = x + 1
+    def foo(x: i64): i64 = x + 1
   endmodule
 endmodule
 
@@ -518,15 +518,13 @@ statement   ::= var_decl
               | import_stmt
               | expression
 
-var_decl    ::= "let" identifier "=" expression
-              | "let" identifier ":" type "=" expression
-              | "let" "mut" identifier "=" expression
-              | "let" "mut" identifier ":" type "=" expression
+var_decl    ::= "def" identifier "=" expression
+              | "def" identifier ":" type "=" expression
 
-func_decl   ::= "let" identifier "(" param_list ")" ":" type "=" expression
-              | "let" identifier "(" param_list ")" "=" expression
-              | "let" identifier "()" ":" type "=" expression
-              | "let" identifier "()" "=" expression
+func_decl   ::= "def" identifier "(" param_list ")" ":" type "=" expression
+              | "def" identifier "(" param_list ")" "=" expression
+              | "def" identifier "()" ":" type "=" expression
+              | "def" identifier "()" "=" expression
 
 module_decl ::= "module" identifier "(" ident_list ")" module_body "endmodule"
               | "module" identifier module_body "endmodule"
@@ -601,63 +599,63 @@ comment     ::= ";" [^\n]*
 ### Simple Variable
 
 ```
-let x = 42
+def x = 42
 ```
 
 ### Arithmetic Expression
 
 ```
-let a = 10
-let b = 20
-let sum = a + b
+def a = 10
+def b = 20
+def sum = a + b
 ```
 
 ### Function Definition and Call
 
 ```
-let multiply(x: i64, y: i64): i64 = x * y
-let result = multiply(6, 7)
+def multiply(x: i64, y: i64): i64 = x * y
+def result = multiply(6, 7)
 ```
 
 ### Comparison
 
 ```
-let a = 5
-let b = 10
-let is_less : bool = a < b
+def a = 5
+def b = 10
+def is_less : bool = a < b
 ```
 
 ### Complex Expression
 
 ```
-let compute(a: i64, b: i64, c: i64): i64 = (a + b) * c
-let answer = compute(1, 2, 3)
+def compute(a: i64, b: i64, c: i64): i64 = (a + b) * c
+def answer = compute(1, 2, 3)
 ```
 
 ### If Expression
 
 ```
-let max(a: i64, b: i64): i64 = if a > b then a else b
-let larger = max(10, 20)
+def max(a: i64, b: i64): i64 = if a > b then a else b
+def larger = max(10, 20)
 ```
 
 ### Type Conversions
 
 ```
 ; Integer narrowing (truncates)
-let big: i64 = 1000
-let small: i8 = big as i8        ; small = -24 (1000 mod 256, interpreted as signed)
+def big: i64 = 1000
+def small: i8 = big as i8        ; small = -24 (1000 mod 256, interpreted as signed)
 
 ; Integer to float
-let n: i32 = 42
-let f: f64 = n as f64            ; f = 42.0
+def n: i32 = 42
+def f: f64 = n as f64            ; f = 42.0
 
 ; Float to integer (truncates toward zero, saturates at bounds)
-let pi: f64 = 3.14159
-let rounded: i32 = pi as i32     ; rounded = 3
+def pi: f64 = 3.14159
+def rounded: i32 = pi as i32     ; rounded = 3
 
 ; Mixed arithmetic with conversions
-let a: i32 = 10
-let b: i64 = 20
-let sum: i64 = a as i64 + b      ; convert a to i64 before adding
+def a: i32 = 10
+def b: i64 = 20
+def sum: i64 = a as i64 + b      ; convert a to i64 before adding
 ```
