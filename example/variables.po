@@ -1,5 +1,5 @@
 ; Variable declarations and usage
-let x = 10          ; type inferred as int
-let y: i64 = 20     ; explicit type annotation
-let sum = x + y     ; use variables in expressions
+def x = 10          ; type inferred as int
+def y: i64 = 20     ; explicit type annotation
+def sum = x + y     ; use variables in expressions
 sum                 ; result: 30
