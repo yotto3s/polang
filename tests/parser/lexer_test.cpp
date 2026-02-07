@@ -66,6 +66,7 @@ std::vector<TokenInfo> tokenizeWithValues(const std::string& source) {
 
 // Symbol kind constants for easier comparison
 constexpr auto S_TLET = yy::parser::symbol_kind::S_TLET;
+constexpr auto S_TDEF = yy::parser::symbol_kind::S_TDEF;
 constexpr auto S_TFUN = yy::parser::symbol_kind::S_TFUN;
 constexpr auto S_TIN = yy::parser::symbol_kind::S_TIN;
 constexpr auto S_TIF = yy::parser::symbol_kind::S_TIF;
@@ -100,6 +101,12 @@ TEST(LexerTest, KeywordLet) {
   auto tokens = tokenize("let");
   ASSERT_EQ(tokens.size(), 1);
   EXPECT_EQ(tokens[0], static_cast<int>(S_TLET));
+}
+
+TEST(LexerTest, KeywordDef) {
+  auto tokens = tokenize("def");
+  ASSERT_EQ(tokens.size(), 1);
+  EXPECT_EQ(tokens[0], static_cast<int>(S_TDEF));
 }
 
 TEST(LexerTest, KeywordFun) {
@@ -340,18 +347,18 @@ TEST(LexerTest, WhitespaceIgnored) {
 }
 
 TEST(LexerTest, TokensSeparatedByWhitespace) {
-  auto tokens = tokenize("let x = 5");
+  auto tokens = tokenize("def x = 5");
   ASSERT_EQ(tokens.size(), 4);
-  EXPECT_EQ(tokens[0], static_cast<int>(S_TLET));
+  EXPECT_EQ(tokens[0], static_cast<int>(S_TDEF));
   EXPECT_EQ(tokens[1], static_cast<int>(S_TIDENTIFIER));
   EXPECT_EQ(tokens[2], static_cast<int>(S_TEQUAL));
   EXPECT_EQ(tokens[3], static_cast<int>(S_TINTEGER));
 }
 
 TEST(LexerTest, TokensSeparatedByNewline) {
-  auto tokens = tokenize("let\nx\n=\n5");
+  auto tokens = tokenize("def\nx\n=\n5");
   ASSERT_EQ(tokens.size(), 4);
-  EXPECT_EQ(tokens[0], static_cast<int>(S_TLET));
+  EXPECT_EQ(tokens[0], static_cast<int>(S_TDEF));
   EXPECT_EQ(tokens[1], static_cast<int>(S_TIDENTIFIER));
   EXPECT_EQ(tokens[2], static_cast<int>(S_TEQUAL));
   EXPECT_EQ(tokens[3], static_cast<int>(S_TINTEGER));
@@ -360,18 +367,18 @@ TEST(LexerTest, TokensSeparatedByNewline) {
 // ============== Complex Expression Tests ==============
 
 TEST(LexerTest, VariableDeclaration) {
-  auto tokens = tokenize("let x = 42");
+  auto tokens = tokenize("def x = 42");
   ASSERT_EQ(tokens.size(), 4);
-  EXPECT_EQ(tokens[0], static_cast<int>(S_TLET));
+  EXPECT_EQ(tokens[0], static_cast<int>(S_TDEF));
   EXPECT_EQ(tokens[1], static_cast<int>(S_TIDENTIFIER));
   EXPECT_EQ(tokens[2], static_cast<int>(S_TEQUAL));
   EXPECT_EQ(tokens[3], static_cast<int>(S_TINTEGER));
 }
 
 TEST(LexerTest, TypedVariableDeclaration) {
-  auto tokens = tokenize("let x : int = 42");
+  auto tokens = tokenize("def x : int = 42");
   ASSERT_EQ(tokens.size(), 6);
-  EXPECT_EQ(tokens[0], static_cast<int>(S_TLET));
+  EXPECT_EQ(tokens[0], static_cast<int>(S_TDEF));
   EXPECT_EQ(tokens[1], static_cast<int>(S_TIDENTIFIER));
   EXPECT_EQ(tokens[2], static_cast<int>(S_TCOLON));
   EXPECT_EQ(tokens[3], static_cast<int>(S_TIDENTIFIER));
@@ -380,9 +387,9 @@ TEST(LexerTest, TypedVariableDeclaration) {
 }
 
 TEST(LexerTest, FunctionDeclaration) {
-  auto tokens = tokenize("let add(x: int, y: int): int = x + y");
+  auto tokens = tokenize("def add(x: int, y: int): int = x + y");
   ASSERT_EQ(tokens.size(), 17);
-  EXPECT_EQ(tokens[0], static_cast<int>(S_TLET));
+  EXPECT_EQ(tokens[0], static_cast<int>(S_TDEF));
   EXPECT_EQ(tokens[1], static_cast<int>(S_TIDENTIFIER)); // add
   EXPECT_EQ(tokens[2], static_cast<int>(S_TLPAREN));
   EXPECT_EQ(tokens[3], static_cast<int>(S_TIDENTIFIER)); // x

@@ -3,7 +3,7 @@
 // ============== Variable Declaration Tests ==============
 
 TEST(ParserTest, SimpleVariableDeclaration) {
-  auto block = parseOrFail("let x = 5");
+  auto block = parseOrFail("def x = 5");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 
@@ -19,7 +19,7 @@ TEST(ParserTest, SimpleVariableDeclaration) {
 }
 
 TEST(ParserTest, TypedVariableDeclaration) {
-  auto block = parseOrFail("let pi : double = 3.14");
+  auto block = parseOrFail("def pi : double = 3.14");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 
@@ -35,7 +35,7 @@ TEST(ParserTest, TypedVariableDeclaration) {
 }
 
 TEST(ParserTest, VariableWithIdentifierExpression) {
-  auto block = parseOrFail("let y = x");
+  auto block = parseOrFail("def y = x");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 
@@ -51,7 +51,7 @@ TEST(ParserTest, VariableWithIdentifierExpression) {
 // ============== Function Declaration Tests ==============
 
 TEST(ParserTest, SimpleFunctionDeclaration) {
-  auto block = parseOrFail("let square(n: int): int = n * n");
+  auto block = parseOrFail("def square(n: int): int = n * n");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 
@@ -67,7 +67,7 @@ TEST(ParserTest, SimpleFunctionDeclaration) {
 }
 
 TEST(ParserTest, FunctionWithMultipleArgs) {
-  auto block = parseOrFail("let add(x: int, y: int): int = x + y");
+  auto block = parseOrFail("def add(x: int, y: int): int = x + y");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 
@@ -82,7 +82,7 @@ TEST(ParserTest, FunctionWithMultipleArgs) {
 }
 
 TEST(ParserTest, FunctionWithInferredReturnType) {
-  auto block = parseOrFail("let double(x: int) = x + x");
+  auto block = parseOrFail("def double(x: int) = x + x");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 

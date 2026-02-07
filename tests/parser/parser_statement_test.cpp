@@ -3,7 +3,7 @@
 // ============== Multiple Statements Tests ==============
 
 TEST(ParserTest, MultipleStatements) {
-  auto block = parseOrFail("let x = 1\nlet y = 2\nx + y");
+  auto block = parseOrFail("def x = 1\ndef y = 2\nx + y");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 3);
 
@@ -20,7 +20,7 @@ TEST(ParserTest, MultipleStatements) {
 }
 
 TEST(ParserTest, FunctionAndCall) {
-  auto block = parseOrFail("let inc(x: int): int = x + 1\ninc(5)");
+  auto block = parseOrFail("def inc(x: int): int = x + 1\ninc(5)");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 2);
 
