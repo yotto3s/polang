@@ -3,5 +3,5 @@
 
 ; Test polymorphic function with comparison operator execution.
 
-let is_zero(x) = x == 0
+def is_zero(x) = x == 0
 is_zero(5)

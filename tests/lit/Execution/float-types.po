@@ -4,8 +4,8 @@
 ; Float literals default to f64
 
 ; Test various float operations - last result is what gets printed
-let a = 3.14 + 3.14
-let b = 3.14 * 3.14
+def a = 3.14 + 3.14
+def b = 3.14 * 3.14
 
 ; Final expression tests division, which prints
 ; CHECK: 1.57{{.*}} : f64

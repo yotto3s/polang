@@ -2,4 +2,4 @@
 
 ; Test error when if condition is not boolean
 ; CHECK: {{.*}}error{{.*}}
-let x: i64 = if 1 then 2 else 3
+def x: i64 = if 1 then 2 else 3

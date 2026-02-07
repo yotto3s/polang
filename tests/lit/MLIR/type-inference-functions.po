@@ -4,16 +4,16 @@
 
 ; Function returning int (inferred from body)
 ; CHECK: {{.*}}polang.func @double_it(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
-let double_it(x: i64) = x * 2
+def double_it(x: i64) = x * 2
 
 ; Function returning double (inferred from body)
 ; CHECK: {{.*}}polang.func @half(%{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}}
-let half(x: f64) = x / 2.0
+def half(x: f64) = x / 2.0
 
 ; Function returning bool (inferred from comparison)
 ; CHECK: {{.*}}polang.func @is_positive(%{{.*}}: !polang.integer<64, signed>) -> !polang.bool{{.*}}
-let is_positive(x: i64) = x > 0
+def is_positive(x: i64) = x > 0
 
 ; Explicit return type should match
 ; CHECK: {{.*}}polang.func @identity(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
-let identity(x: i64): i64 = x
+def identity(x: i64): i64 = x

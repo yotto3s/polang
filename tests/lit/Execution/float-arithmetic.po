@@ -1,13 +1,13 @@
 ; RUN: %polang_repl %s | %FileCheck %s
 
 ; Test float subtraction
-let sub_result = 5.0 - 2.5
+def sub_result = 5.0 - 2.5
 
 ; Test float multiplication
-let mul_result = 3.0 * 4.0
+def mul_result = 3.0 * 4.0
 
 ; Test float division
-let div_result = 10.0 / 4.0
+def div_result = 10.0 / 4.0
 
 ; Test combined float operations
 ; CHECK: 17 : f64

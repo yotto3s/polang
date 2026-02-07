@@ -9,5 +9,5 @@
 ; The unused function should not exist in any form
 ; CHECK-NOT: @unused_identity
 
-let unused_identity(x) = x
+def unused_identity(x) = x
 42

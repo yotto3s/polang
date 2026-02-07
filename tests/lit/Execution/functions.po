@@ -2,5 +2,5 @@
 
 ; Test function declarations and calls
 ; CHECK: 25 : i64
-let square(x: i64): i64 = x * x
+def square(x: i64): i64 = x * x
 square(5)

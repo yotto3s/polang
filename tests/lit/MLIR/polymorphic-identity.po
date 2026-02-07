@@ -13,5 +13,5 @@
 ; The original generic function is erased after monomorphization
 ; CHECK-NOT: polang.generic_func
 
-let identity(x) = x
+def identity(x) = x
 identity(42)

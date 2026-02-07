@@ -1,20 +1,20 @@
 ; RUN: %polang_repl %s | %FileCheck %s
 
 ; Test all comparison operators
-let lt(a: i64, b: i64): bool = a < b
-let le(a: i64, b: i64): bool = a <= b
-let gt(a: i64, b: i64): bool = a > b
-let ge(a: i64, b: i64): bool = a >= b
-let eq(a: i64, b: i64): bool = a == b
-let ne(a: i64, b: i64): bool = a != b
+def lt(a: i64, b: i64): bool = a < b
+def le(a: i64, b: i64): bool = a <= b
+def gt(a: i64, b: i64): bool = a > b
+def ge(a: i64, b: i64): bool = a >= b
+def eq(a: i64, b: i64): bool = a == b
+def ne(a: i64, b: i64): bool = a != b
 
 ; Test less-than: 1 < 2 = true, 2 < 1 = false
 ; First we need a way to combine results
 ; Use integer encoding: true=1, false=0
-let btoi(b: bool): i64 = if b then 1 else 0
+def btoi(b: bool): i64 = if b then 1 else 0
 
 ; Sum all expected true comparisons
-let result =
+def result =
   btoi(lt(1, 2)) +
   btoi(le(1, 2)) +
   btoi(le(2, 2)) +

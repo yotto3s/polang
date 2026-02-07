@@ -8,5 +8,5 @@
 ; Original generic function is erased
 ; CHECK-NOT: polang.generic_func
 
-let identity(x) = x
+def identity(x) = x
 identity(3.14)

@@ -14,4 +14,4 @@
 ; CHECK-NEXT:         | `-NIdentifier 'a'
 ; CHECK-NEXT:         `-else:
 ; CHECK-NEXT:           `-NIdentifier 'b'
-let max(a: i64, b: i64): i64 = if a > b then a else b
+def max(a: i64, b: i64): i64 = if a > b then a else b

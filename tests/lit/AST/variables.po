@@ -4,4 +4,4 @@
 ; CHECK:      NBlock
 ; CHECK-NEXT: `-NVariableDeclaration 'x'
 ; CHECK-NEXT:   `-NInteger 42
-let x = 42
+def x = 42

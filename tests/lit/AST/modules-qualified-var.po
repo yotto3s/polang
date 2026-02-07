@@ -7,6 +7,6 @@
 ; CHECK-NEXT:   `-NQualifiedName 'Math.PI'
 
 module Math (PI)
-  let PI = 3.14
+  def PI = 3.14
 endmodule
 Math.PI

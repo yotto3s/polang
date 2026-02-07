@@ -10,7 +10,7 @@
 ; Original generic function is erased
 ; CHECK-NOT: polang.generic_func
 
-let identity(x) = x
+def identity(x) = x
 ; Call with int and bool to create both specialized versions
 identity(42)
 identity(true)

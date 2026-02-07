@@ -2,7 +2,7 @@
 ; CHECK: 6.28 : f64
 
 module Math (PI, double_pi)
-  let PI = 3.14
-  let double_pi(x: f64): f64 = x * 2.0
+  def PI = 3.14
+  def double_pi(x: f64): f64 = x * 2.0
 endmodule
 Math.double_pi(Math.PI)

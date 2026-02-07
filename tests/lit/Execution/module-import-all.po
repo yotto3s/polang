@@ -2,8 +2,8 @@
 ; CHECK: 6 : i64
 
 module Math (add, mul)
-  let add(x: i64, y: i64): i64 = x + y
-  let mul(x: i64, y: i64): i64 = x * y
+  def add(x: i64, y: i64): i64 = x + y
+  def mul(x: i64, y: i64): i64 = x * y
 endmodule
 from Math import *
 mul(2, add(1, 2))

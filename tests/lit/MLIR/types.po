@@ -5,11 +5,11 @@
 ; CHECK-NEXT:   %{{[0-9]+}} = polang.constant.float 3.140000e+00 : !polang.float<64>
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
 ; CHECK-NEXT: }
-let double_val(): f64 = 3.14
+def double_val(): f64 = 3.14
 
 ; Test bool constant
 ; CHECK:      polang.func @bool_val() -> !polang.bool {
 ; CHECK-NEXT:   %{{[0-9]+}} = polang.constant.bool true : !polang.bool
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
 ; CHECK-NEXT: }
-let bool_val(): bool = true
+def bool_val(): bool = true

@@ -4,15 +4,15 @@
 
 ; Integer literal infers int type
 ; CHECK: {{.*}}polang.constant.integer 42 : !polang.integer<64, signed>{{.*}}
-let a = 42
+def a = 42
 
 ; Double literal infers double type
 ; CHECK: {{.*}}polang.constant.float 3.140000e+00 : !polang.float<64>{{.*}}
-let b = 3.14
+def b = 3.14
 
 ; Boolean literal infers bool type
 ; CHECK: {{.*}}polang.constant.bool true : !polang.bool{{.*}}
-let c = true
+def c = true
 
 ; CHECK: {{.*}}polang.constant.bool false : !polang.bool{{.*}}
-let d = false
+def d = false

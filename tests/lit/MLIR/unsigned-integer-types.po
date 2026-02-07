@@ -4,19 +4,19 @@
 
 ; Function with u8 parameters
 ; CHECK: {{.*}}polang.func @add_u8(%{{.*}}: !polang.integer<8, unsigned>, %{{.*}}: !polang.integer<8, unsigned>) -> !polang.integer<8, unsigned>{{.*}}
-let add_u8(a: u8, b: u8): u8 = a + b
+def add_u8(a: u8, b: u8): u8 = a + b
 
 ; Function with u16 parameters
 ; CHECK: {{.*}}polang.func @add_u16(%{{.*}}: !polang.integer<16, unsigned>, %{{.*}}: !polang.integer<16, unsigned>) -> !polang.integer<16, unsigned>{{.*}}
-let add_u16(a: u16, b: u16): u16 = a + b
+def add_u16(a: u16, b: u16): u16 = a + b
 
 ; Function with u32 parameters
 ; CHECK: {{.*}}polang.func @add_u32(%{{.*}}: !polang.integer<32, unsigned>, %{{.*}}: !polang.integer<32, unsigned>) -> !polang.integer<32, unsigned>{{.*}}
-let add_u32(a: u32, b: u32): u32 = a + b
+def add_u32(a: u32, b: u32): u32 = a + b
 
 ; Function with u64 parameters
 ; CHECK: {{.*}}polang.func @add_u64(%{{.*}}: !polang.integer<64, unsigned>, %{{.*}}: !polang.integer<64, unsigned>) -> !polang.integer<64, unsigned>{{.*}}
-let add_u64(a: u64, b: u64): u64 = a + b
+def add_u64(a: u64, b: u64): u64 = a + b
 
 ; Default expression
 42

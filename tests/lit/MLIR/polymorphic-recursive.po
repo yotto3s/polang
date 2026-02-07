@@ -9,5 +9,5 @@
 ; Verify recursive call uses the same function name
 ; CHECK: {{.*}}polang.call @countdown{{.*}}
 
-let countdown(n) = if n == 0 then 0 else countdown(n - 1)
+def countdown(n) = if n == 0 then 0 else countdown(n - 1)
 countdown(5)

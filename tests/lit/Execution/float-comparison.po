@@ -1,17 +1,17 @@
 ; RUN: %polang_repl %s | %FileCheck %s
 
 ; Test float less-than
-let a = 1.5 < 2.0
+def a = 1.5 < 2.0
 ; Test float greater-than
-let b = 3.0 > 2.0
+def b = 3.0 > 2.0
 ; Test float equality
-let c = 1.0 == 1.0
+def c = 1.0 == 1.0
 ; Test float not-equal
-let d = 1.0 != 2.0
+def d = 1.0 != 2.0
 ; Test float less-or-equal
-let e = 2.0 <= 2.0
+def e = 2.0 <= 2.0
 ; Test float greater-or-equal
-let f = 3.0 >= 2.0
+def f = 3.0 >= 2.0
 
 ; All comparisons should be true, use conditional to verify
 ; CHECK: 1 : i64

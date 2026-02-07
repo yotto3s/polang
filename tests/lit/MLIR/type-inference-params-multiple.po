@@ -5,15 +5,15 @@
 
 ; Function resolved to integer (a + 0 constrains to integer)
 ; CHECK: {{.*}}polang.func @add3(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
-let add3(a, b, c) = (a + 0) + (b + 0) + (c + 0)
+def add3(a, b, c) = (a + 0) + (b + 0) + (c + 0)
 
 ; Function resolved to float (a * 1.0 constrains to float)
 ; CHECK: {{.*}}polang.func @scale3(%{{.*}}: !polang.float<64>, %{{.*}}: !polang.float<64>, %{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}}
-let scale3(a, b, c) = (a * 1.0) + (b * 1.0) + (c * 1.0)
+def scale3(a, b, c) = (a * 1.0) + (b * 1.0) + (c * 1.0)
 
 ; Partially typed function (both resolve to i64)
 ; CHECK: {{.*}}polang.func @add_typed(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
-let add_typed(x: i64, y) = x + y
+def add_typed(x: i64, y) = x + y
 
 ; Call functions
 add3(1, 2, 3)

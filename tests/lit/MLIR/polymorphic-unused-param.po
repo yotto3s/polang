@@ -10,7 +10,7 @@
 ; Original generic function is erased
 ; CHECK-NOT: polang.generic_func
 
-let unused(x) = 42
+def unused(x) = 42
 
 ; Entry point - call the function with an int
 unused(1)
