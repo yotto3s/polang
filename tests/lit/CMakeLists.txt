@@ -47,6 +47,17 @@ foreach(SUBDIR ${TEST_SUBDIRS})
     endforeach()
 endforeach()
 
+# Copy MLIR .mlir test files (round-trip tests for polang-opt)
+file(GLOB MLIR_ROUNDTRIP_TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/MLIR/*.mlir")
+foreach(TEST_FILE ${MLIR_ROUNDTRIP_TEST_FILES})
+    get_filename_component(TEST_NAME "${TEST_FILE}" NAME)
+    configure_file(
+        "${TEST_FILE}"
+        "${CMAKE_CURRENT_BINARY_DIR}/MLIR/${TEST_NAME}"
+        COPYONLY
+    )
+endforeach()
+
 # Copy MLIR AST dialect test files
 file(GLOB MLIR_AST_TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/MLIR/AST/*.mlir")
 foreach(TEST_FILE ${MLIR_AST_TEST_FILES})

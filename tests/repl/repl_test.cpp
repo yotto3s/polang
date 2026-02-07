@@ -211,3 +211,61 @@ TEST(ReplIntegration, MultipleEvaluationsLastPrints) {
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("6 : i64"));
 }
+
+// ============== Incremental REPL / Persistent JIT Tests ==============
+
+TEST(ReplIntegration, PolymorphicFunctionAcrossEvals) {
+  // Define polymorphic function in eval 1, call with i64 in eval 2
+  const auto result =
+      runRepl("let identity(x) = x\nidentity(42)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("42 : i64"));
+}
+
+TEST(ReplIntegration, PolymorphicFunctionMultipleTypes) {
+  // Polymorphic function called with different types across evaluations
+  const auto result =
+      runRepl("let identity(x) = x\nidentity(42)\nidentity(3.14)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("42 : i64"));
+  EXPECT_THAT(result.stdout_output, HasSubstr("3.14"));
+}
+
+TEST(ReplIntegration, ErrorRecoveryPreservesState) {
+  // Define variable, then cause type error — REPL exits on error in pipe mode,
+  // but the important thing is the error message is correct and doesn't crash
+  const auto result = runRepl("let x = 42\nx + 1.0");
+  EXPECT_NE(result.exit_code, 0);
+  EXPECT_THAT(result.stderr_output, HasSubstr("Type error"));
+}
+
+TEST(ReplIntegration, FiveSequentialEvaluations) {
+  // 5+ sequential evaluations building on each other
+  const auto result = runRepl(
+      "let a = 1\n"
+      "let b = 2\n"
+      "let c = a + b\n"
+      "let f(x: i64): i64 = x * c\n"
+      "f(10)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("30 : i64"));
+}
+
+TEST(ReplIntegration, FunctionCompositionAcrossEvals) {
+  // Define two functions in separate evals, compose them in a third
+  const auto result = runRepl(
+      "let double(x: i64): i64 = x * 2\n"
+      "let inc(x: i64): i64 = x + 1\n"
+      "double(inc(4))");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("10 : i64"));
+}
+
+TEST(ReplIntegration, RecursiveFunctionAcrossEvals) {
+  // Define recursive function, call it in next eval
+  const auto result = runRepl(
+      "let fact(n: i64): i64 = if n <= 1 then 1 else n * fact(n - 1)\n"
+      "fact(5)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("120 : i64"));
+}

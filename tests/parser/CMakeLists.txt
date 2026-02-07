@@ -7,6 +7,8 @@ set(PARSER_TESTS
     parser_statement
     error
     type_check
+    type_checker_incremental
+    type_inference
     ast_printer
     polang_types
     operator_utils

@@ -2,6 +2,7 @@
 
 #include "parser/node.hpp"
 #include "parser/operator_utils.hpp"
+#include "parser/type_inference.hpp"
 
 ASTPrinter::ASTPrinter(std::ostream& out) noexcept : out(out) {}
 
@@ -38,7 +39,7 @@ ASTPrinter::DepthScope::~DepthScope() noexcept {
   printer.depthHasMore.pop_back();
 }
 
-void ASTPrinter::visit(const NNamedType& node) {
+void ASTPrinter::visit(const NNamedType& /*node*/) {
   // Types are printed via getTypeName() in parent visitors
 }
 
@@ -70,10 +71,25 @@ void ASTPrinter::visit(const NQualifiedName& node) {
 void ASTPrinter::visit(const NMethodCall& node) {
   printPrefix();
   if (node.qualifiedId != nullptr) {
-    out << "NMethodCall '" << node.qualifiedId->getFullName() << "'\n";
+    out << "NMethodCall '" << node.qualifiedId->getFullName() << "'";
   } else {
-    out << "NMethodCall '" << node.id->name << "'\n";
+    out << "NMethodCall '" << node.id->name << "'";
   }
+
+  // Print type bindings if present
+  if (!node.typeBindings.empty()) {
+    out << "<";
+    bool first = true;
+    for (const auto& [param, type] : node.typeBindings) {
+      if (!first) {
+        out << ", ";
+      }
+      out << param << "=" << type->getTypeName();
+      first = false;
+    }
+    out << ">";
+  }
+  out << "\n";
 
   const auto& args = node.arguments;
   for (size_t i = 0; i < args.size(); ++i) {
@@ -202,7 +218,33 @@ void ASTPrinter::visit(const NVariableDeclaration& node) {
 
 void ASTPrinter::visit(const NFunctionDeclaration& node) {
   printPrefix();
-  out << "NFunctionDeclaration '" << node.id->name << "' (";
+  out << "NFunctionDeclaration '" << node.id->name << "'";
+
+  // Print type parameters with bounds if present
+  if (!node.typeParams.empty()) {
+    out << "<";
+    for (size_t i = 0; i < node.typeParams.size(); ++i) {
+      if (i > 0) {
+        out << ", ";
+      }
+      out << node.typeParams[i];
+      auto boundsIt = node.typeParamBounds.find(node.typeParams[i]);
+      if (boundsIt != node.typeParamBounds.end() && !boundsIt->second.empty()) {
+        out << ": ";
+        bool first = true;
+        for (polang::TraitBound bound : boundsIt->second) {
+          if (!first) {
+            out << " + ";
+          }
+          out << polang::traitBoundToString(bound);
+          first = false;
+        }
+      }
+    }
+    out << ">";
+  }
+
+  out << " (";
 
   for (size_t i = 0; i < node.arguments.size(); ++i) {
     if (i > 0) {

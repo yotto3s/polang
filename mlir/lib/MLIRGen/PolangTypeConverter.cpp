@@ -12,6 +12,7 @@
 #include "polang/Dialect/PolangTypes.h"
 
 #include "mlir/IR/BuiltinTypes.h"
+#include "llvm/ADT/StringRef.h"
 
 #pragma GCC diagnostic pop
 
@@ -26,8 +27,12 @@ using namespace polang;
 
 PolangTypeConverter::PolangTypeConverter(MLIRContext* ctx) : context(ctx) {}
 
-Type PolangTypeConverter::freshTypeVar(TypeVarKind kind) {
-  return TypeVarType::get(context, nextTypeVarId++, kind);
+Type PolangTypeConverter::getTypeParamType(llvm::StringRef name) {
+  // Strip the leading quote if present (e.g., "'a" -> "a")
+  if (name.starts_with("'")) {
+    name = name.drop_front(1);
+  }
+  return TypeParamType::get(context, name);
 }
 
 Type PolangTypeConverter::getTypeOrFresh(const NTypeSpec* typeAnnotation) {
@@ -38,8 +43,8 @@ Type PolangTypeConverter::getTypeOrFresh(const NTypeSpec* typeAnnotation) {
     }
     return ty;
   }
-  // No annotation - always emit type variable for polymorphic inference
-  return freshTypeVar();
+  // No annotation - use default type (AST-level inference handles resolution)
+  return getDefaultType();
 }
 
 Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
@@ -51,12 +56,20 @@ Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
   }
 
   const std::string& typeName = named->name;
+
+  // Handle type parameters ('a, 'b, etc.)
+  if (typeName.size() >= 2 && typeName[0] == '\'') {
+    return getTypeParamType(typeName);
+  }
+
   const TypeMetadata meta = getTypeMetadata(typeName);
 
   switch (meta.kind) {
   case TypeKind::Integer:
     if (meta.isGeneric) {
-      return freshTypeVar(TypeVarKind::Integer);
+      // Generic integer defaults to i64
+      return polang::IntegerType::get(context, DEFAULT_INT_WIDTH,
+                                      Signedness::Signed);
     }
     return polang::IntegerType::get(context, meta.width,
                                     meta.isSigned() ? Signedness::Signed
@@ -64,7 +77,8 @@ Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
 
   case TypeKind::Float:
     if (meta.isGeneric) {
-      return freshTypeVar(TypeVarKind::Float);
+      // Generic float defaults to f64
+      return polang::FloatType::get(context, DEFAULT_FLOAT_WIDTH);
     }
     return polang::FloatType::get(context, meta.width);
 
@@ -72,11 +86,9 @@ Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
     return BoolType::get(context);
 
   case TypeKind::TypeVar:
-    return freshTypeVar();
-
   case TypeKind::Function:
   case TypeKind::Unknown:
-    // Default to i64 for unknown types
+    // Default to i64 for unresolved/unknown types
     return getDefaultType();
   }
 

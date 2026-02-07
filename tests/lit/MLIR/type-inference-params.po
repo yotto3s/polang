@@ -1,22 +1,22 @@
 ; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 
-; Untyped parameters remain as type variables (polymorphic)
-; Type is resolved via monomorphization when the function is called
+; Functions with untyped parameters are resolved by the AST-level TypeChecker
+; when the body constrains the types. They are emitted as monomorphic functions.
 
-; Polymorphic function with untyped parameter
-; CHECK: {{.*}}polang.func @double_it(%{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
+; Function resolved to integer (x * 2 constrains x to integer)
+; CHECK: {{.*}}polang.func @double_it(%{{.*}}: !polang.integer<64, signed>){{.*}}
 let double_it(x) = x * 2
 
-; Polymorphic function with untyped parameter
-; CHECK: {{.*}}polang.func @half(%{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
+; Function resolved to float (x / 2.0 constrains x to float)
+; CHECK: {{.*}}polang.func @half(%{{.*}}: !polang.float<64>){{.*}}
 let half(x) = x / 2.0
 
-; Polymorphic function with untyped parameter
-; CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
+; Function resolved to integer (x == 0 constrains x to integer)
+; CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.integer<64, signed>){{.*}}
 let is_zero(x) = x == 0
 
-; Partially typed function (x is int, y is typevar)
-; CHECK: {{.*}}polang.func @add(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.typevar{{.*}}){{.*}}polang.polymorphic{{.*}}
+; Partially typed function (both resolve to i64)
+; CHECK: {{.*}}polang.func @add(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>){{.*}}
 let add(x: i64, y) = x + y
 
 ; Entry point (required for valid program)

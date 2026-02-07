@@ -1,5 +1,4 @@
 add_mlir_library(PolangTransforms
-  TypeInference.cpp
   Monomorphization.cpp
 
   ADDITIONAL_HEADER_DIRS

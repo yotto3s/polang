@@ -20,7 +20,6 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
 
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 
 #pragma GCC diagnostic pop
@@ -33,26 +32,6 @@ namespace {
 //===----------------------------------------------------------------------===//
 // Helper functions
 //===----------------------------------------------------------------------===//
-
-/// Check if a type is a type variable
-bool isTypeVar(Type type) { return isa<TypeVarType>(type); }
-
-/// Check if a function has any type variables in its signature.
-/// The entry function (__polang_entry) is never considered polymorphic.
-bool isPolymorphicFunction(FuncOp func) {
-  // The entry function is never polymorphic - it should always be resolved
-  if (func.getSymName() == "__polang_entry") {
-    return false;
-  }
-
-  FunctionType funcType = func.getFunctionType();
-  if (llvm::any_of(funcType.getInputs(),
-                   [](Type input) { return isTypeVar(input); })) {
-    return true;
-  }
-  return llvm::any_of(funcType.getResults(),
-                      [](Type result) { return isTypeVar(result); });
-}
 
 /// Get a type string for mangling
 std::string getTypeString(Type type) {
@@ -93,35 +72,13 @@ std::string getSignatureKey(ArrayRef<Type> argTypes, Type returnType) {
   return key;
 }
 
-/// Build a mapping from type variables to concrete types
-void buildTypeVarMapping(FuncOp origFunc, ArrayRef<Type> concreteArgTypes,
-                         Type concreteReturnType,
-                         llvm::DenseMap<uint64_t, Type>& mapping) {
-  FunctionType funcType = origFunc.getFunctionType();
+/// Check if a type is a TypeParamType
+bool isTypeParam(Type type) { return isa<TypeParamType>(type); }
 
-  // Map parameter type variables to concrete types
-  for (size_t i = 0; i < funcType.getNumInputs() && i < concreteArgTypes.size();
-       ++i) {
-    Type paramType = funcType.getInput(i);
-    if (auto typeVar = dyn_cast<TypeVarType>(paramType)) {
-      mapping[typeVar.getId()] = concreteArgTypes[i];
-    }
-  }
-
-  // Map return type variable to concrete type
-  if (funcType.getNumResults() > 0) {
-    Type returnType = funcType.getResult(0);
-    if (auto typeVar = dyn_cast<TypeVarType>(returnType)) {
-      mapping[typeVar.getId()] = concreteReturnType;
-    }
-  }
-}
-
-/// Apply type variable mapping to a type
-Type applyTypeMapping(Type type,
-                      const llvm::DenseMap<uint64_t, Type>& mapping) {
-  if (auto typeVar = dyn_cast<TypeVarType>(type)) {
-    auto it = mapping.find(typeVar.getId());
+/// Apply name-based type parameter mapping to a type
+Type applyTypeParamMapping(Type type, const llvm::StringMap<Type>& mapping) {
+  if (auto paramType = dyn_cast<TypeParamType>(type)) {
+    auto it = mapping.find(paramType.getName());
     if (it != mapping.end()) {
       return it->second;
     }
@@ -151,215 +108,153 @@ struct MonomorphizationPass
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
-    auto polymorphicFuncs = identifyPolymorphicFunctions(module);
-    if (polymorphicFuncs.empty()) {
-      return;
-    }
-
-    auto callSignatures = collectCallSignatures(module, polymorphicFuncs);
-    auto specializedNames =
-        createSpecializedFunctions(module, polymorphicFuncs, callSignatures);
-    updateCallsToSpecialized(module, polymorphicFuncs, specializedNames);
-    markPolymorphicFunctions(polymorphicFuncs);
-    fixupEntryFunctionSignature(module);
+    // Handle GenericFuncOp + InstantiateOp (name-based type params)
+    monomorphizeGenericFunctions(module);
   }
 
 private:
-  /// Signature info for a monomorphized call site.
-  struct CallSignature {
-    SmallVector<Type> argTypes;
-    Type returnType;
+  /// Signature info for a GenericFuncOp instantiation.
+  struct GenericBindingSignature {
+    SmallVector<Type> concreteTypes; // concrete types for each type param
+    SmallVector<Type> argTypes;      // fully resolved arg types
+    Type returnType;                 // fully resolved return type
   };
 
-  /// Identify all polymorphic functions in the module.
-  [[nodiscard]] llvm::StringMap<FuncOp>
-  identifyPolymorphicFunctions(ModuleOp module) {
-    llvm::StringMap<FuncOp> polymorphicFuncs;
-    module.walk([&](FuncOp func) {
-      if (isPolymorphicFunction(func)) {
-        polymorphicFuncs[func.getSymName()] = func;
-      }
-    });
-    return polymorphicFuncs;
-  }
+  //===--------------------------------------------------------------------===//
+  // GenericFuncOp + InstantiateOp monomorphization (name-based type params)
+  //===--------------------------------------------------------------------===//
 
-  /// Collect all unique call signatures for each polymorphic function.
-  [[nodiscard]] llvm::StringMap<llvm::StringMap<CallSignature>>
-  collectCallSignatures(ModuleOp module,
-                        const llvm::StringMap<FuncOp>& polymorphicFuncs) {
-    llvm::StringMap<llvm::StringMap<CallSignature>> callSignatures;
+  /// Orchestrate the GenericFuncOp monomorphization path.
+  void monomorphizeGenericFunctions(ModuleOp module) {
+    // 1. Collect all GenericFuncOp instances
+    llvm::StringMap<GenericFuncOp> genericFuncs;
+    module.walk([&](GenericFuncOp op) { genericFuncs[op.getSymName()] = op; });
 
-    module.walk([&](CallOp call) {
-      if (!polymorphicFuncs.contains(call.getCallee())) {
-        return;
-      }
+    if (genericFuncs.empty()) {
+      return;
+    }
 
-      auto resolvedArgTypesAttr =
-          call->getAttrOfType<ArrayAttr>("polang.resolved_arg_types");
-      auto resolvedReturnTypeAttr =
-          call->getAttrOfType<TypeAttr>("polang.resolved_return_type");
+    // 2. Collect all unique bindings from InstantiateOp instances
+    auto bindings = collectGenericBindings(module, genericFuncs);
 
-      if (!resolvedArgTypesAttr || !resolvedReturnTypeAttr) {
-        return;
-      }
+    // 3. For each GenericFuncOp with call sites, create specialized functions
+    // Maps original function name + signature key -> mangled name
+    llvm::StringMap<llvm::StringMap<std::string>> mangledNames;
 
-      SmallVector<Type> argTypes;
-      for (Attribute attr : resolvedArgTypesAttr) {
-        argTypes.push_back(cast<TypeAttr>(attr).getValue());
-      }
-      Type returnType = resolvedReturnTypeAttr.getValue();
-
-      std::string sigKey = getSignatureKey(argTypes, returnType);
-      auto& signatures = callSignatures[call.getCallee()];
-      if (!signatures.contains(sigKey)) {
-        signatures[sigKey] = {argTypes, returnType};
-      }
-    });
-
-    return callSignatures;
-  }
-
-  /// Create specialized functions for each unique signature.
-  [[nodiscard]] llvm::StringMap<llvm::StringMap<std::string>>
-  createSpecializedFunctions(
-      ModuleOp module, const llvm::StringMap<FuncOp>& polymorphicFuncs,
-      const llvm::StringMap<llvm::StringMap<CallSignature>>& callSignatures) {
-    llvm::StringMap<llvm::StringMap<std::string>> specializedNames;
-
-    for (const auto& [funcName, signatures] : callSignatures) {
-      auto funcIt = polymorphicFuncs.find(funcName);
-      if (funcIt == polymorphicFuncs.end()) {
+    for (const auto& [funcName, signatures] : bindings) {
+      auto funcIt = genericFuncs.find(funcName);
+      if (funcIt == genericFuncs.end()) {
         continue;
       }
-      FuncOp origFunc = funcIt->second;
+      GenericFuncOp genericFunc = funcIt->second;
 
       for (const auto& [sigKey, sig] : signatures) {
         std::string mangledName = getMangledName(funcName, sig.argTypes);
 
-        FuncOp specializedFunc = cloneAndSpecialize(
-            origFunc, mangledName, sig.argTypes, sig.returnType, module);
+        // Build type param mapping
+        llvm::StringMap<Type> typeParamMapping;
+        auto typeParams = genericFunc.getTypeParams();
+        for (size_t i = 0;
+             i < typeParams.size() && i < sig.concreteTypes.size(); ++i) {
+          StringRef paramName = cast<StringAttr>(typeParams[i]).getValue();
+          typeParamMapping[paramName] = sig.concreteTypes[i];
+        }
 
-        if (specializedFunc) {
-          specializedNames[funcName][sigKey] = mangledName;
+        FuncOp specialized = cloneAndSpecializeGeneric(
+            genericFunc, mangledName, typeParamMapping, sig.argTypes,
+            sig.returnType, module);
+
+        if (specialized) {
+          mangledNames[funcName][sigKey] = mangledName;
         }
       }
     }
 
-    return specializedNames;
+    // 4. Replace InstantiateOps with CallOps
+    replaceInstantiateOps(module, genericFuncs, mangledNames);
+
+    // 5. Erase original GenericFuncOp instances
+    for (auto& [funcName, genericFunc] : genericFuncs) {
+      genericFunc.erase();
+    }
   }
 
-  /// Update all CallOps to use specialized functions.
-  void updateCallsToSpecialized(
-      ModuleOp module, const llvm::StringMap<FuncOp>& polymorphicFuncs,
-      const llvm::StringMap<llvm::StringMap<std::string>>& specializedNames) {
-    module.walk([&](CallOp call) {
-      if (!polymorphicFuncs.contains(call.getCallee())) {
+  /// Collect all unique instantiation bindings from InstantiateOp instances.
+  [[nodiscard]] llvm::StringMap<llvm::StringMap<GenericBindingSignature>>
+  collectGenericBindings(ModuleOp module,
+                         const llvm::StringMap<GenericFuncOp>& genericFuncs) {
+    llvm::StringMap<llvm::StringMap<GenericBindingSignature>> result;
+
+    module.walk([&](InstantiateOp instantiate) {
+      StringRef callee = instantiate.getCallee();
+      if (!genericFuncs.contains(callee)) {
         return;
       }
 
-      auto resolvedArgTypesAttr =
-          call->getAttrOfType<ArrayAttr>("polang.resolved_arg_types");
-      auto resolvedReturnTypeAttr =
-          call->getAttrOfType<TypeAttr>("polang.resolved_return_type");
+      auto typeParamNames = instantiate.getTypeParamNames();
+      auto typeBindingsAttr = instantiate.getTypeBindings();
 
-      if (!resolvedArgTypesAttr || !resolvedReturnTypeAttr) {
-        return;
+      SmallVector<Type> concreteTypes;
+      for (Attribute attr : typeBindingsAttr) {
+        concreteTypes.push_back(cast<TypeAttr>(attr).getValue());
+      }
+
+      // Build concrete arg types by substituting type params in the
+      // GenericFuncOp signature
+      GenericFuncOp genericFunc = genericFuncs.lookup(callee);
+      FunctionType funcType = genericFunc.getFunctionType();
+
+      // Build a name->type mapping from the instantiation
+      llvm::StringMap<Type> paramMapping;
+      for (size_t i = 0; i < typeParamNames.size(); ++i) {
+        StringRef name = cast<StringAttr>(typeParamNames[i]).getValue();
+        paramMapping[name] = concreteTypes[i];
       }
 
       SmallVector<Type> argTypes;
-      for (Attribute attr : resolvedArgTypesAttr) {
-        argTypes.push_back(cast<TypeAttr>(attr).getValue());
+      for (Type inputType : funcType.getInputs()) {
+        argTypes.push_back(applyTypeParamMapping(inputType, paramMapping));
       }
-      Type returnType = resolvedReturnTypeAttr.getValue();
+
+      Type returnType =
+          funcType.getNumResults() > 0
+              ? applyTypeParamMapping(funcType.getResult(0), paramMapping)
+              : Type();
 
       std::string sigKey = getSignatureKey(argTypes, returnType);
-
-      auto funcIt = specializedNames.find(call.getCallee());
-      if (funcIt == specializedNames.end()) {
-        return;
+      auto& signatures = result[callee];
+      if (!signatures.contains(sigKey)) {
+        signatures[sigKey] = {concreteTypes, argTypes, returnType};
       }
-
-      auto sigIt = funcIt->second.find(sigKey);
-      if (sigIt == funcIt->second.end()) {
-        return;
-      }
-
-      call.setCalleeFromCallable(
-          SymbolRefAttr::get(call.getContext(), sigIt->second));
-
-      if (call.getResult() && call.getResult().getType() != returnType) {
-        call.getResult().setType(returnType);
-      }
-
-      call->removeAttr("polang.resolved_arg_types");
-      call->removeAttr("polang.resolved_return_type");
     });
+
+    return result;
   }
 
-  /// Mark original polymorphic functions for lowering to skip.
-  void markPolymorphicFunctions(llvm::StringMap<FuncOp>& polymorphicFuncs) {
-    for (auto& [funcName, func] : polymorphicFuncs) {
-      func->setAttr("polang.polymorphic", UnitAttr::get(func.getContext()));
-    }
-  }
-
-  /// Fix up the __polang_entry function's signature if it has type variables.
-  void fixupEntryFunctionSignature(ModuleOp module) {
-    module.walk([&](FuncOp func) {
-      if (func.getSymName() != "__polang_entry") {
-        return;
-      }
-
-      FunctionType funcType = func.getFunctionType();
-      if (funcType.getNumResults() == 0) {
-        return;
-      }
-
-      Type returnType = funcType.getResult(0);
-      if (!isTypeVar(returnType)) {
-        return;
-      }
-
-      Type actualReturnType;
-      func.walk([&](ReturnOp returnOp) {
-        if (returnOp.getValue()) {
-          actualReturnType = returnOp.getValue().getType();
-        }
-      });
-
-      if (!actualReturnType || isTypeVar(actualReturnType)) {
-        return;
-      }
-
-      FunctionType newFuncType = FunctionType::get(
-          func.getContext(), funcType.getInputs(), {actualReturnType});
-      func.setType(newFuncType);
-    });
-  }
-
-  /// Clone a polymorphic function and specialize it with concrete types
-  FuncOp cloneAndSpecialize(FuncOp origFunc, StringRef newName,
+  /// Clone a GenericFuncOp and specialize it with concrete types.
+  FuncOp
+  cloneAndSpecializeGeneric(GenericFuncOp genericFunc, StringRef newName,
+                            const llvm::StringMap<Type>& typeParamMapping,
                             ArrayRef<Type> concreteArgTypes,
                             Type concreteReturnType, ModuleOp module) {
     OpBuilder builder(module.getContext());
 
-    // Build mapping from type variables to concrete types
-    llvm::DenseMap<uint64_t, Type> typeMapping;
-    buildTypeVarMapping(origFunc, concreteArgTypes, concreteReturnType,
-                        typeMapping);
-
     // Create new function type with concrete types
+    SmallVector<Type> resultTypes;
+    if (concreteReturnType) {
+      resultTypes.push_back(concreteReturnType);
+    }
     FunctionType newFuncType =
-        builder.getFunctionType(concreteArgTypes, {concreteReturnType});
+        builder.getFunctionType(concreteArgTypes, resultTypes);
 
-    // Create the new function
-    builder.setInsertionPointAfter(origFunc);
+    // Create the new FuncOp
+    builder.setInsertionPointAfter(genericFunc);
     auto newFunc =
-        builder.create<FuncOp>(origFunc.getLoc(), newName, newFuncType);
+        builder.create<FuncOp>(genericFunc.getLoc(), newName, newFuncType);
 
     // Clone the body
     IRMapping mapping;
-    origFunc.getBody().cloneInto(&newFunc.getBody(), mapping);
+    genericFunc.getBody().cloneInto(&newFunc.getBody(), mapping);
 
     // Update block argument types
     if (!newFunc.getBody().empty()) {
@@ -371,18 +266,18 @@ private:
     }
 
     // Update types of all operations in the body
-    updateFunctionBodyTypes(newFunc, typeMapping, origFunc.getSymName(),
-                            newName);
+    updateGenericFunctionBodyTypes(newFunc, typeParamMapping,
+                                   genericFunc.getSymName(), newName);
 
     return newFunc;
   }
 
-  /// Update types of operations in the specialized function body
-  void
-  updateFunctionBodyTypes(FuncOp func,
-                          const llvm::DenseMap<uint64_t, Type>& typeMapping,
-                          StringRef origFuncName, StringRef newFuncName) {
-    // Collect operations that need type updates (we can't modify while walking)
+  /// Update types of operations in a specialized function body.
+  /// Uses name-based TypeParamType mapping.
+  void updateGenericFunctionBodyTypes(
+      FuncOp func, const llvm::StringMap<Type>& typeParamMapping,
+      StringRef origFuncName, StringRef newFuncName) {
+    // Collect operations that need type updates
     SmallVector<Operation*> opsToUpdate;
     func.walk([&](Operation* op) {
       if (isa<FuncOp>(op)) {
@@ -391,7 +286,7 @@ private:
 
       bool needsUpdate = false;
       for (Type type : op->getResultTypes()) {
-        if (isTypeVar(type)) {
+        if (isTypeParam(type)) {
           needsUpdate = true;
           break;
         }
@@ -403,18 +298,39 @@ private:
 
     // Update operations
     for (Operation* op : opsToUpdate) {
-      // Handle CallOp specially - update recursive calls
+      // Handle InstantiateOp - recursive calls to the same generic function
+      if (auto instantiateOp = dyn_cast<InstantiateOp>(op)) {
+        if (instantiateOp.getCallee() == origFuncName) {
+          // Replace with a CallOp to the specialized function
+          OpBuilder builder(instantiateOp);
+          SmallVector<Type> resultTypes;
+          if (instantiateOp.getNumResults() > 0) {
+            Type resultType = applyTypeParamMapping(
+                instantiateOp.getResult().getType(), typeParamMapping);
+            resultTypes.push_back(resultType);
+          }
+          auto callOp =
+              builder.create<CallOp>(instantiateOp.getLoc(), newFuncName,
+                                     resultTypes, instantiateOp.getOperands());
+          if (instantiateOp.getNumResults() > 0) {
+            instantiateOp.getResult().replaceAllUsesWith(callOp.getResult());
+          }
+          instantiateOp.erase();
+          continue;
+        }
+      }
+
+      // Handle CallOp - update recursive calls
       if (auto callOp = dyn_cast<CallOp>(op)) {
-        // If this is a recursive call to the original function, update it
         if (callOp.getCallee() == origFuncName) {
           callOp.setCalleeFromCallable(
               SymbolRefAttr::get(func.getContext(), newFuncName));
         }
 
-        // Update result type if it's a type variable
+        // Update result type if it's a type parameter
         if (callOp.getResult()) {
           Type resultType = callOp.getResult().getType();
-          Type newType = applyTypeMapping(resultType, typeMapping);
+          Type newType = applyTypeParamMapping(resultType, typeParamMapping);
           if (newType != resultType) {
             callOp.getResult().setType(newType);
           }
@@ -426,30 +342,92 @@ private:
       OpBuilder builder(op);
       SmallVector<Type> newResultTypes;
       for (Type type : op->getResultTypes()) {
-        newResultTypes.push_back(applyTypeMapping(type, typeMapping));
+        newResultTypes.push_back(applyTypeParamMapping(type, typeParamMapping));
       }
 
-      // Create operation state
       OperationState state(op->getLoc(), op->getName());
       state.addOperands(op->getOperands());
       state.addTypes(newResultTypes);
       state.addAttributes(op->getAttrs());
 
-      // Copy regions
       for (Region& region : op->getRegions()) {
         Region* newRegion = state.addRegion();
-        IRMapping mapping;
-        region.cloneInto(newRegion, mapping);
+        IRMapping regionMapping;
+        region.cloneInto(newRegion, regionMapping);
       }
 
       Operation* newOp = builder.create(state);
 
-      // Replace uses
       for (size_t i = 0; i < op->getNumResults(); ++i) {
         op->getResult(i).replaceAllUsesWith(newOp->getResult(i));
       }
 
       op->erase();
+    }
+  }
+
+  /// Replace all InstantiateOps with CallOps to specialized functions.
+  void replaceInstantiateOps(
+      ModuleOp module, const llvm::StringMap<GenericFuncOp>& genericFuncs,
+      const llvm::StringMap<llvm::StringMap<std::string>>& mangledNames) {
+    // Collect InstantiateOps first to avoid invalidating the walk iterator
+    SmallVector<InstantiateOp> instantiateOps;
+    module.walk([&](InstantiateOp op) { instantiateOps.push_back(op); });
+
+    for (InstantiateOp instantiate : instantiateOps) {
+      StringRef callee = instantiate.getCallee();
+      auto funcIt = mangledNames.find(callee);
+      if (funcIt == mangledNames.end()) {
+        continue;
+      }
+
+      // Reconstruct the signature key to find the mangled name
+      auto genericFuncIt = genericFuncs.find(callee);
+      if (genericFuncIt == genericFuncs.end()) {
+        continue;
+      }
+      GenericFuncOp genericFunc = genericFuncIt->second;
+      FunctionType funcType = genericFunc.getFunctionType();
+
+      // Build param mapping from the instantiate op
+      auto typeParamNames = instantiate.getTypeParamNames();
+      auto typeBindingsAttr = instantiate.getTypeBindings();
+      llvm::StringMap<Type> paramMapping;
+      for (size_t i = 0; i < typeParamNames.size(); ++i) {
+        StringRef name = cast<StringAttr>(typeParamNames[i]).getValue();
+        paramMapping[name] = cast<TypeAttr>(typeBindingsAttr[i]).getValue();
+      }
+
+      SmallVector<Type> argTypes;
+      for (Type inputType : funcType.getInputs()) {
+        argTypes.push_back(applyTypeParamMapping(inputType, paramMapping));
+      }
+      Type returnType =
+          funcType.getNumResults() > 0
+              ? applyTypeParamMapping(funcType.getResult(0), paramMapping)
+              : Type();
+
+      std::string sigKey = getSignatureKey(argTypes, returnType);
+      auto sigIt = funcIt->second.find(sigKey);
+      if (sigIt == funcIt->second.end()) {
+        continue;
+      }
+
+      // Create CallOp to the specialized function
+      OpBuilder builder(instantiate);
+      SmallVector<Type> resultTypes;
+      if (returnType) {
+        resultTypes.push_back(returnType);
+      }
+      auto callOp =
+          builder.create<CallOp>(instantiate.getLoc(), sigIt->second,
+                                 resultTypes, instantiate.getOperands());
+
+      if (instantiate.getNumResults() > 0 && callOp.getNumResults() > 0) {
+        instantiate.getResult().replaceAllUsesWith(callOp.getResult());
+      }
+
+      instantiate.erase();
     }
   }
 };

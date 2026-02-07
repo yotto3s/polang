@@ -19,9 +19,6 @@
 
 namespace polang {
 
-/// Create a pass to infer types for type variables using Hindley-Milner.
-std::unique_ptr<mlir::Pass> createTypeInferencePass();
-
 /// Create a pass to monomorphize polymorphic functions.
 std::unique_ptr<mlir::Pass> createMonomorphizationPass();
 

@@ -1,10 +1,16 @@
 #ifndef POLANG_NODE_HPP
 #define POLANG_NODE_HPP
 
+#include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
+
+namespace polang {
+enum class TraitBound;
+} // namespace polang
 
 class Visitor;
 class NStatement;
@@ -19,7 +25,7 @@ struct SourceLocation {
   int column = 0;
   SourceLocation() = default;
   SourceLocation(int l, int c) : line(l), column(c) {}
-  [[nodiscard]] bool isValid() const { return line > 0; }
+  [[nodiscard]] bool isValid() const noexcept { return line > 0; }
 };
 
 // Smart pointer type aliases for owning containers
@@ -101,6 +107,12 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
+/// Helper to create an NTypeSpec from a type name string.
+[[nodiscard]] inline std::shared_ptr<const NTypeSpec>
+makeTypeSpec(const std::string& typeName) {
+  return std::make_shared<const NNamedType>(typeName);
+}
+
 // Capture entry for closures (owns its type and id via shared_ptr/unique_ptr)
 // Mutability is derived from the type annotation (e.g., "mut i64" prefix)
 struct CaptureEntry {
@@ -151,6 +163,9 @@ public:
   std::unique_ptr<NIdentifier> id;          // For simple calls
   std::unique_ptr<NQualifiedName> qualifiedId;  // For qualified calls (optional)
   ExpressionList arguments;
+  // Type bindings for instantiating polymorphic functions (filled by type checker)
+  // e.g., {"'a" -> NNamedType("i64")} when calling identity(42)
+  std::map<std::string, std::shared_ptr<const NTypeSpec>> typeBindings;
   NMethodCall(std::unique_ptr<NIdentifier> id, ExpressionList arguments)
       : id(std::move(id)), qualifiedId(nullptr), arguments(std::move(arguments)) {}
   explicit NMethodCall(std::unique_ptr<NIdentifier> id)
@@ -254,6 +269,12 @@ public:
   VariableList arguments;
   std::unique_ptr<NBlock> block;
   std::vector<CaptureEntry> captures;  // captured variables (filled by type checker)
+  // Type parameters for polymorphic functions (filled by type checker)
+  // e.g., ["'a", "'b"] for a function with two type parameters
+  std::vector<std::string> typeParams;
+  // Trait bounds for type parameters (filled by type checker)
+  // e.g., {"'a" -> {Numeric}} for a function where 'a must be numeric
+  std::map<std::string, std::set<polang::TraitBound>> typeParamBounds;
   // Constructor for inferred return type
   NFunctionDeclaration(std::unique_ptr<NIdentifier> id, VariableList arguments,
                        std::unique_ptr<NBlock> block)

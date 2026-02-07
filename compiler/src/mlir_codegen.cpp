@@ -9,6 +9,7 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
 #include "compiler/mlir_codegen.hpp"
+#include "compiler/compiled_symbols.hpp"
 
 #include "polang/Conversion/Passes.h"
 #include "polang/Dialect/PolangDialect.h"
@@ -89,13 +90,17 @@ bool MLIRCodeGenContext::initializeContext() {
   return true;
 }
 
-bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars) {
+bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars,
+                                      const std::string& inferredType,
+                                      const std::string& entryFuncName,
+                                      OptCompiledSymbols compiledSymbols) {
   if (!initializeContext()) {
     error = "Failed to initialize MLIR context";
     return false;
   }
 
-  auto moduleRef = mlirGen(*context, ast, emitTypeVars);
+  auto moduleRef = mlirGen(*context, ast, emitTypeVars, inferredType,
+                           entryFuncName, compiledSymbols);
   if (!moduleRef) {
     error = "Failed to generate MLIR from AST";
     return false;
@@ -113,18 +118,9 @@ bool MLIRCodeGenContext::runTypeInference() {
 
   PassManager pm(context.get());
 
-  // Add the type inference pass - collects constraints and resolves types
-  // for non-polymorphic functions. Polymorphic functions are preserved
-  // with type variables. Also computes resolved arg/return types for calls
-  // to polymorphic functions (stored as attributes for monomorphization).
-  pm.addPass(polang::createTypeInferencePass());
-
   // Add the monomorphization pass - creates specialized versions of
   // polymorphic functions for each unique call signature.
   pm.addPass(polang::createMonomorphizationPass());
-
-  // Note: We don't run canonicalization here to preserve all operations
-  // for debugging/testing. Canonicalization happens in later lowering stages.
 
   if (failed(pm.run(**module))) {
     error = "Type inference failed";
@@ -273,13 +269,14 @@ std::string typeToString(Type type) {
 
 } // namespace
 
-std::string MLIRCodeGenContext::getResolvedReturnType() const {
+std::string
+MLIRCodeGenContext::getResolvedReturnType(const std::string& funcName) const {
   if (!module || !*module) {
     return "unknown";
   }
 
-  // Find the __polang_entry function
-  auto entryFunc = (*module)->lookupSymbol<polang::FuncOp>("__polang_entry");
+  // Find the entry function
+  auto entryFunc = (*module)->lookupSymbol<polang::FuncOp>(funcName);
   if (!entryFunc) {
     return "unknown";
   }
@@ -290,6 +287,13 @@ std::string MLIRCodeGenContext::getResolvedReturnType() const {
   }
 
   return typeToString(funcType.getResult(0));
+}
+
+OwningOpRef<ModuleOp> MLIRCodeGenContext::takeModule() {
+  if (!module || !*module) {
+    return nullptr;
+  }
+  return std::move(*module);
 }
 
 } // namespace polang

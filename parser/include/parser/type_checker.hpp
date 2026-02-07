@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include <parser/type_inference.hpp>
 #include <parser/visitor.hpp>
 
 class Node;
@@ -22,6 +23,17 @@ struct TypeCheckError {
   int column;
   TypeCheckError(std::string msg, int l = 0, int c = 0)
       : message(std::move(msg)), line(l), column(c) {}
+};
+
+// Snapshot of TypeChecker state for rollback on error
+struct TypeCheckerSnapshot {
+  std::map<std::string, std::string> localTypes;
+  std::map<std::string, std::string> functionReturnTypes;
+  std::map<std::string, std::vector<std::string>> functionParamTypes;
+  std::map<std::string, polang::TypeScheme> functionSchemes;
+  std::map<std::string, std::set<std::string>> moduleExports;
+  std::map<std::string, std::string> moduleAliases;
+  std::map<std::string, std::string> importedSymbols;
 };
 
 class TypeChecker : public Visitor {
@@ -62,8 +74,18 @@ public:
   // Check if there were any errors
   [[nodiscard]] bool hasErrors() const noexcept { return !errors.empty(); }
 
-  // Check an AST and return errors
+  // Check an AST and return errors (resets all state)
   [[nodiscard]] std::vector<TypeCheckError> check(const NBlock& ast);
+
+  // Incrementally check new statements, preserving persistent environment
+  [[nodiscard]] std::vector<TypeCheckError>
+  checkIncremental(const NBlock& newStatements);
+
+  // Save current state for rollback on error
+  [[nodiscard]] TypeCheckerSnapshot saveState() const;
+
+  // Restore state from a snapshot
+  void restoreState(const TypeCheckerSnapshot& snapshot);
 
 private:
   std::string inferredType;
@@ -149,6 +171,25 @@ private:
   void propagateTypeToSource(const NExpression* expr,
                              const std::string& targetType);
   void resolveRemainingGenerics();
+
+  // HM type inference infrastructure
+  polang::Substitution subst;
+  polang::Unifier unifier;
+  polang::TraitConstraints traitConstraints;
+  // Map function name -> type scheme (for polymorphic functions)
+  std::map<std::string, polang::TypeScheme> functionSchemes;
+
+  // Infer a function: assign unification vars, collect constraints, resolve
+  void inferFunction(NFunctionDeclaration& node, const std::string& funcName,
+                     const std::map<std::string, std::string>& savedLocals);
+
+  // Instantiate a polymorphic function at a call site
+  void instantiateCall(NMethodCall& node, const std::string& funcName,
+                       const polang::TypeScheme& scheme,
+                       const std::vector<std::string>& argTypes);
+
+  // Resolve defaults for constrained unification vars
+  [[nodiscard]] std::string resolveWithDefaults(const std::string& type) const;
 };
 
 #endif // POLANG_TYPE_CHECKER_HPP

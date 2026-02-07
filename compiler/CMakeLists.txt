@@ -1,6 +1,7 @@
 # MLIR backend codegen library
 add_library(PolangMLIRCodegen STATIC
     src/mlir_codegen.cpp
+    src/jit_session.cpp
 )
 
 target_include_directories(PolangMLIRCodegen PUBLIC

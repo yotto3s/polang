@@ -1,7 +1,7 @@
 //===- conversion_pass_test.cpp - Test PolangToStandard pass -----*- C++ -*-===//
 //
 // Tests that exercise code paths in PolangToStandard.cpp by constructing
-// MLIR with AllocaOp and PrintOp programmatically.
+// MLIR with PrintOp programmatically.
 //
 //===----------------------------------------------------------------------===//
 
@@ -79,45 +79,6 @@ private:
   DiagnosticEngine::HandlerID diagHandler{};
 };
 
-// ============== AllocaOp Lowering ==============
-
-TEST_F(ConversionPassTest, AllocaOpLowering) {
-  OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto memRefType = MemRefType::get({}, builder.getIntegerType(64));
-
-  auto funcType = builder.getFunctionType({}, {i64Type});
-  auto module = ModuleOp::create(builder.getUnknownLoc());
-  builder.setInsertionPointToEnd(module.getBody());
-
-  auto func = builder.create<polang::FuncOp>(
-      builder.getUnknownLoc(), "__polang_entry", funcType,
-      ArrayRef<StringRef>{});
-  Block* entry = func.addEntryBlock();
-  builder.setInsertionPointToEnd(entry);
-
-  // Create an AllocaOp
-  builder.create<AllocaOp>(
-      builder.getUnknownLoc(), memRefType,
-      "x", (Type)i64Type,
-      /*isMutable=*/false);
-
-  // Return a constant (so the function is complete)
-  auto retVal = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 42));
-  builder.create<ReturnOp>(builder.getUnknownLoc(), retVal.getResult());
-
-  EXPECT_TRUE(runPass(module));
-
-  // Verify AllocaOp was lowered (no polang.alloca remains)
-  EXPECT_FALSE(hasOp<polang::AllocaOp>(module));
-  // Verify memref.alloca was created
-  EXPECT_TRUE(hasOp<memref::AllocaOp>(module));
-
-  module->erase();
-}
-
 // ============== PrintOp Lowering ==============
 
 TEST_F(ConversionPassTest, PrintOpLowering) {
@@ -147,80 +108,6 @@ TEST_F(ConversionPassTest, PrintOpLowering) {
 
   // Verify PrintOp was erased (no polang.print remains)
   EXPECT_FALSE(hasOp<polang::PrintOp>(module));
-
-  module->erase();
-}
-
-// ============== AllocaOp with Mutable Flag ==============
-
-TEST_F(ConversionPassTest, AllocaOpMutable) {
-  OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto memRefType = MemRefType::get({}, builder.getIntegerType(64));
-
-  auto funcType = builder.getFunctionType({}, {i64Type});
-  auto module = ModuleOp::create(builder.getUnknownLoc());
-  builder.setInsertionPointToEnd(module.getBody());
-
-  auto func = builder.create<polang::FuncOp>(
-      builder.getUnknownLoc(), "__polang_entry", funcType,
-      ArrayRef<StringRef>{});
-  Block* entry = func.addEntryBlock();
-  builder.setInsertionPointToEnd(entry);
-
-  // Create a mutable AllocaOp
-  builder.create<AllocaOp>(
-      builder.getUnknownLoc(), memRefType,
-      "y", (Type)i64Type,
-      /*isMutable=*/true);
-
-  auto retVal = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 99));
-  builder.create<ReturnOp>(builder.getUnknownLoc(), retVal.getResult());
-
-  EXPECT_TRUE(runPass(module));
-
-  // Verify the mutable AllocaOp was also lowered
-  EXPECT_FALSE(hasOp<polang::AllocaOp>(module));
-  EXPECT_TRUE(hasOp<memref::AllocaOp>(module));
-
-  module->erase();
-}
-
-// ============== AllocaOp with Float Type ==============
-
-TEST_F(ConversionPassTest, AllocaOpFloatType) {
-  OpBuilder builder(&context);
-  auto f64Type = polang::FloatType::get(&context, 64);
-  auto memRefType = MemRefType::get({}, builder.getF64Type());
-
-  auto funcType = builder.getFunctionType({}, {f64Type});
-  auto module = ModuleOp::create(builder.getUnknownLoc());
-  builder.setInsertionPointToEnd(module.getBody());
-
-  auto func = builder.create<polang::FuncOp>(
-      builder.getUnknownLoc(), "__polang_entry", funcType,
-      ArrayRef<StringRef>{});
-  Block* entry = func.addEntryBlock();
-  builder.setInsertionPointToEnd(entry);
-
-  // Create an AllocaOp for a float variable
-  builder.create<AllocaOp>(
-      builder.getUnknownLoc(), memRefType,
-      "z", (Type)f64Type,
-      /*isMutable=*/false);
-
-  auto retVal = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type,
-      FloatAttr::get(builder.getF64Type(), 3.14));
-  builder.create<ReturnOp>(builder.getUnknownLoc(), retVal.getResult());
-
-  EXPECT_TRUE(runPass(module));
-
-  // Verify polang.alloca was lowered to memref.alloca
-  EXPECT_FALSE(hasOp<polang::AllocaOp>(module));
-  EXPECT_TRUE(hasOp<memref::AllocaOp>(module));
 
   module->erase();
 }

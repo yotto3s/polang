@@ -41,34 +41,7 @@ set_target_properties(mlir_verifier_test PROPERTIES
 )
 gtest_discover_tests(mlir_verifier_test)
 
-# TypeInference pass unit tests (exercise error paths in TypeInference.cpp)
-add_executable(type_inference_pass_test type_inference_pass_test.cpp)
-target_include_directories(type_inference_pass_test PRIVATE
-    ${PROJECT_SOURCE_DIR}/mlir/include
-    ${PROJECT_BINARY_DIR}/mlir/include
-)
-target_compile_options(type_inference_pass_test PRIVATE
-    -Wno-error -Wno-unused-parameter -Wno-overloaded-virtual
-    "SHELL:-idirafter ${POLANG_LLVM_INCLUDE_DIRS}"
-)
-target_compile_definitions(type_inference_pass_test PRIVATE ${LLVM_DEFINITIONS_LIST})
-target_link_directories(type_inference_pass_test PRIVATE ${LLVM_LIBRARY_DIRS})
-target_link_libraries(type_inference_pass_test PRIVATE GTest::gtest_main)
-target_link_libraries(type_inference_pass_test PRIVATE
-    $<TARGET_FILE:PolangTransforms>
-    $<TARGET_FILE:PolangDialect>
-    MLIRIR
-    MLIRSupport
-    MLIRFuncDialect
-    MLIRPass
-)
-add_dependencies(type_inference_pass_test PolangDialect PolangTransforms PolangOpsIncGen PolangTypesIncGen PolangTransformsPassIncGen)
-set_target_properties(type_inference_pass_test PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests/bin"
-)
-gtest_discover_tests(type_inference_pass_test)
-
-# PolangToStandard conversion pass unit tests (AllocaOp, PrintOp lowering)
+# PolangToStandard conversion pass unit tests (PrintOp lowering)
 add_executable(conversion_pass_test conversion_pass_test.cpp)
 target_include_directories(conversion_pass_test PRIVATE
     ${PROJECT_SOURCE_DIR}/mlir/include

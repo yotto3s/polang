@@ -94,6 +94,9 @@ cmake --build build -j$(nproc)
 # Run tests
 ctest --test-dir build --output-on-failure
 
+# MLIR round-trip testing tool (used by lit tests)
+./build/bin/polang-opt input.mlir
+
 # Verify examples work
 for f in example/*.po; do echo "=== $(basename $f) ==="; ./build/bin/PolangRepl "$f"; done
 ```
@@ -136,7 +139,7 @@ When modifying code under `mlir/`, in PLAN mode, **read** the official MLIR docu
 | Directory | Count | Description |
 |-----------|-------|-------------|
 | `tests/lit/AST/` | 18 | AST dump tests (`--dump-ast`) |
-| `tests/lit/MLIR/` | 41 | MLIR output tests (`--emit-mlir`) |
+| `tests/lit/MLIR/` | 46 | MLIR output tests (`--emit-mlir`) |
 | `tests/lit/LLVMIR/` | 16 | LLVM IR generation |
 | `tests/lit/Execution/` | 55 | REPL execution |
 | `tests/lit/Errors/` | 15 | Error handling |

@@ -9,24 +9,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-def TypeInference : Pass<"polang-type-inference", "mlir::ModuleOp"> {
-  let summary = "Infer types for type variables using Hindley-Milner algorithm";
-  let description = [{
-    This pass performs Hindley-Milner style type inference on the Polang
-    dialect. It resolves type variables (!polang.typevar<id>) to concrete
-    types by collecting constraints from operations and solving them using
-    unification.
-
-    The pass:
-    1. Collects type constraints from all operations
-    2. Solves constraints using unification algorithm
-    3. Substitutes resolved types for all type variables
-    4. Reports errors for unsatisfiable constraints
-  }];
-
-  let dependentDialects = ["polang::PolangDialect"];
-}
-
 def Monomorphization : Pass<"polang-monomorphize", "mlir::ModuleOp"> {
   let summary = "Monomorphize polymorphic functions";
   let description = [{

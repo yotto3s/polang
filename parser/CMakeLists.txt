@@ -11,6 +11,7 @@ add_library(PolangParser STATIC
     src/parser_api.cpp
     src/node.cpp
     src/type_checker.cpp
+    src/type_inference.cpp
     src/ast_printer.cpp
     src/operator_utils.cpp
     src/error_reporter.cpp
@@ -22,4 +23,8 @@ target_include_directories(PolangParser PUBLIC
     ${PROJECT_SOURCE_DIR}
 )
 
-target_compile_options(PolangParser PRIVATE -Wno-error)
+set_source_files_properties(
+    ${CMAKE_CURRENT_BINARY_DIR}/parser.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/lexer.cpp
+    PROPERTIES COMPILE_OPTIONS "-Wno-error"
+)

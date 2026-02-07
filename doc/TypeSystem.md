@@ -35,8 +35,8 @@ Polang uses a Hindley-Milner style type system with:
 
 The type system is implemented in two phases:
 
-1. **Parser-level type checking**: Validates types and detects errors early; performs capture analysis for closures
-2. **MLIR-level inference**: Resolves all type variables via unification (Hindley-Milner style)
+1. **Parser-level type checking**: Validates types, detects errors early, performs Hindley-Milner type inference, and performs capture analysis for closures
+2. **MLIR-level passes**: Resolves type parameters in generic functions via monomorphization
 
 ## Primitive Types
 
@@ -318,7 +318,7 @@ This design ensures that boolean semantics are always explicit in the code.
 
 ### Parser-Level Type Checking
 
-The parser's type checker (`parser/src/type_checker.cpp`) focuses on **error detection** and **capture analysis**, while delegating type inference to MLIR. Untyped parameters are marked as `typevar` and resolved later via MLIR's unification algorithm.
+The parser's type checker (`parser/src/type_checker.cpp`) handles **error detection**, **type inference** via Hindley-Milner unification, and **capture analysis**. Untyped polymorphic parameters are marked as `typevar` and represented as `!polang.type_param` in MLIR for monomorphization.
 
 **Type Checker Responsibilities:**
 
@@ -327,7 +327,7 @@ The parser's type checker (`parser/src/type_checker.cpp`) focuses on **error det
 | Error detection | Undefined variables, arity mismatch |
 | Type validation | Validates explicit type annotations match usage |
 | Capture analysis | Identifies free variables for closures via `FreeVariableCollector` |
-| Type variable setup | Marks untyped parameters as `typevar` for MLIR inference |
+| Type variable setup | Marks untyped polymorphic parameters as `typevar` for MLIR monomorphization |
 
 **Example:**
 
@@ -381,11 +381,7 @@ The type checker validates branch type consistency in `TypeChecker::visit(const 
 
 ### MLIR Type Inference
 
-All untyped parameters are marked as **type variables** by the parser. The MLIR type inference pass resolves these via unification, using constraints from:
-- Literal values (e.g., `42` is `int`, `3.14` is `double`)
-- Binary operations (operands must have same type)
-- Call sites (argument types constrain parameter types)
-- If conditions (must be `bool`)
+All untyped parameters are marked as **type variables** by the parser. Type inference happens primarily at the AST level in the TypeChecker. For polymorphic functions, the MLIR representation uses `!polang.type_param<"name">` type parameters in `polang.generic_func` operations, which are resolved during monomorphization.
 
 **Example:**
 
@@ -401,13 +397,11 @@ Source: let identity(x) = x
            ↓
 Parser: x marked as TYPEVAR (type checker)
            ↓
-MLIRGen: fn identity(%arg0: !polang.typevar<0>) -> !polang.typevar<0>
+MLIRGen: generic_func @identity<a>(%arg0: !polang.type_param<"a">) -> !polang.type_param<"a">
            ↓
-Type Inference Pass: Unifies typevar<0> with int from call site
+Monomorphization: Creates identity$i64 specialized version from instantiate call sites
            ↓
-Monomorphization: Creates identity$int specialized version
-           ↓
-Result: fn identity$int(%arg0: !polang.int) -> !polang.int
+Result: fn identity$i64(%arg0: !polang.integer<64, signed>) -> !polang.integer<64, signed>
 ```
 
 ## Type Variables
@@ -423,155 +417,53 @@ In the parser, type variables are represented as the string `"typevar"`:
 mutable_arg.type = new NIdentifier(TypeNames::TYPEVAR);
 ```
 
-In MLIR, type variables are parameterized types with unique IDs and a **kind** that constrains what types they can resolve to:
+In MLIR, type parameters are named types used in generic function templates:
 
 ```mlir
-!polang.typevar<0, Any>      ; Can be any type
-!polang.typevar<1, Integer>  ; Must resolve to an integer type
-!polang.typevar<2, Float>    ; Must resolve to a float type
+!polang.type_param<"a">    ; Named type parameter "a"
+!polang.type_param<"b">    ; Named type parameter "b"
 ```
 
-### Type Variable Kinds
-
-Type variables have a **kind** that constrains their resolution:
-
-| Kind | Description | Default Resolution |
-|------|-------------|-------------------|
-| `Any` | No constraint, can be any type | `i64` (if no other info) |
-| `Integer` | Must be an integer type (i8-i64, u8-u64) | `i64` |
-| `Float` | Must be a float type (f32, f64) | `f64` |
-
-The kind is inferred from usage:
-- Integer literals (e.g., `42`) create `Integer`-kind constraints
-- Float literals (e.g., `3.14`) create `Float`-kind constraints
-- Operations on type variables propagate kind constraints
+Type parameters use ML-style naming convention ('a, 'b, etc.) and appear in `polang.generic_func` signatures. They are bound to concrete types by `polang.instantiate` operations at call sites.
 
 ### Definition
 
-Type variables are defined in `mlir/include/polang/Dialect/PolangTypes.td`:
+Type parameters are defined in `mlir/include/polang/Dialect/PolangTypes.td`:
 
 ```tablegen
-def Polang_TypeVarKind : I32EnumAttr<"TypeVarKind", "Type variable kind", [
-  I32EnumAttrCase<"Any", 0>,
-  I32EnumAttrCase<"Integer", 1>,
-  I32EnumAttrCase<"Float", 2>
-]>;
-
-def Polang_TypeVarType : Polang_Type<"TypeVar", "typevar"> {
-  let summary = "Type variable for polymorphic types";
+def Polang_TypeParamType : Polang_Type<"TypeParam", "type_param"> {
+  let summary = "Named type parameter for generic functions";
   let description = [{
-    Represents an unresolved type variable used during type inference.
-    The id is a unique identifier, and kind constrains resolution.
+    Represents a named type parameter in a generic function template.
+    Uses ML-style naming convention ('a, 'b, etc.).
+    Example: !polang.type_param<"a">
   }];
-  let parameters = (ins "uint64_t":$id, "TypeVarKind":$kind);
-  let assemblyFormat = "`<` $id `,` $kind `>`";
+  let parameters = (ins StringRefParameter<"">:$name);
+  let assemblyFormat = "`<` $name `>`";
 }
 ```
 
 ### Generation
 
-The `MLIRGenVisitor` generates fresh type variables for untyped parameters:
-
-```cpp
-class MLIRGenVisitor : public Visitor {
-  uint64_t nextTypeVarId = 0;
-
-  Type freshTypeVar() {
-    return builder.getType<TypeVarType>(nextTypeVarId++);
-  }
-
-  Type getTypeOrFresh(const NIdentifier* typeAnnotation) {
-    if (typeAnnotation) {
-      return getPolangType(typeAnnotation->name);
-    }
-    return freshTypeVar();
-  }
-};
-```
+The `MLIRGenVisitor` generates type parameters for untyped function parameters in generic functions. Type parameters are named based on parameter position (e.g., "a", "b", "c").
 
 ## Unification Algorithm
 
-The type inference pass uses the standard unification algorithm to resolve type variables.
+Type inference uses the standard Hindley-Milner unification algorithm at the AST level in the TypeChecker (`parser/src/type_checker.cpp`). The algorithm:
 
-### Substitution
+1. **Collects constraints** from expressions:
+   - Arithmetic operations: operands and result must have same type
+   - Function calls: argument types must match parameter types
+   - Return statements: return value must match function return type
 
-A substitution maps type variable IDs to types:
+2. **Unifies types** using the standard algorithm:
+   - Type variables can be bound to concrete types or other type variables
+   - Occurs check prevents infinite types
+   - Constraints are solved to produce a substitution mapping
 
-```cpp
-class Substitution {
-  llvm::DenseMap<uint64_t, Type> bindings;
-public:
-  void bind(uint64_t var, Type type);
-  [[nodiscard]] Type apply(Type type) const;      // Recursively resolve type vars
-  [[nodiscard]] Substitution compose(const Substitution& other) const;
-};
-```
+3. **Applies substitution** to resolve all type variables to concrete types
 
-### Unifier
-
-The unifier attempts to make two types equal:
-
-```cpp
-class Unifier {
-public:
-  bool unify(Type t1, Type t2, Substitution& subst) {
-    // Apply current substitution first
-    Type s1 = subst.apply(t1);
-    Type s2 = subst.apply(t2);
-
-    // Same type - trivially unifiable
-    if (s1 == s2) return true;
-
-    // Left is type variable - bind it
-    if (auto var1 = dyn_cast<TypeVarType>(s1))
-      return unifyVar(var1.getId(), s2, subst);
-
-    // Right is type variable - bind it
-    if (auto var2 = dyn_cast<TypeVarType>(s2))
-      return unifyVar(var2.getId(), s1, subst);
-
-    // Both concrete but different - cannot unify
-    return false;
-  }
-
-private:
-  bool unifyVar(uint64_t var, Type type, Substitution& subst) {
-    // Occurs check - prevent infinite types
-    if (occursIn(var, type)) return false;
-    subst.bind(var, type);
-    return true;
-  }
-};
-```
-
-### Constraint Collection
-
-The type inference pass collects constraints from:
-
-1. **Return statements**: Return value must match function return type
-2. **Arithmetic operations**: Operands and result must have same type
-3. **Call sites**: Argument types must match parameter types
-
-```cpp
-void collectFunctionConstraints(FuncOp func, Substitution& subst, Unifier& unifier) {
-  Type expectedReturnType = func.getFunctionType().getResult(0);
-
-  func.walk([&](ReturnOp returnOp) {
-    Type actualType = returnOp.getValue().getType();
-    unifier.unify(expectedReturnType, actualType, subst);
-  });
-
-  func.walk([&](Operation* op) {
-    if (isa<AddOp, SubOp, MulOp, DivOp>(op)) {
-      Type lhsType = op->getOperand(0).getType();
-      Type rhsType = op->getOperand(1).getType();
-      Type resultType = op->getResult(0).getType();
-      unifier.unify(lhsType, rhsType, subst);
-      unifier.unify(lhsType, resultType, subst);
-    }
-  });
-}
-```
+At the MLIR level, type parameters in `polang.generic_func` operations are resolved during monomorphization, where specialized function copies are created for each unique set of concrete type arguments from `polang.instantiate` call sites.
 
 ## Implementation Details
 
@@ -583,22 +475,22 @@ parser/
 │   ├── polang_types.hpp     # Type constants (INT, DOUBLE, BOOL, TYPEVAR)
 │   └── type_checker.hpp     # Type checker interface
 └── src/
-    └── type_checker.cpp     # Error detection, capture analysis, typevar setup
+    └── type_checker.cpp     # Type inference, error detection, capture analysis
                              # Contains: TypeChecker, FreeVariableCollector
 
 mlir/
 ├── include/polang/
 │   ├── Dialect/
-│   │   ├── PolangTypes.td   # TypeVarType definition
+│   │   ├── PolangTypes.td   # TypeParamType definition
 │   │   └── PolangTypes.h    # Generated type classes
 │   └── Transforms/
-│       └── Passes.h         # Type inference & monomorphization pass declarations
+│       └── Passes.h         # Monomorphization pass declarations
 └── lib/
     ├── Dialect/
-    │   └── PolangTypes.cpp  # TypeVarType implementation
+    │   ├── PolangTypes.cpp          # Type implementations
+    │   └── PolangTypeInference.cpp  # MLIR-level type inference pass
     └── Transforms/
-        ├── TypeInference.cpp    # Unification and constraint solving
-        └── Monomorphization.cpp # Function specialization for call sites
+        └── Monomorphization.cpp     # Function specialization for call sites
 ```
 
 ### Type Checking Flow
@@ -610,36 +502,36 @@ mlir/
 2. Type checker runs (type_checker.cpp)
    ├── Validates explicit type annotations
    ├── Detects errors (undefined vars, arity)
+   ├── Performs Hindley-Milner type inference (unification)
    ├── Performs capture analysis (FreeVariableCollector)
-   └── Marks untyped parameters as TYPEVAR
+   └── Marks untyped polymorphic parameters as TYPEVAR
 
 3. MLIRGen generates MLIR (MLIRGen.cpp)
-   ├── Converts types to MLIR types (!polang.int, etc.)
-   └── Generates !polang.typevar<id> for TYPEVAR
+   ├── Converts types to MLIR types (!polang.integer, etc.)
+   ├── Generates polang.generic_func with !polang.type_param<"name"> for polymorphic functions
+   └── Generates polang.instantiate at call sites with concrete type bindings
 
-4. Type inference pass runs (TypeInference.cpp)
-   ├── Collects constraints from operations and call sites
-   ├── Unifies type variables with concrete types
-   └── Updates operations with resolved types
+4. Type inference pass runs (PolangTypeInference.cpp)
+   └── Resolves residual type parameters in generic functions
 
 5. Monomorphization pass runs (Monomorphization.cpp)
-   ├── Creates specialized versions for each call site
-   └── Updates calls to use specialized functions
+   ├── Creates specialized function copies for each unique type combination
+   └── Replaces polang.instantiate with polang.call to specialized functions
 
 6. Lowering proceeds with fully-typed MLIR
 ```
 
 ### Verifier Compatibility
 
-Operation verifiers are updated to allow type variables during intermediate stages:
+Operation verifiers allow type parameters during intermediate stages (before monomorphization resolves them):
 
 ```cpp
 // In PolangOps.cpp
 namespace {
 bool typesAreCompatible(Type t1, Type t2) {
   if (t1 == t2) return true;
-  // Allow type variables - they will be resolved later
-  if (isa<TypeVarType>(t1) || isa<TypeVarType>(t2)) return true;
+  // Allow type parameters - they will be resolved during monomorphization
+  if (isa<TypeParamType>(t1) || isa<TypeParamType>(t2)) return true;
   return false;
 }
 }
@@ -663,8 +555,7 @@ add(1, 2)
 
 **Inference:**
 - `x` is explicitly `i64`
-- `y` is marked as `typevar` by the parser
-- MLIR unifies `y` with `i64` (from `x + y` where `x: i64`)
+- `y` is marked as `typevar` by the parser, inferred as `i64` from `x + y`
 - Return type inferred as `i64` (result of `+`)
 - Monomorphization creates `add$i64_i64`
 
@@ -676,11 +567,10 @@ identity(42)
 ```
 
 **Inference:**
-- `x` has no local constraints → assigned `typevar<0, Any>`
-- Return type depends on `x` → assigned `typevar<1, Any>`
-- Call `identity(42)` constrains `typevar<0>` to `i64` (integer literal default)
-- Unification: `typevar<1>` = `typevar<0>` = `i64`
-- Final type: `identity$i64: (i64) -> i64`
+- `x` has no local constraints → assigned as type parameter `"a"`
+- Return type depends on `x` → same type parameter `"a"`
+- Call `identity(42)` provides concrete type `i64` via `polang.instantiate`
+- Monomorphization creates specialized `identity$i64: (i64) -> i64`
 
 ### Example 3: Multiple Parameters
 
@@ -702,8 +592,7 @@ is_positive(5)
 ```
 
 **Inference:**
-- `x` marked as `typevar` by parser
-- MLIR unifies `x` with `Integer`-kind from `x > 0` where `0` is an integer literal
+- `x` marked as `typevar` by parser, inferred as integer from `x > 0`
 - At call site, `5` is an integer literal → resolves to `i64`
 - Return type is `bool` (result of comparison)
 - Final type: `is_positive$i64: (i64) -> bool`
@@ -743,8 +632,7 @@ identity(true)   ; Creates identity$bool
 **Generated MLIR:**
 
 ```mlir
-polang.func @identity(%arg0: !polang.typevar<0, Any>) -> !polang.typevar<1, Any>
-    attributes {polang.polymorphic} { ... }
+polang.generic_func @identity<a>(%arg0: !polang.type_param<"a">) -> !polang.type_param<"a"> { ... }
 
 polang.func @identity$i64(%arg0: !polang.integer<64, signed>) -> !polang.integer<64, signed> { ... }
 
@@ -753,10 +641,10 @@ polang.func @identity$bool(%arg0: !polang.bool) -> !polang.bool { ... }
 
 ### Uncalled Polymorphic Functions
 
-Polymorphic functions that are never called remain in MLIR with the `polang.polymorphic` attribute. They are skipped during lowering to LLVM IR (since there's no concrete type to lower to).
+Generic functions that are never instantiated remain as `polang.generic_func` in MLIR. They are erased during lowering to standard dialects (since there's no concrete type to lower to).
 
 ```polang
-let unused(x) = x  ; Kept with polang.polymorphic attribute
+let unused(x) = x  ; Kept as polang.generic_func, erased during lowering
 42                 ; No call to unused, so no specialization created
 ```
 
@@ -795,4 +683,4 @@ x + 1  ; Type error: Undeclared variable: x at line 1, column 1
 
 ### Unresolved Type Variables
 
-Polymorphic functions without call sites keep their type variables and are marked with `polang.polymorphic`. They are skipped during lowering but can be called in subsequent REPL inputs.
+Generic functions without call sites remain as `polang.generic_func` with their type parameters unresolved. They are erased during lowering but can be instantiated in subsequent REPL inputs.
