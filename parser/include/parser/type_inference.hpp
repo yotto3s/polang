@@ -5,6 +5,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace polang {
@@ -85,14 +86,22 @@ private:
   std::map<std::string, std::set<TraitBound>> bounds;
 };
 
-/// Type scheme for polymorphic functions: forall 'a:'Numeric, 'b. ('a, 'b) ->
-/// 'a
-struct TypeScheme {
+/// Monomorphic function signature: concrete param types and return type.
+struct MonoSignature {
+  std::vector<std::string> paramTypes;
+  std::string returnType;
+};
+
+/// Polymorphic function signature: forall 'a:'Numeric, 'b. ('a, 'b) -> 'a
+struct PolymorphicSignature {
   std::vector<std::string> typeParams;                     // ["'a", "'b"]
   std::map<std::string, std::set<TraitBound>> paramBounds; // {"'a": {Numeric}}
   std::vector<std::string> paramTypes; // param types (may reference params)
   std::string returnType;
 };
+
+/// A function signature is either monomorphic or polymorphic.
+using FunctionSignature = std::variant<MonoSignature, PolymorphicSignature>;
 
 } // namespace polang
 
