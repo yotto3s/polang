@@ -1033,8 +1033,18 @@ void TypeChecker::inferFunction(
       resolvedBodyType = resolveWithDefaults(resolvedBodyType);
     }
 
+    std::string returnType;
     if (node.type == nullptr) {
       node.type = makeTypeSpec(resolvedBodyType);
+      returnType = resolvedBodyType;
+    } else {
+      const std::string declReturnType = node.type->getTypeName();
+      if (!areTypesCompatible(resolvedBodyType, declReturnType)) {
+        reportError(polang::formatFuncReturnTypeError(
+                        node.id->name, declReturnType, resolvedBodyType),
+                    node.loc);
+      }
+      returnType = declReturnType;
     }
 
     // Store polymorphic signature for instantiation
@@ -1044,7 +1054,7 @@ void TypeChecker::inferFunction(
       sig.paramBounds[tp] = bounds;
     }
     sig.paramTypes = resolvedParamTypes;
-    sig.returnType = resolvedBodyType;
+    sig.returnType = returnType;
     functionSignatures[funcName] = sig;
   }
 
