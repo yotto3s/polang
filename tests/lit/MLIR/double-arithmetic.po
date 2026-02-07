@@ -5,25 +5,25 @@
 ; CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.float<64>, !polang.float<64> -> !polang.float<64>
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
 ; CHECK-NEXT: }
-let dadd(a: f64, b: f64): f64 = a + b
+def dadd(a: f64, b: f64): f64 = a + b
 
 ; Test double subtraction
 ; CHECK:      polang.func @dsub(%arg0: !polang.float<64>, %arg1: !polang.float<64>) -> !polang.float<64> {
 ; CHECK-NEXT:   %{{[0-9]+}} = polang.sub %arg0, %arg1 : !polang.float<64>, !polang.float<64> -> !polang.float<64>
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
 ; CHECK-NEXT: }
-let dsub(a: f64, b: f64): f64 = a - b
+def dsub(a: f64, b: f64): f64 = a - b
 
 ; Test double multiplication
 ; CHECK:      polang.func @dmul(%arg0: !polang.float<64>, %arg1: !polang.float<64>) -> !polang.float<64> {
 ; CHECK-NEXT:   %{{[0-9]+}} = polang.mul %arg0, %arg1 : !polang.float<64>, !polang.float<64> -> !polang.float<64>
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
 ; CHECK-NEXT: }
-let dmul(a: f64, b: f64): f64 = a * b
+def dmul(a: f64, b: f64): f64 = a * b
 
 ; Test double division
 ; CHECK:      polang.func @ddiv(%arg0: !polang.float<64>, %arg1: !polang.float<64>) -> !polang.float<64> {
 ; CHECK-NEXT:   %{{[0-9]+}} = polang.div %arg0, %arg1 : !polang.float<64>, !polang.float<64> -> !polang.float<64>
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
 ; CHECK-NEXT: }
-let ddiv(a: f64, b: f64): f64 = a / b
+def ddiv(a: f64, b: f64): f64 = a / b

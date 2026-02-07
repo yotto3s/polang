@@ -78,7 +78,7 @@ TEST(ASTPrinterTest, PrintBinaryOperatorCompare) {
 // ============== Declaration Tests ==============
 
 TEST(ASTPrinterTest, PrintVariableDeclaration) {
-  auto block = parseOrFail("let x = 5");
+  auto block = parseOrFail("def x = 5");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -89,7 +89,7 @@ TEST(ASTPrinterTest, PrintVariableDeclaration) {
 }
 
 TEST(ASTPrinterTest, PrintTypedVariable) {
-  auto block = parseOrFail("let z: int = 42");
+  auto block = parseOrFail("def z: int = 42");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -99,7 +99,7 @@ TEST(ASTPrinterTest, PrintTypedVariable) {
 }
 
 TEST(ASTPrinterTest, PrintFunctionDeclaration) {
-  auto block = parseOrFail("let add(a: int, b: int): int = a + b");
+  auto block = parseOrFail("def add(a: int, b: int): int = a + b");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -166,7 +166,7 @@ TEST(ASTPrinterTest, TreeConnectors) {
 }
 
 TEST(ASTPrinterTest, MultipleStatements) {
-  auto block = parseOrFail("let x = 1\nlet y = 2\nx + y");
+  auto block = parseOrFail("def x = 1\ndef y = 2\nx + y");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);

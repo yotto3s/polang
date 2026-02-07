@@ -10,4 +10,4 @@
 ; CHECK-NEXT:   }
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed>
 ; CHECK-NEXT: }
-let max(a: i64, b: i64): i64 = if a > b then a else b
+def max(a: i64, b: i64): i64 = if a > b then a else b

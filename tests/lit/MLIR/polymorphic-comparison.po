@@ -10,5 +10,5 @@
 ; Verify comparison operation with concrete types
 ; CHECK: {{.*}}polang.cmp eq{{.*}}!polang.integer<64, signed>{{.*}}
 
-let is_zero(x) = x == 0
+def is_zero(x) = x == 0
 is_zero(5)

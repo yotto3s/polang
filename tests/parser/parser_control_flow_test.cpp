@@ -55,7 +55,7 @@ TEST(ParserTest, NestedIfExpression) {
 }
 
 TEST(ParserTest, IfExpressionInVariableDeclaration) {
-  auto block = parseOrFail("let x = if a then 1 else 0");
+  auto block = parseOrFail("def x = if a then 1 else 0");
   ASSERT_NE(block, nullptr);
 
   auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
@@ -68,7 +68,7 @@ TEST(ParserTest, IfExpressionInVariableDeclaration) {
 
 TEST(ParserTest, IfExpressionInFunctionBody) {
   auto block =
-      parseOrFail("let max(a: int, b: int): int = if a > b then a else b");
+      parseOrFail("def max(a: int, b: int): int = if a > b then a else b");
   ASSERT_NE(block, nullptr);
 
   auto* funcDecl = getFirstStatement<NFunctionDeclaration>(block.get());
@@ -193,7 +193,7 @@ TEST(ParserTest, NestedLetExpression) {
 }
 
 TEST(ParserTest, LetExpressionInVariableDeclaration) {
-  auto block = parseOrFail("let a = let x = 5 in x + 1");
+  auto block = parseOrFail("def a = let x = 5 in x + 1");
   ASSERT_NE(block, nullptr);
 
   auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
@@ -207,7 +207,7 @@ TEST(ParserTest, LetExpressionInVariableDeclaration) {
 }
 
 TEST(ParserTest, LetExpressionInFunctionBody) {
-  auto block = parseOrFail("let f(a: int): int = let b = 2 in a * b");
+  auto block = parseOrFail("def f(a: int): int = let b = 2 in a * b");
   ASSERT_NE(block, nullptr);
 
   auto* funcDecl = getFirstStatement<NFunctionDeclaration>(block.get());

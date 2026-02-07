@@ -25,8 +25,8 @@
 ; CHECK-NEXT:           `-NInteger 2
 
 module Math (add, sub, PI)
-  let PI = 3.14159
-  let add(x: i64, y: i64): i64 = x + y
-  let sub(x: i64, y: i64): i64 = x - y
-  let internal_helper(x: i64): i64 = x * 2
+  def PI = 3.14159
+  def add(x: i64, y: i64): i64 = x + y
+  def sub(x: i64, y: i64): i64 = x - y
+  def internal_helper(x: i64): i64 = x * 2
 endmodule

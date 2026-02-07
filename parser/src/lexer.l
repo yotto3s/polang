@@ -40,6 +40,7 @@ void polang_reset_lexer_location() {
 \n                      { yycolumn = 1; /* newline resets column */ }
 ;[^\n]*                 { /* skip single-line comments */ }
 "let"                   { return yy::parser::make_TLET(LOC); }
+"def"                   { return yy::parser::make_TDEF(LOC); }
 "fun"                   { return yy::parser::make_TFUN(LOC); }
 "in"                    { return yy::parser::make_TIN(LOC); }
 "and"                   { return yy::parser::make_TAND(LOC); }

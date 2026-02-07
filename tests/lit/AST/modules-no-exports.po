@@ -11,5 +11,5 @@
 ; CHECK-NEXT:           `-NInteger 2
 
 module Private
-  let helper(x: i64): i64 = x * 2
+  def helper(x: i64): i64 = x * 2
 endmodule

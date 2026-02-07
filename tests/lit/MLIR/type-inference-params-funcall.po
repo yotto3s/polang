@@ -2,19 +2,19 @@
 
 ; Known function with explicit types
 ; CHECK: {{.*}}polang.func @double_int(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
-let double_int(x: i64): i64 = x * 2
+def double_int(x: i64): i64 = x * 2
 
 ; Wrapper function resolved via call to double_int (constrains y to i64)
 ; CHECK: {{.*}}polang.func @wrapper(%{{.*}}: !polang.integer<64, signed>){{.*}}
-let wrapper(y) = double_int(y)
+def wrapper(y) = double_int(y)
 
 ; Known function for double type
 ; CHECK: {{.*}}polang.func @half_double(%{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}}
-let half_double(x: f64): f64 = x / 2.0
+def half_double(x: f64): f64 = x / 2.0
 
 ; Wrapper function resolved via call to half_double (constrains y to f64)
 ; CHECK: {{.*}}polang.func @wrapper_double(%{{.*}}: !polang.float<64>){{.*}}
-let wrapper_double(y) = half_double(y)
+def wrapper_double(y) = half_double(y)
 
 ; Entry point
 0

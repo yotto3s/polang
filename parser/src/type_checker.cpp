@@ -20,6 +20,7 @@ using polang::formatArgCountError;
 using polang::formatFuncReturnTypeError;
 using polang::formatTypeMismatch;
 using polang::formatUndeclaredVar;
+using polang::formatUndefinedFunc;
 using polang::formatVarDeclTypeError;
 using polang::isArithmeticOperator;
 using polang::isComparisonOperator;
@@ -323,6 +324,10 @@ void TypeChecker::visit(const NMethodCall& node) {
   const auto funcReturnIt = functionReturnTypes.find(funcName);
   if (funcReturnIt != functionReturnTypes.end()) {
     inferredType = funcReturnIt->second;
+  } else if (functionParamTypes.find(funcName) == functionParamTypes.end() &&
+             functionSchemes.find(funcName) == functionSchemes.end()) {
+    reportError(formatUndefinedFunc(funcName), node.loc);
+    inferredType = TypeNames::UNKNOWN;
   } else {
     inferredType = TypeNames::I64;
   }

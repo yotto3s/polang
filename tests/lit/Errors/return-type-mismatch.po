@@ -2,4 +2,4 @@
 
 ; Test function return type mismatch
 ; CHECK: {{.*}}declared to return i64 but body has type f64{{.*}}
-let f(): i64 = 3.14
+def f(): i64 = 3.14

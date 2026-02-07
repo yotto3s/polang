@@ -1,5 +1,5 @@
 ; Function declarations and calls
-let square(n: i64): i64 = n * n               ; single parameter function
-let add(a: i64, b: i64): i64 = a + b          ; multi-parameter function
-let result = add(square(3), square(4))        ; nested function calls: 9 + 16
+def square(n: i64): i64 = n * n               ; single parameter function
+def add(a: i64, b: i64): i64 = a + b          ; multi-parameter function
+def result = add(square(3), square(4))        ; nested function calls: 9 + 16
 result                                         ; result: 25

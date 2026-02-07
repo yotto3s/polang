@@ -9,5 +9,5 @@
 ; Original generic function is erased
 ; CHECK-NOT: polang.generic_func
 
-let double_val(x) = x + x
+def double_val(x) = x + x
 double_val(21)

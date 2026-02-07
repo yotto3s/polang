@@ -93,16 +93,31 @@ TEST(IsInputIncomplete, SimpleExpression) {
   EXPECT_FALSE(InputChecker::isInputIncomplete("1 + 2"));
 }
 
-TEST(IsInputIncomplete, VariableDeclaration) {
-  EXPECT_FALSE(InputChecker::isInputIncomplete("let x = 5"));
+// let/in balance tests
+TEST(IsInputIncomplete, LetWithoutIn) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("let x = 5"));
 }
 
-TEST(IsInputIncomplete, FunctionDeclaration) {
-  EXPECT_FALSE(InputChecker::isInputIncomplete("let f(x: int): int = x + 1"));
+TEST(IsInputIncomplete, LetFunctionWithoutIn) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("let f(x: int): int = x + 1"));
 }
 
-TEST(IsInputIncomplete, LetExpression) {
+TEST(IsInputIncomplete, LetWithIn) {
   EXPECT_FALSE(InputChecker::isInputIncomplete("let x = 1 in x + 1"));
+}
+
+TEST(IsInputIncomplete, NestedLetWithoutOuterIn) {
+  EXPECT_TRUE(
+      InputChecker::isInputIncomplete("let x = 1 in let y = 2"));
+}
+
+TEST(IsInputIncomplete, NestedLetComplete) {
+  EXPECT_FALSE(
+      InputChecker::isInputIncomplete("let x = 1 in let y = 2 in x + y"));
+}
+
+TEST(IsInputIncomplete, LetAndWithoutIn) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("let x = 1 and y = 2"));
 }
 
 TEST(IsInputIncomplete, FunctionCall) {

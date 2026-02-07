@@ -2,5 +2,5 @@
 
 ; Test that i32 type annotation propagates to integer literal
 ; CHECK: 5 : i32
-let x: i32 = 5
+def x: i32 = 5
 x

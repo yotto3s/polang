@@ -2,7 +2,7 @@
 ; CHECK: 3.14 : f64
 
 module Math (PI)
-  let PI = 3.14
+  def PI = 3.14
 endmodule
 from Math import PI
 PI

@@ -12,6 +12,6 @@
 ; Original generic function is erased
 ; CHECK-NOT: polang.generic_func
 
-let add(x, y) = x + y
+def add(x, y) = x + y
 add(1, 2)
 add(1.0, 2.0)

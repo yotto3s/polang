@@ -8,4 +8,4 @@
 ; CHECK-NEXT:       `-NBinaryOperator '+'
 ; CHECK-NEXT:         |-NIdentifier 'a'
 ; CHECK-NEXT:         `-NIdentifier 'b'
-let add(a: i64, b: i64): i64 = a + b
+def add(a: i64, b: i64): i64 = a + b

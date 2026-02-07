@@ -3,6 +3,6 @@
 
 ; Test polymorphic function with captured variable execution.
 
-let base = 10
-let add_base(x) = x + base
+def base = 10
+def add_base(x) = x + base
 add_base(5)

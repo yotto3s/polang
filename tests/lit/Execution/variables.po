@@ -2,6 +2,6 @@
 
 ; Test variable declaration and usage
 ; CHECK: 30 : i64
-let x = 10
-let y = 20
+def x = 10
+def y = 20
 x + y

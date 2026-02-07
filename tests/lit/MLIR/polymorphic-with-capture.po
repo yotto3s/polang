@@ -10,6 +10,6 @@
 ; Verify add operation with concrete types
 ; CHECK: {{.*}}polang.add{{.*}}!polang.integer<64, signed>, !polang.integer<64, signed>{{.*}}
 
-let base = 10
-let add_base(x) = x + base
+def base = 10
+def add_base(x) = x + base
 add_base(5)

@@ -5,4 +5,4 @@
 ; CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
 ; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed>
 ; CHECK-NEXT: }
-let add(a: i64, b: i64): i64 = a + b
+def add(a: i64, b: i64): i64 = a + b

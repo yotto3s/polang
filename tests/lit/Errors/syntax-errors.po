@@ -2,4 +2,4 @@
 
 ; Test syntax error detection
 ; CHECK: {{.*}}ERROR: syntax error{{.*}}
-let x =
+def x =

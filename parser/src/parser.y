@@ -80,6 +80,7 @@ yy::parser::symbol_type yylex();
 %token TMUL "*"
 %token TDIV "/"
 %token TLET "let"
+%token TDEF "def"
 %token TFUN "fun"
 %token TIN "in"
 %token TCOLON ":"
@@ -151,20 +152,20 @@ stmt : var_decl { $$ = std::move($1); }
      | expr { $$ = std::make_unique<NExpressionStatement>(std::move($1)); SET_LOC($$, @$); }
      ;
 
-var_decl : TLET ident TEQUAL expr {
-             /* let x = expr (immutable, type to be inferred) */
+var_decl : TDEF ident TEQUAL expr {
+             /* def x = expr (immutable, type to be inferred) */
              $$ = std::make_unique<NVariableDeclaration>(std::move($2), std::move($4));
              SET_LOC($$, @$);
            }
-         | TLET ident TCOLON type_spec TEQUAL expr {
-             /* let x : type = expr (immutable) */
+         | TDEF ident TCOLON type_spec TEQUAL expr {
+             /* def x : type = expr (immutable) */
              $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move($6));
              SET_LOC($$, @$);
            }
          ;
 
-func_decl : TLET ident func_decl_args TCOLON type_spec TEQUAL expr {
-              /* let fname (x : type) ... : rettype = expr */
+func_decl : TDEF ident func_decl_args TCOLON type_spec TEQUAL expr {
+              /* def fname (x : type) ... : rettype = expr */
               auto body = std::make_unique<NBlock>();
               SET_LOC(body, @7);
               auto exprStmt = std::make_unique<NExpressionStatement>(std::move($7));
@@ -173,8 +174,8 @@ func_decl : TLET ident func_decl_args TCOLON type_spec TEQUAL expr {
               $$ = std::make_unique<NFunctionDeclaration>(std::move($5), std::move($2), std::move($3), std::move(body));
               SET_LOC($$, @$);
             }
-          | TLET ident func_decl_args TEQUAL expr {
-              /* let fname (x : type) ... = expr (return type to be inferred) */
+          | TDEF ident func_decl_args TEQUAL expr {
+              /* def fname (x : type) ... = expr (return type to be inferred) */
               auto body = std::make_unique<NBlock>();
               SET_LOC(body, @5);
               auto exprStmt = std::make_unique<NExpressionStatement>(std::move($5));

@@ -4,6 +4,6 @@
 ; CHECK: Type error: Undefined qualified name: Math.unknown at line 9, column 1
 
 module Math (PI)
-  let PI = 3.14
+  def PI = 3.14
 endmodule
 Math.unknown
