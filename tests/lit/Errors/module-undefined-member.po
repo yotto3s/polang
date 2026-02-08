@@ -1,7 +1,9 @@
-(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s *)
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
 
 (* Test error when accessing undefined module member *)
-(* CHECK: Type error: Undefined qualified name: Math.unknown at line 9, column 1 *)
+(* CHECK: Type error: Undefined qualified name: Math.unknown at line 11, column 1
+*)
 
 module Math (PI)
   def PI = 3.14

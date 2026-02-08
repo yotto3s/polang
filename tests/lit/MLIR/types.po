@@ -1,15 +1,24 @@
-(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s *)
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
 (* Test double constant *)
-(* CHECK:      polang.func @double_val() -> !polang.float<64> { *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.float 3.140000e+00 : !polang.float<64> *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64> *)
-(* CHECK-NEXT: } *)
+(* CHECK:      polang.func @double_val() -> !polang.float<64> {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.float 3.140000e+00 : !polang.float<64>
+*)
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
+*)
+(* CHECK-NEXT: }
+*)
 def double_val(): f64 = 3.14
 
 (* Test bool constant *)
-(* CHECK:      polang.func @bool_val() -> !polang.bool { *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.bool true : !polang.bool *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool *)
-(* CHECK-NEXT: } *)
+(* CHECK:      polang.func @bool_val() -> !polang.bool {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.bool true : !polang.bool
+*)
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+*)
+(* CHECK-NEXT: }
+*)
 def bool_val(): bool = true

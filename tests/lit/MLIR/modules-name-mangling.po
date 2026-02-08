@@ -1,8 +1,11 @@
-(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s *)
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
 (* Test that module functions get mangled names (call appears before func definition) *)
-(* CHECK: {{.*}}polang.call @Math$$add({{.*}}){{.*}} *)
-(* CHECK: {{.*}}polang.func @Math$$add({{.*}}){{.*}} *)
+(* CHECK: {{.*}}polang.call @Math$$add({{.*}}){{.*}}
+*)
+(* CHECK: {{.*}}polang.func @Math$$add({{.*}}){{.*}}
+*)
 
 module Math (add)
   def add(x: i64, y: i64): i64 = x + y

@@ -1,6 +1,8 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
 (* Test function declarations and calls *)
-(* CHECK: 25 : i64 *)
+(* CHECK: 25 : i64
+*)
 def square(x: i64): i64 = x * x
 square(5)

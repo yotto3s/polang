@@ -1,5 +1,7 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
-(* CHECK: 42 : i64 *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+(* CHECK: 42 : i64
+*)
 
 (* Test that polymorphic functions work correctly with multiple specializations. *)
 (* The identity function is called with both int and bool types. *)

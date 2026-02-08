@@ -1,10 +1,17 @@
-(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s *)
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
 (* Test constant generation *)
-(* CHECK:      module { *)
-(* CHECK-NEXT:   polang.func @__polang_entry() -> !polang.integer<64, signed> { *)
-(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 42 : !polang.integer<64, signed> *)
-(* CHECK-NEXT:     polang.return %{{[0-9]+}} : !polang.integer<64, signed> *)
-(* CHECK-NEXT:   } *)
-(* CHECK-NEXT: } *)
+(* CHECK:      module {
+*)
+(* CHECK-NEXT:   polang.func @__polang_entry() -> !polang.integer<64, signed> {
+*)
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 42 : !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:     polang.return %{{[0-9]+}} : !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:   }
+*)
+(* CHECK-NEXT: }
+*)
 42

@@ -1,5 +1,7 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
-(* CHECK: false : bool *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+(* CHECK: false : bool
+*)
 
 (* Test polymorphic function with comparison operator execution. *)
 

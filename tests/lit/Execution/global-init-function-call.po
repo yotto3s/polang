@@ -1,7 +1,9 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
 (* Test that global init expressions can contain function calls. *)
-(* CHECK: 25 : i64 *)
+(* CHECK: 25 : i64
+*)
 def square(x: i64): i64 = x * x
 def result = square(5)
 result

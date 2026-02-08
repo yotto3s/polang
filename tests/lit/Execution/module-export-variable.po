@@ -1,5 +1,7 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
-(* CHECK: 6.28 : f64 *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+(* CHECK: 6.28 : f64
+*)
 
 module Math (PI, double_pi)
   def PI = 3.14

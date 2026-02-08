@@ -1,8 +1,10 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
 (* Test chained global variable initialization across the same eval. *)
 (* Each global's init expression may reference previously defined globals. *)
-(* CHECK: 13 : i64 *)
+(* CHECK: 13 : i64
+*)
 def x = 5
 def y = x + 3
 def z = x + y

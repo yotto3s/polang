@@ -1,29 +1,46 @@
-(* RUN: %polang_compiler %s | %FileCheck %s *)
+(* RUN: %polang_compiler %s | %FileCheck %s
+*)
 
 (* Test float subtraction LLVM IR *)
-(* CHECK:      define double @fsub(double %{{[0-9]+}}, double %{{[0-9]+}}) { *)
-(* CHECK-NEXT:   %{{[0-9]+}} = fsub double %{{[0-9]+}}, %{{[0-9]+}} *)
-(* CHECK-NEXT:   ret double %{{[0-9]+}} *)
-(* CHECK-NEXT: } *)
+(* CHECK:      define double @fsub(double %{{[0-9]+}}, double %{{[0-9]+}}) {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = fsub double %{{[0-9]+}}, %{{[0-9]+}}
+*)
+(* CHECK-NEXT:   ret double %{{[0-9]+}}
+*)
+(* CHECK-NEXT: }
+*)
 def fsub(a: f64, b: f64): f64 = a - b
 
 (* Test float multiplication LLVM IR *)
-(* CHECK:      define double @fmul(double %{{[0-9]+}}, double %{{[0-9]+}}) { *)
-(* CHECK-NEXT:   %{{[0-9]+}} = fmul double %{{[0-9]+}}, %{{[0-9]+}} *)
-(* CHECK-NEXT:   ret double %{{[0-9]+}} *)
-(* CHECK-NEXT: } *)
+(* CHECK:      define double @fmul(double %{{[0-9]+}}, double %{{[0-9]+}}) {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = fmul double %{{[0-9]+}}, %{{[0-9]+}}
+*)
+(* CHECK-NEXT:   ret double %{{[0-9]+}}
+*)
+(* CHECK-NEXT: }
+*)
 def fmul(a: f64, b: f64): f64 = a * b
 
 (* Test float division LLVM IR *)
-(* CHECK:      define double @fdiv(double %{{[0-9]+}}, double %{{[0-9]+}}) { *)
-(* CHECK-NEXT:   %{{[0-9]+}} = fdiv double %{{[0-9]+}}, %{{[0-9]+}} *)
-(* CHECK-NEXT:   ret double %{{[0-9]+}} *)
-(* CHECK-NEXT: } *)
+(* CHECK:      define double @fdiv(double %{{[0-9]+}}, double %{{[0-9]+}}) {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = fdiv double %{{[0-9]+}}, %{{[0-9]+}}
+*)
+(* CHECK-NEXT:   ret double %{{[0-9]+}}
+*)
+(* CHECK-NEXT: }
+*)
 def fdiv(a: f64, b: f64): f64 = a / b
 
 (* Test float addition LLVM IR *)
-(* CHECK:      define double @fadd(double %{{[0-9]+}}, double %{{[0-9]+}}) { *)
-(* CHECK-NEXT:   %{{[0-9]+}} = fadd double %{{[0-9]+}}, %{{[0-9]+}} *)
-(* CHECK-NEXT:   ret double %{{[0-9]+}} *)
-(* CHECK-NEXT: } *)
+(* CHECK:      define double @fadd(double %{{[0-9]+}}, double %{{[0-9]+}}) {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = fadd double %{{[0-9]+}}, %{{[0-9]+}}
+*)
+(* CHECK-NEXT:   ret double %{{[0-9]+}}
+*)
+(* CHECK-NEXT: }
+*)
 def fadd(a: f64, b: f64): f64 = a + b

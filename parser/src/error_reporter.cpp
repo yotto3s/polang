@@ -109,3 +109,15 @@ extern "C" void polang_report_error(const char* message, int line, int column) {
                  message, line, column);
   }
 }
+
+// C-compatible function for lexer syntax errors (e.g., unterminated comments)
+extern "C" void polang_report_syntax_error(const char* description, int line,
+                                           int column) {
+  auto* reporter = polang::ErrorReporter::current();
+  if (reporter != nullptr) {
+    reporter->error(std::string("Syntax error: ") + description, line, column);
+  } else {
+    std::fprintf(stderr, "Syntax error: %s at line %d, column %d\n",
+                 description, line, column);
+  }
+}

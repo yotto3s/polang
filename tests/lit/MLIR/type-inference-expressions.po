@@ -1,19 +1,24 @@
-(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s *)
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
 (* Test type inference from expressions *)
 
 (* Arithmetic on int produces int *)
-(* CHECK: {{.*}}polang.add %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>{{.*}} *)
+(* CHECK: {{.*}}polang.add %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>{{.*}}
+*)
 def a = 1 + 2
 
 (* Arithmetic on double produces double *)
-(* CHECK: {{.*}}polang.mul %{{[0-9]+}}, %{{[0-9]+}} : !polang.float<64>{{.*}} *)
+(* CHECK: {{.*}}polang.mul %{{[0-9]+}}, %{{[0-9]+}} : !polang.float<64>{{.*}}
+*)
 def b = 1.5 * 2.0
 
 (* Comparison produces bool *)
-(* CHECK: {{.*}}polang.cmp lt, %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>{{.*}} *)
+(* CHECK: {{.*}}polang.cmp lt, %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>{{.*}}
+*)
 def c = 1 < 2
 
 (* Double comparison produces bool *)
-(* CHECK: {{.*}}polang.cmp ge, %{{[0-9]+}}, %{{[0-9]+}} : !polang.float<64>{{.*}} *)
+(* CHECK: {{.*}}polang.cmp ge, %{{[0-9]+}}, %{{[0-9]+}} : !polang.float<64>{{.*}}
+*)
 def d = 3.14 >= 2.71

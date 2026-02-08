@@ -1,11 +1,14 @@
-(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s *)
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
 (* Polymorphic function, type inferred via monomorphization at call site *)
 
 (* Monomorphized version for int *)
-(* CHECK: {{.*}}polang.func @identity$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}} *)
+(* CHECK: {{.*}}polang.func @identity$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+*)
 
 (* Original generic function is erased *)
-(* CHECK-NOT: polang.generic_func *)
+(* CHECK-NOT: polang.generic_func
+*)
 
 let identity(x) = x in identity(42)

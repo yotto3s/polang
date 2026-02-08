@@ -25,10 +25,24 @@ public:
         continue;
       }
 
-      // Skip comments (semicolon to end of line)
-      if (input[i] == ';') {
-        while (i < input.size() && input[i] != '\n') {
-          ++i;
+      // Skip block comments (* ... *) with nesting
+      if (input[i] == '(' && i + 1 < input.size() && input[i + 1] == '*') {
+        int depth = 1;
+        i += 2;
+        while (i < input.size() && depth > 0) {
+          if (input[i] == '(' && i + 1 < input.size() && input[i + 1] == '*') {
+            ++depth;
+            i += 2;
+          } else if (input[i] == '*' && i + 1 < input.size() &&
+                     input[i + 1] == ')') {
+            --depth;
+            i += 2;
+          } else {
+            ++i;
+          }
+        }
+        if (depth > 0) {
+          return true; // Unterminated comment - input is incomplete
         }
         continue;
       }

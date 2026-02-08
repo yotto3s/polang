@@ -145,4 +145,8 @@ formatFuncReturnTypeError(const std::string& funcName,
 /// This allows the lexer (which is C code) to call the error reporter.
 extern "C" void polang_report_error(const char* message, int line, int column);
 
+/// C-compatible function for lexer syntax errors (e.g., unterminated comments).
+extern "C" void polang_report_syntax_error(const char* description, int line,
+                                           int column);
+
 #endif // POLANG_ERROR_REPORTER_HPP

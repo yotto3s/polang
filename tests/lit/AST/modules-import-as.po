@@ -1,9 +1,13 @@
-(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s *)
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
 
 (* Test import with alias AST *)
-(* CHECK:      NBlock *)
-(* CHECK-NEXT: |-NModuleDeclaration 'Math' (add) *)
-(* CHECK:      `-NImportStatement import Math as M *)
+(* CHECK:      NBlock
+*)
+(* CHECK-NEXT: |-NModuleDeclaration 'Math' (add)
+*)
+(* CHECK:      `-NImportStatement import Math as M
+*)
 
 module Math (add)
   def add(x: i64, y: i64): i64 = x + y

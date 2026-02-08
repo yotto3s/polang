@@ -1,6 +1,8 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 (* Test: function parameter i64 annotation matches inferred argument type *)
-(* CHECK: 5 : i64 *)
+(* CHECK: 5 : i64
+*)
 def id(x: i64): i64 = x
 def a = 5
 id(a)

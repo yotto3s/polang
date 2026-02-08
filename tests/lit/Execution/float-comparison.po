@@ -1,4 +1,5 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
 (* Test float less-than *)
 def a = 1.5 < 2.0
@@ -14,5 +15,6 @@ def e = 2.0 <= 2.0
 def f = 3.0 >= 2.0
 
 (* All comparisons should be true, use conditional to verify *)
-(* CHECK: 1 : i64 *)
+(* CHECK: 1 : i64
+*)
 if a then (if b then (if c then (if d then (if e then (if f then 1 else 0) else 0) else 0) else 0) else 0) else 0

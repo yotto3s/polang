@@ -1,6 +1,8 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
 (* Test that i32 type annotation propagates to integer literal *)
-(* CHECK: 5 : i32 *)
+(* CHECK: 5 : i32
+*)
 def x: i32 = 5
 x

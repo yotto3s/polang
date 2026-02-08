@@ -1,4 +1,5 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
 (* Test polymorphic functions that return constants *)
 (* This exercises the constant operation type inference and resolution *)
@@ -18,5 +19,6 @@ def c = always_zero(3.14)    (* should be 0 *)
 (* Sum the integer results *)
 def sum = a + b + c
 
-(* CHECK: 1 : i64 *)
+(* CHECK: 1 : i64
+*)
 sum

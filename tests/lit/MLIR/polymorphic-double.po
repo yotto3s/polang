@@ -1,12 +1,15 @@
-(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s *)
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
 (* Test polymorphic function specialization with double type. *)
 
 (* Specialized version for double *)
-(* CHECK-DAG: {{.*}}polang.func @identity$f64(%{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}} *)
+(* CHECK-DAG: {{.*}}polang.func @identity$f64(%{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}}
+*)
 
 (* Original generic function is erased *)
-(* CHECK-NOT: polang.generic_func *)
+(* CHECK-NOT: polang.generic_func
+*)
 
 def identity(x) = x
 identity(3.14)

@@ -1,4 +1,5 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
 (* Test unsigned comparison operators *)
 def lt_u64(a: u64, b: u64): bool = a < b
@@ -10,5 +11,6 @@ def btoi(b: bool): i64 = if b then 1 else 0
 (* Cast literals to u64 since integer literals default to i64 *)
 def result = btoi(lt_u64(0 as u64, 100 as u64)) + btoi(gt_u64(100 as u64, 0 as u64))
 
-(* CHECK: 2 : i64 *)
+(* CHECK: 2 : i64
+*)
 result

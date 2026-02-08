@@ -1,5 +1,7 @@
-(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s *)
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
 
 (* Test error when if condition is not boolean *)
-(* CHECK: Type error: If condition must be bool{{.*}} *)
+(* CHECK: Type error: If condition must be bool{{.*}}
+*)
 def x: i64 = if 1 then 2 else 3

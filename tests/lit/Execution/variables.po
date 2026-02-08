@@ -1,7 +1,9 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
 (* Test variable declaration and usage *)
-(* CHECK: 30 : i64 *)
+(* CHECK: 30 : i64
+*)
 def x = 10
 def y = 20
 x + y

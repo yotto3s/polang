@@ -1,4 +1,5 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
 (* Test default float type (f64) *)
 (* Float literals default to f64 *)
@@ -8,5 +9,6 @@ def a = 3.14 + 3.14
 def b = 3.14 * 3.14
 
 (* Final expression tests division, which prints *)
-(* CHECK: 1.57{{.*}} : f64 *)
+(* CHECK: 1.57{{.*}} : f64
+*)
 3.14 / 2.0

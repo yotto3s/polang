@@ -1,5 +1,7 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
-(* CHECK: 6.28 : f64 *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+(* CHECK: 6.28 : f64
+*)
 
 (* Test function with explicit double type annotation. *)
 (* Note: Polymorphic functions with double types currently don't print *)

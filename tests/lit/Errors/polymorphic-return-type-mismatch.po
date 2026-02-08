@@ -1,7 +1,9 @@
-(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s *)
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
 
 (* Test return type mismatch in polymorphic function. *)
 (* Body returns i64 literal but function declares f64 return type. *)
-(* CHECK: {{.*}}declared to return f64 but body has type i64{{.*}} *)
+(* CHECK: {{.*}}declared to return f64 but body has type i64{{.*}}
+*)
 def always_one(x): f64 = 1
 always_one(42)

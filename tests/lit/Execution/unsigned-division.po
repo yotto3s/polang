@@ -1,4 +1,5 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
 (* Test unsigned division uses correct LLVM instruction (DivUI vs DivSI) *)
 (* For unsigned types, division should treat operands as unsigned *)
@@ -8,5 +9,6 @@ def div_u64(a: u64, b: u64): u64 = a / b
 (* Test: 100 / 10 = 10 (same result for signed and unsigned) *)
 def result = div_u64(100 as u64, 10 as u64)
 
-(* CHECK: 10 : u64 *)
+(* CHECK: 10 : u64
+*)
 result

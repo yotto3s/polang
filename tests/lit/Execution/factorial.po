@@ -1,7 +1,9 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
 (* Test factorial calculation with let expressions *)
-(* CHECK: 120 : i64 *)
+(* CHECK: 120 : i64
+*)
 def fact5 =
   let n1 = 1 in
   let n2 = n1 * 2 in

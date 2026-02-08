@@ -1,4 +1,5 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
 (* Test that u64 functions exist and can be defined *)
 (* Note: Currently integer literals default to i64 (signed) *)
@@ -11,5 +12,6 @@ def add_u64(a: u64, b: u64): u64 = a + b
 def add(x, y) = x + y
 
 (* Final result using polymorphic function *)
-(* CHECK: 30000 : i64 *)
+(* CHECK: 30000 : i64
+*)
 add(10000, 20000)
