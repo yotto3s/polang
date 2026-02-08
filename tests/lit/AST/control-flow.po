@@ -1,17 +1,17 @@
-; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s *)
 
-; Test if expression
-; CHECK:      NBlock
-; CHECK-NEXT: `-NFunctionDeclaration 'max' (a: i64, b: i64) -> i64
-; CHECK-NEXT:   `-NBlock
-; CHECK-NEXT:     `-NExpressionStatement
-; CHECK-NEXT:       `-NIfExpression
-; CHECK-NEXT:         |-condition:
-; CHECK-NEXT:         | `-NBinaryOperator '>'
-; CHECK-NEXT:         |   |-NIdentifier 'a'
-; CHECK-NEXT:         |   `-NIdentifier 'b'
-; CHECK-NEXT:         |-then:
-; CHECK-NEXT:         | `-NIdentifier 'a'
-; CHECK-NEXT:         `-else:
-; CHECK-NEXT:           `-NIdentifier 'b'
+(* Test if expression *)
+(* CHECK:      NBlock *)
+(* CHECK-NEXT: `-NFunctionDeclaration 'max' (a: i64, b: i64) -> i64 *)
+(* CHECK-NEXT:   `-NBlock *)
+(* CHECK-NEXT:     `-NExpressionStatement *)
+(* CHECK-NEXT:       `-NIfExpression *)
+(* CHECK-NEXT:         |-condition: *)
+(* CHECK-NEXT:         | `-NBinaryOperator '>' *)
+(* CHECK-NEXT:         |   |-NIdentifier 'a' *)
+(* CHECK-NEXT:         |   `-NIdentifier 'b' *)
+(* CHECK-NEXT:         |-then: *)
+(* CHECK-NEXT:         | `-NIdentifier 'a' *)
+(* CHECK-NEXT:         `-else: *)
+(* CHECK-NEXT:           `-NIdentifier 'b' *)
 def max(a: i64, b: i64): i64 = if a > b then a else b

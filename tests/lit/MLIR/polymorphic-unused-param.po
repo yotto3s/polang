@@ -1,16 +1,16 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s *)
 
-; Test polymorphic function with unused parameter.
-; Parameter type is inferred from call site even when not used in body.
-; Monomorphization creates a specialized version.
+(* Test polymorphic function with unused parameter. *)
+(* Parameter type is inferred from call site even when not used in body. *)
+(* Monomorphization creates a specialized version. *)
 
-; The specialized function with concrete int type
-; CHECK-DAG: {{.*}}polang.func @unused$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+(* The specialized function with concrete int type *)
+(* CHECK-DAG: {{.*}}polang.func @unused$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}} *)
 
-; Original generic function is erased
-; CHECK-NOT: polang.generic_func
+(* Original generic function is erased *)
+(* CHECK-NOT: polang.generic_func *)
 
 def unused(x) = 42
 
-; Entry point - call the function with an int
+(* Entry point - call the function with an int *)
 unused(1)

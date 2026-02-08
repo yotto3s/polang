@@ -1,22 +1,22 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s *)
 
-; Test polymorphic functions that return constants
-; This exercises the constant operation type inference and resolution
+(* Test polymorphic functions that return constants *)
+(* This exercises the constant operation type inference and resolution *)
 
-; Polymorphic function returning integer constant
+(* Polymorphic function returning integer constant *)
 def always_zero(x) = 0
 def always_one(x) = 1
 
-; Polymorphic function returning float constant
+(* Polymorphic function returning float constant *)
 def always_pi(x) = 3.14
 
-; Test integer constants work with polymorphic functions
-def a = always_zero(42)      ; should be 0
-def b = always_one(true)     ; should be 1
-def c = always_zero(3.14)    ; should be 0
+(* Test integer constants work with polymorphic functions *)
+def a = always_zero(42)      (* should be 0 *)
+def b = always_one(true)     (* should be 1 *)
+def c = always_zero(3.14)    (* should be 0 *)
 
-; Sum the integer results
+(* Sum the integer results *)
 def sum = a + b + c
 
-; CHECK: 1 : i64
+(* CHECK: 1 : i64 *)
 sum

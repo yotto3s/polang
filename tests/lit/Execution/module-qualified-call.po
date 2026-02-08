@@ -1,5 +1,5 @@
-; RUN: %polang_repl %s | %FileCheck %s
-; CHECK: 8 : i64
+(* RUN: %polang_repl %s | %FileCheck %s *)
+(* CHECK: 8 : i64 *)
 
 module Math (add, mul)
   def add(x: i64, y: i64): i64 = x + y

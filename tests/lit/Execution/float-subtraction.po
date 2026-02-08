@@ -1,5 +1,5 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s *)
 
-; Test float subtraction operation directly
-; CHECK: 1.5 : f64
+(* Test float subtraction operation directly *)
+(* CHECK: 1.5 : f64 *)
 3.5 - 2.0

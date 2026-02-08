@@ -1,18 +1,18 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s *)
 
-; Test type inference from literal values
+(* Test type inference from literal values *)
 
-; Integer literal infers int type
-; CHECK: {{.*}}polang.constant.integer 42 : !polang.integer<64, signed>{{.*}}
+(* Integer literal infers int type *)
+(* CHECK: {{.*}}polang.constant.integer 42 : !polang.integer<64, signed>{{.*}} *)
 def a = 42
 
-; Double literal infers double type
-; CHECK: {{.*}}polang.constant.float 3.140000e+00 : !polang.float<64>{{.*}}
+(* Double literal infers double type *)
+(* CHECK: {{.*}}polang.constant.float 3.140000e+00 : !polang.float<64>{{.*}} *)
 def b = 3.14
 
-; Boolean literal infers bool type
-; CHECK: {{.*}}polang.constant.bool true : !polang.bool{{.*}}
+(* Boolean literal infers bool type *)
+(* CHECK: {{.*}}polang.constant.bool true : !polang.bool{{.*}} *)
 def c = true
 
-; CHECK: {{.*}}polang.constant.bool false : !polang.bool{{.*}}
+(* CHECK: {{.*}}polang.constant.bool false : !polang.bool{{.*}} *)
 def d = false

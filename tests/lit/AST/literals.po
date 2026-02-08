@@ -1,7 +1,7 @@
-; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s *)
 
-; Test integer literal
-; CHECK:      NBlock
-; CHECK-NEXT: `-NExpressionStatement
-; CHECK-NEXT:   `-NInteger 42
+(* Test integer literal *)
+(* CHECK:      NBlock *)
+(* CHECK-NEXT: `-NExpressionStatement *)
+(* CHECK-NEXT:   `-NInteger 42 *)
 42

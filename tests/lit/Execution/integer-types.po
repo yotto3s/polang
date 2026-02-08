@@ -1,12 +1,12 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s *)
 
-; Test default integer type (i64)
-; Integer literals default to i64
+(* Test default integer type (i64) *)
+(* Integer literals default to i64 *)
 
-; Test various integer operations - last result is what gets printed
+(* Test various integer operations - last result is what gets printed *)
 def a = 50 + 50
 def big = 1000000 * 1000000
 
-; Final expression tests negative numbers, which prints
-; CHECK: -42 : i64
+(* Final expression tests negative numbers, which prints *)
+(* CHECK: -42 : i64 *)
 0 - 42

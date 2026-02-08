@@ -1,10 +1,10 @@
-; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s *)
 
-; Test qualified variable access AST
-; CHECK:      NBlock
-; CHECK-NEXT: |-NModuleDeclaration 'Math' (PI)
-; CHECK:      `-NExpressionStatement
-; CHECK-NEXT:   `-NQualifiedName 'Math.PI'
+(* Test qualified variable access AST *)
+(* CHECK:      NBlock *)
+(* CHECK-NEXT: |-NModuleDeclaration 'Math' (PI) *)
+(* CHECK:      `-NExpressionStatement *)
+(* CHECK-NEXT:   `-NQualifiedName 'Math.PI' *)
 
 module Math (PI)
   def PI = 3.14

@@ -1,16 +1,16 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s *)
 
-; Test polymorphic functions with float operations
+(* Test polymorphic functions with float operations *)
 
 def add(x, y) = x + y
 def mul(x, y) = x * y
 
-; Call with integers first
+(* Call with integers first *)
 def int_result = add(10, 20)
 
-; Call same function with floats
+(* Call same function with floats *)
 def float_result = add(1.5, 2.5)
 
-; Test polymorphic multiplication with floats
-; CHECK: 7.5 : f64
+(* Test polymorphic multiplication with floats *)
+(* CHECK: 7.5 : f64 *)
 mul(2.5, 3.0)

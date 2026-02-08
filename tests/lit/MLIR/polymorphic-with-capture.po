@@ -1,14 +1,14 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s *)
 
-; Test function with captured variable.
-; Captured variables are passed as explicit parameters.
-; The AST-level TypeChecker resolves x from x + base where base is i64.
+(* Test function with captured variable. *)
+(* Captured variables are passed as explicit parameters. *)
+(* The AST-level TypeChecker resolves x from x + base where base is i64. *)
 
-; Monomorphic function with concrete types and captures attribute
-; CHECK: {{.*}}polang.func @add_base(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}captures{{.*}}
+(* Monomorphic function with concrete types and captures attribute *)
+(* CHECK: {{.*}}polang.func @add_base(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}captures{{.*}} *)
 
-; Verify add operation with concrete types
-; CHECK: {{.*}}polang.add{{.*}}!polang.integer<64, signed>, !polang.integer<64, signed>{{.*}}
+(* Verify add operation with concrete types *)
+(* CHECK: {{.*}}polang.add{{.*}}!polang.integer<64, signed>, !polang.integer<64, signed>{{.*}} *)
 
 def base = 10
 def add_base(x) = x + base

@@ -1,21 +1,21 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s *)
 
-; Test that polymorphic functions with constants are correctly specialized.
-; After monomorphization, constants have concrete types.
+(* Test that polymorphic functions with constants are correctly specialized. *)
+(* After monomorphization, constants have concrete types. *)
 
-; Specialized function with concrete types
-; CHECK: {{.*}}polang.func @get_zero$i64(%{{.*}}: !polang.integer<64, signed>){{.*}}
+(* Specialized function with concrete types *)
+(* CHECK: {{.*}}polang.func @get_zero$i64(%{{.*}}: !polang.integer<64, signed>){{.*}} *)
 
-; Constants in the specialized function have concrete types
-; CHECK: {{.*}}polang.constant.integer 0 : !polang.integer<64, signed>{{.*}}
+(* Constants in the specialized function have concrete types *)
+(* CHECK: {{.*}}polang.constant.integer 0 : !polang.integer<64, signed>{{.*}} *)
 
-; Original generic function is erased
-; CHECK-NOT: polang.generic_func
+(* Original generic function is erased *)
+(* CHECK-NOT: polang.generic_func *)
 
 def get_zero(x) = 0
 
-; Define a polymorphic function that returns a float constant
+(* Define a polymorphic function that returns a float constant *)
 def get_pi(x) = 3.14
 
-; Call sites to trigger monomorphization
+(* Call sites to trigger monomorphization *)
 get_zero(1)

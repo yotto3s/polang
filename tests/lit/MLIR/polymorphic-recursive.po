@@ -1,13 +1,13 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s *)
 
-; Test recursive function. The AST-level TypeChecker resolves the parameter
-; type from context (n == 0 and n - 1 constrain n to integer).
+(* Test recursive function. The AST-level TypeChecker resolves the parameter *)
+(* type from context (n == 0 and n - 1 constrain n to integer). *)
 
-; Monomorphic function with concrete types
-; CHECK: {{.*}}polang.func @countdown(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+(* Monomorphic function with concrete types *)
+(* CHECK: {{.*}}polang.func @countdown(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}} *)
 
-; Verify recursive call uses the same function name
-; CHECK: {{.*}}polang.call @countdown{{.*}}
+(* Verify recursive call uses the same function name *)
+(* CHECK: {{.*}}polang.call @countdown{{.*}} *)
 
 def countdown(n) = if n == 0 then 0 else countdown(n - 1)
 countdown(5)

@@ -1,8 +1,8 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s *)
 
-; Test function generation
-; CHECK:      polang.func @add(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.integer<64, signed> {
-; CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
-; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed>
-; CHECK-NEXT: }
+(* Test function generation *)
+(* CHECK:      polang.func @add(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.integer<64, signed> { *)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed> *)
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed> *)
+(* CHECK-NEXT: } *)
 def add(a: i64, b: i64): i64 = a + b

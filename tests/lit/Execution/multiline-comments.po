@@ -1,0 +1,10 @@
+(* RUN: %polang_repl %s | %FileCheck %s *)
+
+(* Test multiline block comments *)
+(*
+  This is a multiline comment.
+  It spans several lines.
+*)
+(* CHECK: 42 : i64 *)
+def x = 42
+x
