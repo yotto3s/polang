@@ -598,7 +598,7 @@ base_type   ::= "i8" | "i16" | "i32" | "i64"
               | "bool"
 
 comment     ::= "(*" comment_body "*)"
-comment_body ::= ([^(*] | "(" [^*] | "*" [^)] | comment)*
+comment_body ::= { any_char | comment }    (* nested comments allowed *)
 ```
 
 ## Examples
