@@ -492,9 +492,21 @@ void TypeChecker::visit(const NBinaryOperator& node) {
 void TypeChecker::visit(const NCastExpression& node) {
   // Visit the inner expression to collect any free variables and check types
   node.expression->accept(*this);
-  // The result type is the target type of the cast
-  // Type validation (numeric-only) is handled by MLIR CastOp verifier
-  inferredType = node.targetType->getTypeName();
+  const std::string sourceType = polang::resolveGenericToDefault(inferredType);
+  const std::string targetType = node.targetType->getTypeName();
+
+  // Validate that both source and target are numeric (no bool casts)
+  if (sourceType != polang::TypeNames::UNKNOWN &&
+      sourceType != polang::TypeNames::TYPEVAR &&
+      !polang::isUnificationVar(sourceType)) {
+    if (!polang::isNumericType(sourceType)) {
+      reportError("cannot cast " + sourceType + " to " + targetType, node.loc);
+    } else if (!polang::isNumericType(targetType)) {
+      reportError("cannot cast " + sourceType + " to " + targetType, node.loc);
+    }
+  }
+
+  inferredType = targetType;
 }
 
 void TypeChecker::visit(const NBlock& node) {

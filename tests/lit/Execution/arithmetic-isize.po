@@ -1,0 +1,6 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test arithmetic operations on isize values
+; CHECK: 42 : isize
+def add_isize(a: isize, b: isize): isize = a + b
+add_isize(10 as isize, 32 as isize)

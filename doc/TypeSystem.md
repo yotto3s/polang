@@ -66,8 +66,8 @@ Polang supports a variety of numeric types with explicit width and signedness, p
 
 | Type | Description | Size | MLIR Type | LLVM Type |
 |------|-------------|------|-----------|-----------|
-| `isize` | Signed index (pointer width) | Platform-dependent | `!polang.index<signed>` | `index` |
-| `usize` | Unsigned index (pointer width) | Platform-dependent | `!polang.index<unsigned>` | `index` |
+| `isize` | Signed index (pointer width) | Platform-dependent | `!polang.index<signed>` | `i64` (platform-dependent) |
+| `usize` | Unsigned index (pointer width) | Platform-dependent | `!polang.index<unsigned>` | `i64` (platform-dependent) |
 
 Index types map to the platform-native pointer width. `usize` is intended for array indexing (Phase 2). Both types support explicit casting with `as` to/from integer and float types.
 
@@ -340,6 +340,13 @@ let d: u8 = 200              ; OK: 200 fits in u8
 let x: i8 = 1000             ; Error: 1000 doesn't fit in i8 (-128 to 127)
 let y: u8 = 256              ; Error: 256 doesn't fit in u8 (0 to 255)
 let z: u8 = -1               ; Error: -1 doesn't fit in u8 (unsigned)
+```
+
+Integer literals also adapt to index type contexts:
+
+```polang
+def x: isize = 42            ; OK: literal becomes isize
+def y: usize = 100           ; OK: literal becomes usize
 ```
 
 When no type context is available, literals default to `i64` (integers) or `f64` (floats):

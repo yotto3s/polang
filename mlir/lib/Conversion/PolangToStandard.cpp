@@ -744,6 +744,10 @@ struct GlobalOpLowering : public OpConversionPattern<GlobalOp> {
         initialValue =
             DenseElementsAttr::get(RankedTensorType::get({}, floatTy),
                                    rewriter.getFloatAttr(floatTy, 0.0));
+      } else if (isa<mlir::IndexType>(elementType)) {
+        initialValue = DenseElementsAttr::get(
+            RankedTensorType::get({}, elementType),
+            IntegerAttr::get(mlir::IndexType::get(rewriter.getContext()), 0));
       }
     }
 
