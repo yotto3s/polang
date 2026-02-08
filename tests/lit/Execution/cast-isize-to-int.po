@@ -1,6 +1,8 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-; Test isize to i64 cast via function
-; CHECK: 42 : i64
+(* Test isize to i64 cast via function *)
+(* CHECK: 42 : i64
+*)
 def to_i64(x: isize): i64 = x as i64
 to_i64(42 as isize)

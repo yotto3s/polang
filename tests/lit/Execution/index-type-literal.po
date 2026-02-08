@@ -1,6 +1,8 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-; Test isize variable with type annotation
-; CHECK: 42 : isize
+(* Test isize variable with type annotation *)
+(* CHECK: 42 : isize
+*)
 def make_isize(x: i64): isize = x as isize
 make_isize(42)

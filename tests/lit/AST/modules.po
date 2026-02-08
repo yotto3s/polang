@@ -1,28 +1,51 @@
-; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
 
-; Test module declaration AST with exports
-; CHECK:      NBlock
-; CHECK-NEXT: `-NModuleDeclaration 'Math' (add, sub, PI)
-; CHECK-NEXT:   |-NVariableDeclaration 'PI'
-; CHECK-NEXT:   | `-NDouble 3.14159
-; CHECK-NEXT:   |-NFunctionDeclaration 'add' (x: i64, y: i64) -> i64
-; CHECK-NEXT:   | `-NBlock
-; CHECK-NEXT:   |   `-NExpressionStatement
-; CHECK-NEXT:   |     `-NBinaryOperator '+'
-; CHECK-NEXT:   |       |-NIdentifier 'x'
-; CHECK-NEXT:   |       `-NIdentifier 'y'
-; CHECK-NEXT:   |-NFunctionDeclaration 'sub' (x: i64, y: i64) -> i64
-; CHECK-NEXT:   | `-NBlock
-; CHECK-NEXT:   |   `-NExpressionStatement
-; CHECK-NEXT:   |     `-NBinaryOperator '-'
-; CHECK-NEXT:   |       |-NIdentifier 'x'
-; CHECK-NEXT:   |       `-NIdentifier 'y'
-; CHECK-NEXT:   `-NFunctionDeclaration 'internal_helper' (x: i64) -> i64
-; CHECK-NEXT:     `-NBlock
-; CHECK-NEXT:       `-NExpressionStatement
-; CHECK-NEXT:         `-NBinaryOperator '*'
-; CHECK-NEXT:           |-NIdentifier 'x'
-; CHECK-NEXT:           `-NInteger 2
+(* Test module declaration AST with exports *)
+(* CHECK:      NBlock
+*)
+(* CHECK-NEXT: `-NModuleDeclaration 'Math' (add, sub, PI)
+*)
+(* CHECK-NEXT:   |-NVariableDeclaration 'PI'
+*)
+(* CHECK-NEXT:   | `-NDouble 3.14159
+*)
+(* CHECK-NEXT:   |-NFunctionDeclaration 'add' (x: i64, y: i64) -> i64
+*)
+(* CHECK-NEXT:   | `-NBlock
+*)
+(* CHECK-NEXT:   |   `-NExpressionStatement
+*)
+(* CHECK-NEXT:   |     `-NBinaryOperator '+'
+*)
+(* CHECK-NEXT:   |       |-NIdentifier 'x'
+*)
+(* CHECK-NEXT:   |       `-NIdentifier 'y'
+*)
+(* CHECK-NEXT:   |-NFunctionDeclaration 'sub' (x: i64, y: i64) -> i64
+*)
+(* CHECK-NEXT:   | `-NBlock
+*)
+(* CHECK-NEXT:   |   `-NExpressionStatement
+*)
+(* CHECK-NEXT:   |     `-NBinaryOperator '-'
+*)
+(* CHECK-NEXT:   |       |-NIdentifier 'x'
+*)
+(* CHECK-NEXT:   |       `-NIdentifier 'y'
+*)
+(* CHECK-NEXT:   `-NFunctionDeclaration 'internal_helper' (x: i64) -> i64
+*)
+(* CHECK-NEXT:     `-NBlock
+*)
+(* CHECK-NEXT:       `-NExpressionStatement
+*)
+(* CHECK-NEXT:         `-NBinaryOperator '*'
+*)
+(* CHECK-NEXT:           |-NIdentifier 'x'
+*)
+(* CHECK-NEXT:           `-NInteger 2
+*)
 
 module Math (add, sub, PI)
   def PI = 3.14159

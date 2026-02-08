@@ -1,6 +1,8 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-; Test float to integer saturating conversion
-; Large positive values saturate to INT32_MAX
-; CHECK: 2147483647 : i32
+(* Test float to integer saturating conversion *)
+(* Large positive values saturate to INT32_MAX *)
+(* CHECK: 2147483647 : i32
+*)
 999999999999.0 as i32

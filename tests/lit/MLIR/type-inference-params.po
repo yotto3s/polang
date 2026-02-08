@@ -1,23 +1,28 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
-; Functions with untyped parameters are resolved by the AST-level TypeChecker
-; when the body constrains the types. They are emitted as monomorphic functions.
+(* Functions with untyped parameters are resolved by the AST-level TypeChecker *)
+(* when the body constrains the types. They are emitted as monomorphic functions. *)
 
-; Function resolved to integer (x * 2 constrains x to integer)
-; CHECK: {{.*}}polang.func @double_it(%{{.*}}: !polang.integer<64, signed>){{.*}}
+(* Function resolved to integer (x * 2 constrains x to integer) *)
+(* CHECK: {{.*}}polang.func @double_it(%{{.*}}: !polang.integer<64, signed>){{.*}}
+*)
 def double_it(x) = x * 2
 
-; Function resolved to float (x / 2.0 constrains x to float)
-; CHECK: {{.*}}polang.func @half(%{{.*}}: !polang.float<64>){{.*}}
+(* Function resolved to float (x / 2.0 constrains x to float) *)
+(* CHECK: {{.*}}polang.func @half(%{{.*}}: !polang.float<64>){{.*}}
+*)
 def half(x) = x / 2.0
 
-; Function resolved to integer (x == 0 constrains x to integer)
-; CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.integer<64, signed>){{.*}}
+(* Function resolved to integer (x == 0 constrains x to integer) *)
+(* CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.integer<64, signed>){{.*}}
+*)
 def is_zero(x) = x == 0
 
-; Partially typed function (both resolve to i64)
-; CHECK: {{.*}}polang.func @add(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>){{.*}}
+(* Partially typed function (both resolve to i64) *)
+(* CHECK: {{.*}}polang.func @add(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>){{.*}}
+*)
 def add(x: i64, y) = x + y
 
-; Entry point (required for valid program)
+(* Entry point (required for valid program) *)
 0

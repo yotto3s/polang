@@ -124,6 +124,27 @@ TEST(IsInputIncomplete, FunctionCall) {
   EXPECT_FALSE(InputChecker::isInputIncomplete("f(1, 2)"));
 }
 
+// Block comment tests
+TEST(IsInputIncomplete, UnterminatedBlockComment) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("(* unterminated"));
+}
+
+TEST(IsInputIncomplete, CompleteBlockComment) {
+  EXPECT_FALSE(InputChecker::isInputIncomplete("(* complete *) 42"));
+}
+
+TEST(IsInputIncomplete, NestedUnterminatedComment) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("(* outer (* inner *)"));
+}
+
+TEST(IsInputIncomplete, CommentDoesNotAffectParenDepth) {
+  EXPECT_FALSE(InputChecker::isInputIncomplete("(* ( *) 42"));
+}
+
+TEST(IsInputIncomplete, EmptyComment) {
+  EXPECT_FALSE(InputChecker::isInputIncomplete("(**) 42"));
+}
+
 // Whitespace handling
 TEST(IsInputIncomplete, WhitespaceAfterOperator) {
   EXPECT_TRUE(InputChecker::isInputIncomplete("1 +   "));

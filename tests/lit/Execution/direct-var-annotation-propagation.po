@@ -1,6 +1,8 @@
-; RUN: %polang_repl %s | %FileCheck %s
-; Test: direct i64 annotation is compatible with inferred type
-; CHECK: 10 : i64
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+(* Test: direct i64 annotation is compatible with inferred type *)
+(* CHECK: 10 : i64
+*)
 def x = 10
 def y: i64 = x
 y

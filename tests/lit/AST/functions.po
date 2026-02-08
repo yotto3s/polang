@@ -1,11 +1,19 @@
-; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
 
-; Test function declaration
-; CHECK:      NBlock
-; CHECK-NEXT: `-NFunctionDeclaration 'add' (a: i64, b: i64) -> i64
-; CHECK-NEXT:   `-NBlock
-; CHECK-NEXT:     `-NExpressionStatement
-; CHECK-NEXT:       `-NBinaryOperator '+'
-; CHECK-NEXT:         |-NIdentifier 'a'
-; CHECK-NEXT:         `-NIdentifier 'b'
+(* Test function declaration *)
+(* CHECK:      NBlock
+*)
+(* CHECK-NEXT: `-NFunctionDeclaration 'add' (a: i64, b: i64) -> i64
+*)
+(* CHECK-NEXT:   `-NBlock
+*)
+(* CHECK-NEXT:     `-NExpressionStatement
+*)
+(* CHECK-NEXT:       `-NBinaryOperator '+'
+*)
+(* CHECK-NEXT:         |-NIdentifier 'a'
+*)
+(* CHECK-NEXT:         `-NIdentifier 'b'
+*)
 def add(a: i64, b: i64): i64 = a + b

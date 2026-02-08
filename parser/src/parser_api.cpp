@@ -14,6 +14,7 @@ using YY_BUFFER_STATE = struct yy_buffer_state*;
 extern YY_BUFFER_STATE yy_scan_string(const char* str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 extern void polang_reset_lexer_location();
+extern bool polang_lexer_has_error();
 
 std::unique_ptr<NBlock> polang_parse(const std::string& source) {
   polang_reset_lexer_location();
@@ -22,8 +23,8 @@ std::unique_ptr<NBlock> polang_parse(const std::string& source) {
   yy::parser parser;
   const int parseResult = parser.parse();
   yy_delete_buffer(buffer);
-  // Return nullptr if parsing failed
-  if (parseResult != 0) {
+  // Return nullptr if parsing failed or lexer reported an error
+  if (parseResult != 0 || polang_lexer_has_error()) {
     return nullptr;
   }
   return std::move(programBlock);

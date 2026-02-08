@@ -126,9 +126,6 @@ parseTypeName(const std::string& name) noexcept {
   if (name == "float") {
     return TypeKind::Float;
   }
-  if (name == "index") {
-    return TypeKind::Index;
-  }
   return std::nullopt;
 }
 

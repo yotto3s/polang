@@ -1,5 +1,7 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-; Test boolean comparison result
-; CHECK: true : bool
+(* Test boolean comparison result *)
+(* CHECK: true : bool
+*)
 1 < 2

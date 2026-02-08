@@ -1,11 +1,19 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
-; Test arithmetic operations
-; CHECK:        polang.func @__polang_entry() -> !polang.integer<64, signed> {
-; CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 1 : !polang.integer<64, signed>
-; CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 2 : !polang.integer<64, signed>
-; CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 3 : !polang.integer<64, signed>
-; CHECK-NEXT:     %{{[0-9]+}} = polang.mul %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
-; CHECK-NEXT:     %{{[0-9]+}} = polang.add %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
-; CHECK-NEXT:     polang.return %{{[0-9]+}} : !polang.integer<64, signed>
+(* Test arithmetic operations *)
+(* CHECK:        polang.func @__polang_entry() -> !polang.integer<64, signed> {
+*)
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 1 : !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 2 : !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 3 : !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.mul %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.add %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:     polang.return %{{[0-9]+}} : !polang.integer<64, signed>
+*)
 1 + 2 * 3

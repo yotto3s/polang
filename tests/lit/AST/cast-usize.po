@@ -1,8 +1,13 @@
-; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
 
-; Test cast expression AST for usize type
-; CHECK:      NBlock
-; CHECK-NEXT: `-NExpressionStatement
-; CHECK-NEXT:   `-NCastExpression -> usize
-; CHECK-NEXT:     `-NInteger 42
+(* Test cast expression AST for usize type *)
+(* CHECK:      NBlock
+*)
+(* CHECK-NEXT: `-NExpressionStatement
+*)
+(* CHECK-NEXT:   `-NCastExpression -> usize
+*)
+(* CHECK-NEXT:     `-NInteger 42
+*)
 42 as usize

@@ -1,5 +1,7 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-; Test integer to usize cast
-; CHECK: 42 : usize
+(* Test integer to usize cast *)
+(* CHECK: 42 : usize
+*)
 42 as usize

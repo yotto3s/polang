@@ -1,5 +1,7 @@
-; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
 
-; Test that casting from bool is rejected
-; CHECK: Type error: cannot cast bool to i32 at line 5, column 1
+(* Test that casting from bool is rejected *)
+(* CHECK: Type error: cannot cast bool to i32 at line 7, column 1
+*)
 true as i32

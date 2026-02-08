@@ -1,16 +1,20 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
-; Test that a polymorphic function called with different types creates
-; multiple specialized versions through monomorphization.
+(* Test that a polymorphic function called with different types creates *)
+(* multiple specialized versions through monomorphization. *)
 
-; Specialized versions (order may vary)
-; CHECK-DAG: {{.*}}polang.func @identity$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
-; CHECK-DAG: {{.*}}polang.func @identity$bool(%{{.*}}: !polang.bool) -> !polang.bool{{.*}}
+(* Specialized versions (order may vary) *)
+(* CHECK-DAG: {{.*}}polang.func @identity$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+*)
+(* CHECK-DAG: {{.*}}polang.func @identity$bool(%{{.*}}: !polang.bool) -> !polang.bool{{.*}}
+*)
 
-; Original generic function is erased
-; CHECK-NOT: polang.generic_func
+(* Original generic function is erased *)
+(* CHECK-NOT: polang.generic_func
+*)
 
 def identity(x) = x
-; Call with int and bool to create both specialized versions
+(* Call with int and bool to create both specialized versions *)
 identity(42)
 identity(true)

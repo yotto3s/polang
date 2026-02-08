@@ -1,5 +1,7 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-; Test basic arithmetic execution
-; CHECK: 7 : i64
+(* Test basic arithmetic execution *)
+(* CHECK: 7 : i64
+*)
 1 + 2 * 3

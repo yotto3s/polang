@@ -1,22 +1,26 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
-; Functions with untyped parameters used as if conditions.
-; The AST-level TypeChecker resolves the parameter types from usage context.
-; When called with bool arguments, the TypeChecker resolves params to bool.
+(* Functions with untyped parameters used as if conditions. *)
+(* The AST-level TypeChecker resolves the parameter types from usage context. *)
+(* When called with bool arguments, the TypeChecker resolves params to bool. *)
 
-; Function with bool parameter (resolved from call site)
-; CHECK: {{.*}}polang.func @is_truthy(%{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
+(* Function with bool parameter (resolved from call site) *)
+(* CHECK: {{.*}}polang.func @is_truthy(%{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
+*)
 def is_truthy(x) = if x then 1 else 0
 
-; Function with two bool parameters
-; CHECK: {{.*}}polang.func @both_true(%{{.*}}: !polang.bool, %{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
+(* Function with two bool parameters *)
+(* CHECK: {{.*}}polang.func @both_true(%{{.*}}: !polang.bool, %{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
+*)
 def both_true(x, y) = if x then (if y then 1 else 0) else 0
 
-; Function with bool parameter
-; CHECK: {{.*}}polang.func @negate(%{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
+(* Function with bool parameter *)
+(* CHECK: {{.*}}polang.func @negate(%{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
+*)
 def negate(x) = if x then 0 else 1
 
-; Call the functions with bool arguments
+(* Call the functions with bool arguments *)
 is_truthy(true)
 both_true(true, true)
 negate(false)

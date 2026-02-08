@@ -1,19 +1,33 @@
-; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
 
-; Test nested module declaration AST
-; CHECK:      NBlock
-; CHECK-NEXT: `-NModuleDeclaration 'Outer' (inner_func)
-; CHECK-NEXT:   |-NFunctionDeclaration 'inner_func' (x: i64) -> i64
-; CHECK-NEXT:   | `-NBlock
-; CHECK-NEXT:   |   `-NExpressionStatement
-; CHECK-NEXT:   |     `-NIdentifier 'x'
-; CHECK-NEXT:   `-NModuleDeclaration 'Inner' (nested_func)
-; CHECK-NEXT:     `-NFunctionDeclaration 'nested_func' (y: i64) -> i64
-; CHECK-NEXT:       `-NBlock
-; CHECK-NEXT:         `-NExpressionStatement
-; CHECK-NEXT:           `-NBinaryOperator '*'
-; CHECK-NEXT:             |-NIdentifier 'y'
-; CHECK-NEXT:             `-NInteger 2
+(* Test nested module declaration AST *)
+(* CHECK:      NBlock
+*)
+(* CHECK-NEXT: `-NModuleDeclaration 'Outer' (inner_func)
+*)
+(* CHECK-NEXT:   |-NFunctionDeclaration 'inner_func' (x: i64) -> i64
+*)
+(* CHECK-NEXT:   | `-NBlock
+*)
+(* CHECK-NEXT:   |   `-NExpressionStatement
+*)
+(* CHECK-NEXT:   |     `-NIdentifier 'x'
+*)
+(* CHECK-NEXT:   `-NModuleDeclaration 'Inner' (nested_func)
+*)
+(* CHECK-NEXT:     `-NFunctionDeclaration 'nested_func' (y: i64) -> i64
+*)
+(* CHECK-NEXT:       `-NBlock
+*)
+(* CHECK-NEXT:         `-NExpressionStatement
+*)
+(* CHECK-NEXT:           `-NBinaryOperator '*'
+*)
+(* CHECK-NEXT:             |-NIdentifier 'y'
+*)
+(* CHECK-NEXT:             `-NInteger 2
+*)
 
 module Outer (inner_func)
   def inner_func(x: i64): i64 = x

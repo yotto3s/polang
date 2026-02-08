@@ -1,6 +1,8 @@
-; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
 
-; Mutual recursion between let-group siblings should be rejected.
-; The first function (is_even) calls is_odd, which hasn't been declared yet.
-; CHECK: Type error: Undefined function: is_odd at line 6, column 50
+(* Mutual recursion between let-group siblings should be rejected. *)
+(* The first function (is_even) calls is_odd, which hasn't been declared yet. *)
+(* CHECK: Type error: Undefined function: is_odd at line 8, column 50
+*)
 let is_even(n: i64): i64 = if n == 0 then 1 else is_odd(n - 1) and is_odd(n: i64): i64 = if n == 0 then 0 else is_even(n - 1) in is_even(4)

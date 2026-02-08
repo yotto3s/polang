@@ -1205,7 +1205,8 @@ private:
     // i64
     Type returnType;
     if (inferredType == TypeNames::UNKNOWN ||
-        inferredType == TypeNames::TYPEVAR || isGenericType(inferredType)) {
+        inferredType == TypeNames::TYPEVAR || isGenericType(inferredType) ||
+        polang::isTypeParameter(inferredType)) {
       // Type is unknown or generic - use default i64
       returnType = getDefaultType();
     } else {

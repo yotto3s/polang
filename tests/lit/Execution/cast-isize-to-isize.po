@@ -1,6 +1,8 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-; Test isize to isize identity cast (noop)
-; CHECK: 42 : isize
+(* Test isize to isize identity cast (noop) *)
+(* CHECK: 42 : isize
+*)
 def identity(x: isize): isize = x as isize
 identity(42 as isize)

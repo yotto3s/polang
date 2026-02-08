@@ -1,5 +1,7 @@
-; RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
 
-; Test that casting to bool is rejected
-; CHECK: Type error: cannot cast i64 to bool at line 5, column 1
+(* Test that casting to bool is rejected *)
+(* CHECK: Type error: cannot cast i64 to bool at line 7, column 1
+*)
 42 as bool

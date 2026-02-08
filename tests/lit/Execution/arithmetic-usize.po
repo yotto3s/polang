@@ -1,6 +1,8 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-; Test arithmetic operations on usize values
-; CHECK: 42 : usize
+(* Test arithmetic operations on usize values *)
+(* CHECK: 42 : usize
+*)
 def add_usize(a: usize, b: usize): usize = a + b
 add_usize(10 as usize, 32 as usize)

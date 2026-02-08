@@ -1,19 +1,21 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-; Test execution of functions with inferred parameter types
+(* Test execution of functions with inferred parameter types *)
 
-; Inferred int parameter
+(* Inferred int parameter *)
 def double_int(x) = x * 2
 def r1 = double_int(5)
 
-; Inferred bool parameter
+(* Inferred bool parameter *)
 def to_int(x) = if x then 1 else 0
 def r2 = to_int(true)
 
-; Multiple inferred parameters - each param directly used with literal
+(* Multiple inferred parameters - each param directly used with literal *)
 def add3(a, b, c) = (a + 0) + (b + 0) + (c + 0)
 def r3 = add3(1, 2, 3)
 
-; Combine results: r1 (10) + r2 (1) + r3 (6) = 17
-; CHECK: 17 : i64
+(* Combine results: r1 (10) + r2 (1) + r3 (6) = 17 *)
+(* CHECK: 17 : i64
+*)
 r1 + r2 + r3
