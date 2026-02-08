@@ -1,14 +1,18 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
-; Test MLIR representation of i64 (default integer type)
+(* Test MLIR representation of i64 (default integer type) *)
 
-; CHECK: {{.*}}polang.constant.integer 42 : !polang.integer<64, signed>
+(* CHECK: {{.*}}polang.constant.integer 42 : !polang.integer<64, signed>
+*)
 def a = 42
 
-; CHECK: {{.*}}polang.constant.integer 100 : !polang.integer<64, signed>
+(* CHECK: {{.*}}polang.constant.integer 100 : !polang.integer<64, signed>
+*)
 def b = 100
 
-; Explicit i64 annotation works since literal is i64
-; CHECK: {{.*}}polang.constant.integer 50 : !polang.integer<64, signed>
+(* Explicit i64 annotation works since literal is i64 *)
+(* CHECK: {{.*}}polang.constant.integer 50 : !polang.integer<64, signed>
+*)
 def c: i64 = 50
 c

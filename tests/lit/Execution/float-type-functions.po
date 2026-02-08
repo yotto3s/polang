@@ -1,18 +1,20 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-; Test functions with float type annotations (f64)
-; Note: Float literals default to f64, so we test f64 functions here
+(* Test functions with float type annotations (f64) *)
+(* Note: Float literals default to f64, so we test f64 functions here *)
 
-; Function with explicit f64 type
+(* Function with explicit f64 type *)
 def add_f64(a: f64, b: f64): f64 = a + b
 
-; Test arithmetic with f64
+(* Test arithmetic with f64 *)
 def r1 = add_f64(1.5, 2.5)
 
-; Test nested calls
+(* Test nested calls *)
 def mul_f64(a: f64, b: f64): f64 = a * b
 def r2 = mul_f64(add_f64(1.0, 1.0), 3.0)
 
-; Final result
-; CHECK: 6.28{{.*}} : f64
+(* Final result *)
+(* CHECK: 6.28{{.*}} : f64
+*)
 add_f64(3.14, 3.14)

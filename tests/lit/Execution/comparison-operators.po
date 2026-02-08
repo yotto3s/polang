@@ -1,6 +1,7 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-; Test all comparison operators
+(* Test all comparison operators *)
 def lt(a: i64, b: i64): bool = a < b
 def le(a: i64, b: i64): bool = a <= b
 def gt(a: i64, b: i64): bool = a > b
@@ -8,12 +9,12 @@ def ge(a: i64, b: i64): bool = a >= b
 def eq(a: i64, b: i64): bool = a == b
 def ne(a: i64, b: i64): bool = a != b
 
-; Test less-than: 1 < 2 = true, 2 < 1 = false
-; First we need a way to combine results
-; Use integer encoding: true=1, false=0
+(* Test less-than: 1 < 2 = true, 2 < 1 = false *)
+(* First we need a way to combine results *)
+(* Use integer encoding: true=1, false=0 *)
 def btoi(b: bool): i64 = if b then 1 else 0
 
-; Sum all expected true comparisons
+(* Sum all expected true comparisons *)
 def result =
   btoi(lt(1, 2)) +
   btoi(le(1, 2)) +
@@ -24,5 +25,6 @@ def result =
   btoi(eq(2, 2)) +
   btoi(ne(1, 2))
 
-; CHECK: 8 : i64
+(* CHECK: 8 : i64
+*)
 result

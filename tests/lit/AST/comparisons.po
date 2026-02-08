@@ -1,28 +1,42 @@
-; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
 
-; Test all comparison operators
-; CHECK:      NBlock
+(* Test all comparison operators *)
+(* CHECK:      NBlock
+*)
 
-; CHECK:      |-NExpressionStatement
-; CHECK-NEXT: | `-NBinaryOperator '<'
+(* CHECK:      |-NExpressionStatement
+*)
+(* CHECK-NEXT: | `-NBinaryOperator '<'
+*)
 1 < 2
 
-; CHECK:      |-NExpressionStatement
-; CHECK-NEXT: | `-NBinaryOperator '<='
+(* CHECK:      |-NExpressionStatement
+*)
+(* CHECK-NEXT: | `-NBinaryOperator '<='
+*)
 1 <= 2
 
-; CHECK:      |-NExpressionStatement
-; CHECK-NEXT: | `-NBinaryOperator '>'
+(* CHECK:      |-NExpressionStatement
+*)
+(* CHECK-NEXT: | `-NBinaryOperator '>'
+*)
 1 > 2
 
-; CHECK:      |-NExpressionStatement
-; CHECK-NEXT: | `-NBinaryOperator '>='
+(* CHECK:      |-NExpressionStatement
+*)
+(* CHECK-NEXT: | `-NBinaryOperator '>='
+*)
 1 >= 2
 
-; CHECK:      |-NExpressionStatement
-; CHECK-NEXT: | `-NBinaryOperator '=='
+(* CHECK:      |-NExpressionStatement
+*)
+(* CHECK-NEXT: | `-NBinaryOperator '=='
+*)
 1 == 2
 
-; CHECK:      `-NExpressionStatement
-; CHECK-NEXT:   `-NBinaryOperator '!='
+(* CHECK:      `-NExpressionStatement
+*)
+(* CHECK-NEXT:   `-NBinaryOperator '!='
+*)
 1 != 2

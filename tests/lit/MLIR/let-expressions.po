@@ -1,11 +1,18 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
-; Test let-expression binding
-; Immutable variables use SSA values directly
-; CHECK:      polang.func @__polang_entry() -> !polang.integer<64, signed> {
-; CHECK-NEXT:   %{{[0-9]+}} = polang.constant.integer 1 : !polang.integer<64, signed>
-; CHECK-NEXT:   %{{[0-9]+}} = polang.constant.integer 1 : !polang.integer<64, signed>
-; CHECK-NEXT:   %{{[0-9]+}} = polang.add %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
-; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed>
-; CHECK-NEXT: }
+(* Test let-expression binding *)
+(* Immutable variables use SSA values directly *)
+(* CHECK:      polang.func @__polang_entry() -> !polang.integer<64, signed> {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.integer 1 : !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.integer 1 : !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.add %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed>
+*)
+(* CHECK-NEXT: }
+*)
 let x = 1 in x + 1

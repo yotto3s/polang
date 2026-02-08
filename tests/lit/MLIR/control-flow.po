@@ -1,13 +1,23 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
-; Test if-expression in MLIR
-; CHECK:      polang.func @max(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.integer<64, signed> {
-; CHECK-NEXT:   %{{[0-9]+}} = polang.cmp gt, %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed>
-; CHECK-NEXT:   %{{[0-9]+}} = polang.if %{{[0-9]+}} : !polang.bool -> !polang.integer<64, signed> {
-; CHECK-NEXT:     polang.yield %arg0 : !polang.integer<64, signed>
-; CHECK-NEXT:   } else {
-; CHECK-NEXT:     polang.yield %arg1 : !polang.integer<64, signed>
-; CHECK-NEXT:   }
-; CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed>
-; CHECK-NEXT: }
+(* Test if-expression in MLIR *)
+(* CHECK:      polang.func @max(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.integer<64, signed> {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp gt, %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.if %{{[0-9]+}} : !polang.bool -> !polang.integer<64, signed> {
+*)
+(* CHECK-NEXT:     polang.yield %arg0 : !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:   } else {
+*)
+(* CHECK-NEXT:     polang.yield %arg1 : !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:   }
+*)
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed>
+*)
+(* CHECK-NEXT: }
+*)
 def max(a: i64, b: i64): i64 = if a > b then a else b

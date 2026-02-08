@@ -5,16 +5,29 @@
 
 // Forward declaration for unified error reporting
 extern "C" void polang_report_error(const char* message, int line, int column);
+extern "C" void polang_report_syntax_error(const char* description, int line, int column);
 
 // Global location variable for the C++ parser
 yy::parser::location_type yylloc;
 
 static int yycolumn = 1;
 
+// Block comment nesting state
+static int commentDepth = 0;
+static int commentStartLine = 0;
+static int commentStartColumn = 0;
+static bool lexerError = false;
+
 void polang_reset_lexer_location() {
     yycolumn = 1;
     yylineno = 1;
     yylloc = yy::parser::location_type();
+    commentDepth = 0;
+    lexerError = false;
+}
+
+bool polang_lexer_has_error() {
+    return lexerError;
 }
 
 // Create location for token constructors
@@ -34,11 +47,19 @@ void polang_reset_lexer_location() {
 %option noyywrap
 %option yylineno
 
+%x COMMENT
+
 %%
+
+"(*"                    { commentDepth = 1; commentStartLine = yylineno; commentStartColumn = yylloc.begin.column; BEGIN(COMMENT); }
+<COMMENT>"(*"           { ++commentDepth; }
+<COMMENT>"*)"           { if (--commentDepth == 0) { BEGIN(INITIAL); } }
+<COMMENT>\n             { yycolumn = 1; }
+<COMMENT>.              { /* consume comment content */ }
+<COMMENT><<EOF>>        { lexerError = true; polang_report_syntax_error("unterminated comment", commentStartLine, commentStartColumn); BEGIN(INITIAL); return yy::parser::make_YYEOF(LOC); }
 
 [ \t]+                  { /* skip spaces and tabs */ }
 \n                      { yycolumn = 1; /* newline resets column */ }
-;[^\n]*                 { /* skip single-line comments */ }
 "let"                   { return yy::parser::make_TLET(LOC); }
 "def"                   { return yy::parser::make_TDEF(LOC); }
 "fun"                   { return yy::parser::make_TFUN(LOC); }
@@ -77,6 +98,6 @@ void polang_reset_lexer_location() {
 "*"                     { return yy::parser::make_TMUL(LOC); }
 "/"                     { return yy::parser::make_TDIV(LOC); }
 <<EOF>>                 { return yy::parser::make_YYEOF(LOC); }
-.                       { polang_report_error(yytext, yylineno, yylloc.begin.column); return yy::parser::make_YYEOF(LOC); }
+.                       { lexerError = true; polang_report_error(yytext, yylineno, yylloc.begin.column); return yy::parser::make_YYEOF(LOC); }
 
 %%

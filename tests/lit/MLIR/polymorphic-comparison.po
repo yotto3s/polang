@@ -1,14 +1,17 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
-; Test function with type inference from comparison.
-; The AST-level TypeChecker resolves the parameter type from context (x == 0
-; constrains x to integer), so the function is emitted as monomorphic.
+(* Test function with type inference from comparison. *)
+(* The AST-level TypeChecker resolves the parameter type from context (x == 0 *)
+(* constrains x to integer), so the function is emitted as monomorphic. *)
 
-; Monomorphic function with concrete types (resolved by AST TypeChecker)
-; CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.integer<64, signed>) -> !polang.bool{{.*}}
+(* Monomorphic function with concrete types (resolved by AST TypeChecker) *)
+(* CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.integer<64, signed>) -> !polang.bool{{.*}}
+*)
 
-; Verify comparison operation with concrete types
-; CHECK: {{.*}}polang.cmp eq{{.*}}!polang.integer<64, signed>{{.*}}
+(* Verify comparison operation with concrete types *)
+(* CHECK: {{.*}}polang.cmp eq{{.*}}!polang.integer<64, signed>{{.*}}
+*)
 
 def is_zero(x) = x == 0
 is_zero(5)

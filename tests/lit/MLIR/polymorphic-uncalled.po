@@ -1,13 +1,16 @@
-; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
 
-; Test that an uncalled polymorphic function is erased after monomorphization.
-; Since there are no call sites, no specialized version is created.
+(* Test that an uncalled polymorphic function is erased after monomorphization. *)
+(* Since there are no call sites, no specialized version is created. *)
 
-; Only the entry function should remain
-; CHECK: {{.*}}polang.func @__polang_entry(){{.*}}
+(* Only the entry function should remain *)
+(* CHECK: {{.*}}polang.func @__polang_entry(){{.*}}
+*)
 
-; The unused function should not exist in any form
-; CHECK-NOT: @unused_identity
+(* The unused function should not exist in any form *)
+(* CHECK-NOT: @unused_identity
+*)
 
 def unused_identity(x) = x
 42

@@ -1,7 +1,9 @@
-; RUN: %polang_repl %s | %FileCheck %s
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-; Test fibonacci sequence with let expressions
-; CHECK: 5 : i64
+(* Test fibonacci sequence with let expressions *)
+(* CHECK: 5 : i64
+*)
 def fib5 =
   let f0 = 0 and f1 = 1 in
   let f2 = f0 + f1 in

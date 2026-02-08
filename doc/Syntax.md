@@ -91,10 +91,10 @@ false
 Variables are declared using the `def` keyword. All variables in Polang are **immutable**:
 
 ```
-def x = 5           ; type inferred as i64
-def y = 3.14        ; type inferred as f64
-def z = true        ; type inferred as bool
-def w : i64 = 10    ; explicit type annotation
+def x = 5           (* type inferred as i64 *)
+def y = 3.14        (* type inferred as f64 *)
+def z = true        (* type inferred as bool *)
+def w : i64 = 10    (* explicit type annotation *)
 ```
 
 **Syntax:**
@@ -115,17 +115,17 @@ def <identifier> : <type> = <expression>
 Functions are declared using `def` with parameter lists:
 
 ```
-def add(x: i64, y: i64): i64 = x + y   ; explicit types
-def square(n: i64) = n * n              ; return type inferred as i64
-def double(x) = x * 2                   ; parameter type inferred from body (i64)
-def half(x) = x / 2.0                   ; parameter type inferred as f64
+def add(x: i64, y: i64): i64 = x + y   (* explicit types *)
+def square(n: i64) = n * n              (* return type inferred as i64 *)
+def double(x) = x * 2                   (* parameter type inferred from body (i64) *)
+def half(x) = x / 2.0                   (* parameter type inferred as f64 *)
 ```
 
 **Syntax:**
 ```
 def <name>(<param>: <type>, ...): <return_type> = <expression>
 def <name>(<param>: <type>, ...) = <expression>
-def <name>(<param>, ...) = <expression>    ; types inferred
+def <name>(<param>, ...) = <expression>    (* types inferred *)
 ```
 
 - Parameters are comma-separated within parentheses
@@ -144,10 +144,10 @@ Polang uses Hindley-Milner style type inference to determine parameter types. Wh
 **Local inference examples:**
 
 ```
-def double(x) = x * 2       ; x inferred as i64 (from * 2)
-def half(x) = x / 2.0       ; x inferred as f64 (from / 2.0)
-def is_zero(x) = x == 0     ; x inferred as i64 (from == 0)
-def add(x: i64, y) = x + y  ; y inferred as i64 (from + x)
+def double(x) = x * 2       (* x inferred as i64 (from * 2) *)
+def half(x) = x / 2.0       (* x inferred as f64 (from / 2.0) *)
+def is_zero(x) = x == 0     (* x inferred as i64 (from == 0) *)
+def add(x: i64, y) = x + y  (* y inferred as i64 (from + x) *)
 ```
 
 **Local inference rules:**
@@ -162,13 +162,13 @@ def add(x: i64, y) = x + y  ; y inferred as i64 (from + x)
 When a parameter's type cannot be determined from local usage, Polang infers it from the call site:
 
 ```
-def identity(x) = x         ; x is polymorphic (type variable)
-identity(42)                ; x inferred as i64 from call site
+def identity(x) = x         (* x is polymorphic (type variable) *)
+identity(42)                (* x inferred as i64 from call site *)
 ```
 
 ```
-def unused(x) = 42          ; x is polymorphic (type variable)
-unused(1)                   ; x inferred as i64 from call site
+def unused(x) = 42          (* x is polymorphic (type variable) *)
+unused(1)                   (* x inferred as i64 from call site *)
 ```
 
 This enables polymorphic functions where the same function definition can work with different types based on how it's called. The type inference happens at the MLIR level using a unification-based algorithm.
@@ -255,20 +255,20 @@ Or a function binding:
 **Examples:**
 
 ```
-; Simple variable bindings
+(* Simple variable bindings *)
 let a = 10 and b = 20 in a + b
 let x = 5 in let y = x + 1 in y * 2
 
-; Function binding in let expression
+(* Function binding in let expression *)
 let f(x: i64): i64 = x + 1 in f(5)
 
-; Multiple function bindings
+(* Multiple function bindings *)
 let square(n: i64): i64 = n * n and cube(n: i64): i64 = n * n * n in square(3) + cube(2)
 
-; Mixed variable and function bindings
+(* Mixed variable and function bindings *)
 let x = 10 and double(y: i64): i64 = y * 2 in double(x)
 
-; Function with inferred return type
+(* Function with inferred return type *)
 let inc(n: i64) = n + 1 in inc(41)
 ```
 
@@ -278,8 +278,8 @@ Functions can capture variables from their enclosing scope:
 
 ```
 def x = 10
-def f() = x + 1   ; f captures x
-f()               ; returns 11
+def f() = x + 1   (* f captures x *)
+f()               (* returns 11 *)
 ```
 
 **Capture Semantics:**
@@ -289,22 +289,22 @@ f()               ; returns 11
 **Examples:**
 
 ```
-; Simple capture
+(* Simple capture *)
 def multiplier = 3
 def scale(n: i64) = n * multiplier
-scale(10)  ; returns 30
+scale(10)  (* returns 30 *)
 
-; Capture in let expression
+(* Capture in let expression *)
 def result =
   let base = 100 and
       add(x: i64) = base + x
-  in add(5)  ; returns 105
+  in add(5)  (* returns 105 *)
 
-; Multiple captures
+(* Multiple captures *)
 def a = 1
 def b = 2
 def sum() = a + b
-sum()  ; returns 3
+sum()  (* returns 3 *)
 ```
 
 ## Expressions
@@ -353,9 +353,9 @@ The `as` operator converts a value from one numeric type to another. Only numeri
 
 ```
 def a: i64 = 1000
-def b: i32 = a as i32           ; narrow i64 to i32
-def c: f64 = a as f64           ; convert integer to float
-def d: i32 = 3.7 as i32         ; convert float to integer (truncates to 3)
+def b: i32 = a as i32           (* narrow i64 to i32 *)
+def c: f64 = a as f64           (* convert integer to float *)
+def d: i32 = 3.7 as i32         (* convert float to integer (truncates to 3) *)
 ```
 
 See [Type Conversions](TypeSystem.md#type-conversions) for detailed conversion semantics.
@@ -373,18 +373,24 @@ From highest to lowest:
 Parentheses can be used to override precedence:
 
 ```
-(1 + 2) * 3    // 9, not 7
+(1 + 2) * 3    (* 9, not 7 *)
 ```
 
 ## Comments
 
-Polang supports single-line comments using the semicolon (`;`), following Lisp-style syntax:
+Polang uses OCaml-style block comments with `(* ... *)` delimiters:
 
 ```
-; This is a comment
-def x = 5  ; inline comment after code
-; Comments extend to the end of the line
+(* This is a comment *)
+def x = 5  (* inline comment after code *)
+
+(* Comments can span
+   multiple lines *)
+
+(* Comments can be nested: (* inner comment *) still in outer comment *)
 ```
+
+Comments support arbitrary nesting, so `(* outer (* inner *) outer *)` is valid. An unterminated comment produces a syntax error at the position of the opening `(*`.
 
 Comments are ignored by the parser and do not affect program execution. A file containing only comments is valid (produces an empty program).
 
@@ -400,7 +406,7 @@ Modules are declared using the `module`/`endmodule` keywords with a Haskell-styl
 module Math (add, PI)
   def PI = 3.14159
   def add(x: i64, y: i64): i64 = x + y
-  def internal_helper(x: i64): i64 = x * 2  ; not exported
+  def internal_helper(x: i64): i64 = x * 2  (* not exported *)
 endmodule
 ```
 
@@ -426,8 +432,8 @@ module Math (add, PI)
   def add(x: i64, y: i64): i64 = x + y
 endmodule
 
-Math.PI              ; access exported variable
-Math.add(1, 2)       ; call exported function
+Math.PI              (* access exported variable *)
+Math.add(1, 2)       (* call exported function *)
 ```
 
 ### Import Statements
@@ -436,23 +442,23 @@ Import statements bring module symbols into the current scope:
 
 **Import entire module:**
 ```
-import Math                  ; use as Math.add, Math.PI
+import Math                  (* use as Math.add, Math.PI *)
 ```
 
 **Import with alias:**
 ```
-import Math as M             ; use as M.add, M.PI
+import Math as M             (* use as M.add, M.PI *)
 ```
 
 **Import specific items:**
 ```
-from Math import add, PI     ; use directly as add, PI
-from Math import add as plus ; use as plus instead of add
+from Math import add, PI     (* use directly as add, PI *)
+from Math import add as plus (* use as plus instead of add *)
 ```
 
 **Import all exports:**
 ```
-from Math import *           ; import all exported symbols
+from Math import *           (* import all exported symbols *)
 ```
 
 **Syntax:**
@@ -474,26 +480,26 @@ module Math (add, mul, PI)
   def mul(x: i64, y: i64): i64 = x * y
 endmodule
 
-; Using qualified access
-Math.add(2, Math.mul(2, 3))  ; returns 8
+(* Using qualified access *)
+Math.add(2, Math.mul(2, 3))  (* returns 8 *)
 
-; Using imports
+(* Using imports *)
 from Math import add, mul
-mul(2, add(1, 2))            ; returns 6
+mul(2, add(1, 2))            (* returns 6 *)
 ```
 
 **Private helpers:**
 ```
 module Utils (process)
-  ; Public function
+  (* Public function *)
   def process(x: i64): i64 = helper(x) + helper(x)
 
-  ; Private helper (not exported)
+  (* Private helper (not exported) *)
   def helper(x: i64): i64 = x * 2
 endmodule
 
-Utils.process(5)   ; returns 20
-Utils.helper(5)    ; ERROR: helper is not exported
+Utils.process(5)   (* returns 20 *)
+Utils.helper(5)    (* ERROR: helper is not exported *)
 ```
 
 **Nested modules:**
@@ -504,7 +510,7 @@ module Outer (Inner)
   endmodule
 endmodule
 
-Outer.Inner.foo(5)  ; returns 6
+Outer.Inner.foo(5)  (* returns 6 *)
 ```
 
 ## Grammar Summary
@@ -591,7 +597,9 @@ base_type   ::= "i8" | "i16" | "i32" | "i64"
               | "f32" | "f64"
               | "bool"
 
-comment     ::= ";" [^\n]*
+comment      ::= "(*" comment_body "*)"
+comment_body ::= { any_char | comment }    (* nested comments allowed *)
+any_char     ::= ? any character other than "(*", "*)", or EOF ?
 ```
 
 ## Examples
@@ -642,20 +650,20 @@ def larger = max(10, 20)
 ### Type Conversions
 
 ```
-; Integer narrowing (truncates)
+(* Integer narrowing (truncates) *)
 def big: i64 = 1000
-def small: i8 = big as i8        ; small = -24 (1000 mod 256, interpreted as signed)
+def small: i8 = big as i8        (* small = -24 (1000 mod 256, interpreted as signed) *)
 
-; Integer to float
+(* Integer to float *)
 def n: i32 = 42
-def f: f64 = n as f64            ; f = 42.0
+def f: f64 = n as f64            (* f = 42.0 *)
 
-; Float to integer (truncates toward zero, saturates at bounds)
+(* Float to integer (truncates toward zero, saturates at bounds) *)
 def pi: f64 = 3.14159
-def rounded: i32 = pi as i32     ; rounded = 3
+def rounded: i32 = pi as i32     (* rounded = 3 *)
 
-; Mixed arithmetic with conversions
+(* Mixed arithmetic with conversions *)
 def a: i32 = 10
 def b: i64 = 20
-def sum: i64 = a as i64 + b      ; convert a to i64 before adding
+def sum: i64 = a as i64 + b      (* convert a to i64 before adding *)
 ```

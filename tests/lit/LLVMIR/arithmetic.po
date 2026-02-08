@@ -1,26 +1,43 @@
-; RUN: %polang_compiler %s | %FileCheck %s
+(* RUN: %polang_compiler %s | %FileCheck %s
+*)
 
-; Test arithmetic operations in LLVM IR
-; CHECK:      define i64 @add(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
-; CHECK-NEXT:   %{{[0-9]+}} = add i64 %{{[0-9]+}}, %{{[0-9]+}}
-; CHECK-NEXT:   ret i64 %{{[0-9]+}}
-; CHECK-NEXT: }
+(* Test arithmetic operations in LLVM IR *)
+(* CHECK:      define i64 @add(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = add i64 %{{[0-9]+}}, %{{[0-9]+}}
+*)
+(* CHECK-NEXT:   ret i64 %{{[0-9]+}}
+*)
+(* CHECK-NEXT: }
+*)
 def add(a: i64, b: i64): i64 = a + b
 
-; CHECK:      define i64 @sub(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
-; CHECK-NEXT:   %{{[0-9]+}} = sub i64 %{{[0-9]+}}, %{{[0-9]+}}
-; CHECK-NEXT:   ret i64 %{{[0-9]+}}
-; CHECK-NEXT: }
+(* CHECK:      define i64 @sub(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = sub i64 %{{[0-9]+}}, %{{[0-9]+}}
+*)
+(* CHECK-NEXT:   ret i64 %{{[0-9]+}}
+*)
+(* CHECK-NEXT: }
+*)
 def sub(a: i64, b: i64): i64 = a - b
 
-; CHECK:      define i64 @mul(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
-; CHECK-NEXT:   %{{[0-9]+}} = mul i64 %{{[0-9]+}}, %{{[0-9]+}}
-; CHECK-NEXT:   ret i64 %{{[0-9]+}}
-; CHECK-NEXT: }
+(* CHECK:      define i64 @mul(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = mul i64 %{{[0-9]+}}, %{{[0-9]+}}
+*)
+(* CHECK-NEXT:   ret i64 %{{[0-9]+}}
+*)
+(* CHECK-NEXT: }
+*)
 def mul(a: i64, b: i64): i64 = a * b
 
-; CHECK:      define i64 @div(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
-; CHECK-NEXT:   %{{[0-9]+}} = sdiv i64 %{{[0-9]+}}, %{{[0-9]+}}
-; CHECK-NEXT:   ret i64 %{{[0-9]+}}
-; CHECK-NEXT: }
+(* CHECK:      define i64 @div(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = sdiv i64 %{{[0-9]+}}, %{{[0-9]+}}
+*)
+(* CHECK-NEXT:   ret i64 %{{[0-9]+}}
+*)
+(* CHECK-NEXT: }
+*)
 def div(a: i64, b: i64): i64 = a / b

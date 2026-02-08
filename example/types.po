@@ -1,10 +1,10 @@
-; Type system demonstration
-def i: i64 = 42           ; integer type
-def d: f64 = 3.14159   ; double type
-def b: bool = true        ; boolean type
+(* Type system demonstration *)
+def i: i64 = 42           (* integer type *)
+def d: f64 = 3.14159   (* double type *)
+def b: bool = true        (* boolean type *)
 
-; Comparisons return bool
+(* Comparisons return bool *)
 def is_positive: bool = i > 0
 def is_large: bool = d > 3.0
 
-if is_positive then i * 2 else 0  ; result: 84
+if is_positive then i * 2 else 0  (* result: 84 *)

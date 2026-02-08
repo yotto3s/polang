@@ -1,9 +1,13 @@
-; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
 
-; Test from import statement AST
-; CHECK:      NBlock
-; CHECK-NEXT: |-NModuleDeclaration 'Math' (add, PI)
-; CHECK:      `-NImportStatement from Math import add, PI
+(* Test from import statement AST *)
+(* CHECK:      NBlock
+*)
+(* CHECK-NEXT: |-NModuleDeclaration 'Math' (add, PI)
+*)
+(* CHECK:      `-NImportStatement from Math import add, PI
+*)
 
 module Math (add, PI)
   def PI = 3.14
