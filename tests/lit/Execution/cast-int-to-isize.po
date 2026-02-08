@@ -1,0 +1,5 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test integer to isize cast
+; CHECK: 42 : isize
+42 as isize

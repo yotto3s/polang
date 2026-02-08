@@ -62,6 +62,15 @@ Polang supports a variety of numeric types with explicit width and signedness, p
 | `f32` | Single-precision float | 32-bit | `!polang.float<32>` | `f32` |
 | `f64` | Double-precision float | 64-bit | `!polang.float<64>` | `f64` |
 
+### Index Types
+
+| Type | Description | Size | MLIR Type | LLVM Type |
+|------|-------------|------|-----------|-----------|
+| `isize` | Signed index (pointer width) | Platform-dependent | `!polang.index<signed>` | `index` |
+| `usize` | Unsigned index (pointer width) | Platform-dependent | `!polang.index<unsigned>` | `index` |
+
+Index types map to the platform-native pointer width. `usize` is intended for array indexing (Phase 2). Both types support explicit casting with `as` to/from integer and float types.
+
 ### Boolean Type
 
 | Type | Description | Size | MLIR Type | LLVM Type |
@@ -89,6 +98,10 @@ struct TypeNames {
   // Floating-point
   static constexpr const char* F32 = "f32";
   static constexpr const char* F64 = "f64";
+
+  // Index types
+  static constexpr const char* ISIZE = "isize";
+  static constexpr const char* USIZE = "usize";
 
   // Other types
   static constexpr const char* BOOL = "bool";
@@ -161,8 +174,13 @@ Only numeric-to-numeric conversions are permitted:
 |-----------|---------|---------|
 | Any integer (`i8`-`i64`, `u8`-`u64`) | Any integer | ✓ |
 | Any integer | Any float (`f32`, `f64`) | ✓ |
+| Any integer | Any index (`isize`, `usize`) | ✓ |
 | Any float | Any integer | ✓ |
 | Any float | Any float | ✓ |
+| Any float | Any index | ✓ |
+| Any index | Any integer | ✓ |
+| Any index | Any float | ✓ |
+| Any index | Any index | ✓ |
 | `bool` | Any type | ✗ |
 | Any type | `bool` | ✗ |
 
@@ -272,6 +290,37 @@ let h: i32 = (-1.0 / 0.0) as i32  ; h = -2147483648 (i32 min)
 
 ; NaN handling
 let i: i32 = (0.0 / 0.0) as i32   ; i = 0
+```
+
+#### Integer to Index
+
+Converting an integer to `isize` or `usize` uses `arith.index_cast` (signed) or `arith.index_castui` (unsigned):
+
+```polang
+def a: i64 = 42
+def b: isize = a as isize       ; signed index cast
+def c: usize = a as usize       ; unsigned index cast
+```
+
+#### Index to Integer
+
+Converting `isize` or `usize` to an integer type uses the corresponding signed or unsigned index cast:
+
+```polang
+def a: isize = 42 as isize
+def b: i64 = a as i64           ; signed index cast to i64
+```
+
+#### Float to/from Index
+
+Float-to-index and index-to-float conversions use a two-step process via `i64`:
+
+```polang
+def a: f64 = 3.14
+def b: isize = a as isize       ; float → i64 (saturating truncation) → index
+
+def c: isize = 42 as isize
+def d: f64 = c as f64           ; index → i64 → float
 ```
 
 ### Literal Type Inference

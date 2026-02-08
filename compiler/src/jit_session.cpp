@@ -173,6 +173,7 @@ std::optional<JitResult> JITSession::execute(const std::string& entryName,
     auto entryFn = sym->toPtr<int32_t (*)()>();
     return entryFn();
   }
+  // i64, u64, isize, usize all return as int64_t (index is pointer-width)
   auto entryFn = sym->toPtr<int64_t (*)()>();
   return entryFn();
 }

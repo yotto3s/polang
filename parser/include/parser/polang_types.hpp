@@ -11,7 +11,7 @@ constexpr unsigned DEFAULT_INT_WIDTH = 64;
 constexpr unsigned DEFAULT_FLOAT_WIDTH = 64;
 
 /// Enumeration of Polang's built-in type kinds.
-enum class TypeKind { Integer, Float, Bool, Function, TypeVar, Unknown };
+enum class TypeKind { Integer, Float, Bool, Index, Function, TypeVar, Unknown };
 
 /// Signedness for integer types.
 enum class TypeSignedness { Signed, Unsigned };
@@ -39,8 +39,11 @@ struct TypeMetadata {
   [[nodiscard]] constexpr bool isUnsigned() const noexcept {
     return signedness == TypeSignedness::Unsigned;
   }
+  [[nodiscard]] constexpr bool isIndex() const noexcept {
+    return kind == TypeKind::Index;
+  }
   [[nodiscard]] constexpr bool isNumeric() const noexcept {
-    return isInteger() || isFloat();
+    return isInteger() || isFloat() || isIndex();
   }
 };
 
@@ -57,6 +60,9 @@ struct TypeNames {
   static constexpr const char* U16 = "u16";
   static constexpr const char* U32 = "u32";
   static constexpr const char* U64 = "u64";
+  // Index types (platform-native pointer width)
+  static constexpr const char* ISIZE = "isize";
+  static constexpr const char* USIZE = "usize";
   // Floats
   static constexpr const char* F32 = "f32";
   static constexpr const char* F64 = "f64";
@@ -83,6 +89,10 @@ parseTypeName(const std::string& name) noexcept {
   if (name == TypeNames::U8 || name == TypeNames::U16 ||
       name == TypeNames::U32 || name == TypeNames::U64) {
     return TypeKind::Integer;
+  }
+  // Index types
+  if (name == TypeNames::ISIZE || name == TypeNames::USIZE) {
+    return TypeKind::Index;
   }
   // Generic integer (unresolved literal)
   if (name == TypeNames::GENERIC_INT) {
@@ -116,6 +126,9 @@ parseTypeName(const std::string& name) noexcept {
   if (name == "float") {
     return TypeKind::Float;
   }
+  if (name == "index") {
+    return TypeKind::Index;
+  }
   return std::nullopt;
 }
 
@@ -146,9 +159,15 @@ isUnsignedIntegerType(const std::string& typeName) noexcept {
   return typeName == TypeNames::F32 || typeName == TypeNames::F64;
 }
 
-/// Check if a type name represents a numeric type (integer or float).
+/// Check if a type name represents an index type (isize or usize).
+[[nodiscard]] inline bool isIndexType(const std::string& typeName) noexcept {
+  return typeName == TypeNames::ISIZE || typeName == TypeNames::USIZE;
+}
+
+/// Check if a type name represents a numeric type (integer, float, or index).
 [[nodiscard]] inline bool isNumericType(const std::string& typeName) noexcept {
-  return isIntegerType(typeName) || isFloatType(typeName);
+  return isIntegerType(typeName) || isFloatType(typeName) ||
+         isIndexType(typeName);
 }
 
 /// Check if a type name represents a boolean type.
@@ -204,11 +223,12 @@ template <typename Predicate>
     return true;
   }
 
-  // Generic int is compatible with any concrete integer type
-  if (detail::checkSymmetric(
-          t1, t2, [](const std::string& a, const std::string& b) {
-            return isGenericIntegerType(a) && isIntegerType(b);
-          })) {
+  // Generic int is compatible with any concrete integer or index type
+  if (detail::checkSymmetric(t1, t2,
+                             [](const std::string& a, const std::string& b) {
+                               return isGenericIntegerType(a) &&
+                                      (isIntegerType(b) || isIndexType(b));
+                             })) {
     return true;
   }
 
@@ -240,7 +260,7 @@ template <typename Predicate>
 resolveGenericType(const std::string& type,
                    const std::string& contextType) noexcept {
   if (isGenericIntegerType(type)) {
-    if (isIntegerType(contextType)) {
+    if (isIntegerType(contextType) || isIndexType(contextType)) {
       return contextType;
     }
     // Default to i64
@@ -284,6 +304,8 @@ resolveAllGenericsToDefault(const std::string& type) noexcept {
     return "float";
   case TypeKind::Bool:
     return "bool";
+  case TypeKind::Index:
+    return "index";
   case TypeKind::Function:
     return "function";
   case TypeKind::TypeVar:
@@ -348,6 +370,20 @@ getTypeMetadata(const std::string& typeName) noexcept {
   if (typeName == TypeNames::U64) {
     meta.kind = TypeKind::Integer;
     meta.width = 64;
+    meta.signedness = TypeSignedness::Unsigned;
+    return meta;
+  }
+
+  // Index types (platform-native pointer width)
+  if (typeName == TypeNames::ISIZE) {
+    meta.kind = TypeKind::Index;
+    meta.width = 0; // Platform-dependent, no fixed width
+    meta.signedness = TypeSignedness::Signed;
+    return meta;
+  }
+  if (typeName == TypeNames::USIZE) {
+    meta.kind = TypeKind::Index;
+    meta.width = 0; // Platform-dependent, no fixed width
     meta.signedness = TypeSignedness::Unsigned;
     return meta;
   }

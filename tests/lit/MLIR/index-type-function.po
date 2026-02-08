@@ -1,0 +1,10 @@
+; RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+
+; Test MLIR generation for functions with isize/usize parameter and return types
+; CHECK:  polang.func @to_i64(%{{.*}}: !polang.index<signed>) -> !polang.integer<64, signed> {
+; CHECK-NEXT:    %{{[0-9]+}} = polang.cast %{{.*}} : !polang.index<signed> -> !polang.integer<64, signed>
+; CHECK:  polang.func @to_usize(%{{.*}}: !polang.integer<64, signed>) -> !polang.index<unsigned> {
+; CHECK-NEXT:    %{{[0-9]+}} = polang.cast %{{.*}} : !polang.integer<64, signed> -> !polang.index<unsigned>
+def to_i64(x: isize): i64 = x as i64
+def to_usize(x: i64): usize = x as usize
+to_i64(42 as isize)

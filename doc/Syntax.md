@@ -39,6 +39,15 @@ Polang supports a variety of numeric types with explicit width and signedness:
 | `f32` | Single-precision float     | 32-bit  |
 | `f64` | Double-precision float     | 64-bit  |
 
+### Index Types
+
+| Type    | Description                    | Size               |
+|---------|--------------------------------|---------------------|
+| `isize` | Signed index (pointer width)   | Platform-dependent  |
+| `usize` | Unsigned index (pointer width) | Platform-dependent  |
+
+Index types map to the platform-native pointer width. `usize` is intended for array indexing (Phase 2). Both types support explicit casting with `as`.
+
 ### Boolean Type
 
 | Type   | Description   | Size   |
@@ -589,6 +598,7 @@ type        ::= base_type
 base_type   ::= "i8" | "i16" | "i32" | "i64"
               | "u8" | "u16" | "u32" | "u64"
               | "f32" | "f64"
+              | "isize" | "usize"
               | "bool"
 
 comment     ::= ";" [^\n]*
@@ -658,4 +668,9 @@ def rounded: i32 = pi as i32     ; rounded = 3
 def a: i32 = 10
 def b: i64 = 20
 def sum: i64 = a as i64 + b      ; convert a to i64 before adding
+
+; Index type conversions
+def idx: isize = 42 as isize     ; convert integer to isize
+def n: i64 = idx as i64          ; convert isize back to integer
+def uidx: usize = 10 as usize   ; convert integer to usize
 ```

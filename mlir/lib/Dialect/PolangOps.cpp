@@ -747,10 +747,12 @@ LogicalResult CastOp::verify() {
   }
 
   // Both types must be numeric (not bool)
-  const bool inputIsNumeric =
-      isa<polang::IntegerType>(inputType) || isa<polang::FloatType>(inputType);
+  const bool inputIsNumeric = isa<polang::IntegerType>(inputType) ||
+                              isa<polang::FloatType>(inputType) ||
+                              isa<polang::IndexType>(inputType);
   const bool resultIsNumeric = isa<polang::IntegerType>(resultType) ||
-                               isa<polang::FloatType>(resultType);
+                               isa<polang::FloatType>(resultType) ||
+                               isa<polang::IndexType>(resultType);
 
   if (!inputIsNumeric) {
     return emitOpError("input type must be numeric, got ") << inputType;
@@ -810,12 +812,14 @@ ParseResult ConstantIntegerOp::parse(OpAsmParser& parser,
   }
 
   // Create the IntegerAttr with the appropriate bit width
-  unsigned width = 64; // Default width for type parameters
+  unsigned width = 64; // Default width for type parameters and index types
   if (auto intType = dyn_cast<polang::IntegerType>(resultType)) {
     width = intType.getWidth();
-  } else if (!isa<TypeParamType>(resultType)) {
-    return parser.emitError(parser.getNameLoc(),
-                            "expected polang.integer or type_param type");
+  } else if (!isa<polang::IndexType>(resultType) &&
+             !isa<TypeParamType>(resultType)) {
+    return parser.emitError(
+        parser.getNameLoc(),
+        "expected polang.integer, polang.index, or type_param type");
   }
   auto attr = IntegerAttr::get(
       mlir::IntegerType::get(parser.getContext(), width), value);

@@ -1,0 +1,5 @@
+; RUN: %polang_repl %s | %FileCheck %s
+
+; Test float to usize cast (truncates to integer)
+; CHECK: 3 : usize
+3.14 as usize

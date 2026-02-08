@@ -1,0 +1,13 @@
+; RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+
+; Test isize/usize in function parameter and return type annotations
+; CHECK:      NBlock
+; CHECK-NEXT: |-NFunctionDeclaration 'make_isize' (x: i64) -> isize
+; CHECK:      |-NFunctionDeclaration 'to_i64' (x: isize) -> i64
+; CHECK:      `-NExpressionStatement
+; CHECK-NEXT:   `-NMethodCall 'to_i64'
+; CHECK-NEXT:     `-NMethodCall 'make_isize'
+; CHECK-NEXT:       `-NInteger 42
+def make_isize(x: i64): isize = x as isize
+def to_i64(x: isize): i64 = x as i64
+to_i64(make_isize(42))
