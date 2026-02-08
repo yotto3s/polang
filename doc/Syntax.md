@@ -597,8 +597,9 @@ base_type   ::= "i8" | "i16" | "i32" | "i64"
               | "f32" | "f64"
               | "bool"
 
-comment     ::= "(*" comment_body "*)"
+comment      ::= "(*" comment_body "*)"
 comment_body ::= { any_char | comment }    (* nested comments allowed *)
+any_char     ::= ? any character other than "(*", "*)", or EOF ?
 ```
 
 ## Examples

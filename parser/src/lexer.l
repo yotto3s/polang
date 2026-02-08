@@ -98,6 +98,6 @@ bool polang_lexer_has_error() {
 "*"                     { return yy::parser::make_TMUL(LOC); }
 "/"                     { return yy::parser::make_TDIV(LOC); }
 <<EOF>>                 { return yy::parser::make_YYEOF(LOC); }
-.                       { polang_report_error(yytext, yylineno, yylloc.begin.column); return yy::parser::make_YYEOF(LOC); }
+.                       { lexerError = true; polang_report_error(yytext, yylineno, yylloc.begin.column); return yy::parser::make_YYEOF(LOC); }
 
 %%
