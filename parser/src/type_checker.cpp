@@ -151,9 +151,7 @@ std::string TypeChecker::mangledName(const std::string& name) const {
 std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   errors.clear();
   localTypes.clear();
-  functionReturnTypes.clear();
-  functionParamTypes.clear();
-  functionSchemes.clear();
+  functionSignatures.clear();
   subst = polang::Substitution();
   traitConstraints = polang::TraitConstraints();
   polang::resetUnificationVarCounter();
@@ -164,7 +162,7 @@ std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
 std::vector<TypeCheckError>
 TypeChecker::checkIncremental(const NBlock& newStatements) {
   // Clear transient state but preserve persistent environment
-  // (localTypes, functionReturnTypes, functionParamTypes, functionSchemes)
+  // (localTypes, functionSignatures)
   errors.clear();
   subst = polang::Substitution();
   traitConstraints = polang::TraitConstraints();
@@ -175,9 +173,7 @@ TypeChecker::checkIncremental(const NBlock& newStatements) {
 TypeCheckerSnapshot TypeChecker::saveState() const {
   TypeCheckerSnapshot snapshot;
   snapshot.localTypes = localTypes;
-  snapshot.functionReturnTypes = functionReturnTypes;
-  snapshot.functionParamTypes = functionParamTypes;
-  snapshot.functionSchemes = functionSchemes;
+  snapshot.functionSignatures = functionSignatures;
   snapshot.moduleExports = moduleExports;
   snapshot.moduleAliases = moduleAliases;
   snapshot.importedSymbols = importedSymbols;
@@ -186,9 +182,7 @@ TypeCheckerSnapshot TypeChecker::saveState() const {
 
 void TypeChecker::restoreState(const TypeCheckerSnapshot& snapshot) {
   localTypes = snapshot.localTypes;
-  functionReturnTypes = snapshot.functionReturnTypes;
-  functionParamTypes = snapshot.functionParamTypes;
-  functionSchemes = snapshot.functionSchemes;
+  functionSignatures = snapshot.functionSignatures;
   moduleExports = snapshot.moduleExports;
   moduleAliases = snapshot.moduleAliases;
   importedSymbols = snapshot.importedSymbols;
@@ -266,76 +260,69 @@ void TypeChecker::visit(const NMethodCall& node) {
     argTypes.push_back(inferredType);
   }
 
-  // Check if this is a polymorphic function call
-  auto schemeIt = functionSchemes.find(funcName);
-  if (schemeIt != functionSchemes.end()) {
-    auto& mutableNode = const_cast<NMethodCall&>(node);
-    instantiateCall(mutableNode, funcName, schemeIt->second, argTypes);
+  auto sigIt = functionSignatures.find(funcName);
+  if (sigIt == functionSignatures.end()) {
+    reportError(formatUndefinedFunc(funcName), node.loc);
+    inferredType = TypeNames::UNKNOWN;
     return;
   }
 
-  const auto paramIt = functionParamTypes.find(funcName);
-  if (paramIt != functionParamTypes.end()) {
-    const auto& paramTypes = paramIt->second;
+  if (std::holds_alternative<polang::PolymorphicSignature>(sigIt->second)) {
+    auto& mutableNode = const_cast<NMethodCall&>(node);
+    instantiateCall(mutableNode, funcName,
+                    std::get<polang::PolymorphicSignature>(sigIt->second),
+                    argTypes);
+    return;
+  }
 
-    if (argTypes.size() != paramTypes.size()) {
-      reportError(
-          formatArgCountError(funcName, paramTypes.size(), argTypes.size()),
-          node.loc);
-    } else {
-      // Propagate concrete types from function parameters to arguments that
-      // might be resolvable (in unresolvedGenerics)
-      for (std::size_t i = 0; i < argTypes.size(); ++i) {
-        if (!isGenericType(paramTypes[i]) &&
-            paramTypes[i] != TypeNames::UNKNOWN &&
-            paramTypes[i] != TypeNames::TYPEVAR &&
-            !polang::isTypeParameter(paramTypes[i]) &&
-            !polang::isUnificationVar(paramTypes[i])) {
-          propagateTypeToSource(node.arguments[i].get(), paramTypes[i]);
-          node.arguments[i]->accept(*this);
-          argTypes[i] = inferredType;
-        }
+  // Monomorphic function call
+  const auto& sig = std::get<polang::MonoSignature>(sigIt->second);
+  const auto& paramTypes = sig.paramTypes;
+
+  if (argTypes.size() != paramTypes.size()) {
+    reportError(
+        formatArgCountError(funcName, paramTypes.size(), argTypes.size()),
+        node.loc);
+  } else {
+    // Propagate concrete types from function parameters to arguments
+    for (std::size_t i = 0; i < argTypes.size(); ++i) {
+      if (!isGenericType(paramTypes[i]) &&
+          paramTypes[i] != TypeNames::UNKNOWN &&
+          paramTypes[i] != TypeNames::TYPEVAR &&
+          !polang::isTypeParameter(paramTypes[i]) &&
+          !polang::isUnificationVar(paramTypes[i])) {
+        propagateTypeToSource(node.arguments[i].get(), paramTypes[i]);
+        node.arguments[i]->accept(*this);
+        argTypes[i] = inferredType;
       }
+    }
 
-      for (std::size_t i = 0; i < argTypes.size(); ++i) {
-        // If either type is a unification variable, unify instead of strict
-        // compatibility check. This handles cases like polymorphic wrappers
-        // calling monomorphic functions, and recursive calls.
-        if (polang::isUnificationVar(argTypes[i]) ||
-            polang::isUnificationVar(paramTypes[i])) {
-          unifier.unify(argTypes[i], paramTypes[i], subst);
-          continue;
-        }
-        if (argTypes[i] != TypeNames::UNKNOWN &&
-            paramTypes[i] != TypeNames::UNKNOWN &&
-            argTypes[i] != TypeNames::TYPEVAR &&
-            paramTypes[i] != TypeNames::TYPEVAR &&
-            !polang::isTypeParameter(paramTypes[i]) &&
-            !areTypesCompatible(argTypes[i], paramTypes[i])) {
-          reportError("Function '" + funcName + "' argument " +
-                          std::to_string(i + 1) + " expects " + paramTypes[i] +
-                          ", got " + resolveGenericToDefault(argTypes[i]),
-                      node.loc);
-        }
+    for (std::size_t i = 0; i < argTypes.size(); ++i) {
+      if (polang::isUnificationVar(argTypes[i]) ||
+          polang::isUnificationVar(paramTypes[i])) {
+        unifier.unify(argTypes[i], paramTypes[i], subst);
+        continue;
+      }
+      if (argTypes[i] != TypeNames::UNKNOWN &&
+          paramTypes[i] != TypeNames::UNKNOWN &&
+          argTypes[i] != TypeNames::TYPEVAR &&
+          paramTypes[i] != TypeNames::TYPEVAR &&
+          !polang::isTypeParameter(paramTypes[i]) &&
+          !areTypesCompatible(argTypes[i], paramTypes[i])) {
+        reportError("Function '" + funcName + "' argument " +
+                        std::to_string(i + 1) + " expects " + paramTypes[i] +
+                        ", got " + resolveGenericToDefault(argTypes[i]),
+                    node.loc);
       }
     }
   }
 
-  const auto funcReturnIt = functionReturnTypes.find(funcName);
-  if (funcReturnIt != functionReturnTypes.end()) {
-    inferredType = funcReturnIt->second;
-  } else if (functionParamTypes.find(funcName) == functionParamTypes.end() &&
-             functionSchemes.find(funcName) == functionSchemes.end()) {
-    reportError(formatUndefinedFunc(funcName), node.loc);
-    inferredType = TypeNames::UNKNOWN;
-  } else {
-    inferredType = TypeNames::I64;
-  }
+  inferredType = sig.returnType;
 }
 
 void TypeChecker::instantiateCall(NMethodCall& node,
                                   const std::string& funcName,
-                                  const polang::TypeScheme& scheme,
+                                  const polang::PolymorphicSignature& scheme,
                                   const std::vector<std::string>& argTypes) {
   if (argTypes.size() != scheme.paramTypes.size()) {
     reportError(formatArgCountError(funcName, scheme.paramTypes.size(),
@@ -687,10 +674,16 @@ void TypeChecker::addLetBindingsToScope(
   for (const auto& binding : bindings) {
     if (binding->isFunction) {
       const auto& func = binding->func;
-      functionParamTypes[func->id->name] = funcParams[funcIdx++];
-      functionReturnTypes[func->id->name] = func->type != nullptr
-                                                ? func->type->getTypeName()
-                                                : TypeNames::TYPEVAR;
+      // inferFunction already registered the signature during
+      // typeCheckLetBindings; only add a fallback if it's missing
+      if (functionSignatures.find(func->id->name) == functionSignatures.end()) {
+        std::string returnType = func->type != nullptr
+                                     ? func->type->getTypeName()
+                                     : TypeNames::TYPEVAR;
+        functionSignatures[func->id->name] =
+            polang::MonoSignature{funcParams[funcIdx], returnType};
+      }
+      ++funcIdx;
     } else {
       localTypes[binding->var->id->name] = bindingTypes[i];
     }
@@ -700,8 +693,7 @@ void TypeChecker::addLetBindingsToScope(
 
 void TypeChecker::visit(const NLetExpression& node) {
   const auto savedLocals = localTypes;
-  const auto savedFuncReturns = functionReturnTypes;
-  const auto savedFuncParams = functionParamTypes;
+  const auto savedSignatures = functionSignatures;
 
   // Pass 1: Collect sibling variable binding types
   std::map<std::string, std::string> siblingVarTypes;
@@ -719,8 +711,7 @@ void TypeChecker::visit(const NLetExpression& node) {
   node.body->accept(*this);
 
   localTypes = savedLocals;
-  functionReturnTypes = savedFuncReturns;
-  functionParamTypes = savedFuncParams;
+  functionSignatures = savedSignatures;
 }
 
 void TypeChecker::visit(const NExpressionStatement& node) {
@@ -910,22 +901,25 @@ void TypeChecker::inferFunction(
     }
   }
 
-  functionParamTypes[funcName] = paramTypes;
+  // Pre-register signature with TYPEVAR return for recursive call support
+  functionSignatures[funcName] =
+      polang::MonoSignature{paramTypes, TypeNames::TYPEVAR};
 
   // Type-check function body
   node.block->accept(*this);
   std::string bodyType = inferredType;
 
   if (!hasUntypedParams) {
-    // Monomorphic function — same as before
+    // Monomorphic function
+    std::string returnType;
     if (node.type == nullptr) {
       if (bodyType != TypeNames::UNKNOWN && bodyType != TypeNames::TYPEVAR) {
         std::string resolvedBodyType = resolveGenericToDefault(bodyType);
         node.type = makeTypeSpec(resolvedBodyType);
-        functionReturnTypes[funcName] = resolvedBodyType;
+        returnType = resolvedBodyType;
       } else {
         node.type = makeTypeSpec(TypeNames::TYPEVAR);
-        functionReturnTypes[funcName] = TypeNames::TYPEVAR;
+        returnType = TypeNames::TYPEVAR;
       }
     } else {
       const std::string declReturnType = node.type->getTypeName();
@@ -936,8 +930,11 @@ void TypeChecker::inferFunction(
                         resolveGenericToDefault(bodyType)),
                     node.loc);
       }
-      functionReturnTypes[funcName] = declReturnType;
+      returnType = declReturnType;
     }
+
+    functionSignatures[funcName] =
+        polang::MonoSignature{paramTypes, returnType};
 
     // Restore HM state
     subst = savedSubst;
@@ -971,7 +968,6 @@ void TypeChecker::inferFunction(
 
   if (unresolvedVars.empty()) {
     // All vars resolved to concrete types — function is monomorphic
-    // Apply defaults for generic types
     for (size_t i = 0; i < resolvedParamTypes.size(); ++i) {
       resolvedParamTypes[i] = resolveWithDefaults(resolvedParamTypes[i]);
       auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
@@ -979,11 +975,10 @@ void TypeChecker::inferFunction(
     }
     resolvedBodyType = resolveWithDefaults(resolvedBodyType);
 
-    functionParamTypes[funcName] = resolvedParamTypes;
-
+    std::string returnType;
     if (node.type == nullptr) {
       node.type = makeTypeSpec(resolvedBodyType);
-      functionReturnTypes[funcName] = resolvedBodyType;
+      returnType = resolvedBodyType;
     } else {
       const std::string declReturnType = node.type->getTypeName();
       if (!areTypesCompatible(resolvedBodyType, declReturnType)) {
@@ -991,8 +986,11 @@ void TypeChecker::inferFunction(
                         node.id->name, declReturnType, resolvedBodyType),
                     node.loc);
       }
-      functionReturnTypes[funcName] = declReturnType;
+      returnType = declReturnType;
     }
+
+    functionSignatures[funcName] =
+        polang::MonoSignature{resolvedParamTypes, returnType};
   } else {
     // Some vars remain unresolved — function is polymorphic
     // Name the type parameters 'a, 'b, 'c, ...
@@ -1035,24 +1033,29 @@ void TypeChecker::inferFunction(
       resolvedBodyType = resolveWithDefaults(resolvedBodyType);
     }
 
-    functionParamTypes[funcName] = resolvedParamTypes;
-
+    std::string returnType;
     if (node.type == nullptr) {
       node.type = makeTypeSpec(resolvedBodyType);
-      functionReturnTypes[funcName] = resolvedBodyType;
+      returnType = resolvedBodyType;
     } else {
-      functionReturnTypes[funcName] = node.type->getTypeName();
+      const std::string declReturnType = node.type->getTypeName();
+      if (!areTypesCompatible(resolvedBodyType, declReturnType)) {
+        reportError(polang::formatFuncReturnTypeError(
+                        node.id->name, declReturnType, resolvedBodyType),
+                    node.loc);
+      }
+      returnType = declReturnType;
     }
 
-    // Store type scheme for polymorphic instantiation
-    polang::TypeScheme scheme;
-    scheme.typeParams = node.typeParams;
+    // Store polymorphic signature for instantiation
+    polang::PolymorphicSignature sig;
+    sig.typeParams = node.typeParams;
     for (const auto& [tp, bounds] : node.typeParamBounds) {
-      scheme.paramBounds[tp] = bounds;
+      sig.paramBounds[tp] = bounds;
     }
-    scheme.paramTypes = resolvedParamTypes;
-    scheme.returnType = resolvedBodyType;
-    functionSchemes[funcName] = scheme;
+    sig.paramTypes = resolvedParamTypes;
+    sig.returnType = returnType;
+    functionSignatures[funcName] = sig;
   }
 
   // Restore HM state
@@ -1114,13 +1117,9 @@ void TypeChecker::handleItemsImport(const NImportStatement& node) {
       importedSymbols[localName] = mangledItemName;
     }
 
-    auto retIt = functionReturnTypes.find(mangledItemName);
-    if (retIt != functionReturnTypes.end()) {
-      functionReturnTypes[localName] = retIt->second;
-      auto paramIt = functionParamTypes.find(mangledItemName);
-      if (paramIt != functionParamTypes.end()) {
-        functionParamTypes[localName] = paramIt->second;
-      }
+    auto sigIt = functionSignatures.find(mangledItemName);
+    if (sigIt != functionSignatures.end()) {
+      functionSignatures[localName] = sigIt->second;
       importedSymbols[localName] = mangledItemName;
     }
   }
@@ -1144,13 +1143,9 @@ void TypeChecker::handleWildcardImport(const NImportStatement& node) {
       importedSymbols[exportName] = mangledExportName;
     }
 
-    auto retIt = functionReturnTypes.find(mangledExportName);
-    if (retIt != functionReturnTypes.end()) {
-      functionReturnTypes[exportName] = retIt->second;
-      auto paramIt = functionParamTypes.find(mangledExportName);
-      if (paramIt != functionParamTypes.end()) {
-        functionParamTypes[exportName] = paramIt->second;
-      }
+    auto sigIt = functionSignatures.find(mangledExportName);
+    if (sigIt != functionSignatures.end()) {
+      functionSignatures[exportName] = sigIt->second;
       importedSymbols[exportName] = mangledExportName;
     }
   }

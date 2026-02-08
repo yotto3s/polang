@@ -17,6 +17,7 @@
 #pragma GCC diagnostic pop
 
 #include <iostream>
+#include <variant>
 
 ReplSession::ReplSession() noexcept = default;
 ReplSession::~ReplSession() noexcept = default;
@@ -178,21 +179,22 @@ void ReplSession::updateCompiledSymbols(NBlock& newAst) {
     polang::CompiledFunction func;
     func.name = mangledName;
 
-    // Get return type from TypeChecker
-    auto retIt = currentState.functionReturnTypes.find(mangledName);
-    if (retIt != currentState.functionReturnTypes.end()) {
-      func.returnType = retIt->second;
+    // Get return type and param types from TypeChecker
+    auto sigIt = currentState.functionSignatures.find(mangledName);
+    if (sigIt != currentState.functionSignatures.end()) {
+      std::visit(
+          [&](const auto& sig) {
+            func.returnType = sig.returnType;
+            func.paramTypes = sig.paramTypes;
+          },
+          sigIt->second);
     } else if (funcDecl->type) {
       func.returnType = funcDecl->type->getTypeName();
+      for (const auto& arg : funcDecl->arguments) {
+        func.paramTypes.push_back(arg->type ? arg->type->getTypeName() : "i64");
+      }
     } else {
       func.returnType = "i64";
-    }
-
-    // Get param types from TypeChecker
-    auto paramIt = currentState.functionParamTypes.find(mangledName);
-    if (paramIt != currentState.functionParamTypes.end()) {
-      func.paramTypes = paramIt->second;
-    } else {
       for (const auto& arg : funcDecl->arguments) {
         func.paramTypes.push_back(arg->type ? arg->type->getTypeName() : "i64");
       }

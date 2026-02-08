@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <variant>
+
 #include "parser/type_inference.hpp"
 
 using namespace polang;
@@ -283,22 +285,73 @@ TEST(UnificationVarTest, IsTypeParameter) {
   EXPECT_FALSE(isTypeParameter(""));
 }
 
-// ============== TypeScheme Tests ==============
+// ============== FunctionSignature Tests ==============
 
-TEST(TypeSchemeTest, MonomorphicScheme) {
-  TypeScheme scheme;
-  scheme.paramTypes = {"i64", "i64"};
-  scheme.returnType = "i64";
-  EXPECT_TRUE(scheme.typeParams.empty());
-  EXPECT_TRUE(scheme.paramBounds.empty());
+TEST(FunctionSignatureTest, MonomorphicSignature) {
+  MonoSignature sig;
+  sig.paramTypes = {"i64", "i64"};
+  sig.returnType = "i64";
+  EXPECT_EQ(sig.paramTypes.size(), 2u);
+  EXPECT_EQ(sig.returnType, "i64");
 }
 
-TEST(TypeSchemeTest, PolymorphicScheme) {
-  TypeScheme scheme;
-  scheme.typeParams = {"'a"};
-  scheme.paramBounds["'a"] = {TraitBound::Numeric};
-  scheme.paramTypes = {"'a", "'a"};
-  scheme.returnType = "'a";
-  EXPECT_EQ(scheme.typeParams.size(), 1u);
-  EXPECT_TRUE(scheme.paramBounds.at("'a").count(TraitBound::Numeric) > 0);
+TEST(FunctionSignatureTest, PolymorphicSignature) {
+  PolymorphicSignature sig;
+  sig.typeParams = {"'a"};
+  sig.paramBounds["'a"] = {TraitBound::Numeric};
+  sig.paramTypes = {"'a", "'a"};
+  sig.returnType = "'a";
+  EXPECT_EQ(sig.typeParams.size(), 1u);
+  EXPECT_TRUE(sig.paramBounds.at("'a").count(TraitBound::Numeric) > 0);
+}
+
+TEST(FunctionSignatureTest, VariantHoldsCorrectType) {
+  FunctionSignature monoSig = MonoSignature{{"i64"}, "i64"};
+  EXPECT_TRUE(std::holds_alternative<MonoSignature>(monoSig));
+  EXPECT_FALSE(std::holds_alternative<PolymorphicSignature>(monoSig));
+
+  PolymorphicSignature poly;
+  poly.typeParams = {"'a"};
+  poly.paramTypes = {"'a"};
+  poly.returnType = "'a";
+  FunctionSignature polySig = poly;
+  EXPECT_TRUE(std::holds_alternative<PolymorphicSignature>(polySig));
+  EXPECT_FALSE(std::holds_alternative<MonoSignature>(polySig));
+}
+
+TEST(FunctionSignatureTest, VariantGetTypeSafety) {
+  FunctionSignature monoSig = MonoSignature{{"i64", "bool"}, "i64"};
+
+  // std::get succeeds for the correct alternative
+  const auto& mono = std::get<MonoSignature>(monoSig);
+  EXPECT_EQ(mono.paramTypes.size(), 2u);
+  EXPECT_EQ(mono.returnType, "i64");
+
+  // std::get throws for the wrong alternative
+  EXPECT_THROW(std::get<PolymorphicSignature>(monoSig), std::bad_variant_access);
+
+  FunctionSignature polySig =
+      PolymorphicSignature{{"'a"}, {}, {"'a", "'a"}, "'a"};
+
+  const auto& poly = std::get<PolymorphicSignature>(polySig);
+  EXPECT_EQ(poly.typeParams.size(), 1u);
+  EXPECT_EQ(poly.paramTypes.size(), 2u);
+
+  EXPECT_THROW(std::get<MonoSignature>(polySig), std::bad_variant_access);
+}
+
+TEST(FunctionSignatureTest, MonoSignatureEquality) {
+  MonoSignature a{{"i64", "bool"}, "i64"};
+  MonoSignature b{{"i64", "bool"}, "i64"};
+  MonoSignature c{{"f64"}, "f64"};
+  EXPECT_EQ(a, b);
+  EXPECT_NE(a, c);
+}
+
+TEST(FunctionSignatureTest, PolymorphicSignatureEquality) {
+  PolymorphicSignature a{{"'a"}, {}, {"'a"}, "'a"};
+  PolymorphicSignature b{{"'a"}, {}, {"'a"}, "'a"};
+  PolymorphicSignature c{{"'a", "'b"}, {}, {"'a", "'b"}, "'a"};
+  EXPECT_EQ(a, b);
+  EXPECT_NE(a, c);
 }

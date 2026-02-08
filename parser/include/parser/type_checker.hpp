@@ -28,9 +28,7 @@ struct TypeCheckError {
 // Snapshot of TypeChecker state for rollback on error
 struct TypeCheckerSnapshot {
   std::map<std::string, std::string> localTypes;
-  std::map<std::string, std::string> functionReturnTypes;
-  std::map<std::string, std::vector<std::string>> functionParamTypes;
-  std::map<std::string, polang::TypeScheme> functionSchemes;
+  std::map<std::string, polang::FunctionSignature> functionSignatures;
   std::map<std::string, std::set<std::string>> moduleExports;
   std::map<std::string, std::string> moduleAliases;
   std::map<std::string, std::string> importedSymbols;
@@ -90,8 +88,6 @@ public:
 private:
   std::string inferredType;
   std::map<std::string, std::string> localTypes;
-  std::map<std::string, std::string> functionReturnTypes;
-  std::map<std::string, std::vector<std::string>> functionParamTypes;
   std::vector<TypeCheckError> errors;
 
   // Module path for name mangling (e.g., ["Math", "Internal"])
@@ -176,8 +172,8 @@ private:
   polang::Substitution subst;
   polang::Unifier unifier;
   polang::TraitConstraints traitConstraints;
-  // Map function name -> type scheme (for polymorphic functions)
-  std::map<std::string, polang::TypeScheme> functionSchemes;
+  // Map function name -> signature (monomorphic or polymorphic)
+  std::map<std::string, polang::FunctionSignature> functionSignatures;
 
   // Infer a function: assign unification vars, collect constraints, resolve
   void inferFunction(NFunctionDeclaration& node, const std::string& funcName,
@@ -185,7 +181,7 @@ private:
 
   // Instantiate a polymorphic function at a call site
   void instantiateCall(NMethodCall& node, const std::string& funcName,
-                       const polang::TypeScheme& scheme,
+                       const polang::PolymorphicSignature& scheme,
                        const std::vector<std::string>& argTypes);
 
   // Resolve defaults for constrained unification vars
