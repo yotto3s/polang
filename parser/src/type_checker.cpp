@@ -501,7 +501,8 @@ void TypeChecker::visit(const NCastExpression& node) {
       !polang::isUnificationVar(sourceType)) {
     if (!polang::isNumericType(sourceType)) {
       reportError("cannot cast " + sourceType + " to " + targetType, node.loc);
-    } else if (!polang::isNumericType(targetType)) {
+    }
+    if (!polang::isNumericType(targetType)) {
       reportError("cannot cast " + sourceType + " to " + targetType, node.loc);
     }
   }
