@@ -264,6 +264,9 @@ std::string typeToString(Type type) {
   if (isa<polang::BoolType>(type)) {
     return "bool";
   }
+  if (auto indexType = dyn_cast<polang::IndexType>(type)) {
+    return indexType.isSigned() ? "isize" : "usize";
+  }
   return "unknown";
 }
 

@@ -85,6 +85,10 @@ Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
   case TypeKind::Bool:
     return BoolType::get(context);
 
+  case TypeKind::Index:
+    return polang::IndexType::get(
+        context, meta.isSigned() ? Signedness::Signed : Signedness::Unsigned);
+
   case TypeKind::TypeVar:
   case TypeKind::Function:
   case TypeKind::Unknown:
@@ -113,6 +117,9 @@ Type PolangTypeConverter::convertPolangType(Type polangType) {
   }
   if (isa<BoolType>(polangType)) {
     return mlir::IntegerType::get(context, 1);
+  }
+  if (isa<polang::IndexType>(polangType)) {
+    return mlir::IndexType::get(context);
   }
   return mlir::IntegerType::get(context, DEFAULT_INT_WIDTH);
 }

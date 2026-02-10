@@ -87,6 +87,29 @@ def Polang_BoolType : Polang_Type<"Bool", "bool"> {
   }];
 }
 
+def Polang_IndexType : Polang_Type<"Index", "index"> {
+  let summary = "Platform-native index type with signedness";
+  let description = [{
+    Represents isize (signed) and usize (unsigned) types that map to
+    the platform-native pointer width. Both lower to MLIR's built-in
+    index type, with signedness tracked for correct cast lowering.
+
+    Examples:
+    ```mlir
+    !polang.index<signed>    ; isize
+    !polang.index<unsigned>  ; usize
+    ```
+  }];
+
+  let parameters = (ins "Signedness":$signedness);
+  let assemblyFormat = "`<` $signedness `>`";
+
+  let extraClassDeclaration = [{
+    bool isSigned() const { return getSignedness() == Signedness::Signed; }
+    bool isUnsigned() const { return getSignedness() == Signedness::Unsigned; }
+  }];
+}
+
 def Polang_TypeParamType : Polang_Type<"TypeParam", "type_param"> {
   let summary = "Named type parameter for generic functions";
   let description = [{
@@ -102,19 +125,22 @@ def Polang_TypeParamType : Polang_Type<"TypeParam", "type_param"> {
 // Type constraints
 //===----------------------------------------------------------------------===//
 
-def Polang_AnyNumericType : AnyTypeOf<[Polang_IntegerType, Polang_FloatType],
-    "Polang numeric type">;
+def Polang_AnyNumericType : AnyTypeOf<[
+    Polang_IntegerType, Polang_FloatType, Polang_IndexType
+], "Polang numeric type">;
 
-def Polang_AnyType : AnyTypeOf<[Polang_IntegerType, Polang_FloatType, Polang_BoolType],
-    "any Polang type">;
+def Polang_AnyType : AnyTypeOf<[
+    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_IndexType
+], "any Polang type">;
 
 // Type constraints that include type parameters (for generic functions)
 def Polang_AnyNumericOrParam : AnyTypeOf<[
-    Polang_IntegerType, Polang_FloatType, Polang_TypeParamType
+    Polang_IntegerType, Polang_FloatType, Polang_IndexType, Polang_TypeParamType
 ], "Polang numeric type or type parameter">;
 
 def Polang_AnyTypeOrParam : AnyTypeOf<[
-    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_TypeParamType
+    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_IndexType,
+    Polang_TypeParamType
 ], "any Polang type or type parameter">;
 
 #endif // POLANG_TYPES_TD

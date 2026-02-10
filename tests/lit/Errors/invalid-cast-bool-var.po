@@ -2,7 +2,7 @@
 *)
 
 (* Test that casting a bool variable to numeric is rejected *)
-(* CHECK: loc("<source>":8:1): error: 'polang.cast' op operand #0 must be Polang numeric type or type parameter, but got '!polang.bool'
+(* CHECK: Type error: cannot cast bool to i32 at line 8, column 1
 *)
 def b: bool = true
 b as i32

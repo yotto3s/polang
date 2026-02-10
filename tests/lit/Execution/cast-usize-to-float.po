@@ -1,0 +1,8 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test usize to f64 cast via function *)
+(* CHECK: 42 : f64
+*)
+def to_f64(x: usize): f64 = x as f64
+to_f64(42 as usize)

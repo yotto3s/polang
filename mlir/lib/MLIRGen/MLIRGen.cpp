@@ -107,7 +107,7 @@ public:
     // annotation, use it instead of the default i64.
     if (expectedLiteralType != nullptr) {
       const auto meta = getTypeMetadata(expectedLiteralType->getTypeName());
-      if (meta.isInteger()) {
+      if (meta.isInteger() || meta.isIndex()) {
         auto type = getPolangType(*expectedLiteralType);
         result =
             builder.create<ConstantIntegerOp>(loc(node.loc), type, node.value);

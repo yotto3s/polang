@@ -2,6 +2,6 @@
 *)
 
 (* Test that casting to bool is rejected *)
-(* CHECK: loc("<source>":7:1): error: 'polang.cast' op result #0 must be Polang numeric type or type parameter, but got '!polang.bool'
+(* CHECK: Type error: cannot cast i64 to bool at line 7, column 1
 *)
 42 as bool

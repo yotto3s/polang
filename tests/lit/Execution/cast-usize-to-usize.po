@@ -1,0 +1,8 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test usize to usize identity cast (noop) *)
+(* CHECK: 42 : usize
+*)
+def identity(x: usize): usize = x as usize
+identity(42 as usize)

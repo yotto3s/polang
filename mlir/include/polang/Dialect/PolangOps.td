@@ -57,7 +57,7 @@ def Polang_ConstantIntegerOp : Polang_Op<"constant.integer", [Pure]> {
   }];
 
   let arguments = (ins Polang_AnyIntegerAttr:$value);
-  let results = (outs AnyTypeOf<[Polang_IntegerType, Polang_TypeParamType]>:$result);
+  let results = (outs AnyTypeOf<[Polang_IntegerType, Polang_IndexType, Polang_TypeParamType]>:$result);
 
   let hasCustomAssemblyFormat = 1;
 
@@ -78,7 +78,7 @@ def Polang_ConstantIntegerOp : Polang_Op<"constant.integer", [Pure]> {
               $_builder.getIntegerAttr(
                   $_builder.getIntegerType(width, isSigned), value));
       } else {
-        // For type parameters, use i64 attribute (actual type resolved later)
+        // For index types and type parameters, use i64 attribute
         build($_builder, $_state, type,
               $_builder.getIntegerAttr($_builder.getI64Type(), value));
       }

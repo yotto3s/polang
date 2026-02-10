@@ -1,0 +1,8 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test usize to i32 cast via function *)
+(* CHECK: 42 : i32
+*)
+def to_i32(x: usize): i32 = x as i32
+to_i32(42 as usize)

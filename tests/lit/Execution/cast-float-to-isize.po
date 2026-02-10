@@ -1,0 +1,7 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test float to isize cast (truncates to integer) *)
+(* CHECK: 3 : isize
+*)
+3.14 as isize

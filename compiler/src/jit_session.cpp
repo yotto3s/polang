@@ -173,6 +173,19 @@ std::optional<JitResult> JITSession::execute(const std::string& entryName,
     auto entryFn = sym->toPtr<int32_t (*)()>();
     return entryFn();
   }
+  // isize/usize are pointer-width (index type). Use the JIT data layout
+  // to determine the correct ABI return type, then widen to int64_t.
+  if (resultType == "isize" || resultType == "usize") {
+    const unsigned pointerBits =
+        impl->jit->getDataLayout().getPointerSizeInBits();
+    if (pointerBits <= 32U) {
+      auto entryFn = sym->toPtr<int32_t (*)()>();
+      return static_cast<int64_t>(entryFn());
+    }
+    auto entryFn = sym->toPtr<int64_t (*)()>();
+    return entryFn();
+  }
+  // i64, u64 and fallback
   auto entryFn = sym->toPtr<int64_t (*)()>();
   return entryFn();
 }
