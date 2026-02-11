@@ -84,7 +84,6 @@ yy::parser::symbol_type yylex();
 %token TMUL "*"
 %token TDIV "/"
 %token TLET "let"
-%token TDEF "def"
 %token TFUN "fun"
 %token TIN "in"
 %token TCOLON ":"
@@ -107,7 +106,7 @@ yy::parser::symbol_type yylex();
 %type <std::vector<std::shared_ptr<const NTypeSpec>>> type_product_list
 %type <std::unique_ptr<NExpression>> numeric expr boolean
 %type <std::unique_ptr<NBlock>> program stmts
-%type <std::unique_ptr<NStatement>> stmt var_decl func_decl module_decl import_stmt
+%type <std::unique_ptr<NStatement>> stmt type_sig module_decl import_stmt
 %type <std::unique_ptr<NVariableDeclaration>> func_param
 %type <std::unique_ptr<NLetBinding>> let_binding
 %type <std::unique_ptr<NQualifiedName>> qualified_name
@@ -133,11 +132,13 @@ yy::parser::symbol_type yylex();
 %left TAS
 %left TDOT
 
-/* Expected conflicts:
-   - ident TLPAREN (function call vs expr + (expr)) x2
-   - ident TDOT (qualified name vs expr DOT)
+/* Expected shift/reduce conflicts (all on TLPAREN):
+   1. expr . "(" in call_args (function call vs grouped expr)
+   2. ident . "(" in module (export list vs module_body expr)
+   3. ident . "(" in stmts (function call vs grouped expr)
+   4. ident "." ident . "(" (qualified call vs qualified name + grouped expr)
 */
-%expect 3
+%expect 4
 
 %start program
 
@@ -150,46 +151,65 @@ stmts : %empty { $$ = std::make_unique<NBlock>(); SET_LOC($$, @$); }
       | stmts stmt { $1->statements.push_back(std::move($2)); $$ = std::move($1); }
       ;
 
-stmt : var_decl { $$ = std::move($1); }
-     | func_decl { $$ = std::move($1); }
+stmt : expr TEQUAL expr {
+         /* Definition: LHS determines if var or func */
+         auto* lhsIdent = dynamic_cast<NIdentifier*>($1.get());
+         if (lhsIdent != nullptr) {
+           /* Variable definition: x = expr */
+           auto id = std::unique_ptr<NIdentifier>(
+               static_cast<NIdentifier*>($1.release()));
+           $$ = std::make_unique<NVariableDeclaration>(std::move(id), std::move($3));
+           SET_LOC($$, @$);
+         } else {
+           auto* lhsCall = dynamic_cast<NMethodCall*>($1.get());
+           if (lhsCall != nullptr && lhsCall->qualifiedId == nullptr) {
+             /* Function definition: f(a, b) = expr */
+             VariableList params;
+             for (auto& arg : lhsCall->arguments) {
+               auto* argIdent = dynamic_cast<NIdentifier*>(arg.get());
+               if (argIdent == nullptr) {
+                 error(@1, "function definition parameters must be identifiers");
+                 YYERROR;
+               }
+               auto paramId = std::unique_ptr<NIdentifier>(
+                   static_cast<NIdentifier*>(arg.release()));
+               params.push_back(std::make_unique<NVariableDeclaration>(
+                   std::move(paramId), nullptr));
+             }
+             auto funcId = std::unique_ptr<NIdentifier>(
+                 static_cast<NIdentifier*>(lhsCall->id.release()));
+             auto body = std::make_unique<NBlock>();
+             SET_LOC(body, @3);
+             auto exprStmt = std::make_unique<NExpressionStatement>(std::move($3));
+             SET_LOC(exprStmt, @3);
+             body->statements.push_back(std::move(exprStmt));
+             $$ = std::make_unique<NFunctionDeclaration>(
+                 std::move(funcId), std::move(params), std::move(body));
+             SET_LOC($$, @$);
+           } else {
+             error(@1, "invalid left-hand side of definition");
+             YYERROR;
+           }
+         }
+       }
+     | type_sig { $$ = std::move($1); }
      | module_decl { $$ = std::move($1); }
      | import_stmt { $$ = std::move($1); }
      | expr { $$ = std::make_unique<NExpressionStatement>(std::move($1)); SET_LOC($$, @$); }
      ;
 
-var_decl : TDEF ident TEQUAL expr {
-             /* def x = expr (immutable, type to be inferred) */
-             $$ = std::make_unique<NVariableDeclaration>(std::move($2), std::move($4));
-             SET_LOC($$, @$);
-           }
-         | TDEF ident TCOLON type_spec TEQUAL expr {
-             /* def x : type = expr (immutable) */
-             $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move($6));
+type_sig : expr TCOLON type_expr {
+             auto* lhsIdent = dynamic_cast<NIdentifier*>($1.get());
+             if (lhsIdent == nullptr) {
+               error(@1, "type signature must be for an identifier");
+               YYERROR;
+             }
+             auto id = std::unique_ptr<NIdentifier>(
+                 static_cast<NIdentifier*>($1.release()));
+             $$ = std::make_unique<NTypeSignature>(std::move(id), std::move($3));
              SET_LOC($$, @$);
            }
          ;
-
-func_decl : TDEF ident func_decl_args TCOLON type_spec TEQUAL expr {
-              /* def fname (x : type) ... : rettype = expr */
-              auto body = std::make_unique<NBlock>();
-              SET_LOC(body, @7);
-              auto exprStmt = std::make_unique<NExpressionStatement>(std::move($7));
-              SET_LOC(exprStmt, @7);
-              body->statements.push_back(std::move(exprStmt));
-              $$ = std::make_unique<NFunctionDeclaration>(std::move($5), std::move($2), std::move($3), std::move(body));
-              SET_LOC($$, @$);
-            }
-          | TDEF ident func_decl_args TEQUAL expr {
-              /* def fname (x : type) ... = expr (return type to be inferred) */
-              auto body = std::make_unique<NBlock>();
-              SET_LOC(body, @5);
-              auto exprStmt = std::make_unique<NExpressionStatement>(std::move($5));
-              SET_LOC(exprStmt, @5);
-              body->statements.push_back(std::move(exprStmt));
-              $$ = std::make_unique<NFunctionDeclaration>(std::move($2), std::move($3), std::move(body));
-              SET_LOC($$, @$);
-            }
-          ;
 
 func_decl_args : TLPAREN func_param_list TRPAREN {
               /* (x: type, y: type, ...) */
@@ -239,9 +259,67 @@ module_decl : TMODULE ident TLPAREN ident_list TRPAREN module_body TENDMODULE {
             ;
 
 module_body : %empty { $$ = StatementList(); }
-            | module_body var_decl { $1.push_back(std::move($2)); $$ = std::move($1); }
-            | module_body func_decl { $1.push_back(std::move($2)); $$ = std::move($1); }
-            | module_body module_decl { $1.push_back(std::move($2)); $$ = std::move($1); }
+            | module_body expr TEQUAL expr {
+                /* Module definition */
+                auto* lhsIdent = dynamic_cast<NIdentifier*>($2.get());
+                if (lhsIdent != nullptr) {
+                  auto id = std::unique_ptr<NIdentifier>(
+                      static_cast<NIdentifier*>($2.release()));
+                  auto stmt = std::make_unique<NVariableDeclaration>(
+                      std::move(id), std::move($4));
+                  SET_LOC(stmt, @2);
+                  $1.push_back(std::move(stmt));
+                } else {
+                  auto* lhsCall = dynamic_cast<NMethodCall*>($2.get());
+                  if (lhsCall != nullptr && lhsCall->qualifiedId == nullptr) {
+                    VariableList params;
+                    for (auto& arg : lhsCall->arguments) {
+                      auto* argIdent = dynamic_cast<NIdentifier*>(arg.get());
+                      if (argIdent == nullptr) {
+                        error(@2, "function definition parameters must be identifiers");
+                        YYERROR;
+                      }
+                      auto paramId = std::unique_ptr<NIdentifier>(
+                          static_cast<NIdentifier*>(arg.release()));
+                      params.push_back(std::make_unique<NVariableDeclaration>(
+                          std::move(paramId), nullptr));
+                    }
+                    auto funcId = std::unique_ptr<NIdentifier>(
+                        static_cast<NIdentifier*>(lhsCall->id.release()));
+                    auto body = std::make_unique<NBlock>();
+                    SET_LOC(body, @4);
+                    auto exprStmt = std::make_unique<NExpressionStatement>(std::move($4));
+                    SET_LOC(exprStmt, @4);
+                    body->statements.push_back(std::move(exprStmt));
+                    auto stmt = std::make_unique<NFunctionDeclaration>(
+                        std::move(funcId), std::move(params), std::move(body));
+                    SET_LOC(stmt, @2);
+                    $1.push_back(std::move(stmt));
+                  } else {
+                    error(@2, "invalid definition in module");
+                    YYERROR;
+                  }
+                }
+                $$ = std::move($1);
+              }
+            | module_body expr TCOLON type_expr {
+                auto* lhsIdent = dynamic_cast<NIdentifier*>($2.get());
+                if (lhsIdent == nullptr) {
+                  error(@2, "type signature must be for an identifier");
+                  YYERROR;
+                }
+                auto id = std::unique_ptr<NIdentifier>(
+                    static_cast<NIdentifier*>($2.release()));
+                auto stmt = std::make_unique<NTypeSignature>(
+                    std::move(id), std::move($4));
+                SET_LOC(stmt, @2);
+                $1.push_back(std::move(stmt));
+                $$ = std::move($1);
+              }
+            | module_body module_decl {
+                $1.push_back(std::move($2));
+                $$ = std::move($1);
+              }
             ;
 
 ident_list : ident {
