@@ -163,6 +163,7 @@ std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   errors.clear();
   localTypes.clear();
   functionSignatures.clear();
+  scopeDepth = 0;
   subst = polang::Substitution();
   traitConstraints = polang::TraitConstraints();
   polang::resetUnificationVarCounter();
@@ -817,6 +818,9 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
   if (sigIt != pendingTypeSignatures.end()) {
     mutableNode.type = sigIt->second;
     pendingTypeSignatures.erase(sigIt);
+  } else if (scopeDepth == 0 && node.assignmentExpr != nullptr) {
+    std::cerr << "Warning: missing type signature for '" << node.id->name
+              << "'\n";
   }
 
   if (node.assignmentExpr == nullptr) {
@@ -874,6 +878,9 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   if (sigIt != pendingTypeSignatures.end()) {
     applyFunctionSignature(mutableNode, sigIt->second);
     pendingTypeSignatures.erase(sigIt);
+  } else if (scopeDepth == 0) {
+    std::cerr << "Warning: missing type signature for '" << node.id->name
+              << "'\n";
   }
 
   const auto savedLocals = localTypes;
@@ -945,7 +952,9 @@ void TypeChecker::inferFunction(
       polang::MonoSignature{paramTypes, TypeNames::TYPEVAR};
 
   // Type-check function body
+  ++scopeDepth;
   node.block->accept(*this);
+  --scopeDepth;
   std::string bodyType = inferredType;
 
   if (!hasUntypedParams) {

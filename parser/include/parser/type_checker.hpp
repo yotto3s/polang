@@ -97,6 +97,9 @@ private:
   std::map<std::string, std::string> localTypes;
   std::vector<TypeCheckError> errors;
 
+  // Scope depth: 0 = top level, >0 = inside function body
+  int scopeDepth = 0;
+
   // Module path for name mangling (e.g., ["Math", "Internal"])
   std::vector<std::string> modulePath;
 
