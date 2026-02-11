@@ -58,6 +58,55 @@ yy::parser::symbol_type yylex();
 // Macro to set source location on a node
 #define SET_LOC(node, bisonLoc) \
   do { if (node) (node)->setLocation((bisonLoc).begin.line, (bisonLoc).begin.column); } while(0)
+
+// Build a definition (variable or function) from LHS = RHS expressions.
+// Returns nullptr if LHS is not a valid definition target.
+static std::unique_ptr<NStatement>
+buildDefinition(std::unique_ptr<NExpression> lhs,
+                std::unique_ptr<NExpression> rhs) {
+  auto* lhsIdent = dynamic_cast<NIdentifier*>(lhs.get());
+  if (lhsIdent != nullptr) {
+    auto id = std::unique_ptr<NIdentifier>(
+        static_cast<NIdentifier*>(lhs.release()));
+    return std::make_unique<NVariableDeclaration>(std::move(id), std::move(rhs));
+  }
+  auto* lhsCall = dynamic_cast<NMethodCall*>(lhs.get());
+  if (lhsCall != nullptr && lhsCall->qualifiedId == nullptr) {
+    VariableList params;
+    for (auto& arg : lhsCall->arguments) {
+      auto* argIdent = dynamic_cast<NIdentifier*>(arg.get());
+      if (argIdent == nullptr) {
+        return nullptr; // caller should report error
+      }
+      auto paramId = std::unique_ptr<NIdentifier>(
+          static_cast<NIdentifier*>(arg.release()));
+      params.push_back(std::make_unique<NVariableDeclaration>(
+          std::move(paramId), nullptr));
+    }
+    auto funcId = std::unique_ptr<NIdentifier>(
+        static_cast<NIdentifier*>(lhsCall->id.release()));
+    auto body = std::make_unique<NBlock>();
+    auto exprStmt = std::make_unique<NExpressionStatement>(std::move(rhs));
+    body->statements.push_back(std::move(exprStmt));
+    return std::make_unique<NFunctionDeclaration>(
+        std::move(funcId), std::move(params), std::move(body));
+  }
+  return nullptr;
+}
+
+// Build a type signature from LHS : type_expr.
+// Returns nullptr if LHS is not an identifier.
+static std::unique_ptr<NStatement>
+buildTypeSignature(std::unique_ptr<NExpression> lhs,
+                   std::shared_ptr<const NTypeSpec> typeExpr) {
+  auto* lhsIdent = dynamic_cast<NIdentifier*>(lhs.get());
+  if (lhsIdent == nullptr) {
+    return nullptr;
+  }
+  auto id = std::unique_ptr<NIdentifier>(
+      static_cast<NIdentifier*>(lhs.release()));
+  return std::make_unique<NTypeSignature>(std::move(id), std::move(typeExpr));
+}
 }
 
 // Tokens with string values
@@ -152,45 +201,12 @@ stmts : %empty { $$ = std::make_unique<NBlock>(); SET_LOC($$, @$); }
       ;
 
 stmt : expr TEQUAL expr {
-         /* Definition: LHS determines if var or func */
-         auto* lhsIdent = dynamic_cast<NIdentifier*>($1.get());
-         if (lhsIdent != nullptr) {
-           /* Variable definition: x = expr */
-           auto id = std::unique_ptr<NIdentifier>(
-               static_cast<NIdentifier*>($1.release()));
-           $$ = std::make_unique<NVariableDeclaration>(std::move(id), std::move($3));
-           SET_LOC($$, @$);
-         } else {
-           auto* lhsCall = dynamic_cast<NMethodCall*>($1.get());
-           if (lhsCall != nullptr && lhsCall->qualifiedId == nullptr) {
-             /* Function definition: f(a, b) = expr */
-             VariableList params;
-             for (auto& arg : lhsCall->arguments) {
-               auto* argIdent = dynamic_cast<NIdentifier*>(arg.get());
-               if (argIdent == nullptr) {
-                 error(@1, "function definition parameters must be identifiers");
-                 YYERROR;
-               }
-               auto paramId = std::unique_ptr<NIdentifier>(
-                   static_cast<NIdentifier*>(arg.release()));
-               params.push_back(std::make_unique<NVariableDeclaration>(
-                   std::move(paramId), nullptr));
-             }
-             auto funcId = std::unique_ptr<NIdentifier>(
-                 static_cast<NIdentifier*>(lhsCall->id.release()));
-             auto body = std::make_unique<NBlock>();
-             SET_LOC(body, @3);
-             auto exprStmt = std::make_unique<NExpressionStatement>(std::move($3));
-             SET_LOC(exprStmt, @3);
-             body->statements.push_back(std::move(exprStmt));
-             $$ = std::make_unique<NFunctionDeclaration>(
-                 std::move(funcId), std::move(params), std::move(body));
-             SET_LOC($$, @$);
-           } else {
-             error(@1, "invalid left-hand side of definition");
-             YYERROR;
-           }
+         $$ = buildDefinition(std::move($1), std::move($3));
+         if ($$ == nullptr) {
+           error(@1, "invalid left-hand side of definition");
+           YYERROR;
          }
+         SET_LOC($$, @$);
        }
      | type_sig { $$ = std::move($1); }
      | module_decl { $$ = std::move($1); }
@@ -199,14 +215,11 @@ stmt : expr TEQUAL expr {
      ;
 
 type_sig : expr TCOLON type_expr {
-             auto* lhsIdent = dynamic_cast<NIdentifier*>($1.get());
-             if (lhsIdent == nullptr) {
+             $$ = buildTypeSignature(std::move($1), std::move($3));
+             if ($$ == nullptr) {
                error(@1, "type signature must be for an identifier");
                YYERROR;
              }
-             auto id = std::unique_ptr<NIdentifier>(
-                 static_cast<NIdentifier*>($1.release()));
-             $$ = std::make_unique<NTypeSignature>(std::move(id), std::move($3));
              SET_LOC($$, @$);
            }
          ;
@@ -260,58 +273,21 @@ module_decl : TMODULE ident TLPAREN ident_list TRPAREN module_body TENDMODULE {
 
 module_body : %empty { $$ = StatementList(); }
             | module_body expr TEQUAL expr {
-                /* Module definition */
-                auto* lhsIdent = dynamic_cast<NIdentifier*>($2.get());
-                if (lhsIdent != nullptr) {
-                  auto id = std::unique_ptr<NIdentifier>(
-                      static_cast<NIdentifier*>($2.release()));
-                  auto stmt = std::make_unique<NVariableDeclaration>(
-                      std::move(id), std::move($4));
-                  SET_LOC(stmt, @2);
-                  $1.push_back(std::move(stmt));
-                } else {
-                  auto* lhsCall = dynamic_cast<NMethodCall*>($2.get());
-                  if (lhsCall != nullptr && lhsCall->qualifiedId == nullptr) {
-                    VariableList params;
-                    for (auto& arg : lhsCall->arguments) {
-                      auto* argIdent = dynamic_cast<NIdentifier*>(arg.get());
-                      if (argIdent == nullptr) {
-                        error(@2, "function definition parameters must be identifiers");
-                        YYERROR;
-                      }
-                      auto paramId = std::unique_ptr<NIdentifier>(
-                          static_cast<NIdentifier*>(arg.release()));
-                      params.push_back(std::make_unique<NVariableDeclaration>(
-                          std::move(paramId), nullptr));
-                    }
-                    auto funcId = std::unique_ptr<NIdentifier>(
-                        static_cast<NIdentifier*>(lhsCall->id.release()));
-                    auto body = std::make_unique<NBlock>();
-                    SET_LOC(body, @4);
-                    auto exprStmt = std::make_unique<NExpressionStatement>(std::move($4));
-                    SET_LOC(exprStmt, @4);
-                    body->statements.push_back(std::move(exprStmt));
-                    auto stmt = std::make_unique<NFunctionDeclaration>(
-                        std::move(funcId), std::move(params), std::move(body));
-                    SET_LOC(stmt, @2);
-                    $1.push_back(std::move(stmt));
-                  } else {
-                    error(@2, "invalid definition in module");
-                    YYERROR;
-                  }
+                auto stmt = buildDefinition(std::move($2), std::move($4));
+                if (stmt == nullptr) {
+                  error(@2, "invalid definition in module");
+                  YYERROR;
                 }
+                SET_LOC(stmt, @2);
+                $1.push_back(std::move(stmt));
                 $$ = std::move($1);
               }
             | module_body expr TCOLON type_expr {
-                auto* lhsIdent = dynamic_cast<NIdentifier*>($2.get());
-                if (lhsIdent == nullptr) {
+                auto stmt = buildTypeSignature(std::move($2), std::move($4));
+                if (stmt == nullptr) {
                   error(@2, "type signature must be for an identifier");
                   YYERROR;
                 }
-                auto id = std::unique_ptr<NIdentifier>(
-                    static_cast<NIdentifier*>($2.release()));
-                auto stmt = std::make_unique<NTypeSignature>(
-                    std::move(id), std::move($4));
                 SET_LOC(stmt, @2);
                 $1.push_back(std::move(stmt));
                 $$ = std::move($1);

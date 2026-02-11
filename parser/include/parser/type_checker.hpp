@@ -120,6 +120,9 @@ private:
   applyFunctionSignature(NFunctionDeclaration& node,
                          const std::shared_ptr<const NTypeSpec>& signature);
 
+  // Warn about type signatures with no corresponding definition
+  void warnOrphanedTypeSignatures();
+
   // Get mangled name for a symbol within current module context
   [[nodiscard]] std::string mangledName(const std::string& name) const;
 

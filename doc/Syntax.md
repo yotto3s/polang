@@ -648,10 +648,12 @@ boolean     ::= "true" | "false"
 
 type        ::= base_type
 
-type_expr   ::= type_expr "->" type_expr    (* right-associative *)
-              | type_expr "*" type_expr
-              | type
-              | "(" type_expr ")"
+type_expr    ::= type_product "->" type_expr   (* right-associative *)
+               | type_product
+type_product ::= type_atom "*" type_product   (* `*` binds tighter than `->` *)
+               | type_atom
+type_atom    ::= type
+               | "(" type_expr ")"
 
 base_type   ::= "i8" | "i16" | "i32" | "i64"
               | "u8" | "u16" | "u32" | "u64"

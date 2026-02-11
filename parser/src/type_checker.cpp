@@ -163,11 +163,13 @@ std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   errors.clear();
   localTypes.clear();
   functionSignatures.clear();
+  pendingTypeSignatures.clear();
   scopeDepth = 0;
   subst = polang::Substitution();
   traitConstraints = polang::TraitConstraints();
   polang::resetUnificationVarCounter();
   ast.accept(*this);
+  warnOrphanedTypeSignatures();
   return errors;
 }
 
@@ -1231,8 +1233,8 @@ void TypeChecker::applyFunctionSignature(
       node.type = signature;
       return;
     }
-    std::cerr << "Type error: type signature for '" << node.id->name
-              << "' is not a function type\n";
+    reportError("type signature for '" + node.id->name +
+                "' is not a function type");
     return;
   }
 
@@ -1248,9 +1250,10 @@ void TypeChecker::applyFunctionSignature(
 
   // Check arity matches
   if (paramTypes.size() != node.arguments.size()) {
-    std::cerr << "Type error: type signature for '" << node.id->name << "' has "
-              << paramTypes.size() << " parameters but definition has "
-              << node.arguments.size() << "\n";
+    reportError("type signature for '" + node.id->name + "' has " +
+                std::to_string(paramTypes.size()) +
+                " parameters but definition has " +
+                std::to_string(node.arguments.size()));
     return;
   }
 
@@ -1261,6 +1264,21 @@ void TypeChecker::applyFunctionSignature(
 
   // Apply return type
   node.type = arrowType->returnType;
+}
+
+void TypeChecker::warnOrphanedTypeSignatures() {
+  for (const auto& [name, typeExpr] : pendingTypeSignatures) {
+    // Unmangle the name for display: strip module prefix (everything up to
+    // and including the last "$$")
+    std::string displayName = name;
+    const auto pos = name.rfind("$$");
+    if (pos != std::string::npos) {
+      displayName = name.substr(pos + 2);
+    }
+    std::cerr << "Warning: type signature for '" << displayName
+              << "' has no corresponding definition\n";
+  }
+  pendingTypeSignatures.clear();
 }
 
 std::set<std::string> TypeChecker::collectFreeVariables(

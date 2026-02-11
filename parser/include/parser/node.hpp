@@ -380,6 +380,7 @@ public:
         modulePath(std::move(modulePath)), items(std::move(items)) {}
   void accept(Visitor &visitor) const override;
 };
+
 // Type signature: name : type_expr (separate from definition)
 class NTypeSignature : public NStatement {
 public:

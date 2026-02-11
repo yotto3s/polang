@@ -1,4 +1,4 @@
-(* RUN: %polang_compiler %s 2>&1 | %FileCheck %s
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
 *)
 
 (* Test arity mismatch between signature and definition *)
