@@ -20,6 +20,8 @@ class NFunctionDeclaration;
 class NModuleDeclaration;
 class NArrowType;
 class NProductType;
+class NTypeVar;
+class NForallType;
 class NImportStatement;
 class NTypeSignature;
 
@@ -76,6 +78,8 @@ public:
   virtual void visit(const NNamedType& node) = 0;
   virtual void visit(const NArrowType& node) = 0;
   virtual void visit(const NProductType& node) = 0;
+  virtual void visit(const NTypeVar& node) = 0;
+  virtual void visit(const NForallType& node) = 0;
   /// @}
 
   /// @name Expression Visitors

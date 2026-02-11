@@ -1,6 +1,6 @@
 (* RUN: %polang_repl %s | %FileCheck %s
 *)
-(* CHECK: 4.{{0*}}
+(* CHECK: 4 : f64
 *)
 
 (* Test forall with Numeric constraint on float arguments. *)

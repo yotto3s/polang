@@ -180,4 +180,90 @@ bool TraitConstraints::satisfies(
   return true;
 }
 
+// ============== TraitRegistry ==============
+
+TraitRegistry::TraitRegistry() {
+  // Built-in Numeric trait: all integer and float types
+  TraitDefinition numeric;
+  numeric.name = "Numeric";
+  numeric.methods = {
+      {"+", {"'self", "'self"}, "'self"},
+      {"-", {"'self", "'self"}, "'self"},
+      {"*", {"'self", "'self"}, "'self"},
+      {"/", {"'self", "'self"}, "'self"},
+  };
+  numeric.satisfyingTypes = {
+      TypeNames::I8,  TypeNames::I16, TypeNames::I32, TypeNames::I64,
+      TypeNames::U8,  TypeNames::U16, TypeNames::U32, TypeNames::U64,
+      TypeNames::F32, TypeNames::F64,
+  };
+  registerTrait(std::move(numeric));
+
+  // Built-in Integer trait: integer types only
+  TraitDefinition integer;
+  integer.name = "Integer";
+  integer.methods = {
+      {"%", {"'self", "'self"}, "'self"},
+  };
+  integer.satisfyingTypes = {
+      TypeNames::I8, TypeNames::I16, TypeNames::I32, TypeNames::I64,
+      TypeNames::U8, TypeNames::U16, TypeNames::U32, TypeNames::U64,
+  };
+  registerTrait(std::move(integer));
+
+  // Built-in Float trait: float types only
+  TraitDefinition floatTrait;
+  floatTrait.name = "Float";
+  floatTrait.methods = {};
+  floatTrait.satisfyingTypes = {
+      TypeNames::F32,
+      TypeNames::F64,
+  };
+  registerTrait(std::move(floatTrait));
+}
+
+void TraitRegistry::registerTrait(TraitDefinition def) {
+  std::string name = def.name;
+  // Build reverse index from method names to trait
+  for (const auto& method : def.methods) {
+    methodToTrait[method.methodName] = name;
+  }
+  traits[std::move(name)] = std::move(def);
+}
+
+bool TraitRegistry::isKnownTrait(const std::string& name) const {
+  return traits.find(name) != traits.end();
+}
+
+bool TraitRegistry::satisfies(const std::string& concreteType,
+                              const std::string& traitName) const {
+  auto it = traits.find(traitName);
+  if (it == traits.end()) {
+    return false;
+  }
+  return it->second.satisfyingTypes.count(concreteType) > 0;
+}
+
+std::optional<std::string>
+TraitRegistry::traitForMethod(const std::string& method) const {
+  auto it = methodToTrait.find(method);
+  if (it != methodToTrait.end()) {
+    return it->second;
+  }
+  return std::nullopt;
+}
+
+const TraitDefinition* TraitRegistry::getTrait(const std::string& name) const {
+  auto it = traits.find(name);
+  if (it != traits.end()) {
+    return &it->second;
+  }
+  return nullptr;
+}
+
+TraitRegistry& getTraitRegistry() {
+  static TraitRegistry registry;
+  return registry;
+}
+
 } // namespace polang

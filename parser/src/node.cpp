@@ -45,6 +45,10 @@ void NArrowType::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NProductType::accept(Visitor& visitor) const { visitor.visit(*this); }
 
+void NTypeVar::accept(Visitor& visitor) const { visitor.visit(*this); }
+
+void NForallType::accept(Visitor& visitor) const { visitor.visit(*this); }
+
 void NImportStatement::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NTypeSignature::accept(Visitor& visitor) const { visitor.visit(*this); }

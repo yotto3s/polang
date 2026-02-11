@@ -51,6 +51,14 @@ void ASTPrinter::visit(const NProductType& /*node*/) {
   // Types are printed via getTypeName() in parent visitors
 }
 
+void ASTPrinter::visit(const NTypeVar& /*node*/) {
+  // Types are printed via getTypeName() in parent visitors
+}
+
+void ASTPrinter::visit(const NForallType& /*node*/) {
+  // Types are printed via getTypeName() in parent visitors
+}
+
 void ASTPrinter::visit(const NInteger& node) {
   printPrefix();
   out << "NInteger " << node.value << "\n";

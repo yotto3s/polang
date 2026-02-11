@@ -8,6 +8,8 @@
 #include <utility>
 #include <vector>
 
+#include "parser/type_var_decl.hpp"
+
 namespace polang {
 enum class TraitBound;
 } // namespace polang
@@ -135,6 +137,43 @@ public:
       }
       result += types[i]->getTypeName();
     }
+    return result;
+  }
+  void accept(Visitor &visitor) const override;
+};
+
+// Type variable reference in type signatures (e.g., 'a in forall 'a. 'a -> 'a)
+class NTypeVar : public NTypeSpec {
+public:
+  std::string name;  // e.g., "'a"
+  explicit NTypeVar(std::string name) : name(std::move(name)) {}
+  [[nodiscard]] std::string getTypeName() const override { return name; }
+  void accept(Visitor &visitor) const override;
+};
+
+// Forall-quantified type for polymorphic type signatures
+// e.g., forall 'a:Numeric, 'b. 'a * 'b -> 'a
+// TypeVarDecl is defined in parser/type_var_decl.hpp
+
+class NForallType : public NTypeSpec {
+public:
+  std::vector<TypeVarDecl> typeVars;
+  std::shared_ptr<const NTypeSpec> innerType;
+  NForallType(std::vector<TypeVarDecl> typeVars,
+              std::shared_ptr<const NTypeSpec> innerType)
+      : typeVars(std::move(typeVars)), innerType(std::move(innerType)) {}
+  [[nodiscard]] std::string getTypeName() const override {
+    std::string result = "forall ";
+    for (size_t i = 0; i < typeVars.size(); ++i) {
+      if (i > 0) {
+        result += ", ";
+      }
+      result += typeVars[i].name;
+      if (!typeVars[i].bound.empty()) {
+        result += ":" + typeVars[i].bound;
+      }
+    }
+    result += ". " + innerType->getTypeName();
     return result;
   }
   void accept(Visitor &visitor) const override;
@@ -308,6 +347,8 @@ public:
   // Trait bounds for type parameters (filled by type checker)
   // e.g., {"'a" -> {Numeric}} for a function where 'a must be numeric
   std::map<std::string, std::set<polang::TraitBound>> typeParamBounds;
+  // True when function has an explicit forall type signature
+  bool hasExplicitForall = false;
   // Constructor for inferred return type
   NFunctionDeclaration(std::unique_ptr<NIdentifier> id, VariableList arguments,
                        std::unique_ptr<NBlock> block)

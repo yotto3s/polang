@@ -16,6 +16,8 @@ public:
   void visit(const NNamedType& node) override;
   void visit(const NArrowType& node) override;
   void visit(const NProductType& node) override;
+  void visit(const NTypeVar& node) override;
+  void visit(const NForallType& node) override;
   void visit(const NInteger& node) override;
   void visit(const NDouble& node) override;
   void visit(const NBoolean& node) override;

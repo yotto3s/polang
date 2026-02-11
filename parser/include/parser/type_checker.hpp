@@ -46,6 +46,8 @@ public:
   void visit(const NNamedType& node) override;
   void visit(const NArrowType& node) override;
   void visit(const NProductType& node) override;
+  void visit(const NTypeVar& node) override;
+  void visit(const NForallType& node) override;
 
   // Expression Visitor methods
   void visit(const NInteger& node) override;
@@ -207,6 +209,13 @@ private:
 
   // Resolve defaults for constrained unification vars
   [[nodiscard]] std::string resolveWithDefaults(const std::string& type) const;
+
+  // Validate type names in a type expression tree.
+  // Returns false if any errors were found.
+  // If usedTypeVars is non-null, collects all NTypeVar references found.
+  bool validateTypeNames(const NTypeSpec* typeSpec,
+                         const std::set<std::string>& declaredTypeVars,
+                         std::set<std::string>* usedTypeVars = nullptr);
 };
 
 #endif // POLANG_TYPE_CHECKER_HPP

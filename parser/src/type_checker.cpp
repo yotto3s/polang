@@ -46,6 +46,8 @@ public:
   void visit(const NNamedType& /*node*/) override {}
   void visit(const NArrowType& /*node*/) override {}
   void visit(const NProductType& /*node*/) override {}
+  void visit(const NTypeVar& /*node*/) override {}
+  void visit(const NForallType& /*node*/) override {}
   void visit(const NInteger& /*node*/) override {}
   void visit(const NDouble& /*node*/) override {}
   void visit(const NBoolean& /*node*/) override {}
@@ -145,6 +147,15 @@ void TypeChecker::visit(const NArrowType& /*node*/) {
 
 void TypeChecker::visit(const NProductType& /*node*/) {
   // Product types are used in type signatures, not directly visited
+}
+
+void TypeChecker::visit(const NTypeVar& node) {
+  // Type variables in signatures set inferredType to "typevar"
+  inferredType = node.getTypeName();
+}
+
+void TypeChecker::visit(const NForallType& /*node*/) {
+  // Forall types are handled in applyFunctionSignature, not directly visited
 }
 
 std::string TypeChecker::mangledName(const std::string& name) const {
@@ -387,7 +398,12 @@ void TypeChecker::instantiateCall(NMethodCall& node,
         msg += funcName;
         msg += "': type ";
         msg += resolved;
-        msg += " does not satisfy trait bounds for ";
+        msg += " does not satisfy ";
+        for (auto b : boundsIt->second) {
+          msg += polang::traitBoundToString(b);
+          msg += " ";
+        }
+        msg += "for ";
         msg += tp;
         reportError(msg, node.loc);
       }
@@ -953,11 +969,115 @@ void TypeChecker::inferFunction(
   functionSignatures[funcName] =
       polang::MonoSignature{paramTypes, TypeNames::TYPEVAR};
 
+  // For explicit forall: pre-unify params that share the same type variable,
+  // and build the type param -> uni var mapping
+  std::map<std::string, std::string> typeParamToUniVar;
+  if (node.hasExplicitForall) {
+    for (const auto& arg : node.arguments) {
+      if (arg->type != nullptr &&
+          polang::isTypeParameter(arg->type->getTypeName())) {
+        std::string tp = arg->type->getTypeName();
+        auto uvIt = paramUniVars.find(arg->id->name);
+        if (uvIt != paramUniVars.end()) {
+          auto existingIt = typeParamToUniVar.find(tp);
+          if (existingIt != typeParamToUniVar.end()) {
+            // Same type param → unify the uni vars
+            unifier.unify(existingIt->second, uvIt->second, subst);
+          } else {
+            typeParamToUniVar[tp] = uvIt->second;
+          }
+        }
+      }
+    }
+  }
+
   // Type-check function body
   ++scopeDepth;
   node.block->accept(*this);
   --scopeDepth;
   std::string bodyType = inferredType;
+
+  // Handle explicit forall: validate bounds and build signature from declared
+  // params
+  if (node.hasExplicitForall) {
+    // Validate: body trait constraints ⊆ declared bounds
+    for (const auto& [typeParam, uniVar] : typeParamToUniVar) {
+      std::string resolved = subst.apply(uniVar);
+      auto accBounds = traitConstraints.getBounds(uniVar);
+      // Also check bounds on the resolved var (in case of unification)
+      auto resolvedBounds = traitConstraints.getBounds(resolved);
+      accBounds.insert(resolvedBounds.begin(), resolvedBounds.end());
+
+      for (auto bound : accBounds) {
+        auto declIt = node.typeParamBounds.find(typeParam);
+        bool isDeclared = declIt != node.typeParamBounds.end() &&
+                          declIt->second.count(bound) > 0;
+        if (!isDeclared) {
+          reportError("type variable " + typeParam + " requires " +
+                          polang::traitBoundToString(bound) +
+                          " bound for arithmetic operations",
+                      node.loc);
+        }
+      }
+    }
+
+    // Build param types using declared type param names
+    std::vector<std::string> sigParamTypes;
+    for (size_t i = 0; i < paramTypes.size(); ++i) {
+      std::string resolved = subst.apply(paramTypes[i]);
+      // Check if this uni var maps to a declared type param
+      bool mapped = false;
+      for (const auto& [tp, uv] : typeParamToUniVar) {
+        if (subst.apply(uv) == resolved || uv == paramTypes[i]) {
+          sigParamTypes.push_back(tp);
+          mapped = true;
+          break;
+        }
+      }
+      if (!mapped) {
+        sigParamTypes.push_back(resolveWithDefaults(resolved));
+      }
+      auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
+      mutableArg.type = makeTypeSpec(sigParamTypes.back());
+    }
+
+    // Resolve return type
+    std::string resolvedReturn = subst.apply(bodyType);
+    std::string returnType;
+    // Check if return type maps to a declared type param
+    bool retMapped = false;
+    for (const auto& [tp, uv] : typeParamToUniVar) {
+      if (subst.apply(uv) == resolvedReturn || uv == resolvedReturn) {
+        returnType = tp;
+        retMapped = true;
+        break;
+      }
+    }
+    if (!retMapped) {
+      if (node.type != nullptr &&
+          polang::isTypeParameter(node.type->getTypeName())) {
+        returnType = node.type->getTypeName();
+      } else {
+        returnType = resolveWithDefaults(resolvedReturn);
+      }
+    }
+    node.type = makeTypeSpec(returnType);
+
+    // Store polymorphic signature
+    polang::PolymorphicSignature sig;
+    sig.typeParams = node.typeParams;
+    for (const auto& [tp, bounds] : node.typeParamBounds) {
+      sig.paramBounds[tp] = bounds;
+    }
+    sig.paramTypes = sigParamTypes;
+    sig.returnType = returnType;
+    functionSignatures[funcName] = sig;
+
+    // Restore HM state
+    subst = savedSubst;
+    traitConstraints = savedTraitConstraints;
+    return;
+  }
 
   if (!hasUntypedParams) {
     // Monomorphic function
@@ -1226,11 +1346,60 @@ void TypeChecker::visit(const NTypeSignature& node) {
 void TypeChecker::applyFunctionSignature(
     NFunctionDeclaration& node,
     const std::shared_ptr<const NTypeSpec>& signature) {
-  const auto* arrowType = dynamic_cast<const NArrowType*>(signature.get());
+  // Check if this is a forall type signature
+  const auto* forallType = dynamic_cast<const NForallType*>(signature.get());
+  std::set<std::string> declaredTypeVars;
+  std::shared_ptr<const NTypeSpec> innerSig = signature;
+
+  if (forallType != nullptr) {
+    node.hasExplicitForall = true;
+    node.typeParams.clear();
+    node.typeParamBounds.clear();
+
+    auto& registry = polang::getTraitRegistry();
+
+    for (const auto& tv : forallType->typeVars) {
+      declaredTypeVars.insert(tv.name);
+      node.typeParams.push_back(tv.name);
+
+      if (!tv.bound.empty()) {
+        if (!registry.isKnownTrait(tv.bound)) {
+          reportError("unknown type class '" + tv.bound + "'");
+          return;
+        }
+        auto traitBound = polang::stringToTraitBound(tv.bound);
+        if (traitBound) {
+          node.typeParamBounds[tv.name].insert(*traitBound);
+        }
+      }
+    }
+
+    innerSig = forallType->innerType;
+  }
+
+  // Validate type names in the signature
+  std::set<std::string> usedTypeVars;
+  const size_t errorsBefore = errors.size();
+  validateTypeNames(innerSig.get(), declaredTypeVars, &usedTypeVars);
+  if (errors.size() > errorsBefore) {
+    return;
+  }
+
+  // Warn about unused type variables (only for forall signatures)
+  if (forallType != nullptr) {
+    for (const auto& tv : forallType->typeVars) {
+      if (usedTypeVars.find(tv.name) == usedTypeVars.end()) {
+        std::cerr << "Warning: unused type variable " << tv.name << "\n";
+      }
+    }
+  }
+
+  // Process the (inner) type as arrow type
+  const auto* arrowType = dynamic_cast<const NArrowType*>(innerSig.get());
   if (arrowType == nullptr) {
     if (node.arguments.empty()) {
       // Zero-param function: non-arrow signature is just the return type
-      node.type = signature;
+      node.type = innerSig;
       return;
     }
     reportError("type signature for '" + node.id->name +
@@ -1264,6 +1433,54 @@ void TypeChecker::applyFunctionSignature(
 
   // Apply return type
   node.type = arrowType->returnType;
+}
+
+bool TypeChecker::validateTypeNames(
+    const NTypeSpec* typeSpec, const std::set<std::string>& declaredTypeVars,
+    std::set<std::string>* usedTypeVars) {
+  if (typeSpec == nullptr) {
+    return true;
+  }
+
+  if (const auto* named = dynamic_cast<const NNamedType*>(typeSpec)) {
+    auto kind = polang::parseTypeName(named->name);
+    if (!kind.has_value()) {
+      reportError("unknown type '" + named->name + "'");
+      return false;
+    }
+    return true;
+  }
+
+  if (const auto* typeVar = dynamic_cast<const NTypeVar*>(typeSpec)) {
+    if (usedTypeVars != nullptr) {
+      usedTypeVars->insert(typeVar->name);
+    }
+    if (declaredTypeVars.find(typeVar->name) == declaredTypeVars.end()) {
+      reportError("undeclared type variable " + typeVar->name);
+      return false;
+    }
+    return true;
+  }
+
+  if (const auto* arrow = dynamic_cast<const NArrowType*>(typeSpec)) {
+    bool valid = validateTypeNames(arrow->paramType.get(), declaredTypeVars,
+                                   usedTypeVars);
+    valid = validateTypeNames(arrow->returnType.get(), declaredTypeVars,
+                              usedTypeVars) &&
+            valid;
+    return valid;
+  }
+
+  if (const auto* product = dynamic_cast<const NProductType*>(typeSpec)) {
+    bool valid = true;
+    for (const auto& t : product->types) {
+      valid =
+          validateTypeNames(t.get(), declaredTypeVars, usedTypeVars) && valid;
+    }
+    return valid;
+  }
+
+  return true;
 }
 
 void TypeChecker::warnOrphanedTypeSignatures() {

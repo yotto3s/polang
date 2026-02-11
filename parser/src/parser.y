@@ -16,6 +16,7 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include "parser/type_var_decl.hpp"
 // Forward declarations for node types
 class NBlock;
 class NExpression;
@@ -25,6 +26,8 @@ class NTypeSpec;
 class NNamedType;
 class NArrowType;
 class NProductType;
+class NTypeVar;
+class NForallType;
 class NQualifiedName;
 class NVariableDeclaration;
 class NFunctionDeclaration;
@@ -148,11 +151,15 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
 %token TIMPORT "import"
 %token TFROM "from"
 %token TAS "as"
+%token TFORALL "forall"
+%token <std::string> TTYPEVAR "typevar"
 
 // Nonterminal types with smart pointers
 %type <std::unique_ptr<NIdentifier>> ident
 %type <std::shared_ptr<const NTypeSpec>> type_spec type_expr type_product type_atom
 %type <std::vector<std::shared_ptr<const NTypeSpec>>> type_product_list
+%type <std::vector<TypeVarDecl>> type_var_list
+%type <TypeVarDecl> type_var_decl
 %type <std::unique_ptr<NExpression>> numeric expr boolean
 %type <std::unique_ptr<NBlock>> program stmts
 %type <std::unique_ptr<NStatement>> stmt type_sig module_decl import_stmt
@@ -370,7 +377,11 @@ type_spec : ident {
           ;
 
 /* Type expressions for type signatures */
-type_expr : type_product TARROW type_expr {
+type_expr : TFORALL type_var_list TDOT type_expr {
+              /* Forall quantifier: forall 'a, 'b:Numeric. 'a -> 'b */
+              $$ = std::make_shared<const NForallType>(std::move($2), std::move($4));
+            }
+          | type_product TARROW type_expr {
               /* Function type: a -> b (right-associative) */
               $$ = std::make_shared<const NArrowType>(std::move($1), std::move($3));
             }
@@ -378,6 +389,26 @@ type_expr : type_product TARROW type_expr {
               $$ = std::move($1);
             }
           ;
+
+type_var_list : type_var_decl {
+                  $$ = std::vector<TypeVarDecl>();
+                  $$.push_back(std::move($1));
+                }
+              | type_var_list TCOMMA type_var_decl {
+                  $1.push_back(std::move($3));
+                  $$ = std::move($1);
+                }
+              ;
+
+type_var_decl : TTYPEVAR {
+                  /* 'a (unconstrained type variable) */
+                  $$ = TypeVarDecl($1);
+                }
+              | TTYPEVAR TCOLON ident {
+                  /* 'a:Numeric (constrained type variable) */
+                  $$ = TypeVarDecl($1, $3->name);
+                }
+              ;
 
 type_product : type_atom {
                  $$ = std::move($1);
@@ -400,6 +431,10 @@ type_product_list : type_atom TMUL type_atom {
 
 type_atom : ident {
               $$ = std::make_shared<const NNamedType>($1->name);
+            }
+          | TTYPEVAR {
+              /* Type variable reference: 'a */
+              $$ = std::make_shared<const NTypeVar>($1);
             }
           | TLPAREN type_expr TRPAREN {
               $$ = std::move($2);

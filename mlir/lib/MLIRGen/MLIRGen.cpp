@@ -102,6 +102,8 @@ public:
   }
   void visit(const NArrowType& /*node*/) override {}
   void visit(const NProductType& /*node*/) override {}
+  void visit(const NTypeVar& /*node*/) override {}
+  void visit(const NForallType& /*node*/) override {}
 
   // Expression Visitor implementations
   void visit(const NInteger& node) override {
