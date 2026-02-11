@@ -107,6 +107,39 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
+// Arrow type for function signatures: paramType -> returnType
+class NArrowType : public NTypeSpec {
+public:
+  std::shared_ptr<const NTypeSpec> paramType;
+  std::shared_ptr<const NTypeSpec> returnType;
+  NArrowType(std::shared_ptr<const NTypeSpec> param,
+             std::shared_ptr<const NTypeSpec> ret)
+      : paramType(std::move(param)), returnType(std::move(ret)) {}
+  [[nodiscard]] std::string getTypeName() const override {
+    return paramType->getTypeName() + " -> " + returnType->getTypeName();
+  }
+  void accept(Visitor &visitor) const override;
+};
+
+// Product type for multi-param signatures: type1 * type2 * ...
+class NProductType : public NTypeSpec {
+public:
+  std::vector<std::shared_ptr<const NTypeSpec>> types;
+  explicit NProductType(std::vector<std::shared_ptr<const NTypeSpec>> types)
+      : types(std::move(types)) {}
+  [[nodiscard]] std::string getTypeName() const override {
+    std::string result;
+    for (size_t i = 0; i < types.size(); ++i) {
+      if (i > 0) {
+        result += " * ";
+      }
+      result += types[i]->getTypeName();
+    }
+    return result;
+  }
+  void accept(Visitor &visitor) const override;
+};
+
 /// Helper to create an NTypeSpec from a type name string.
 [[nodiscard]] inline std::shared_ptr<const NTypeSpec>
 makeTypeSpec(const std::string& typeName) {
@@ -345,6 +378,16 @@ public:
                    bool importAll = false)
       : kind(importAll ? ImportKind::All : ImportKind::Items),
         modulePath(std::move(modulePath)), items(std::move(items)) {}
+  void accept(Visitor &visitor) const override;
+};
+// Type signature: name : type_expr (separate from definition)
+class NTypeSignature : public NStatement {
+public:
+  std::unique_ptr<NIdentifier> id;
+  std::shared_ptr<const NTypeSpec> typeExpr;
+  NTypeSignature(std::unique_ptr<NIdentifier> id,
+                 std::shared_ptr<const NTypeSpec> typeExpr)
+      : id(std::move(id)), typeExpr(std::move(typeExpr)) {}
   void accept(Visitor &visitor) const override;
 };
 // clang-format on

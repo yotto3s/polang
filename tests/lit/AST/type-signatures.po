@@ -1,0 +1,13 @@
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
+
+(* CHECK:      NBlock
+*)
+(* CHECK-NEXT: |-NTypeSignature 'x' : i64
+*)
+(* CHECK-NEXT: |-NVariableDeclaration 'x'
+*)
+(* CHECK-NEXT: | `-NInteger 10
+*)
+x : i64
+x = 10
