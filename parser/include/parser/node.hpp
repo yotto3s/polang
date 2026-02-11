@@ -98,6 +98,8 @@ class NTypeSpec : public Node {
 public:
   // Get the string representation of this type (for backwards compatibility)
   [[nodiscard]] virtual std::string getTypeName() const = 0;
+  // Deep-copy this type specification
+  [[nodiscard]] virtual std::unique_ptr<const NTypeSpec> clone() const = 0;
 };
 
 // Named type (base types like i64, f64, bool, typevar)
@@ -106,6 +108,9 @@ public:
   std::string name;
   explicit NNamedType(std::string name) : name(std::move(name)) {}
   [[nodiscard]] std::string getTypeName() const override { return name; }
+  [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
+    return std::make_unique<const NNamedType>(name);
+  }
   void accept(Visitor &visitor) const override;
 };
 
@@ -119,6 +124,13 @@ public:
       : paramType(std::move(param)), returnType(std::move(ret)) {}
   [[nodiscard]] std::string getTypeName() const override {
     return paramType->getTypeName() + " -> " + returnType->getTypeName();
+  }
+  [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
+    auto clonedParam = paramType->clone();
+    auto clonedRet = returnType->clone();
+    return std::make_unique<const NArrowType>(
+        std::shared_ptr<const NTypeSpec>(std::move(clonedParam)),
+        std::shared_ptr<const NTypeSpec>(std::move(clonedRet)));
   }
   void accept(Visitor &visitor) const override;
 };
@@ -139,6 +151,14 @@ public:
     }
     return result;
   }
+  [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
+    std::vector<std::shared_ptr<const NTypeSpec>> cloned;
+    cloned.reserve(types.size());
+    for (const auto& t : types) {
+      cloned.push_back(std::shared_ptr<const NTypeSpec>(t->clone()));
+    }
+    return std::make_unique<const NProductType>(std::move(cloned));
+  }
   void accept(Visitor &visitor) const override;
 };
 
@@ -148,6 +168,9 @@ public:
   std::string name;  // e.g., "'a"
   explicit NTypeVar(std::string name) : name(std::move(name)) {}
   [[nodiscard]] std::string getTypeName() const override { return name; }
+  [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
+    return std::make_unique<const NTypeVar>(name);
+  }
   void accept(Visitor &visitor) const override;
 };
 
@@ -175,6 +198,11 @@ public:
     }
     result += ". " + innerType->getTypeName();
     return result;
+  }
+  [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
+    return std::make_unique<const NForallType>(
+        typeVars,
+        std::shared_ptr<const NTypeSpec>(innerType->clone()));
   }
   void accept(Visitor &visitor) const override;
 };
