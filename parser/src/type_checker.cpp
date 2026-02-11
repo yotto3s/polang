@@ -373,16 +373,29 @@ void TypeChecker::instantiateCall(NMethodCall& node,
   // Unify argument types with instantiated parameter types
   for (size_t i = 0; i < argTypes.size(); ++i) {
     std::string instantiatedParam = callSubst.apply(scheme.paramTypes[i]);
-    std::string resolvedArg = resolveWithDefaults(argTypes[i]);
-    if (resolvedArg == TypeNames::UNKNOWN) {
+    if (argTypes[i] == TypeNames::UNKNOWN) {
       continue;
     }
-    if (!callUnifier.unify(instantiatedParam, resolvedArg, callSubst)) {
+    if (!callUnifier.unify(instantiatedParam, argTypes[i], callSubst)) {
       reportError("Function '" + funcName + "' argument " +
                       std::to_string(i + 1) + ": type mismatch",
                   node.loc);
       inferredType = TypeNames::UNKNOWN;
       return;
+    }
+  }
+
+  // Propagate resolved types back to arguments with generic types
+  for (size_t i = 0; i < argTypes.size(); ++i) {
+    std::string resolvedParam = callSubst.apply(scheme.paramTypes[i]);
+    resolvedParam = resolveWithDefaults(resolvedParam);
+    if (!isGenericType(resolvedParam) &&
+        resolvedParam != TypeNames::UNKNOWN &&
+        resolvedParam != TypeNames::TYPEVAR &&
+        !polang::isTypeParameter(resolvedParam) &&
+        !polang::isUnificationVar(resolvedParam)) {
+      propagateTypeToSource(node.arguments[i].get(), resolvedParam);
+      node.arguments[i]->accept(*this);
     }
   }
 

@@ -200,9 +200,23 @@ public:
     // Collect arguments, propagating parameter types to literals
     SmallVector<Value> args;
     for (size_t i = 0; i < node.arguments.size(); ++i) {
+      std::shared_ptr<const NTypeSpec> effectiveParamType;
       if (paramTypes != nullptr && i < paramTypes->size() &&
           (*paramTypes)[i] != nullptr) {
-        ExpectedTypeScope scope(*this, (*paramTypes)[i]);
+        effectiveParamType = (*paramTypes)[i];
+        // For polymorphic calls, resolve type parameters to concrete bindings
+        if (!node.typeBindings.empty()) {
+          const std::string paramTypeName = effectiveParamType->getTypeName();
+          if (polang::isTypeParameter(paramTypeName)) {
+            auto bindingIt = node.typeBindings.find(paramTypeName);
+            if (bindingIt != node.typeBindings.end()) {
+              effectiveParamType = bindingIt->second;
+            }
+          }
+        }
+      }
+      if (effectiveParamType != nullptr) {
+        ExpectedTypeScope scope(*this, effectiveParamType);
         node.arguments[i]->accept(*this);
       } else {
         node.arguments[i]->accept(*this);
