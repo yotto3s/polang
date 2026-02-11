@@ -3,7 +3,7 @@
 // ============== Multiple Statements Tests ==============
 
 TEST(ParserTest, MultipleStatements) {
-  auto block = parseOrFail("def x = 1\ndef y = 2\nx + y");
+  auto block = parseOrFail("x = 1\ny = 2\nx + y");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 3);
 
@@ -20,15 +20,19 @@ TEST(ParserTest, MultipleStatements) {
 }
 
 TEST(ParserTest, FunctionAndCall) {
-  auto block = parseOrFail("def inc(x: int): int = x + 1\ninc(5)");
+  auto block = parseOrFail("inc : int -> int\ninc(x) = x + 1\ninc(5)");
   ASSERT_NE(block, nullptr);
-  ASSERT_EQ(block->statements.size(), 2);
+  ASSERT_EQ(block->statements.size(), 3);
 
-  auto* funcDecl = dynamic_cast<NFunctionDeclaration*>(block->statements[0].get());
+  auto* typeSig = dynamic_cast<NTypeSignature*>(block->statements[0].get());
+  ASSERT_NE(typeSig, nullptr);
+  EXPECT_EQ(typeSig->id->name, "inc");
+
+  auto* funcDecl = dynamic_cast<NFunctionDeclaration*>(block->statements[1].get());
   ASSERT_NE(funcDecl, nullptr);
   EXPECT_EQ(funcDecl->id->name, "inc");
 
-  auto* exprStmt = dynamic_cast<NExpressionStatement*>(block->statements[1].get());
+  auto* exprStmt = dynamic_cast<NExpressionStatement*>(block->statements[2].get());
   ASSERT_NE(exprStmt, nullptr);
   auto* call = dynamic_cast<const NMethodCall*>(exprStmt->expression.get());
   ASSERT_NE(call, nullptr);

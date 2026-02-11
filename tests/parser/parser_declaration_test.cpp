@@ -3,7 +3,7 @@
 // ============== Variable Declaration Tests ==============
 
 TEST(ParserTest, SimpleVariableDeclaration) {
-  auto block = parseOrFail("def x = 5");
+  auto block = parseOrFail("x = 5");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 
@@ -19,15 +19,23 @@ TEST(ParserTest, SimpleVariableDeclaration) {
 }
 
 TEST(ParserTest, TypedVariableDeclaration) {
-  auto block = parseOrFail("def pi : double = 3.14");
+  auto block = parseOrFail("pi : double\npi = 3.14");
   ASSERT_NE(block, nullptr);
-  ASSERT_EQ(block->statements.size(), 1);
+  ASSERT_EQ(block->statements.size(), 2);
 
-  auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
+  // First statement: type signature
+  auto* typeSig =
+      dynamic_cast<NTypeSignature*>(block->statements[0].get());
+  ASSERT_NE(typeSig, nullptr);
+  EXPECT_EQ(typeSig->id->name, "pi");
+  EXPECT_EQ(typeSig->typeExpr->getTypeName(), "double");
+
+  // Second statement: variable declaration (type applied by type checker)
+  auto* varDecl =
+      dynamic_cast<NVariableDeclaration*>(block->statements[1].get());
   ASSERT_NE(varDecl, nullptr);
   EXPECT_EQ(varDecl->id->name, "pi");
-  ASSERT_NE(varDecl->type, nullptr);
-  EXPECT_EQ(varDecl->type->getTypeName(), "double");
+  EXPECT_EQ(varDecl->type, nullptr); // type not yet applied by parser
 
   auto* doubleExpr = dynamic_cast<NDouble*>(varDecl->assignmentExpr.get());
   ASSERT_NE(doubleExpr, nullptr);
@@ -35,7 +43,7 @@ TEST(ParserTest, TypedVariableDeclaration) {
 }
 
 TEST(ParserTest, VariableWithIdentifierExpression) {
-  auto block = parseOrFail("def y = x");
+  auto block = parseOrFail("y = x");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 
@@ -51,38 +59,53 @@ TEST(ParserTest, VariableWithIdentifierExpression) {
 // ============== Function Declaration Tests ==============
 
 TEST(ParserTest, SimpleFunctionDeclaration) {
-  auto block = parseOrFail("def square(n: int): int = n * n");
+  auto block = parseOrFail("square : int -> int\nsquare(n) = n * n");
   ASSERT_NE(block, nullptr);
-  ASSERT_EQ(block->statements.size(), 1);
+  ASSERT_EQ(block->statements.size(), 2);
 
-  auto* funcDecl = getFirstStatement<NFunctionDeclaration>(block.get());
+  // First statement: type signature
+  auto* typeSig =
+      dynamic_cast<NTypeSignature*>(block->statements[0].get());
+  ASSERT_NE(typeSig, nullptr);
+  EXPECT_EQ(typeSig->id->name, "square");
+  EXPECT_EQ(typeSig->typeExpr->getTypeName(), "int -> int");
+
+  // Second statement: function declaration (types applied by type checker)
+  auto* funcDecl =
+      dynamic_cast<NFunctionDeclaration*>(block->statements[1].get());
   ASSERT_NE(funcDecl, nullptr);
   EXPECT_EQ(funcDecl->id->name, "square");
-  ASSERT_NE(funcDecl->type, nullptr);
-  EXPECT_EQ(funcDecl->type->getTypeName(), "int");
+  EXPECT_EQ(funcDecl->type, nullptr); // return type applied by type checker
   ASSERT_EQ(funcDecl->arguments.size(), 1);
   EXPECT_EQ(funcDecl->arguments[0]->id->name, "n");
-  ASSERT_NE(funcDecl->arguments[0]->type, nullptr);
-  EXPECT_EQ(funcDecl->arguments[0]->type->getTypeName(), "int");
+  EXPECT_EQ(funcDecl->arguments[0]->type, nullptr); // param type applied by type checker
 }
 
 TEST(ParserTest, FunctionWithMultipleArgs) {
-  auto block = parseOrFail("def add(x: int, y: int): int = x + y");
+  auto block = parseOrFail("add : int * int -> int\nadd(x, y) = x + y");
   ASSERT_NE(block, nullptr);
-  ASSERT_EQ(block->statements.size(), 1);
+  ASSERT_EQ(block->statements.size(), 2);
 
-  auto* funcDecl = getFirstStatement<NFunctionDeclaration>(block.get());
+  // First statement: type signature
+  auto* typeSig =
+      dynamic_cast<NTypeSignature*>(block->statements[0].get());
+  ASSERT_NE(typeSig, nullptr);
+  EXPECT_EQ(typeSig->id->name, "add");
+  EXPECT_EQ(typeSig->typeExpr->getTypeName(), "int * int -> int");
+
+  // Second statement: function declaration
+  auto* funcDecl =
+      dynamic_cast<NFunctionDeclaration*>(block->statements[1].get());
   ASSERT_NE(funcDecl, nullptr);
   EXPECT_EQ(funcDecl->id->name, "add");
-  ASSERT_NE(funcDecl->type, nullptr);
-  EXPECT_EQ(funcDecl->type->getTypeName(), "int");
+  EXPECT_EQ(funcDecl->type, nullptr); // return type applied by type checker
   ASSERT_EQ(funcDecl->arguments.size(), 2);
   EXPECT_EQ(funcDecl->arguments[0]->id->name, "x");
   EXPECT_EQ(funcDecl->arguments[1]->id->name, "y");
 }
 
 TEST(ParserTest, FunctionWithInferredReturnType) {
-  auto block = parseOrFail("def double(x: int) = x + x");
+  auto block = parseOrFail("double(x) = x + x");
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->statements.size(), 1);
 

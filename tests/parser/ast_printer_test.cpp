@@ -78,7 +78,7 @@ TEST(ASTPrinterTest, PrintBinaryOperatorCompare) {
 // ============== Declaration Tests ==============
 
 TEST(ASTPrinterTest, PrintVariableDeclaration) {
-  auto block = parseOrFail("def x = 5");
+  auto block = parseOrFail("x = 5");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
@@ -89,26 +89,28 @@ TEST(ASTPrinterTest, PrintVariableDeclaration) {
 }
 
 TEST(ASTPrinterTest, PrintTypedVariable) {
-  auto block = parseOrFail("def z: int = 42");
-  std::ostringstream out;
-  ASTPrinter printer(out);
-  printer.print(*block);
-
-  EXPECT_NE(out.str().find("NVariableDeclaration 'z' : int"),
-            std::string::npos);
-}
-
-TEST(ASTPrinterTest, PrintFunctionDeclaration) {
-  auto block = parseOrFail("def add(a: int, b: int): int = a + b");
+  auto block = parseOrFail("z : int\nz = 42");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);
 
   const std::string result = out.str();
+  EXPECT_NE(result.find("NTypeSignature 'z' : int"), std::string::npos);
+  EXPECT_NE(result.find("NVariableDeclaration 'z'"), std::string::npos);
+  EXPECT_NE(result.find("NInteger 42"), std::string::npos);
+}
+
+TEST(ASTPrinterTest, PrintFunctionDeclaration) {
+  auto block = parseOrFail("add : int * int -> int\nadd(a, b) = a + b");
+  std::ostringstream out;
+  ASTPrinter printer(out);
+  printer.print(*block);
+
+  const std::string result = out.str();
+  EXPECT_NE(result.find("NTypeSignature 'add' : int * int -> int"),
+            std::string::npos);
   EXPECT_NE(result.find("NFunctionDeclaration 'add'"), std::string::npos);
-  EXPECT_NE(result.find("a: int"), std::string::npos);
-  EXPECT_NE(result.find("b: int"), std::string::npos);
-  EXPECT_NE(result.find("-> int"), std::string::npos);
+  EXPECT_NE(result.find("NBinaryOperator '+'"), std::string::npos);
 }
 
 // ============== Control Flow Tests ==============
@@ -166,7 +168,7 @@ TEST(ASTPrinterTest, TreeConnectors) {
 }
 
 TEST(ASTPrinterTest, MultipleStatements) {
-  auto block = parseOrFail("def x = 1\ndef y = 2\nx + y");
+  auto block = parseOrFail("x = 1\ny = 2\nx + y");
   std::ostringstream out;
   ASTPrinter printer(out);
   printer.print(*block);

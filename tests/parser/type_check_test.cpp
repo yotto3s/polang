@@ -34,27 +34,29 @@ bool hasNoTypeError(const std::string& source) {
 // ============== Valid Type Tests ==============
 
 TEST(TypeCheckTest, IntegerArithmetic) {
-  EXPECT_TRUE(hasNoTypeError("def x = 1 + 2"));
-  EXPECT_TRUE(hasNoTypeError("def x = 1 - 2"));
-  EXPECT_TRUE(hasNoTypeError("def x = 1 * 2"));
-  EXPECT_TRUE(hasNoTypeError("def x = 1 / 2"));
+  EXPECT_TRUE(hasNoTypeError("x = 1 + 2"));
+  EXPECT_TRUE(hasNoTypeError("x = 1 - 2"));
+  EXPECT_TRUE(hasNoTypeError("x = 1 * 2"));
+  EXPECT_TRUE(hasNoTypeError("x = 1 / 2"));
 }
 
 TEST(TypeCheckTest, DoubleArithmetic) {
-  EXPECT_TRUE(hasNoTypeError("def x : f64 = 1.0 + 2.0"));
-  EXPECT_TRUE(hasNoTypeError("def x : f64 = 1.0 - 2.0"));
-  EXPECT_TRUE(hasNoTypeError("def x : f64 = 1.0 * 2.0"));
-  EXPECT_TRUE(hasNoTypeError("def x : f64 = 1.0 / 2.0"));
+  EXPECT_TRUE(hasNoTypeError("x : f64\nx = 1.0 + 2.0"));
+  EXPECT_TRUE(hasNoTypeError("x : f64\nx = 1.0 - 2.0"));
+  EXPECT_TRUE(hasNoTypeError("x : f64\nx = 1.0 * 2.0"));
+  EXPECT_TRUE(hasNoTypeError("x : f64\nx = 1.0 / 2.0"));
 }
 
 TEST(TypeCheckTest, VariableUsage) {
-  EXPECT_TRUE(hasNoTypeError("def x = 1\ndef y = x + 1"));
-  EXPECT_TRUE(hasNoTypeError("def x : f64 = 1.0\ndef y : f64 = x + 2.0"));
+  EXPECT_TRUE(hasNoTypeError("x = 1\ny = x + 1"));
+  EXPECT_TRUE(hasNoTypeError("x : f64\nx = 1.0\ny : f64\ny = x + 2.0"));
 }
 
 TEST(TypeCheckTest, FunctionDeclaration) {
-  EXPECT_TRUE(hasNoTypeError("def add(x: i64, y: i64): i64 = x + y"));
-  EXPECT_TRUE(hasNoTypeError("def mul(a: f64, b: f64): f64 = a * b"));
+  EXPECT_TRUE(
+      hasNoTypeError("add : i64 * i64 -> i64\nadd(x, y) = x + y"));
+  EXPECT_TRUE(
+      hasNoTypeError("mul : f64 * f64 -> f64\nmul(a, b) = a * b"));
 }
 
 TEST(TypeCheckTest, LetExpression) {
@@ -66,15 +68,15 @@ TEST(TypeCheckTest, IfExpression) {
   // If condition must be bool (comparison or boolean literal)
   EXPECT_TRUE(hasNoTypeError("if true then 2 else 3"));
   EXPECT_TRUE(hasNoTypeError("if 1 == 1 then 2 else 3"));
-  EXPECT_TRUE(hasNoTypeError("def x = if true then 2 else 3"));
+  EXPECT_TRUE(hasNoTypeError("x = if true then 2 else 3"));
 }
 
 TEST(TypeCheckTest, Comparison) {
   // Comparisons return bool, so variable must be declared as bool
-  EXPECT_TRUE(hasNoTypeError("def x : bool = 1 < 2"));
-  EXPECT_TRUE(hasNoTypeError("def x : bool = 1 == 2"));
+  EXPECT_TRUE(hasNoTypeError("x : bool\nx = 1 < 2"));
+  EXPECT_TRUE(hasNoTypeError("x : bool\nx = 1 == 2"));
   EXPECT_TRUE(hasNoTypeError(
-      "def x : f64 = 1.0\ndef y : f64 = 2.0\ndef z : bool = x < y"));
+      "x : f64\nx = 1.0\ny : f64\ny = 2.0\nz : bool\nz = x < y"));
   // Using comparison in if condition (returns bool)
   EXPECT_TRUE(hasNoTypeError("if 1 < 2 then 3 else 4"));
 }
@@ -82,25 +84,25 @@ TEST(TypeCheckTest, Comparison) {
 // ============== Type Error Tests ==============
 
 TEST(TypeCheckTest, MixedArithmeticTypes) {
-  EXPECT_TRUE(hasTypeError("def x = 1 + 2.0"));
-  EXPECT_TRUE(hasTypeError("def x = 1.0 - 2"));
-  EXPECT_TRUE(hasTypeError("def x = 1 * 2.0"));
-  EXPECT_TRUE(hasTypeError("def x = 1.0 / 2"));
+  EXPECT_TRUE(hasTypeError("x = 1 + 2.0"));
+  EXPECT_TRUE(hasTypeError("x = 1.0 - 2"));
+  EXPECT_TRUE(hasTypeError("x = 1 * 2.0"));
+  EXPECT_TRUE(hasTypeError("x = 1.0 / 2"));
 }
 
 TEST(TypeCheckTest, MixedComparisonTypes) {
-  EXPECT_TRUE(hasTypeError("def x = 1 < 2.0"));
-  EXPECT_TRUE(hasTypeError("def x = 1.0 == 2"));
+  EXPECT_TRUE(hasTypeError("x = 1 < 2.0"));
+  EXPECT_TRUE(hasTypeError("x = 1.0 == 2"));
 }
 
 TEST(TypeCheckTest, VariableTypeMismatch) {
-  EXPECT_TRUE(hasTypeError("def x : i64 = 1.0"));
-  EXPECT_TRUE(hasTypeError("def x : f64 = 1"));
+  EXPECT_TRUE(hasTypeError("x : i64\nx = 1.0"));
+  EXPECT_TRUE(hasTypeError("x : f64\nx = 1"));
 }
 
 TEST(TypeCheckTest, FunctionReturnTypeMismatch) {
-  EXPECT_TRUE(hasTypeError("def f(x: i64): f64 = x"));
-  EXPECT_TRUE(hasTypeError("def f(x: f64): i64 = x"));
+  EXPECT_TRUE(hasTypeError("f : i64 -> f64\nf(x) = x"));
+  EXPECT_TRUE(hasTypeError("f : f64 -> i64\nf(x) = x"));
 }
 
 TEST(TypeCheckTest, IfBranchTypeMismatch) {
@@ -115,7 +117,7 @@ TEST(TypeCheckTest, IfConditionMustBeBool) {
 
 TEST(TypeCheckTest, UndeclaredVariable) {
   EXPECT_TRUE(hasTypeError("x + 1"));
-  EXPECT_TRUE(hasTypeError("def y = x"));
+  EXPECT_TRUE(hasTypeError("y = x"));
 }
 
 TEST(TypeCheckTest, LetExpressionTypeMismatch) {
@@ -126,13 +128,13 @@ TEST(TypeCheckTest, LetExpressionTypeMismatch) {
 // ============== Error Message Tests ==============
 
 TEST(TypeCheckTest, ErrorMessageContainsOperator) {
-  auto errors = checkTypes("def x = 1 + 2.0");
+  auto errors = checkTypes("x = 1 + 2.0");
   ASSERT_FALSE(errors.empty());
   EXPECT_TRUE(errors[0].message.find("+") != std::string::npos);
 }
 
 TEST(TypeCheckTest, ErrorMessageContainsTypes) {
-  auto errors = checkTypes("def x = 1 + 2.0");
+  auto errors = checkTypes("x = 1 + 2.0");
   ASSERT_FALSE(errors.empty());
   EXPECT_TRUE(errors[0].message.find("i64") != std::string::npos);
   EXPECT_TRUE(errors[0].message.find("f64") != std::string::npos);
@@ -141,49 +143,50 @@ TEST(TypeCheckTest, ErrorMessageContainsTypes) {
 // ============== Type Inference Tests ==============
 
 TEST(TypeCheckTest, InferIntFromLiteral) {
-  // def x = 42 should infer int
-  EXPECT_TRUE(hasNoTypeError("def x = 42\ndef y: i64 = x"));
+  // x = 42 should infer int
+  EXPECT_TRUE(hasNoTypeError("x = 42\ny : i64\ny = x"));
 }
 
 TEST(TypeCheckTest, InferDoubleFromLiteral) {
-  // def x = 3.14 should infer double
-  EXPECT_TRUE(hasNoTypeError("def x = 3.14\ndef y: f64 = x"));
+  // x = 3.14 should infer double
+  EXPECT_TRUE(hasNoTypeError("x = 3.14\ny : f64\ny = x"));
 }
 
 TEST(TypeCheckTest, InferBoolFromLiteral) {
-  // def x = true should infer bool
-  EXPECT_TRUE(hasNoTypeError("def x = true\nif x then 1 else 0"));
+  // x = true should infer bool
+  EXPECT_TRUE(hasNoTypeError("x = true\nif x then 1 else 0"));
 }
 
 TEST(TypeCheckTest, InferFromExpression) {
-  // def x = 1 + 2 should infer int
-  EXPECT_TRUE(hasNoTypeError("def x = 1 + 2\ndef y: i64 = x"));
+  // x = 1 + 2 should infer int
+  EXPECT_TRUE(hasNoTypeError("x = 1 + 2\ny : i64\ny = x"));
 }
 
 TEST(TypeCheckTest, InferFromComparison) {
-  // def x = 1 < 2 should infer bool
-  EXPECT_TRUE(hasNoTypeError("def x = 1 < 2\nif x then 1 else 0"));
+  // x = 1 < 2 should infer bool
+  EXPECT_TRUE(hasNoTypeError("x = 1 < 2\nif x then 1 else 0"));
 }
 
 TEST(TypeCheckTest, InferFunctionReturnType) {
-  // def f(x: i64) = x + 1 should infer int return type
-  EXPECT_TRUE(hasNoTypeError("def f(x: i64) = x + 1\ndef y: i64 = f(5)"));
+  // f(x) = x + 1 should infer int return type
+  EXPECT_TRUE(hasNoTypeError(
+      "f : i64 -> i64\nf(x) = x + 1\ny : i64\ny = f(5)"));
 }
 
 TEST(TypeCheckTest, InferFunctionReturnTypeDouble) {
-  // def f(x: f64) = x + 1.0 should infer double return type
-  EXPECT_TRUE(
-      hasNoTypeError("def f(x: f64) = x + 1.0\ndef y: f64 = f(5.0)"));
+  // f(x) = x + 1.0 should infer double return type
+  EXPECT_TRUE(hasNoTypeError(
+      "f : f64 -> f64\nf(x) = x + 1.0\ny : f64\ny = f(5.0)"));
 }
 
 TEST(TypeCheckTest, NoImplicitConversionIntToDouble) {
-  // def x: f64 = 42 should be error (no coercion)
-  EXPECT_TRUE(hasTypeError("def x: f64 = 42"));
+  // x: f64 = 42 should be error (no coercion)
+  EXPECT_TRUE(hasTypeError("x : f64\nx = 42"));
 }
 
 TEST(TypeCheckTest, NoImplicitConversionDoubleToInt) {
-  // def x: i64 = 42.0 should be error (no coercion)
-  EXPECT_TRUE(hasTypeError("def x: i64 = 42.0"));
+  // x: i64 = 42.0 should be error (no coercion)
+  EXPECT_TRUE(hasTypeError("x : i64\nx = 42.0"));
 }
 
 TEST(TypeCheckTest, LetExpressionInferInt) {
@@ -202,42 +205,51 @@ TEST(TypeCheckTest, LetExpressionInferMismatch) {
 }
 
 TEST(TypeCheckTest, InferredVariableUsedWithWrongType) {
-  // def x = 42 followed by double operation should fail
-  EXPECT_TRUE(hasTypeError("def x = 42\ndef y = x + 1.0"));
+  // x = 42 followed by double operation should fail
+  EXPECT_TRUE(hasTypeError("x = 42\ny = x + 1.0"));
 }
 
 // ============== Function Call Type Checking Tests ==============
 
 TEST(TypeCheckTest, FunctionCallCorrectTypes) {
   // Correct argument types should pass
-  EXPECT_TRUE(hasNoTypeError("def f(x: i64) = x + 1\nf(5)"));
-  EXPECT_TRUE(hasNoTypeError("def f(x: f64) = x + 1.0\nf(5.0)"));
-  EXPECT_TRUE(hasNoTypeError("def f(x: i64, y: i64) = x + y\nf(1, 2)"));
+  EXPECT_TRUE(
+      hasNoTypeError("f : i64 -> i64\nf(x) = x + 1\nf(5)"));
+  EXPECT_TRUE(
+      hasNoTypeError("f : f64 -> f64\nf(x) = x + 1.0\nf(5.0)"));
+  EXPECT_TRUE(hasNoTypeError(
+      "f : i64 * i64 -> i64\nf(x, y) = x + y\nf(1, 2)"));
 }
 
 TEST(TypeCheckTest, FunctionCallWrongArgType) {
   // Passing double to int parameter should fail
-  EXPECT_TRUE(hasTypeError("def f(x: i64) = x + 1\nf(3.5)"));
+  EXPECT_TRUE(
+      hasTypeError("f : i64 -> i64\nf(x) = x + 1\nf(3.5)"));
   // Passing int to double parameter should fail
-  EXPECT_TRUE(hasTypeError("def f(x: f64) = x + 1.0\nf(3)"));
+  EXPECT_TRUE(
+      hasTypeError("f : f64 -> f64\nf(x) = x + 1.0\nf(3)"));
 }
 
 TEST(TypeCheckTest, FunctionCallWrongArgCount) {
   // Too few arguments
-  EXPECT_TRUE(hasTypeError("def f(x: i64, y: i64) = x + y\nf(1)"));
+  EXPECT_TRUE(hasTypeError(
+      "f : i64 * i64 -> i64\nf(x, y) = x + y\nf(1)"));
   // Too many arguments
-  EXPECT_TRUE(hasTypeError("def f(x: i64) = x + 1\nf(1, 2)"));
+  EXPECT_TRUE(
+      hasTypeError("f : i64 -> i64\nf(x) = x + 1\nf(1, 2)"));
 }
 
 TEST(TypeCheckTest, FunctionCallMultipleArgsTypeMismatch) {
   // Second argument has wrong type
-  EXPECT_TRUE(hasTypeError("def f(x: i64, y: i64) = x + y\nf(1, 2.0)"));
+  EXPECT_TRUE(hasTypeError(
+      "f : i64 * i64 -> i64\nf(x, y) = x + y\nf(1, 2.0)"));
   // First argument has wrong type
-  EXPECT_TRUE(hasTypeError("def f(x: i64, y: i64) = x + y\nf(1.0, 2)"));
+  EXPECT_TRUE(hasTypeError(
+      "f : i64 * i64 -> i64\nf(x, y) = x + y\nf(1.0, 2)"));
 }
 
 TEST(TypeCheckTest, FunctionCallErrorMessage) {
-  auto errors = checkTypes("def f(x: i64) = x + 1\nf(3.5)");
+  auto errors = checkTypes("f : i64 -> i64\nf(x) = x + 1\nf(3.5)");
   ASSERT_FALSE(errors.empty());
   EXPECT_TRUE(errors[0].message.find("i64") != std::string::npos);
   EXPECT_TRUE(errors[0].message.find("f64") != std::string::npos);
@@ -300,18 +312,18 @@ TEST(TypeCheckTest, LetBindingParallelEvaluation) {
 
 TEST(TypeCheckTest, SimpleClosure) {
   // Function can capture variable from outer scope
-  EXPECT_TRUE(hasNoTypeError("def x = 10\ndef f() = x + 1\nf()"));
+  EXPECT_TRUE(hasNoTypeError("x = 10\nf() = x + 1\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithParameter) {
   // Function with parameter can also capture
   EXPECT_TRUE(hasNoTypeError(
-      "def multiplier = 3\ndef scale(n: i64) = n * multiplier\nscale(5)"));
+      "multiplier = 3\nscale : i64 -> i64\nscale(n) = n * multiplier\nscale(5)"));
 }
 
 TEST(TypeCheckTest, MultipleCapturedVariables) {
   // Function can capture multiple variables
-  EXPECT_TRUE(hasNoTypeError("def a = 1\ndef b = 2\ndef sum() = a + b\nsum()"));
+  EXPECT_TRUE(hasNoTypeError("a = 1\nb = 2\nsum() = a + b\nsum()"));
 }
 
 TEST(TypeCheckTest, ClosureInLetExpression) {
@@ -321,29 +333,29 @@ TEST(TypeCheckTest, ClosureInLetExpression) {
 
 TEST(TypeCheckTest, ClosureTypeMismatch) {
   // Captured variable type must be compatible with usage
-  EXPECT_TRUE(hasTypeError("def x = 10\ndef f(): f64 = x + 1.0\nf()"));
+  EXPECT_TRUE(hasTypeError("x = 10\nf() = x + 1.0\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureUndeclaredCapture) {
   // Cannot capture undeclared variable
-  EXPECT_TRUE(hasTypeError("def f() = y + 1\nf()"));
+  EXPECT_TRUE(hasTypeError("f() = y + 1\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureCapturesDoubleType) {
   // Function can capture double variable
-  EXPECT_TRUE(hasNoTypeError("def x = 3.14\ndef f() = x + 1.0\nf()"));
+  EXPECT_TRUE(hasNoTypeError("x = 3.14\nf() = x + 1.0\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureCapturesBoolType) {
   // Function can capture bool variable
   EXPECT_TRUE(
-      hasNoTypeError("def flag = true\ndef f() = if flag then 1 else 0\nf()"));
+      hasNoTypeError("flag = true\nf() = if flag then 1 else 0\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithParamsAndCaptures) {
   // Function uses both parameters and captured variables
-  EXPECT_TRUE(
-      hasNoTypeError("def base = 100\ndef add(x: i64) = x + base\nadd(5)"));
+  EXPECT_TRUE(hasNoTypeError(
+      "base = 100\nadd : i64 -> i64\nadd(x) = x + base\nadd(5)"));
 }
 
 TEST(TypeCheckTest, NestedLetWithClosure) {
@@ -359,7 +371,7 @@ TEST(TypeCheckTest, ClosureInLetWithMultipleSiblings) {
 TEST(TypeCheckTest, ClosureCaptureFromOuterNotSibling) {
   // Function captures from outer scope, not sibling
   EXPECT_TRUE(
-      hasNoTypeError("def outer = 5\nlet x = 10 and f() = outer + 1 in f()"));
+      hasNoTypeError("outer = 5\nlet x = 10 and f() = outer + 1 in f()"));
 }
 
 // ============== FreeVariableCollector Tests ==============
@@ -368,56 +380,56 @@ TEST(TypeCheckTest, ClosureCaptureFromOuterNotSibling) {
 TEST(TypeCheckTest, ClosureWithLetExpression) {
   // Let expression inside closure that captures outer variable
   EXPECT_TRUE(hasNoTypeError(
-      "def outer = 10\ndef f() = let inner = 1 in inner + outer\nf()"));
+      "outer = 10\nf() = let inner = 1 in inner + outer\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithLetExpressionFunction) {
   // Let expression with function binding inside closure
   EXPECT_TRUE(hasNoTypeError(
-      "def outer = 10\ndef f() = let g(x: i64) = x in g(outer)\nf()"));
+      "outer = 10\nf() = let g(x: i64) = x in g(outer)\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithLetExpressionCaptureInInit) {
   // Capture in let expression initializer inside closure
   EXPECT_TRUE(
-      hasNoTypeError("def outer = 5\ndef f() = let x = outer + 1 in x\nf()"));
+      hasNoTypeError("outer = 5\nf() = let x = outer + 1 in x\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithNestedLetBindings) {
   // Multiple bindings in let inside closure
   EXPECT_TRUE(hasNoTypeError(
-      "def outer = 10\ndef f() = let a = 1 and b = outer in a + b\nf()"));
+      "outer = 10\nf() = let a = 1 and b = outer in a + b\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithBinaryOpCapture) {
   // Binary operator with captures on both sides
-  EXPECT_TRUE(hasNoTypeError("def a = 1\ndef b = 2\ndef f() = a + b\nf()"));
+  EXPECT_TRUE(hasNoTypeError("a = 1\nb = 2\nf() = a + b\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithIfConditionCapture) {
   // If condition captures variable
   EXPECT_TRUE(
-      hasNoTypeError("def flag = true\ndef f() = if flag then 1 else 0\nf()"));
+      hasNoTypeError("flag = true\nf() = if flag then 1 else 0\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithIfBranchCapture) {
   // If branches capture variables
   EXPECT_TRUE(hasNoTypeError(
-      "def x = 1\ndef y = 2\ndef f() = if true then x else y\nf()"));
+      "x = 1\ny = 2\nf() = if true then x else y\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithMethodCallArgs) {
   // Method call arguments capture variables
   EXPECT_TRUE(hasNoTypeError(
-      "def x = 5\ndef add(a: i64, b: i64) = a + b\ndef f() = add(x, x)\nf()"));
+      "x = 5\nadd : i64 * i64 -> i64\nadd(a, b) = a + b\nf() = add(x, x)\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureWithNestedBlocks) {
   // Block with multiple expression statements
-  EXPECT_TRUE(hasNoTypeError("def x = 1\ndef f() = x + 1\nf()"));
+  EXPECT_TRUE(hasNoTypeError("x = 1\nf() = x + 1\nf()"));
 }
 
 TEST(TypeCheckTest, ClosureDoesNotCaptureLocalLetBinding) {
   // Local let binding should not be captured
-  EXPECT_TRUE(hasNoTypeError("def f() = let local = 5 in local + 1\nf()"));
+  EXPECT_TRUE(hasNoTypeError("f() = let local = 5 in local + 1\nf()"));
 }
