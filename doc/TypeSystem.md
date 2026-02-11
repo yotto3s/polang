@@ -297,9 +297,12 @@ let i: i32 = (0.0 / 0.0) as i32   ; i = 0
 Converting an integer to `isize` or `usize` uses `arith.index_cast` (signed) or `arith.index_castui` (unsigned):
 
 ```polang
-def a: i64 = 42
-def b: isize = a as isize       ; signed index cast
-def c: usize = a as usize       ; unsigned index cast
+a : i64
+a = 42
+b : isize
+b = a as isize                   ; signed index cast
+c : usize
+c = a as usize                   ; unsigned index cast
 ```
 
 #### Index to Integer
@@ -307,8 +310,10 @@ def c: usize = a as usize       ; unsigned index cast
 Converting `isize` or `usize` to an integer type uses the corresponding signed or unsigned index cast:
 
 ```polang
-def a: isize = 42 as isize
-def b: i64 = a as i64           ; signed index cast to i64
+a : isize
+a = 42 as isize
+b : i64
+b = a as i64                     ; signed index cast to i64
 ```
 
 #### Float to/from Index
@@ -316,11 +321,15 @@ def b: i64 = a as i64           ; signed index cast to i64
 Float-to-index and index-to-float conversions use a two-step process via `i64`:
 
 ```polang
-def a: f64 = 3.14
-def b: isize = a as isize       ; float → i64 (saturating truncation) → index
+a : f64
+a = 3.14
+b : isize
+b = a as isize                   ; float → i64 (saturating truncation) → index
 
-def c: isize = 42 as isize
-def d: f64 = c as f64           ; index → i64 → float
+c : isize
+c = 42 as isize
+d : f64
+d = c as f64                     ; index → i64 → float
 ```
 
 ### Literal Type Inference
@@ -345,8 +354,10 @@ let z: u8 = -1               ; Error: -1 doesn't fit in u8 (unsigned)
 Integer literals also adapt to index type contexts:
 
 ```polang
-def x: isize = 42            ; OK: literal becomes isize
-def y: usize = 100           ; OK: literal becomes usize
+x : isize
+x = 42                          ; OK: literal becomes isize
+y : usize
+y = 100                         ; OK: literal becomes usize
 ```
 
 When no type context is available, literals default to `i64` (integers) or `f64` (floats):
