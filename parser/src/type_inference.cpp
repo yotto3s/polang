@@ -117,10 +117,10 @@ bool Unifier::unify(const std::string& t1, const std::string& t2,
   }
 
   // Handle generic types: {int} is compatible with concrete integer types
-  if (isGenericIntegerType(s1) && isIntegerType(s2)) {
+  if (isGenericIntegerType(s1) && (isIntegerType(s2) || isIndexType(s2))) {
     return true;
   }
-  if (isGenericIntegerType(s2) && isIntegerType(s1)) {
+  if (isGenericIntegerType(s2) && (isIntegerType(s1) || isIndexType(s1))) {
     return true;
   }
   if (isGenericFloatType(s1) && isFloatType(s2)) {
