@@ -240,6 +240,55 @@ TEST_F(IncrementalTypeCheckerTest, SnapshotPreservesFunctionSchemes) {
   EXPECT_EQ(tc.getInferredType(), "i64");
 }
 
+TEST_F(IncrementalTypeCheckerTest,
+       SnapshotRollbackRestoresPendingTypeSignatures) {
+  // Input 1: Add a type signature via checkIncremental (not check(), which
+  // would call warnOrphanedTypeSignatures() and clear the pending map).
+  auto sig = parse("foo : i64 -> i64\n");
+  ASSERT_NE(sig, nullptr);
+  auto errors1 = tc.checkIncremental(*sig);
+  EXPECT_TRUE(errors1.empty());
+
+  // Save state — foo's pending signature should be captured in the snapshot
+  auto snapshot = tc.saveState();
+
+  // Input 2: A definition that consumes foo's pending signature, then fails.
+  // applyFunctionSignature sets x to i64 (from the signature), then
+  // "x + 1.0" is i64 + f64 which is a type mismatch.
+  auto bad = parse("foo(x) = x + 1.0\n");
+  ASSERT_NE(bad, nullptr);
+  auto errors2 = tc.checkIncremental(*bad);
+  EXPECT_FALSE(errors2.empty()) << "i64 + f64 should be a type mismatch";
+
+  // Rollback — foo's pending signature should be restored to pendingTypeSignatures
+  tc.restoreState(snapshot);
+
+  // Input 3: Define foo with a body that succeeds for any parameter type.
+  // If the pending signature was restored, applyFunctionSignature will
+  // constrain x to i64 and foo becomes monomorphic i64 -> i64.
+  // If the pending signature was lost (the bug), foo will be inferred as
+  // polymorphic (identity function).
+  auto def = parse("foo(x) = x\n");
+  ASSERT_NE(def, nullptr);
+  auto errors3 = tc.checkIncremental(*def);
+  EXPECT_TRUE(errors3.empty());
+
+  // Input 4: Call foo with a float argument.
+  // If foo is monomorphic i64 -> i64 (signature was correctly restored),
+  // passing f64 should produce a type error.
+  // If foo is polymorphic (signature was lost due to the bug),
+  // foo(3.14) would succeed — and this assertion would FAIL,
+  // exposing the missing snapshot/rollback of pendingTypeSignatures.
+  auto call = parse("foo(3.14)\n");
+  ASSERT_NE(call, nullptr);
+  auto errors4 = tc.checkIncremental(*call);
+  EXPECT_FALSE(errors4.empty())
+      << "foo should be monomorphic (i64 -> i64) after rollback restored its "
+         "pending type signature, so calling with f64 should fail. "
+         "If this passes, pendingTypeSignatures was not saved/restored "
+         "by saveState()/restoreState().";
+}
+
 // ============== Edge Cases ==============
 
 TEST_F(IncrementalTypeCheckerTest, EmptyBlockIncremental) {
