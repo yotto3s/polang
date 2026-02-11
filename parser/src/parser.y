@@ -22,9 +22,13 @@ class NExpression;
 class NStatement;
 class NIdentifier;
 class NTypeSpec;
+class NNamedType;
+class NArrowType;
+class NProductType;
 class NQualifiedName;
 class NVariableDeclaration;
 class NFunctionDeclaration;
+class NTypeSignature;
 struct NLetBinding;
 struct ImportItem;
 
@@ -99,7 +103,8 @@ yy::parser::symbol_type yylex();
 
 // Nonterminal types with smart pointers
 %type <std::unique_ptr<NIdentifier>> ident
-%type <std::shared_ptr<const NTypeSpec>> type_spec
+%type <std::shared_ptr<const NTypeSpec>> type_spec type_expr type_product type_atom
+%type <std::vector<std::shared_ptr<const NTypeSpec>>> type_product_list
 %type <std::unique_ptr<NExpression>> numeric expr boolean
 %type <std::unique_ptr<NBlock>> program stmts
 %type <std::unique_ptr<NStatement>> stmt var_decl func_decl module_decl import_stmt
@@ -307,6 +312,43 @@ ident : TIDENTIFIER { $$ = std::make_unique<NIdentifier>($1); SET_LOC($$, @$); }
 
 type_spec : ident {
               $$ = std::make_shared<const NNamedType>($1->name);
+            }
+          ;
+
+/* Type expressions for type signatures */
+type_expr : type_product TARROW type_expr {
+              /* Function type: a -> b (right-associative) */
+              $$ = std::make_shared<const NArrowType>(std::move($1), std::move($3));
+            }
+          | type_product {
+              $$ = std::move($1);
+            }
+          ;
+
+type_product : type_atom {
+                 $$ = std::move($1);
+               }
+             | type_product_list {
+                 $$ = std::make_shared<const NProductType>(std::move($1));
+               }
+             ;
+
+type_product_list : type_atom TMUL type_atom {
+                      $$ = std::vector<std::shared_ptr<const NTypeSpec>>();
+                      $$.push_back(std::move($1));
+                      $$.push_back(std::move($3));
+                    }
+                  | type_product_list TMUL type_atom {
+                      $1.push_back(std::move($3));
+                      $$ = std::move($1);
+                    }
+                  ;
+
+type_atom : ident {
+              $$ = std::make_shared<const NNamedType>($1->name);
+            }
+          | TLPAREN type_expr TRPAREN {
+              $$ = std::move($2);
             }
           ;
 
