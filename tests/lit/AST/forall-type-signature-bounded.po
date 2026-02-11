@@ -1,0 +1,12 @@
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
+
+(* Test that forall with trait bounds produces correct AST output. *)
+(* CHECK:      NBlock
+*)
+(* CHECK-NEXT: |-NTypeSignature 'add' : forall 'a:Numeric. 'a * 'a -> 'a
+*)
+(* CHECK-NEXT: `-NFunctionDeclaration 'add' (x, y)
+*)
+add : forall 'a:Numeric. 'a * 'a -> 'a
+add(x, y) = x + y

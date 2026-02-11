@@ -1,0 +1,16 @@
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
+
+(* Test that forall with multiple type variables produces correct MLIR. *)
+
+(* Specialized first for i64, bool *)
+(* CHECK-DAG: {{.*}}polang.func @first$i64_bool(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
+*)
+
+(* Original generic erased *)
+(* CHECK-NOT: polang.generic_func
+*)
+
+first : forall 'a, 'b. 'a * 'b -> 'a
+first(x, y) = x
+first(42, true)

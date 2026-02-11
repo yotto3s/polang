@@ -1,0 +1,10 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+(* CHECK: 4.{{0*}}
+*)
+
+(* Test forall with Numeric constraint on float arguments. *)
+
+fadd : forall 'a:Numeric. 'a * 'a -> 'a
+fadd(x, y) = x + y
+fadd(1.5, 2.5)

@@ -1,0 +1,8 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* Test that using arithmetic on a type variable without Numeric bound is an error. *)
+(* CHECK: {{.*}}requires Numeric{{.*}}
+*)
+bad : forall 'a. 'a * 'a -> 'a
+bad(x, y) = x + y

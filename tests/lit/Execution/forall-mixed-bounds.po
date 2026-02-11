@@ -1,0 +1,10 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+(* CHECK: 10 : i64
+*)
+
+(* Test forall with mixed bounds: one Numeric, one unconstrained. *)
+
+numFirst : forall 'a:Numeric, 'b. 'a * 'b -> 'a
+numFirst(x, y) = x + x
+numFirst(5, true)

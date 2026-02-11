@@ -1,0 +1,9 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* Test that passing a concrete type that violates a trait bound is caught. *)
+(* CHECK: {{.*}}does not satisfy Integer{{.*}}
+*)
+wrong : forall 'a:Integer. 'a -> 'a
+wrong(x) = x
+wrong(3.14)
