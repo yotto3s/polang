@@ -648,11 +648,17 @@ boolean     ::= "true" | "false"
 
 type        ::= base_type
 
-type_expr    ::= type_product "->" type_expr   (* right-associative *)
+type_expr    ::= "forall" type_var_list "." type_expr   (* quantified type *)
+               | type_product "->" type_expr            (* right-associative *)
                | type_product
+type_var_list ::= type_var_decl { "," type_var_decl }
+type_var_decl ::= typevar                 (* unconstrained: 'a *)
+                | typevar ":" identifier  (* constrained: 'a:Numeric *)
+typevar      ::= "'" [a-z] [a-zA-Z0-9_]*
 type_product ::= type_atom "*" type_product   (* `*` binds tighter than `->` *)
                | type_atom
 type_atom    ::= type
+               | typevar
                | "(" type_expr ")"
 
 base_type   ::= "i8" | "i16" | "i32" | "i64"

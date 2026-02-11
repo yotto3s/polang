@@ -78,9 +78,9 @@ public:
   [[nodiscard]] std::set<TraitBound> getBounds(const std::string& var) const;
 
   /// Check if a concrete type satisfies a set of trait bounds.
-  [[nodiscard]] static bool
-  satisfies(const std::string& concreteType,
-            const std::set<TraitBound>& bounds) noexcept;
+  /// Delegates to TraitRegistry for consistent type-to-trait membership checks.
+  [[nodiscard]] static bool satisfies(const std::string& concreteType,
+                                      const std::set<TraitBound>& bounds);
 
 private:
   std::map<std::string, std::set<TraitBound>> bounds;

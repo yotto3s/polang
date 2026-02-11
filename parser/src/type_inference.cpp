@@ -155,26 +155,12 @@ std::set<TraitBound> TraitConstraints::getBounds(const std::string& var) const {
   return {};
 }
 
-bool TraitConstraints::satisfies(
-    const std::string& concreteType,
-    const std::set<TraitBound>& boundsSet) noexcept {
+bool TraitConstraints::satisfies(const std::string& concreteType,
+                                 const std::set<TraitBound>& boundsSet) {
+  auto& registry = getTraitRegistry();
   for (TraitBound bound : boundsSet) {
-    switch (bound) {
-    case TraitBound::Numeric:
-      if (!isNumericType(concreteType)) {
-        return false;
-      }
-      break;
-    case TraitBound::Integer:
-      if (!isIntegerType(concreteType)) {
-        return false;
-      }
-      break;
-    case TraitBound::Float:
-      if (!isFloatType(concreteType)) {
-        return false;
-      }
-      break;
+    if (!registry.satisfies(concreteType, traitBoundToString(bound))) {
+      return false;
     }
   }
   return true;
@@ -193,9 +179,9 @@ TraitRegistry::TraitRegistry() {
       {"/", {"'self", "'self"}, "'self"},
   };
   numeric.satisfyingTypes = {
-      TypeNames::I8,  TypeNames::I16, TypeNames::I32, TypeNames::I64,
-      TypeNames::U8,  TypeNames::U16, TypeNames::U32, TypeNames::U64,
-      TypeNames::F32, TypeNames::F64,
+      TypeNames::I8,    TypeNames::I16,   TypeNames::I32, TypeNames::I64,
+      TypeNames::U8,    TypeNames::U16,   TypeNames::U32, TypeNames::U64,
+      TypeNames::ISIZE, TypeNames::USIZE, TypeNames::F32, TypeNames::F64,
   };
   registerTrait(std::move(numeric));
 
@@ -206,8 +192,9 @@ TraitRegistry::TraitRegistry() {
       {"%", {"'self", "'self"}, "'self"},
   };
   integer.satisfyingTypes = {
-      TypeNames::I8, TypeNames::I16, TypeNames::I32, TypeNames::I64,
-      TypeNames::U8, TypeNames::U16, TypeNames::U32, TypeNames::U64,
+      TypeNames::I8,    TypeNames::I16,   TypeNames::I32, TypeNames::I64,
+      TypeNames::U8,    TypeNames::U16,   TypeNames::U32, TypeNames::U64,
+      TypeNames::ISIZE, TypeNames::USIZE,
   };
   registerTrait(std::move(integer));
 

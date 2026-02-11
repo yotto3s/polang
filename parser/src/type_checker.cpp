@@ -187,7 +187,10 @@ std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
 std::vector<TypeCheckError>
 TypeChecker::checkIncremental(const NBlock& newStatements) {
   // Clear transient state but preserve persistent environment
-  // (localTypes, functionSignatures)
+  // (localTypes, functionSignatures).
+  // Note: we intentionally do NOT call warnOrphanedTypeSignatures() here
+  // because the REPL is incremental — a type signature entered in one input
+  // may have its corresponding definition provided in a subsequent input.
   errors.clear();
   subst = polang::Substitution();
   traitConstraints = polang::TraitConstraints();

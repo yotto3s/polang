@@ -1,0 +1,13 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test that usize satisfies Numeric constraint *)
+add : forall 'a:Numeric. 'a * 'a -> 'a
+add(x, y) = x + y
+
+result : usize
+result = add(10 as usize, 20 as usize)
+
+(* CHECK: 30 : usize
+*)
+result
