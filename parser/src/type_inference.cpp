@@ -1,6 +1,8 @@
 #include "parser/type_inference.hpp"
 #include "parser/polang_types.hpp"
 
+#include <algorithm>
+
 namespace polang {
 
 namespace {
@@ -158,12 +160,10 @@ std::set<TraitBound> TraitConstraints::getBounds(const std::string& var) const {
 bool TraitConstraints::satisfies(const std::string& concreteType,
                                  const std::set<TraitBound>& boundsSet) {
   auto& registry = getTraitRegistry();
-  for (TraitBound bound : boundsSet) {
-    if (!registry.satisfies(concreteType, traitBoundToString(bound))) {
-      return false;
-    }
-  }
-  return true;
+  return std::all_of(
+      boundsSet.begin(), boundsSet.end(), [&](const TraitBound& bound) {
+        return registry.satisfies(concreteType, traitBoundToString(bound));
+      });
 }
 
 // ============== TraitRegistry ==============

@@ -1216,6 +1216,7 @@ private:
 
       // Pre-populate parameter types for literal type inference
       std::vector<std::shared_ptr<const NTypeSpec>> paramTypeSpecs;
+      paramTypeSpecs.reserve(func.paramTypes.size());
       for (const auto& paramType : func.paramTypes) {
         paramTypeSpecs.push_back(makeTypeSpec(paramType));
       }
