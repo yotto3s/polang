@@ -1171,7 +1171,8 @@ void TypeChecker::inferFunction(
   if (unresolvedVars.empty()) {
     // All vars resolved to concrete types — function is monomorphic
     for (size_t i = 0; i < resolvedParamTypes.size(); ++i) {
-      resolvedParamTypes[i] = polang::resolveGenericToDefault(resolvedParamTypes[i]);
+      resolvedParamTypes[i] =
+          polang::resolveGenericToDefault(resolvedParamTypes[i]);
       auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
       mutableArg.type = makeTypeSpec(resolvedParamTypes[i]);
     }
@@ -1221,7 +1222,8 @@ void TypeChecker::inferFunction(
       if (it != uniVarToTypeParam.end()) {
         resolvedParamTypes[i] = it->second;
       } else {
-        resolvedParamTypes[i] = polang::resolveGenericToDefault(resolvedParamTypes[i]);
+        resolvedParamTypes[i] =
+            polang::resolveGenericToDefault(resolvedParamTypes[i]);
       }
       auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
       mutableArg.type = makeTypeSpec(resolvedParamTypes[i]);
@@ -1264,7 +1266,6 @@ void TypeChecker::inferFunction(
   subst = savedSubst;
   traitConstraints = savedTraitConstraints;
 }
-
 
 void TypeChecker::visit(const NModuleDeclaration& node) {
   modulePath.push_back(node.name->name);

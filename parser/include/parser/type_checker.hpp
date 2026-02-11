@@ -204,7 +204,6 @@ private:
                        const polang::PolymorphicSignature& scheme,
                        const std::vector<std::string>& argTypes);
 
-
   // Validate type names in a type expression tree.
   // Returns false if any errors were found.
   // If usedTypeVars is non-null, collects all NTypeVar references found.
