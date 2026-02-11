@@ -39,37 +39,37 @@ TEST(ReplIntegration, LetExpressionMixedBindingsCallBody) {
 
 TEST(ReplIntegration, VariablePersistsAcrossEvaluations) {
   // Declare variable, then use it in next evaluation
-  const auto result = runRepl("def x = 42\nx + 1");
+  const auto result = runRepl("x = 42\nx + 1");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("43 : i64"));
 }
 
 TEST(ReplIntegration, FunctionPersistsAcrossEvaluations) {
   // Declare function, then call it in next evaluation
-  const auto result = runRepl("def double(n: i64): i64 = n * 2\ndouble(21)");
+  const auto result = runRepl("double : i64 -> i64\ndouble(n) = n * 2\ndouble(21)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("42 : i64"));
 }
 
 TEST(ReplIntegration, MultipleVariablesPersist) {
   // Multiple variables across multiple lines
-  const auto result = runRepl("def a = 10\ndef b = 20\ndef c = 30\na + b + c");
+  const auto result = runRepl("a = 10\nb = 20\nc = 30\na + b + c");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("60 : i64"));
 }
 
 TEST(ReplIntegration, FunctionCalledWithPersistedVariable) {
   // Variable declared, then passed to function call
-  const auto result = runRepl("def multiplier = 3\ndef scale(x: i64, y: i64): "
-                              "i64 = x * y\nscale(10, multiplier)");
+  const auto result = runRepl("multiplier = 3\nscale : i64 * i64 -> i64\n"
+                              "scale(x, y) = x * y\nscale(10, multiplier)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("30 : i64"));
 }
 
 TEST(ReplIntegration, MultipleFunctionsPersist) {
   // Multiple functions, each can call the other
-  const auto result = runRepl("def add1(x: i64): i64 = x + 1\n"
-                              "def add2(x: i64): i64 = add1(add1(x))\n"
+  const auto result = runRepl("add1 : i64 -> i64\nadd1(x) = x + 1\n"
+                              "add2 : i64 -> i64\nadd2(x) = add1(add1(x))\n"
                               "add2(10)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("12 : i64"));
@@ -85,13 +85,13 @@ TEST(ReplIntegration, MultipleFunctionsPersist) {
 // ============== Closure / Variable Capture Tests ==============
 
 TEST(ReplIntegration, SimpleClosure) {
-  const auto result = runRepl("def x = 10\ndef f() = x + 1\nf()");
+  const auto result = runRepl("x = 10\nf() = x + 1\nf()");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("11 : i64"));
 }
 
 TEST(ReplIntegration, ClosureWithParameter) {
-  const auto result = runRepl("def multiplier = 3\ndef scale(n: i64) = n * multiplier\nscale(10)");
+  const auto result = runRepl("multiplier = 3\nscale(n) = n * multiplier\nscale(10)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("30 : i64"));
 }
@@ -103,7 +103,7 @@ TEST(ReplIntegration, ClosureInLetExpression) {
 }
 
 TEST(ReplIntegration, MultipleCapturedVariables) {
-  const auto result = runRepl("def a = 1\ndef b = 2\ndef sum() = a + b\nsum()");
+  const auto result = runRepl("a = 1\nb = 2\nsum() = a + b\nsum()");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("3 : i64"));
 }
@@ -113,13 +113,13 @@ TEST(ReplIntegration, MultipleCapturedVariables) {
 // ClosureCaptureByValue test removed - variables are now immutable (no reassignment)
 
 TEST(ReplIntegration, ClosureCapturesDouble) {
-  const auto result = runRepl("def x = 3.14\ndef f() = x + 1.0\nf()");
+  const auto result = runRepl("x = 3.14\nf() = x + 1.0\nf()");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("4.14 : f64"));
 }
 
 TEST(ReplIntegration, ClosureWithParamsAndCaptures) {
-  const auto result = runRepl("def base = 100\ndef add(x: i64) = x + base\nadd(5)");
+  const auto result = runRepl("base = 100\nadd(x) = x + base\nadd(5)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("105 : i64"));
 }
@@ -163,7 +163,7 @@ TEST(ReplIntegration, UndeclaredVariableError) {
 TEST(ReplIntegration, TypeErrorAfterValidDeclaration) {
   // First line succeeds (declaration), second line has type error
   // This exercises the rollback path: accumulatedAst->statements.resize()
-  const auto result = runRepl("def x = 42\nx + 1.0");
+  const auto result = runRepl("x = 42\nx + 1.0");
   EXPECT_NE(result.exit_code, 0);
   EXPECT_THAT(result.stderr_output, HasSubstr("Type error"));
 }
@@ -171,14 +171,14 @@ TEST(ReplIntegration, TypeErrorAfterValidDeclaration) {
 TEST(ReplIntegration, DeclarationDoesNotPrintValue) {
   // A declaration (not expression) should not print a value
   // This exercises the lastIsExpression=false path in repl_session.cpp:80-89
-  const auto result = runRepl("def x = 42");
+  const auto result = runRepl("x = 42");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_TRUE(result.stdout_output.empty());
 }
 
 TEST(ReplIntegration, FunctionArityMismatch) {
   // Wrong number of arguments triggers type error
-  const auto result = runRepl("def f(x: i64): i64 = x\nf(1, 2)");
+  const auto result = runRepl("f : i64 -> i64\nf(x) = x\nf(1, 2)");
   EXPECT_NE(result.exit_code, 0);
   EXPECT_THAT(result.stderr_output, HasSubstr("argument"));
 }
@@ -217,7 +217,7 @@ TEST(ReplIntegration, MultipleEvaluationsLastPrints) {
 TEST(ReplIntegration, PolymorphicFunctionAcrossEvals) {
   // Define polymorphic function in eval 1, call with i64 in eval 2
   const auto result =
-      runRepl("def identity(x) = x\nidentity(42)");
+      runRepl("identity(x) = x\nidentity(42)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("42 : i64"));
 }
@@ -225,7 +225,7 @@ TEST(ReplIntegration, PolymorphicFunctionAcrossEvals) {
 TEST(ReplIntegration, PolymorphicFunctionMultipleTypes) {
   // Polymorphic function called with different types across evaluations
   const auto result =
-      runRepl("def identity(x) = x\nidentity(42)\nidentity(3.14)");
+      runRepl("identity(x) = x\nidentity(42)\nidentity(3.14)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("42 : i64"));
   EXPECT_THAT(result.stdout_output, HasSubstr("3.14"));
@@ -234,7 +234,7 @@ TEST(ReplIntegration, PolymorphicFunctionMultipleTypes) {
 TEST(ReplIntegration, ErrorRecoveryPreservesState) {
   // Define variable, then cause type error — REPL exits on error in pipe mode,
   // but the important thing is the error message is correct and doesn't crash
-  const auto result = runRepl("def x = 42\nx + 1.0");
+  const auto result = runRepl("x = 42\nx + 1.0");
   EXPECT_NE(result.exit_code, 0);
   EXPECT_THAT(result.stderr_output, HasSubstr("Type error"));
 }
@@ -242,10 +242,11 @@ TEST(ReplIntegration, ErrorRecoveryPreservesState) {
 TEST(ReplIntegration, FiveSequentialEvaluations) {
   // 5+ sequential evaluations building on each other
   const auto result = runRepl(
-      "def a = 1\n"
-      "def b = 2\n"
-      "def c = a + b\n"
-      "def f(x: i64): i64 = x * c\n"
+      "a = 1\n"
+      "b = 2\n"
+      "c = a + b\n"
+      "f : i64 -> i64\n"
+      "f(x) = x * c\n"
       "f(10)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("30 : i64"));
@@ -254,8 +255,8 @@ TEST(ReplIntegration, FiveSequentialEvaluations) {
 TEST(ReplIntegration, FunctionCompositionAcrossEvals) {
   // Define two functions in separate evals, compose them in a third
   const auto result = runRepl(
-      "def double(x: i64): i64 = x * 2\n"
-      "def inc(x: i64): i64 = x + 1\n"
+      "double : i64 -> i64\ndouble(x) = x * 2\n"
+      "inc : i64 -> i64\ninc(x) = x + 1\n"
       "double(inc(4))");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("10 : i64"));
@@ -264,7 +265,7 @@ TEST(ReplIntegration, FunctionCompositionAcrossEvals) {
 TEST(ReplIntegration, RecursiveFunctionAcrossEvals) {
   // Define recursive function, call it in next eval
   const auto result = runRepl(
-      "def fact(n: i64): i64 = if n <= 1 then 1 else n * fact(n - 1)\n"
+      "fact : i64 -> i64\nfact(n) = if n <= 1 then 1 else n * fact(n - 1)\n"
       "fact(5)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("120 : i64"));
