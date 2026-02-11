@@ -1,0 +1,11 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test: polymorphic function with f32 arg and float literal *)
+
+add : forall 'a:Numeric. 'a * 'a -> 'a
+add(x, y) = x + y
+
+(* CHECK: {{4\.[0-9]+}} : f32
+*)
+add(1.0 as f32, 3.0)
