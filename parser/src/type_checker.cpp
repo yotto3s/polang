@@ -1226,7 +1226,11 @@ void TypeChecker::applyFunctionSignature(
     const std::shared_ptr<const NTypeSpec>& signature) {
   const auto* arrowType = dynamic_cast<const NArrowType*>(signature.get());
   if (arrowType == nullptr) {
-    // Non-function signature applied to function — error
+    if (node.arguments.empty()) {
+      // Zero-param function: non-arrow signature is just the return type
+      node.type = signature;
+      return;
+    }
     std::cerr << "Type error: type signature for '" << node.id->name
               << "' is not a function type\n";
     return;
@@ -1244,10 +1248,9 @@ void TypeChecker::applyFunctionSignature(
 
   // Check arity matches
   if (paramTypes.size() != node.arguments.size()) {
-    std::cerr << "Type error: type signature for '" << node.id->name
-              << "' has " << paramTypes.size()
-              << " parameters but definition has " << node.arguments.size()
-              << "\n";
+    std::cerr << "Type error: type signature for '" << node.id->name << "' has "
+              << paramTypes.size() << " parameters but definition has "
+              << node.arguments.size() << "\n";
     return;
   }
 

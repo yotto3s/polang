@@ -303,8 +303,8 @@ void ASTPrinter::visit(const NModuleDeclaration& node) {
 
 void ASTPrinter::visit(const NTypeSignature& node) {
   printPrefix();
-  out << "NTypeSignature '" << node.id->name << "' : "
-      << node.typeExpr->getTypeName() << "\n";
+  out << "NTypeSignature '" << node.id->name
+      << "' : " << node.typeExpr->getTypeName() << "\n";
 }
 
 void ASTPrinter::visit(const NImportStatement& node) {

@@ -116,8 +116,9 @@ private:
   std::map<std::string, std::shared_ptr<const NTypeSpec>> pendingTypeSignatures;
 
   // Apply a type signature to a function declaration
-  void applyFunctionSignature(NFunctionDeclaration& node,
-                              const std::shared_ptr<const NTypeSpec>& signature);
+  void
+  applyFunctionSignature(NFunctionDeclaration& node,
+                         const std::shared_ptr<const NTypeSpec>& signature);
 
   // Get mangled name for a symbol within current module context
   [[nodiscard]] std::string mangledName(const std::string& name) const;
