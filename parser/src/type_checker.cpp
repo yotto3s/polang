@@ -389,8 +389,7 @@ void TypeChecker::instantiateCall(NMethodCall& node,
   for (size_t i = 0; i < argTypes.size(); ++i) {
     std::string resolvedParam = callSubst.apply(scheme.paramTypes[i]);
     resolvedParam = resolveWithDefaults(resolvedParam);
-    if (!isGenericType(resolvedParam) &&
-        resolvedParam != TypeNames::UNKNOWN &&
+    if (!isGenericType(resolvedParam) && resolvedParam != TypeNames::UNKNOWN &&
         resolvedParam != TypeNames::TYPEVAR &&
         !polang::isTypeParameter(resolvedParam) &&
         !polang::isUnificationVar(resolvedParam)) {

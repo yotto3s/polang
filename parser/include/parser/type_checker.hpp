@@ -177,7 +177,8 @@ private:
                                const std::string& lhsType,
                                const std::string& rhsType);
 
-  // Track AST nodes for variables with generic types needing deferred resolution
+  // Track AST nodes for variables with generic types needing deferred
+  // resolution
   std::map<std::string, NVariableDeclaration*> varDeclNodes;
 
   // Helper methods for deferred type resolution
