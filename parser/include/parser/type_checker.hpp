@@ -14,6 +14,10 @@
 class Node;
 class NBlock;
 class NExpression;
+class NTypeSpec;
+class NArrowType;
+class NProductType;
+class NFunctionDeclaration;
 struct NLetBinding;
 struct SourceLocation;
 
@@ -104,6 +108,13 @@ private:
 
   // Imported symbols: local name -> mangled module symbol name
   std::map<std::string, std::string> importedSymbols;
+
+  // Pending type signatures: name -> type expression
+  std::map<std::string, std::shared_ptr<const NTypeSpec>> pendingTypeSignatures;
+
+  // Apply a type signature to a function declaration
+  void applyFunctionSignature(NFunctionDeclaration& node,
+                              const std::shared_ptr<const NTypeSpec>& signature);
 
   // Get mangled name for a symbol within current module context
   [[nodiscard]] std::string mangledName(const std::string& name) const;

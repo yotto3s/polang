@@ -812,6 +812,13 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
   auto& mutableNode = const_cast<NVariableDeclaration&>(node);
   const std::string varName = mangledName(node.id->name);
 
+  // Apply pending type signature if available
+  auto sigIt = pendingTypeSignatures.find(varName);
+  if (sigIt != pendingTypeSignatures.end()) {
+    mutableNode.type = sigIt->second;
+    pendingTypeSignatures.erase(sigIt);
+  }
+
   if (node.assignmentExpr == nullptr) {
     typeCheckVarDeclNoInit(mutableNode, varName);
     return;
@@ -861,6 +868,14 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   auto& mutableNode = const_cast<NFunctionDeclaration&>(node);
 
   const std::string funcName = mangledName(node.id->name);
+
+  // Apply pending type signature if available
+  auto sigIt = pendingTypeSignatures.find(funcName);
+  if (sigIt != pendingTypeSignatures.end()) {
+    applyFunctionSignature(mutableNode, sigIt->second);
+    pendingTypeSignatures.erase(sigIt);
+  }
+
   const auto savedLocals = localTypes;
 
   inferFunction(mutableNode, funcName, savedLocals);
@@ -1192,8 +1207,48 @@ void TypeChecker::visit(const NImportStatement& node) {
   }
 }
 
-void TypeChecker::visit(const NTypeSignature& /*node*/) {
-  // Stub: will be implemented in Task 6
+void TypeChecker::visit(const NTypeSignature& node) {
+  const std::string name = mangledName(node.id->name);
+  pendingTypeSignatures[name] = node.typeExpr;
+}
+
+void TypeChecker::applyFunctionSignature(
+    NFunctionDeclaration& node,
+    const std::shared_ptr<const NTypeSpec>& signature) {
+  const auto* arrowType = dynamic_cast<const NArrowType*>(signature.get());
+  if (arrowType == nullptr) {
+    // Non-function signature applied to function — error
+    std::cerr << "Type error: type signature for '" << node.id->name
+              << "' is not a function type\n";
+    return;
+  }
+
+  // Extract parameter types
+  std::vector<std::shared_ptr<const NTypeSpec>> paramTypes;
+  const auto* productType =
+      dynamic_cast<const NProductType*>(arrowType->paramType.get());
+  if (productType != nullptr) {
+    paramTypes = productType->types;
+  } else {
+    paramTypes.push_back(arrowType->paramType);
+  }
+
+  // Check arity matches
+  if (paramTypes.size() != node.arguments.size()) {
+    std::cerr << "Type error: type signature for '" << node.id->name
+              << "' has " << paramTypes.size()
+              << " parameters but definition has " << node.arguments.size()
+              << "\n";
+    return;
+  }
+
+  // Apply parameter types
+  for (size_t i = 0; i < paramTypes.size(); ++i) {
+    node.arguments[i]->type = paramTypes[i];
+  }
+
+  // Apply return type
+  node.type = arrowType->returnType;
 }
 
 std::set<std::string> TypeChecker::collectFreeVariables(
