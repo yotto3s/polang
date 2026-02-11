@@ -188,10 +188,23 @@ public:
       funcName = importIt->second;
     }
 
-    // Collect arguments
+    // Look up parameter types for literal type inference
+    const std::vector<std::shared_ptr<const NTypeSpec>>* paramTypes = nullptr;
+    auto paramTypesIt = functionParamTypes.find(funcName);
+    if (paramTypesIt != functionParamTypes.end()) {
+      paramTypes = &paramTypesIt->second;
+    }
+
+    // Collect arguments, propagating parameter types to literals
     SmallVector<Value> args;
-    for (const auto& arg : node.arguments) {
-      arg->accept(*this);
+    for (size_t i = 0; i < node.arguments.size(); ++i) {
+      if (paramTypes != nullptr && i < paramTypes->size() &&
+          (*paramTypes)[i] != nullptr) {
+        ExpectedTypeScope scope(*this, (*paramTypes)[i]);
+        node.arguments[i]->accept(*this);
+      } else {
+        node.arguments[i]->accept(*this);
+      }
       if (!result) {
         return;
       }
@@ -617,6 +630,13 @@ public:
     // Store captures for call site (using mangled name)
     functionCaptures[funcName] = captureNames;
 
+    // Store parameter types for literal type inference at call sites
+    std::vector<std::shared_ptr<const NTypeSpec>> paramTypeSpecs;
+    for (const auto& arg : node.arguments) {
+      paramTypeSpecs.push_back(arg->type);
+    }
+    functionParamTypes[funcName] = std::move(paramTypeSpecs);
+
     // Return type
     Type returnType = getTypeOrFresh(node.type.get());
     if (node.type != nullptr) {
@@ -791,6 +811,10 @@ public:
         if (retMLIRIt != functionReturnMLIRTypes.end()) {
           functionReturnMLIRTypes[localName] = retMLIRIt->second;
         }
+        auto paramIt = functionParamTypes.find(mangled);
+        if (paramIt != functionParamTypes.end()) {
+          functionParamTypes[localName] = paramIt->second;
+        }
         auto captIt = functionCaptures.find(mangled);
         if (captIt != functionCaptures.end()) {
           functionCaptures[localName] = captIt->second;
@@ -902,6 +926,8 @@ private:
       typeVarTable; // Variable types as MLIR types (for type vars)
   std::map<std::string, std::vector<std::string>> functionCaptures;
   std::map<std::string, std::shared_ptr<const NTypeSpec>> functionReturnTypes;
+  std::map<std::string, std::vector<std::shared_ptr<const NTypeSpec>>>
+      functionParamTypes; // Function parameter types for literal inference
   std::map<std::string, Type>
       functionReturnMLIRTypes; // Function return types as MLIR types
   std::map<std::string, std::string>
@@ -1167,10 +1193,17 @@ private:
         continue;
       }
 
-      // Pre-populate return type and captures (but don't emit FuncOp yet)
+      // Pre-populate return type, param types, and captures
       functionReturnTypes[name] = retTypeSpec;
       functionReturnMLIRTypes[name] = returnType;
       functionCaptures[name] = func.captureNames;
+
+      // Pre-populate parameter types for literal type inference
+      std::vector<std::shared_ptr<const NTypeSpec>> paramTypeSpecs;
+      for (const auto& paramType : func.paramTypes) {
+        paramTypeSpecs.push_back(makeTypeSpec(paramType));
+      }
+      functionParamTypes[name] = std::move(paramTypeSpecs);
     }
 
     // 3. Restore import mappings (local name → mangled name)
@@ -1185,6 +1218,10 @@ private:
       auto retMLIRIt = functionReturnMLIRTypes.find(mangledName);
       if (retMLIRIt != functionReturnMLIRTypes.end()) {
         functionReturnMLIRTypes[localName] = retMLIRIt->second;
+      }
+      auto paramIt = functionParamTypes.find(mangledName);
+      if (paramIt != functionParamTypes.end()) {
+        functionParamTypes[localName] = paramIt->second;
       }
       auto captIt = functionCaptures.find(mangledName);
       if (captIt != functionCaptures.end()) {
