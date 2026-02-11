@@ -270,3 +270,56 @@ TEST(ReplIntegration, RecursiveFunctionAcrossEvals) {
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("120 : i64"));
 }
+
+// ============== Multi-line Block (:{ :}) Tests ==============
+
+TEST(ReplIntegration, MultilineBlockTypeSigAndDef) {
+  // Type signature and definition grouped in :{ :} block
+  const auto result = runRepl(
+      ":{\nsquare : i64 -> i64\nsquare(n) = n * n\n:}\nsquare(5)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("25 : i64"));
+}
+
+TEST(ReplIntegration, MultilineBlockMultipleFunctions) {
+  // Multiple functions defined in a single :{ :} block
+  const auto result = runRepl(
+      ":{\nadd : i64 * i64 -> i64\nadd(a, b) = a + b\n"
+      "mul : i64 * i64 -> i64\nmul(a, b) = a * b\n:}\n"
+      "add(mul(3, 4), 5)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("17 : i64"));
+}
+
+TEST(ReplIntegration, MultilineBlockVariableWithType) {
+  // Variable with type signature in :{ :} block
+  const auto result = runRepl(
+      ":{\nx : i64\nx = 42\n:}\nx + 1");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("43 : i64"));
+}
+
+TEST(ReplIntegration, MultilineBlockEmpty) {
+  // Empty :{ :} block should not crash
+  const auto result = runRepl(":{\n:}\n42");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("42 : i64"));
+}
+
+TEST(ReplIntegration, MultilineBlockFollowedByExpression) {
+  // Block defines function, next line evaluates it
+  const auto result = runRepl(
+      ":{\ndouble : i64 -> i64\ndouble(x) = x * 2\n:}\ndouble(21)");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("42 : i64"));
+}
+
+TEST(ReplIntegration, MultipleMultilineBlocks) {
+  // Two separate :{ :} blocks, second uses function from first
+  const auto result = runRepl(
+      ":{\ninc : i64 -> i64\ninc(x) = x + 1\n:}\n"
+      ":{\ndec : i64 -> i64\ndec(x) = x - 1\n:}\n"
+      "inc(dec(10))");
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_THAT(result.stdout_output, HasSubstr("10 : i64"));
+}
