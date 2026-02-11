@@ -558,7 +558,6 @@ void TypeChecker::visit(const NCastExpression& node) {
 
 void TypeChecker::visit(const NBlock& node) {
   // Save tracking maps for nested scope handling
-  const auto savedUnresolvedGenerics = unresolvedGenerics;
   const auto savedVarDeclNodes = varDeclNodes;
 
   for (const auto& stmt : node.statements) {
@@ -574,7 +573,6 @@ void TypeChecker::visit(const NBlock& node) {
   }
 
   // Restore tracking maps for outer scope
-  unresolvedGenerics = savedUnresolvedGenerics;
   varDeclNodes = savedVarDeclNodes;
 }
 
@@ -822,9 +820,9 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
 
   const std::string& expectedType = declType;
 
-  // If actual type could be re-resolved (source is in unresolvedGenerics) and
+  // If actual type could be re-resolved (source has generic type) and
   // expected is concrete, propagate back. We check by trying to propagate - if
-  // the source variable is in unresolvedGenerics, it will be resolved;
+  // the source variable has a generic type, it will be resolved;
   // otherwise nothing happens.
   std::string actualType = exprType;
   if (!isGenericType(expectedType) && expectedType != TypeNames::TYPEVAR) {
@@ -1569,7 +1567,6 @@ void TypeChecker::resolveGenericVariable(const std::string& varName,
   }
 
   // Clean up tracking
-  unresolvedGenerics.erase(varName);
   varDeclNodes.erase(varName);
 }
 
@@ -1596,6 +1593,5 @@ void TypeChecker::resolveRemainingGenerics() {
   }
 
   // Clear tracking maps
-  unresolvedGenerics.clear();
   varDeclNodes.clear();
 }

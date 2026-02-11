@@ -177,11 +177,7 @@ private:
                                const std::string& lhsType,
                                const std::string& rhsType);
 
-  // Deferred type inference for generic types
-  // Variables with unresolved generic types (name -> generic type)
-  std::map<std::string, std::string> unresolvedGenerics;
-
-  // Track AST nodes for updating types later (name -> node pointer)
+  // Track AST nodes for variables with generic types needing deferred resolution
   std::map<std::string, NVariableDeclaration*> varDeclNodes;
 
   // Helper methods for deferred type resolution
