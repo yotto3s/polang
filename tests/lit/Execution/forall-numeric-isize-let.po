@@ -1,0 +1,12 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test: let-bound generic variable used in polymorphic call *)
+(* b=3 should stay generic until add resolves 'a to isize *)
+
+add : forall 'a:Numeric. 'a * 'a -> 'a
+add(x, y) = x + y
+
+(* CHECK: 4 : isize
+*)
+let a : isize = 1 as isize and b = 3 in add(a, b)
