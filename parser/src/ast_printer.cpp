@@ -43,6 +43,14 @@ void ASTPrinter::visit(const NNamedType& /*node*/) {
   // Types are printed via getTypeName() in parent visitors
 }
 
+void ASTPrinter::visit(const NArrowType& /*node*/) {
+  // Types are printed via getTypeName() in parent visitors
+}
+
+void ASTPrinter::visit(const NProductType& /*node*/) {
+  // Types are printed via getTypeName() in parent visitors
+}
+
 void ASTPrinter::visit(const NInteger& node) {
   printPrefix();
   out << "NInteger " << node.value << "\n";
@@ -291,6 +299,12 @@ void ASTPrinter::visit(const NModuleDeclaration& node) {
     DepthScope scope(*this, !isLast);
     node.members[i]->accept(*this);
   }
+}
+
+void ASTPrinter::visit(const NTypeSignature& node) {
+  printPrefix();
+  out << "NTypeSignature '" << node.id->name << "' : "
+      << node.typeExpr->getTypeName() << "\n";
 }
 
 void ASTPrinter::visit(const NImportStatement& node) {

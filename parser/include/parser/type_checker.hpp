@@ -40,6 +40,8 @@ public:
 
   // Type Specification Visitor methods
   void visit(const NNamedType& node) override;
+  void visit(const NArrowType& node) override;
+  void visit(const NProductType& node) override;
 
   // Expression Visitor methods
   void visit(const NInteger& node) override;
@@ -58,6 +60,7 @@ public:
   void visit(const NFunctionDeclaration& node) override;
   void visit(const NModuleDeclaration& node) override;
   void visit(const NImportStatement& node) override;
+  void visit(const NTypeSignature& node) override;
 
   // Get the inferred type of the last visited node
   [[nodiscard]] std::string getInferredType() const noexcept {

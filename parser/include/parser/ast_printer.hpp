@@ -14,6 +14,8 @@ public:
   void print(const NBlock& root);
 
   void visit(const NNamedType& node) override;
+  void visit(const NArrowType& node) override;
+  void visit(const NProductType& node) override;
   void visit(const NInteger& node) override;
   void visit(const NDouble& node) override;
   void visit(const NBoolean& node) override;
@@ -30,6 +32,7 @@ public:
   void visit(const NFunctionDeclaration& node) override;
   void visit(const NModuleDeclaration& node) override;
   void visit(const NImportStatement& node) override;
+  void visit(const NTypeSignature& node) override;
 
 private:
   std::ostream& out;

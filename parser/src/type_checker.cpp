@@ -44,6 +44,8 @@ public:
   }
 
   void visit(const NNamedType& /*node*/) override {}
+  void visit(const NArrowType& /*node*/) override {}
+  void visit(const NProductType& /*node*/) override {}
   void visit(const NInteger& /*node*/) override {}
   void visit(const NDouble& /*node*/) override {}
   void visit(const NBoolean& /*node*/) override {}
@@ -123,6 +125,7 @@ public:
 
   void visit(const NModuleDeclaration& /*node*/) override {}
   void visit(const NImportStatement& /*node*/) override {}
+  void visit(const NTypeSignature& /*node*/) override {}
 
 private:
   std::set<std::string> localNames;
@@ -134,6 +137,14 @@ TypeChecker::TypeChecker() : inferredType(TypeNames::I64) {}
 void TypeChecker::visit(const NNamedType& node) {
   // Named types just set inferredType to their name
   inferredType = node.name;
+}
+
+void TypeChecker::visit(const NArrowType& /*node*/) {
+  // Arrow types are used in type signatures, not directly visited
+}
+
+void TypeChecker::visit(const NProductType& /*node*/) {
+  // Product types are used in type signatures, not directly visited
 }
 
 std::string TypeChecker::mangledName(const std::string& name) const {
@@ -1179,6 +1190,10 @@ void TypeChecker::visit(const NImportStatement& node) {
     handleWildcardImport(node);
     break;
   }
+}
+
+void TypeChecker::visit(const NTypeSignature& /*node*/) {
+  // Stub: will be implemented in Task 6
 }
 
 std::set<std::string> TypeChecker::collectFreeVariables(

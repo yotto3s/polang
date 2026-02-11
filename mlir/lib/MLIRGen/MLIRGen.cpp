@@ -100,6 +100,8 @@ public:
     // Type specifications are not directly visited during MLIR generation
     // They are accessed via getTypeName() when processing declarations
   }
+  void visit(const NArrowType& /*node*/) override {}
+  void visit(const NProductType& /*node*/) override {}
 
   // Expression Visitor implementations
   void visit(const NInteger& node) override {
@@ -826,6 +828,11 @@ public:
     }
 
     result = nullptr; // Import statements don't produce a value
+  }
+
+  void visit(const NTypeSignature& /*node*/) override {
+    // Type signatures are handled by the type checker, not MLIR generation
+    result = nullptr;
   }
 
 private:

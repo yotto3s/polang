@@ -41,4 +41,10 @@ void NModuleDeclaration::accept(Visitor& visitor) const {
   visitor.visit(*this);
 }
 
+void NArrowType::accept(Visitor& visitor) const { visitor.visit(*this); }
+
+void NProductType::accept(Visitor& visitor) const { visitor.visit(*this); }
+
 void NImportStatement::accept(Visitor& visitor) const { visitor.visit(*this); }
+
+void NTypeSignature::accept(Visitor& visitor) const { visitor.visit(*this); }

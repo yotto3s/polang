@@ -18,7 +18,10 @@ class NExpressionStatement;
 class NVariableDeclaration;
 class NFunctionDeclaration;
 class NModuleDeclaration;
+class NArrowType;
+class NProductType;
 class NImportStatement;
+class NTypeSignature;
 
 /// Base class for implementing the Visitor design pattern on the Polang AST.
 ///
@@ -71,6 +74,8 @@ public:
   /// @name Type Specification Visitors
   /// @{
   virtual void visit(const NNamedType& node) = 0;
+  virtual void visit(const NArrowType& node) = 0;
+  virtual void visit(const NProductType& node) = 0;
   /// @}
 
   /// @name Expression Visitors
@@ -95,6 +100,7 @@ public:
   virtual void visit(const NFunctionDeclaration& node) = 0;
   virtual void visit(const NModuleDeclaration& node) = 0;
   virtual void visit(const NImportStatement& node) = 0;
+  virtual void visit(const NTypeSignature& node) = 0;
   /// @}
 };
 
