@@ -192,6 +192,7 @@ TypeChecker::checkIncremental(const NBlock& newStatements) {
   // because the REPL is incremental — a type signature entered in one input
   // may have its corresponding definition provided in a subsequent input.
   errors.clear();
+  scopeDepth = 0;
   subst = polang::Substitution();
   traitConstraints = polang::TraitConstraints();
   newStatements.accept(*this);
@@ -199,6 +200,9 @@ TypeChecker::checkIncremental(const NBlock& newStatements) {
 }
 
 TypeCheckerSnapshot TypeChecker::saveState() const {
+  // Note: pendingTypeSignatures is intentionally not snapshotted. On rollback,
+  // signatures from the failed input are discarded, which is correct — the
+  // input failed so its side effects should not persist.
   TypeCheckerSnapshot snapshot;
   snapshot.localTypes = localTypes;
   snapshot.functionSignatures = functionSignatures;
@@ -388,7 +392,7 @@ void TypeChecker::instantiateCall(NMethodCall& node,
   // Propagate resolved types back to arguments with generic types
   for (size_t i = 0; i < argTypes.size(); ++i) {
     std::string resolvedParam = callSubst.apply(scheme.paramTypes[i]);
-    resolvedParam = resolveWithDefaults(resolvedParam);
+    resolvedParam = polang::resolveGenericToDefault(resolvedParam);
     if (!isGenericType(resolvedParam) && resolvedParam != TypeNames::UNKNOWN &&
         resolvedParam != TypeNames::TYPEVAR &&
         !polang::isTypeParameter(resolvedParam) &&
@@ -402,7 +406,7 @@ void TypeChecker::instantiateCall(NMethodCall& node,
   node.typeBindings.clear();
   for (const auto& tp : scheme.typeParams) {
     std::string resolved = callSubst.apply(tp);
-    resolved = resolveWithDefaults(resolved);
+    resolved = polang::resolveGenericToDefault(resolved);
 
     // Validate trait bounds
     auto boundsIt = scheme.paramBounds.find(tp);
@@ -413,12 +417,16 @@ void TypeChecker::instantiateCall(NMethodCall& node,
         msg += funcName;
         msg += "': type ";
         msg += resolved;
-        msg += " does not satisfy ";
+        msg += " does not satisfy [";
+        bool first = true;
         for (auto b : boundsIt->second) {
+          if (!first) {
+            msg += ", ";
+          }
           msg += polang::traitBoundToString(b);
-          msg += " ";
+          first = false;
         }
-        msg += "for ";
+        msg += "] for ";
         msg += tp;
         reportError(msg, node.loc);
       }
@@ -429,7 +437,7 @@ void TypeChecker::instantiateCall(NMethodCall& node,
 
   // Resolve return type
   std::string resolvedReturn = callSubst.apply(scheme.returnType);
-  resolvedReturn = resolveWithDefaults(resolvedReturn);
+  resolvedReturn = polang::resolveGenericToDefault(resolvedReturn);
   inferredType = resolvedReturn;
 }
 
@@ -537,6 +545,8 @@ void TypeChecker::visit(const NBinaryOperator& node) {
 void TypeChecker::visit(const NCastExpression& node) {
   // Visit the inner expression to collect any free variables and check types
   node.expression->accept(*this);
+  // Resolve generic for validation only — don't propagate back to the source
+  // variable, since a cast is a type conversion, not a type constraint.
   const std::string sourceType = polang::resolveGenericToDefault(inferredType);
   const std::string targetType = node.targetType->getTypeName();
 
@@ -712,6 +722,9 @@ void TypeChecker::typeCheckLetBindings(
         // in a context that provides a concrete type, or defaulted at end of
         // block.
         if (containsGenericType(exprType)) {
+          // Raw name is intentional: let-bindings use raw names in localTypes
+          // (via addLetBindingsToScope), unlike top-level decls which use
+          // mangled names.
           varDeclNodes[var->id->name] = &mutableVar;
         }
         mutableVar.type = makeTypeSpec(exprType);
@@ -884,7 +897,8 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
   bool needsInference = node.type == nullptr;
   if (!needsInference && containsGenericType(exprType)) {
     // Check if the current node type matches what we'd get from default
-    // resolution
+    // resolution. This relies on defaults being stable ({int}->i64,
+    // {float}->f64). If defaults ever change, update this check.
     std::string defaultType = resolveGenericToDefault(exprType);
     std::string nodeTypeName = node.type->getTypeName();
     if (nodeTypeName == defaultType) {
@@ -1053,7 +1067,7 @@ void TypeChecker::inferFunction(
         }
       }
       if (!mapped) {
-        sigParamTypes.push_back(resolveWithDefaults(resolved));
+        sigParamTypes.push_back(polang::resolveGenericToDefault(resolved));
       }
       auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
       mutableArg.type = makeTypeSpec(sigParamTypes.back());
@@ -1076,7 +1090,7 @@ void TypeChecker::inferFunction(
           polang::isTypeParameter(node.type->getTypeName())) {
         returnType = node.type->getTypeName();
       } else {
-        returnType = resolveWithDefaults(resolvedReturn);
+        returnType = polang::resolveGenericToDefault(resolvedReturn);
       }
     }
     node.type = makeTypeSpec(returnType);
@@ -1157,11 +1171,11 @@ void TypeChecker::inferFunction(
   if (unresolvedVars.empty()) {
     // All vars resolved to concrete types — function is monomorphic
     for (size_t i = 0; i < resolvedParamTypes.size(); ++i) {
-      resolvedParamTypes[i] = resolveWithDefaults(resolvedParamTypes[i]);
+      resolvedParamTypes[i] = polang::resolveGenericToDefault(resolvedParamTypes[i]);
       auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
       mutableArg.type = makeTypeSpec(resolvedParamTypes[i]);
     }
-    resolvedBodyType = resolveWithDefaults(resolvedBodyType);
+    resolvedBodyType = polang::resolveGenericToDefault(resolvedBodyType);
 
     std::string returnType;
     if (node.type == nullptr) {
@@ -1207,7 +1221,7 @@ void TypeChecker::inferFunction(
       if (it != uniVarToTypeParam.end()) {
         resolvedParamTypes[i] = it->second;
       } else {
-        resolvedParamTypes[i] = resolveWithDefaults(resolvedParamTypes[i]);
+        resolvedParamTypes[i] = polang::resolveGenericToDefault(resolvedParamTypes[i]);
       }
       auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
       mutableArg.type = makeTypeSpec(resolvedParamTypes[i]);
@@ -1218,7 +1232,7 @@ void TypeChecker::inferFunction(
     if (retIt != uniVarToTypeParam.end()) {
       resolvedBodyType = retIt->second;
     } else {
-      resolvedBodyType = resolveWithDefaults(resolvedBodyType);
+      resolvedBodyType = polang::resolveGenericToDefault(resolvedBodyType);
     }
 
     std::string returnType;
@@ -1251,15 +1265,6 @@ void TypeChecker::inferFunction(
   traitConstraints = savedTraitConstraints;
 }
 
-std::string TypeChecker::resolveWithDefaults(const std::string& type) const {
-  if (polang::isGenericIntegerType(type)) {
-    return TypeNames::I64;
-  }
-  if (polang::isGenericFloatType(type)) {
-    return TypeNames::F64;
-  }
-  return resolveGenericToDefault(type);
-}
 
 void TypeChecker::visit(const NModuleDeclaration& node) {
   modulePath.push_back(node.name->name);

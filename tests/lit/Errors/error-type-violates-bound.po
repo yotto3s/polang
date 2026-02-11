@@ -2,7 +2,7 @@
 *)
 
 (* Test that passing a concrete type that violates a trait bound is caught. *)
-(* CHECK: {{.*}}does not satisfy Integer{{.*}}
+(* CHECK: {{.*}}does not satisfy {{[[]}}Integer{{[]]}}{{.*}}
 *)
 wrong : forall 'a:Integer. 'a -> 'a
 wrong(x) = x

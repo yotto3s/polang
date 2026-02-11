@@ -204,8 +204,6 @@ private:
                        const polang::PolymorphicSignature& scheme,
                        const std::vector<std::string>& argTypes);
 
-  // Resolve defaults for constrained unification vars
-  [[nodiscard]] std::string resolveWithDefaults(const std::string& type) const;
 
   // Validate type names in a type expression tree.
   // Returns false if any errors were found.
