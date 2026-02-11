@@ -568,6 +568,11 @@ void TypeChecker::visit(const NBlock& node) {
   // Resolve any remaining generic types to defaults at end of block
   resolveRemainingGenerics();
 
+  // Also resolve the block's inferred type if it's still generic
+  if (containsGenericType(inferredType)) {
+    inferredType = resolveAllGenericsToDefault(inferredType);
+  }
+
   // Restore tracking maps for outer scope
   unresolvedGenerics = savedUnresolvedGenerics;
   varDeclNodes = savedVarDeclNodes;
@@ -706,10 +711,14 @@ void TypeChecker::typeCheckLetBindings(
       }
 
       if (var->type == nullptr) {
-        // Resolve generic types to defaults for inferred declarations
-        std::string resolvedType = resolveGenericToDefault(exprType);
-        mutableVar.type = makeTypeSpec(resolvedType);
-        bindingTypes.push_back(resolvedType);
+        // Keep generic types (e.g. {int}) — they will be resolved when used
+        // in a context that provides a concrete type, or defaulted at end of
+        // block.
+        if (containsGenericType(exprType)) {
+          varDeclNodes[var->id->name] = &mutableVar;
+        }
+        mutableVar.type = makeTypeSpec(exprType);
+        bindingTypes.push_back(exprType);
       } else {
         std::string declaredType = var->type->getTypeName();
         if (!areTypesCompatible(exprType, declaredType)) {
@@ -794,20 +803,16 @@ void TypeChecker::typeCheckVarDeclNoInit(NVariableDeclaration& node,
 void TypeChecker::typeCheckVarDeclInferType(NVariableDeclaration& node,
                                             const std::string& varName,
                                             const std::string& exprType) {
-  // For deferred type inference: resolve to default but track for potential
-  // re-resolution
-  std::string resolvedType = resolveAllGenericsToDefault(exprType);
-
-  // Track types containing generics for later resolution
+  // Track variables with generic types for deferred resolution at block end
   if (containsGenericType(exprType)) {
-    unresolvedGenerics[varName] = exprType;
     varDeclNodes[varName] = &node;
   }
 
-  // Always set node.type so MLIR has valid types
-  node.type = makeTypeSpec(resolvedType);
-  localTypes[varName] = resolvedType;
-  inferredType = resolvedType;
+  // Keep generic types (e.g. {int}) — they will be resolved when used in a
+  // context that provides a concrete type, or defaulted at end of block.
+  node.type = makeTypeSpec(exprType);
+  localTypes[varName] = exprType;
+  inferredType = exprType;
 }
 
 void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
@@ -1538,14 +1543,14 @@ void TypeChecker::propagateTypeToSource(const NExpression* expr,
 
 void TypeChecker::resolveGenericVariable(const std::string& varName,
                                          const std::string& concreteType) {
-  // Find variable in unresolvedGenerics
-  auto it = unresolvedGenerics.find(varName);
-  if (it == unresolvedGenerics.end()) {
-    // Variable is not tracked as having a generic type - nothing to do
+  // Check if the variable has a generic type in localTypes
+  auto localIt = localTypes.find(varName);
+  if (localIt == localTypes.end() || !containsGenericType(localIt->second)) {
+    // Variable doesn't exist or doesn't have a generic type - nothing to do
     return;
   }
 
-  const std::string& genericType = it->second;
+  const std::string& genericType = localIt->second;
 
   // Check compatibility between generic and concrete type
   if (!areTypesCompatible(genericType, concreteType)) {
@@ -1563,23 +1568,30 @@ void TypeChecker::resolveGenericVariable(const std::string& varName,
     nodeIt->second->type = makeTypeSpec(concreteType);
   }
 
-  // Remove from unresolvedGenerics
-  unresolvedGenerics.erase(it);
+  // Clean up tracking
+  unresolvedGenerics.erase(varName);
   varDeclNodes.erase(varName);
 }
 
 void TypeChecker::resolveRemainingGenerics() {
-  // Since we now always set node.type to defaults immediately,
-  // this function mainly handles updating localTypes when variables
-  // weren't resolved by context propagation
-  for (auto& entry : unresolvedGenerics) {
-    const std::string& varName = entry.first;
-
-    // Update localTypes with resolved type
+  // Resolve any variables whose types still contain generics to defaults.
+  // This handles variables that were never used in a context that provided
+  // a concrete type (e.g. top-level `a = 3.14` → f64).
+  for (auto& [varName, nodePtr] : varDeclNodes) {
     auto localIt = localTypes.find(varName);
-    if (localIt != localTypes.end()) {
-      // Resolve all generics in the type, including those in reference types
-      localTypes[varName] = resolveAllGenericsToDefault(localIt->second);
+    if (localIt == localTypes.end()) {
+      continue;
+    }
+    if (!containsGenericType(localIt->second)) {
+      continue;
+    }
+    // Resolve all generics in the type, including those in reference types
+    std::string resolved = resolveAllGenericsToDefault(localIt->second);
+    localTypes[varName] = resolved;
+
+    // Update AST node type so MLIR sees the resolved type
+    if (nodePtr != nullptr) {
+      nodePtr->type = makeTypeSpec(resolved);
     }
   }
 
