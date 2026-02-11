@@ -2,7 +2,8 @@
 *)
 
 (* Test unsigned integer to float cast (UIToFPOp) *)
-def u32_to_f64(x: u32): f64 = x as f64
+u32_to_f64 : u32 -> f64
+u32_to_f64(x) = x as f64
 
 (* CHECK: 42 : f64
 *)

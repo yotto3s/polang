@@ -5,7 +5,7 @@
 (* Each global's init expression may reference previously defined globals. *)
 (* CHECK: 13 : i64
 *)
-def x = 5
-def y = x + 3
-def z = x + y
+x = 5
+y = x + 3
+z = x + y
 z

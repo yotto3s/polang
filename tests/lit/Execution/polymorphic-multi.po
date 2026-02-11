@@ -6,7 +6,7 @@
 (* Test that polymorphic functions work correctly with multiple specializations. *)
 (* The identity function is called with both int and bool types. *)
 
-def identity(x) = x
+identity(x) = x
 (* Both calls create specialized versions *)
 identity(true)
 identity(42)

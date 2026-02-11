@@ -12,5 +12,5 @@
 (* CHECK: {{.*}}polang.call @countdown{{.*}}
 *)
 
-def countdown(n) = if n == 0 then 0 else countdown(n - 1)
+countdown(n) = if n == 0 then 0 else countdown(n - 1)
 countdown(5)

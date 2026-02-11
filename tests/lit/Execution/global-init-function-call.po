@@ -4,6 +4,7 @@
 (* Test that global init expressions can contain function calls. *)
 (* CHECK: 25 : i64
 *)
-def square(x: i64): i64 = x * x
-def result = square(5)
+square : i64 -> i64
+square(x) = x * x
+result = square(5)
 result

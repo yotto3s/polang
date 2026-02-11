@@ -10,7 +10,8 @@
 *)
 (* CHECK-NEXT: }
 *)
-def widen_unsigned(x: u8): u64 = x as u64
+widen_unsigned : u8 -> u64
+widen_unsigned(x) = x as u64
 
 (* Test unsigned integer to float (u32 to f64) uses uitofp *)
 (* CHECK:      define double @unsigned_to_float(i32 %{{[0-9]+}}) {
@@ -21,7 +22,8 @@ def widen_unsigned(x: u8): u64 = x as u64
 *)
 (* CHECK-NEXT: }
 *)
-def unsigned_to_float(x: u32): f64 = x as f64
+unsigned_to_float : u32 -> f64
+unsigned_to_float(x) = x as f64
 
 (* Test same-width float cast (f64 to f64) is identity *)
 (* CHECK:      define double @same_width_float(double %{{[0-9]+}}) {
@@ -30,4 +32,5 @@ def unsigned_to_float(x: u32): f64 = x as f64
 *)
 (* CHECK-NEXT: }
 *)
-def same_width_float(x: f64): f64 = x as f64
+same_width_float : f64 -> f64
+same_width_float(x) = x as f64

@@ -10,7 +10,8 @@
 *)
 
 module Math (add, PI)
-  def PI = 3.14
-  def add(x: i64, y: i64): i64 = x + y
+  PI = 3.14
+  add : i64 * i64 -> i64
+  add(x, y) = x + y
 endmodule
 from Math import add, PI

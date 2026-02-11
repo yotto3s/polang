@@ -10,7 +10,8 @@
 *)
 (* CHECK-NEXT: }
 *)
-def double_val(): f64 = 3.14
+double_val : f64
+double_val() = 3.14
 
 (* Test bool constant *)
 (* CHECK:      polang.func @bool_val() -> !polang.bool {
@@ -21,4 +22,5 @@ def double_val(): f64 = 3.14
 *)
 (* CHECK-NEXT: }
 *)
-def bool_val(): bool = true
+bool_val : bool
+bool_val() = true

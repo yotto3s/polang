@@ -2,13 +2,13 @@
 *)
 
 (* Test float subtraction *)
-def sub_result = 5.0 - 2.5
+sub_result = 5.0 - 2.5
 
 (* Test float multiplication *)
-def mul_result = 3.0 * 4.0
+mul_result = 3.0 * 4.0
 
 (* Test float division *)
-def div_result = 10.0 / 4.0
+div_result = 10.0 / 4.0
 
 (* Test combined float operations *)
 (* CHECK: 17 : f64

@@ -4,5 +4,6 @@
 (* Test if-then-else expression *)
 (* CHECK: 10 : i64
 *)
-def max(a: i64, b: i64): i64 = if a > b then a else b
+max : i64 * i64 -> i64
+max(a, b) = if a > b then a else b
 max(10, 5)

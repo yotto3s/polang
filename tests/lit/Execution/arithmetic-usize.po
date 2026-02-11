@@ -4,5 +4,6 @@
 (* Test arithmetic operations on usize values *)
 (* CHECK: 42 : usize
 *)
-def add_usize(a: usize, b: usize): usize = a + b
+add_usize : usize * usize -> usize
+add_usize(a, b) = a + b
 add_usize(10 as usize, 32 as usize)

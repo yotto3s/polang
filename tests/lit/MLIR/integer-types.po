@@ -5,14 +5,15 @@
 
 (* CHECK: {{.*}}polang.constant.integer 42 : !polang.integer<64, signed>
 *)
-def a = 42
+a = 42
 
 (* CHECK: {{.*}}polang.constant.integer 100 : !polang.integer<64, signed>
 *)
-def b = 100
+b = 100
 
 (* Explicit i64 annotation works since literal is i64 *)
 (* CHECK: {{.*}}polang.constant.integer 50 : !polang.integer<64, signed>
 *)
-def c: i64 = 50
+c : i64
+c = 50
 c

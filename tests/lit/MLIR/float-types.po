@@ -5,14 +5,15 @@
 
 (* CHECK: {{.*}}polang.constant.float {{.*}} : !polang.float<64>
 *)
-def a = 3.14
+a = 3.14
 
 (* CHECK: {{.*}}polang.constant.float {{.*}} : !polang.float<64>
 *)
-def b = 2.71828
+b = 2.71828
 
 (* Explicit f64 annotation works since literal is f64 *)
 (* CHECK: {{.*}}polang.constant.float {{.*}} : !polang.float<64>
 *)
-def c: f64 = 1.5
+c : f64
+c = 1.5
 c

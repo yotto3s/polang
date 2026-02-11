@@ -4,7 +4,9 @@
 (* Test if expression *)
 (* CHECK:      NBlock
 *)
-(* CHECK-NEXT: `-NFunctionDeclaration 'max' (a: i64, b: i64) -> i64
+(* CHECK-NEXT: |-NTypeSignature 'max' : i64 * i64 -> i64
+*)
+(* CHECK-NEXT: `-NFunctionDeclaration 'max' (a, b)
 *)
 (* CHECK-NEXT:   `-NBlock
 *)
@@ -28,4 +30,5 @@
 *)
 (* CHECK-NEXT:           `-NIdentifier 'b'
 *)
-def max(a: i64, b: i64): i64 = if a > b then a else b
+max : i64 * i64 -> i64
+max(a, b) = if a > b then a else b

@@ -4,7 +4,8 @@
 *)
 
 module Math (PI, double_pi)
-  def PI = 3.14
-  def double_pi(x: f64): f64 = x * 2.0
+  PI = 3.14
+  double_pi : f64 -> f64
+  double_pi(x) = x * 2.0
 endmodule
 Math.double_pi(Math.PI)

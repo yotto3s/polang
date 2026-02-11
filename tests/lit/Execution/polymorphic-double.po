@@ -7,5 +7,5 @@
 (* Note: Polymorphic functions with double types currently don't print *)
 (* results due to REPL type detection limitation. *)
 
-def double_it(x: f64) = x + x
+double_it(x) = x + x
 double_it(3.14)

@@ -4,5 +4,6 @@
 (* Test isize to usize cast (both are index, noop) *)
 (* CHECK: 42 : usize
 *)
-def to_usize(x: isize): usize = x as usize
+to_usize : isize -> usize
+to_usize(x) = x as usize
 to_usize(42 as isize)

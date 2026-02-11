@@ -3,5 +3,5 @@
 (* CHECK: 3.5 : f64
 *)
 
-def add(x, y) = x + y
+add(x, y) = x + y
 add(1.5, 2.0)

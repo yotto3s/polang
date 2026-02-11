@@ -5,8 +5,8 @@
 (* Integer literals default to i64 *)
 
 (* Test various integer operations - last result is what gets printed *)
-def a = 50 + 50
-def big = 1000000 * 1000000
+a = 50 + 50
+big = 1000000 * 1000000
 
 (* Final expression tests negative numbers, which prints *)
 (* CHECK: -42 : i64

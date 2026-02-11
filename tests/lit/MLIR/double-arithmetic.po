@@ -10,7 +10,8 @@
 *)
 (* CHECK-NEXT: }
 *)
-def dadd(a: f64, b: f64): f64 = a + b
+dadd : f64 * f64 -> f64
+dadd(a, b) = a + b
 
 (* Test double subtraction *)
 (* CHECK:      polang.func @dsub(%arg0: !polang.float<64>, %arg1: !polang.float<64>) -> !polang.float<64> {
@@ -21,7 +22,8 @@ def dadd(a: f64, b: f64): f64 = a + b
 *)
 (* CHECK-NEXT: }
 *)
-def dsub(a: f64, b: f64): f64 = a - b
+dsub : f64 * f64 -> f64
+dsub(a, b) = a - b
 
 (* Test double multiplication *)
 (* CHECK:      polang.func @dmul(%arg0: !polang.float<64>, %arg1: !polang.float<64>) -> !polang.float<64> {
@@ -32,7 +34,8 @@ def dsub(a: f64, b: f64): f64 = a - b
 *)
 (* CHECK-NEXT: }
 *)
-def dmul(a: f64, b: f64): f64 = a * b
+dmul : f64 * f64 -> f64
+dmul(a, b) = a * b
 
 (* Test double division *)
 (* CHECK:      polang.func @ddiv(%arg0: !polang.float<64>, %arg1: !polang.float<64>) -> !polang.float<64> {
@@ -43,4 +46,5 @@ def dmul(a: f64, b: f64): f64 = a * b
 *)
 (* CHECK-NEXT: }
 *)
-def ddiv(a: f64, b: f64): f64 = a / b
+ddiv : f64 * f64 -> f64
+ddiv(a, b) = a / b

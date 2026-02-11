@@ -4,14 +4,16 @@
 (* Test closure variable capture *)
 (* CHECK: 21 : i64
 *)
-def base = 10
-def add_base(x: i64): i64 = x + base
-def result1 = add_base(5)
+base = 10
+add_base : i64 -> i64
+add_base(x) = x + base
+result1 = add_base(5)
 
-def a = 1
-def b = 2
-def c = 3
-def sum_all(): i64 = a + b + c
-def result2 = sum_all()
+a = 1
+b = 2
+c = 3
+sum_all : i64
+sum_all() = a + b + c
+result2 = sum_all()
 
 result1 + result2

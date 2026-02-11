@@ -6,5 +6,5 @@
 (* Test that polymorphic function calls display results correctly. *)
 (* Previously this showed no output because result type was "typevar". *)
 
-def identity(x) = x
+identity(x) = x
 identity(3.14)

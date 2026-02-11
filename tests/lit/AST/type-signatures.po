@@ -5,9 +5,9 @@
 *)
 (* CHECK-NEXT: |-NTypeSignature 'x' : i64
 *)
-(* CHECK-NEXT: |-NVariableDeclaration 'x'
+(* CHECK-NEXT: `-NVariableDeclaration 'x'
 *)
-(* CHECK-NEXT: | `-NInteger 10
+(* CHECK-NEXT:   `-NInteger 10
 *)
 x : i64
 x = 10

@@ -3,5 +3,5 @@
 (* CHECK: 3 : i64
 *)
 
-def add(x, y) = x + y
+add(x, y) = x + y
 add(1, 2)

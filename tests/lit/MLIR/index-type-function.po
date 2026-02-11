@@ -10,6 +10,8 @@
 *)
 (* CHECK-NEXT:    %{{[0-9]+}} = polang.cast %{{.*}} : !polang.integer<64, signed> -> !polang.index<unsigned>
 *)
-def to_i64(x: isize): i64 = x as i64
-def to_usize(x: i64): usize = x as usize
+to_i64 : isize -> i64
+to_i64(x) = x as i64
+to_usize : i64 -> usize
+to_usize(x) = x as usize
 to_i64(42 as isize)

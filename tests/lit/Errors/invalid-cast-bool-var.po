@@ -2,7 +2,8 @@
 *)
 
 (* Test that casting a bool variable to numeric is rejected *)
-(* CHECK: Type error: cannot cast bool to i32 at line 8, column 1
+(* CHECK: Type error: cannot cast bool to i32 at line 9, column 1
 *)
-def b: bool = true
+b : bool
+b = true
 b as i32

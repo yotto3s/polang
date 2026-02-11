@@ -4,6 +4,6 @@
 (* Test variable declaration and usage *)
 (* CHECK: 30 : i64
 *)
-def x = 10
-def y = 20
+x = 10
+y = 20
 x + y

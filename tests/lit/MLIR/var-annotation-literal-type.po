@@ -11,7 +11,9 @@
 *)
 (* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.float {{.*}} : !polang.float<32>
 *)
-def x: i32 = 5
-def y: f32 = 3.0
+x : i32
+x = 5
+y : f32
+y = 3.0
 
 y

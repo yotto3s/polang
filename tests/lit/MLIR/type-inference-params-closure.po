@@ -2,16 +2,16 @@
 *)
 
 (* Captured variable with inferred parameter *)
-def base = 10
+base = 10
 (* CHECK: {{.*}}polang.func @add_base(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
 *)
-def add_base(x) = x + base
+add_base(x) = x + base
 
 (* Double captured variable with inferred parameter *)
-def factor = 2.5
+factor = 2.5
 (* CHECK: {{.*}}polang.func @scale(%{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}}
 *)
-def scale(x) = x * factor
+scale(x) = x * factor
 
 (* Entry point *)
 0

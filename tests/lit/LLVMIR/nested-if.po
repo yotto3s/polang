@@ -10,4 +10,5 @@
 *)
 (* CHECK: {{.*}}br {{.*}}
 *)
-def f(x: i64): i64 = if x > 0 then if x > 10 then 1 else 2 else 3
+f : i64 -> i64
+f(x) = if x > 0 then if x > 10 then 1 else 2 else 3

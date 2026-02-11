@@ -17,5 +17,5 @@
 (* CHECK-NOT: polang.generic_func
 *)
 
-def identity(x) = x
+identity(x) = x
 identity(42)

@@ -4,5 +4,6 @@
 (* Test integer widening (i32 -> i64) *)
 (* CHECK: 12345 : i64
 *)
-def x: i32 = 12345 as i32
+x : i32
+x = 12345 as i32
 x as i64

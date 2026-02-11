@@ -2,17 +2,17 @@
 *)
 
 (* Test float less-than *)
-def a = 1.5 < 2.0
+a = 1.5 < 2.0
 (* Test float greater-than *)
-def b = 3.0 > 2.0
+b = 3.0 > 2.0
 (* Test float equality *)
-def c = 1.0 == 1.0
+c = 1.0 == 1.0
 (* Test float not-equal *)
-def d = 1.0 != 2.0
+d = 1.0 != 2.0
 (* Test float less-or-equal *)
-def e = 2.0 <= 2.0
+e = 2.0 <= 2.0
 (* Test float greater-or-equal *)
-def f = 3.0 >= 2.0
+f = 3.0 >= 2.0
 
 (* All comparisons should be true, use conditional to verify *)
 (* CHECK: 1 : i64

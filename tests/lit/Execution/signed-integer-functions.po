@@ -5,14 +5,16 @@
 (* Note: Integer literals default to i64, so we test i64 functions here *)
 
 (* Function with explicit i64 type *)
-def add_i64(a: i64, b: i64): i64 = a + b
+add_i64 : i64 * i64 -> i64
+add_i64(a, b) = a + b
 
 (* Test arithmetic with i64 *)
-def r1 = add_i64(10000, 20000)
+r1 = add_i64(10000, 20000)
 
 (* Test nested calls *)
-def mul_i64(a: i64, b: i64): i64 = a * b
-def r2 = mul_i64(add_i64(5, 5), 100)
+mul_i64 : i64 * i64 -> i64
+mul_i64(a, b) = a * b
+r2 = mul_i64(add_i64(5, 5), 100)
 
 (* Final result *)
 (* CHECK: 30000 : i64

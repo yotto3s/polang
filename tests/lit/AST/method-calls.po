@@ -4,15 +4,18 @@
 (* Test method call *)
 (* CHECK:      NBlock
 *)
-(* CHECK-NEXT: |-NFunctionDeclaration 'add' (a: i64, b: i64) -> i64
+(* CHECK-NEXT: |-NTypeSignature 'add' : i64 * i64 -> i64
+*)
+(* CHECK-NEXT: |-NFunctionDeclaration 'add' (a, b)
 *)
 (* CHECK:      {{^}}`-NExpressionStatement
 *)
-(* CHECK-NEXT:  `-NMethodCall 'add'
+(* CHECK-NEXT:   `-NMethodCall 'add'
 *)
-(* CHECK-NEXT:    |-NInteger 1
+(* CHECK-NEXT:     |-NInteger 1
 *)
-(* CHECK-NEXT:    `-NInteger 2
+(* CHECK-NEXT:     `-NInteger 2
 *)
-def add(a: i64, b: i64): i64 = a + b
+add : i64 * i64 -> i64
+add(a, b) = a + b
 add(1, 2)

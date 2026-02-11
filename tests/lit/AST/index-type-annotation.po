@@ -4,9 +4,13 @@
 (* Test isize/usize in function parameter and return type annotations *)
 (* CHECK:      NBlock
 *)
-(* CHECK-NEXT: |-NFunctionDeclaration 'make_isize' (x: i64) -> isize
+(* CHECK-NEXT: |-NTypeSignature 'make_isize' : i64 -> isize
 *)
-(* CHECK:      |-NFunctionDeclaration 'to_i64' (x: isize) -> i64
+(* CHECK-NEXT: |-NFunctionDeclaration 'make_isize' (x)
+*)
+(* CHECK:      |-NTypeSignature 'to_i64' : isize -> i64
+*)
+(* CHECK-NEXT: |-NFunctionDeclaration 'to_i64' (x)
 *)
 (* CHECK:      `-NExpressionStatement
 *)
@@ -16,6 +20,8 @@
 *)
 (* CHECK-NEXT:       `-NInteger 42
 *)
-def make_isize(x: i64): isize = x as isize
-def to_i64(x: isize): i64 = x as i64
+make_isize : i64 -> isize
+make_isize(x) = x as isize
+to_i64 : isize -> i64
+to_i64(x) = x as i64
 to_i64(make_isize(42))
