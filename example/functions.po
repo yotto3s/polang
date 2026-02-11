@@ -1,5 +1,7 @@
 (* Function declarations and calls *)
-def square(n: i64): i64 = n * n               (* single parameter function *)
-def add(a: i64, b: i64): i64 = a + b          (* multi-parameter function *)
-def result = add(square(3), square(4))        (* nested function calls: 9 + 16 *)
+square : i64 -> i64
+square(n) = n * n  (* single parameter function *)
+add : i64 * i64 -> i64
+add(a, b) = a + b  (* multi-parameter function *)
+result = add(square(3), square(4))  (* nested function calls: 9 + 16 *)
 result                                         (* result: 25 *)
