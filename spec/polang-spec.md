@@ -318,9 +318,19 @@ A name declared in an inner scope shadows any name with the same identifier in a
     x = 10
     let x = 20 in x             (* evaluates to 20; inner x shadows outer x *)
 
-### 8.4 Declaration Order
+### 8.4 Declaration Order and Forward References
 
-Declarations at the same scope level are processed in order. A declaration must not reference names that have not yet been declared in the same scope.
+Declarations at the same scope level are processed in order. A name must not be referenced before it is declared, with one exception:
+
+**Forward references via type signatures.** If a type signature for a name appears before its definition, the name is available for reference from the point of the type signature onward. This enables mutual recursion and top-down code organization:
+
+    isEven : i64 -> bool
+    isOdd : i64 -> bool
+
+    isEven(n) = if n == 0 then true else isOdd(n - 1)
+    isOdd(n) = if n == 0 then false else isEven(n - 1)
+
+A type signature without a corresponding definition in the same scope is ill-formed.
 
 ## 9. Declarations
 
