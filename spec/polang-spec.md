@@ -96,7 +96,7 @@ The following words are reserved and must not be used as identifiers:
 
 The following character sequences represent operators and punctuation:
 
-    +    -    *    /
+    +    -    *    /    %
     ==   !=   <    <=   >    >=
     &&   ||   !
     =    :    ->   .    ,
@@ -509,7 +509,7 @@ Unary `-` computes the arithmetic negation of its operand. For signed integers, 
 ### 10.4 Binary Operators
 
     BinaryExpr = Expression BinOp Expression .
-    BinOp      = "+" | "-" | "*" | "/"
+    BinOp      = "+" | "-" | "*" | "/" | "%"
                | "==" | "!=" | "<" | "<=" | ">" | ">="
                | "&&" | "||" .
 
@@ -521,10 +521,13 @@ Unary `-` computes the arithmetic negation of its operand. For signed integers, 
 | `-`      | Subtraction    | Integer or Float    | Same as operands |
 | `*`      | Multiplication | Integer or Float    | Same as operands |
 | `/`      | Division       | Integer or Float    | Same as operands |
+| `%`      | Remainder      | Integer only        | Same as operands |
 
-Both operands must have identical types. The result has the same type as the operands.
+Both operands of `+`, `-`, `*`, `/` must have identical types. The result has the same type as the operands.
 
-Integer division truncates toward zero. Division of a signed integer by zero is undefined behavior. Division of an unsigned integer by zero is undefined behavior. Floating-point division by zero produces infinity or NaN per IEEE 754.
+The `%` operator computes the remainder of integer division (truncated division). The result has the same sign as the dividend. Float operands are not permitted with `%`; the program is ill-formed.
+
+Integer division and remainder by zero is undefined behavior. Floating-point division by zero produces infinity or NaN per IEEE 754.
 
 #### 10.4.2 Comparison Operators
 
@@ -567,7 +570,7 @@ Operators are listed from highest to lowest precedence:
 | 9          | `.` (member access)                 | Left            |
 | 8          | Unary `-`, `!`                      | Right (prefix)  |
 | 7          | `as` (type conversion)              | Left            |
-| 6          | `*`, `/`                            | Left            |
+| 6          | `*`, `/`, `%`                       | Left            |
 | 5          | `+`, `-`                            | Left            |
 | 4          | `==`, `!=`, `<`, `<=`, `>`, `>=`    | Non-associative |
 | 3          | `&&`                                | Left            |
