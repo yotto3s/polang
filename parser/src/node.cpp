@@ -15,6 +15,8 @@ void NQualifiedName::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NMethodCall::accept(Visitor& visitor) const { visitor.visit(*this); }
 
+void NUnaryOperator::accept(Visitor& visitor) const { visitor.visit(*this); }
+
 void NBinaryOperator::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NCastExpression::accept(Visitor& visitor) const { visitor.visit(*this); }

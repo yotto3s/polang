@@ -137,6 +137,9 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
 %token TMINUS "-"
 %token TMUL "*"
 %token TDIV "/"
+%token TLAND "&&"
+%token TLOR "||"
+%token TNOT "!"
 %token TLET "let"
 %token TFUN "fun"
 %token TIN "in"
@@ -184,10 +187,13 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
 %right TLET TIN TAND
 %right TIF TTHEN TELSE
 %right TEQUAL
+%right TLOR
+%left TLAND
 %nonassoc COMPARISON TCEQ TCNE TCLT TCLE TCGT TCGE
 %left TPLUS TMINUS
 %left TMUL TDIV
 %left TAS
+%right UNARY TNOT
 %left TDOT
 
 /* Expected shift/reduce conflicts (all on TLPAREN):
@@ -500,6 +506,14 @@ expr : ident TLPAREN call_args TRPAREN {
        }
      | numeric { $$ = std::move($1); }
      | boolean { $$ = std::move($1); }
+     | TMINUS expr %prec UNARY {
+         $$ = std::make_unique<NUnaryOperator>(yy::parser::token::TMINUS, std::move($2));
+         SET_LOC($$, @$);
+       }
+     | TNOT expr %prec UNARY {
+         $$ = std::make_unique<NUnaryOperator>(yy::parser::token::TNOT, std::move($2));
+         SET_LOC($$, @$);
+       }
      | expr comparison expr %prec COMPARISON {
          $$ = std::make_unique<NBinaryOperator>(std::move($1), $2, std::move($3));
          SET_LOC($$, @$);
@@ -518,6 +532,14 @@ expr : ident TLPAREN call_args TRPAREN {
        }
      | expr TDIV expr {
          $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TDIV, std::move($3));
+         SET_LOC($$, @$);
+       }
+     | expr TLAND expr {
+         $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TLAND, std::move($3));
+         SET_LOC($$, @$);
+       }
+     | expr TLOR expr {
+         $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TLOR, std::move($3));
          SET_LOC($$, @$);
        }
      | expr TAS type_spec {

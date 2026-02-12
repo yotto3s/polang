@@ -87,6 +87,9 @@ bool polang_lexer_has_error() {
 "<="                    { return yy::parser::make_TCLE(LOC); }
 ">"                     { return yy::parser::make_TCGT(LOC); }
 ">="                    { return yy::parser::make_TCGE(LOC); }
+"&&"                    { return yy::parser::make_TLAND(LOC); }
+"||"                    { return yy::parser::make_TLOR(LOC); }
+"!"                     { return yy::parser::make_TNOT(LOC); }
 "("                     { return yy::parser::make_TLPAREN(LOC); }
 ")"                     { return yy::parser::make_TRPAREN(LOC); }
 "{"                     { return yy::parser::make_TLBRACE(LOC); }
