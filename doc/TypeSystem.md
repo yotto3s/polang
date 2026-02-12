@@ -130,6 +130,7 @@ struct TypeNames {
   static constexpr const char* FUNCTION = "function";
   static constexpr const char* TYPEVAR = "typevar";
   static constexpr const char* UNKNOWN = "unknown";
+  static constexpr const char* UNIT = "()";
 };
 ```
 

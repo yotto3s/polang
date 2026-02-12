@@ -11,7 +11,16 @@ constexpr unsigned DEFAULT_INT_WIDTH = 64;
 constexpr unsigned DEFAULT_FLOAT_WIDTH = 64;
 
 /// Enumeration of Polang's built-in type kinds.
-enum class TypeKind { Integer, Float, Bool, Index, Function, TypeVar, Unknown };
+enum class TypeKind {
+  Integer,
+  Float,
+  Bool,
+  Index,
+  Function,
+  TypeVar,
+  Unit,
+  Unknown
+};
 
 /// Signedness for integer types.
 enum class TypeSignedness { Signed, Unsigned };
@@ -41,6 +50,9 @@ struct TypeMetadata {
   }
   [[nodiscard]] constexpr bool isIndex() const noexcept {
     return kind == TypeKind::Index;
+  }
+  [[nodiscard]] constexpr bool isUnit() const noexcept {
+    return kind == TypeKind::Unit;
   }
   [[nodiscard]] constexpr bool isNumeric() const noexcept {
     return isInteger() || isFloat() || isIndex();
@@ -121,7 +133,7 @@ parseTypeName(const std::string& name) noexcept {
     return TypeKind::Unknown;
   }
   if (name == TypeNames::UNIT || name == "()") {
-    return TypeKind::Unknown;
+    return TypeKind::Unit;
   }
   // Also accept kind names for round-trip testing
   if (name == "integer") {
@@ -311,6 +323,8 @@ resolveAllGenericsToDefault(const std::string& type) noexcept {
     return "function";
   case TypeKind::TypeVar:
     return "typevar";
+  case TypeKind::Unit:
+    return "unit";
   case TypeKind::Unknown:
     return "unknown";
   }
@@ -432,6 +446,12 @@ getTypeMetadata(const std::string& typeName) noexcept {
   }
   if (typeName == TypeNames::TYPEVAR) {
     meta.kind = TypeKind::TypeVar;
+    return meta;
+  }
+
+  if (typeName == TypeNames::UNIT) {
+    meta.kind = TypeKind::Unit;
+    meta.width = 0;
     return meta;
   }
 

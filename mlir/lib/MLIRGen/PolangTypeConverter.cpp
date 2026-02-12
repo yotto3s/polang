@@ -89,6 +89,7 @@ Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
     return polang::IndexType::get(
         context, meta.isSigned() ? Signedness::Signed : Signedness::Unsigned);
 
+  case TypeKind::Unit:
   case TypeKind::TypeVar:
   case TypeKind::Function:
   case TypeKind::Unknown:
