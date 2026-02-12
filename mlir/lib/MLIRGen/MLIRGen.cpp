@@ -67,9 +67,12 @@ public:
     module = ModuleOp::create(builder.getUnknownLoc());
   }
 
-  /// Get a Polang type from annotation, or a fresh type variable if none
-  Type getTypeOrFresh(const NTypeSpec* typeAnnotation) {
-    return typeConverter.getTypeOrFresh(typeAnnotation);
+  /// Get a fresh type variable (when no type annotation is present)
+  Type getTypeFresh() { return typeConverter.getTypeOrFresh(nullptr); }
+
+  /// Get a Polang type from a type annotation
+  Type getType(const NTypeSpec& typeAnnotation) {
+    return typeConverter.getPolangType(typeAnnotation);
   }
 
   /// Generate MLIR for the given AST block
@@ -623,7 +626,7 @@ public:
     std::vector<Type> argMLIRTypes;
 
     for (const auto& arg : node.arguments) {
-      Type argType = getTypeOrFresh(arg->type.get());
+      Type argType = arg->type ? getType(*arg->type) : getTypeFresh();
       argTypes.push_back(argType);
       argMLIRTypes.push_back(argType);
       argNames.push_back(arg->id->name);
@@ -633,7 +636,7 @@ public:
     std::vector<std::string> captureNames;
     std::vector<Type> captureMLIRTypes;
     for (const auto& capture : node.captures) {
-      Type captureType = getTypeOrFresh(capture.type.get());
+      Type captureType = capture.type ? getType(*capture.type) : getTypeFresh();
       argTypes.push_back(captureType);
       captureMLIRTypes.push_back(captureType);
       captureNames.push_back(capture.id->name);
@@ -650,7 +653,7 @@ public:
     functionParamTypes[funcName] = std::move(paramTypeSpecs);
 
     // Return type
-    Type returnType = getTypeOrFresh(node.type.get());
+    Type returnType = node.type ? getType(*node.type) : getTypeFresh();
     if (node.type != nullptr) {
       functionReturnTypes[funcName] = node.type->clone();
     }

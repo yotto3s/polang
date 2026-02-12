@@ -1372,8 +1372,7 @@ void TypeChecker::visit(const NImportStatement& node) {
 
 void TypeChecker::visit(const NTypeSignature& node) {
   const std::string name = mangledName(node.id->name);
-  pendingTypeSignatures[name] =
-      std::move(const_cast<NTypeSignature&>(node).typeExpr);
+  pendingTypeSignatures[name] = node.typeExpr->clone();
 }
 
 void TypeChecker::applyFunctionSignature(

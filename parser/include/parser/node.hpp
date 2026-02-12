@@ -109,7 +109,9 @@ public:
   explicit NNamedType(std::string name) : name(std::move(name)) {}
   [[nodiscard]] std::string getTypeName() const override { return name; }
   [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
-    return std::make_unique<const NNamedType>(name);
+    auto copy = std::make_unique<NNamedType>(name);
+    copy->loc = loc;
+    return copy;
   }
   void accept(Visitor &visitor) const override;
 };
@@ -126,7 +128,10 @@ public:
     return paramType->getTypeName() + " -> " + returnType->getTypeName();
   }
   [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
-    return std::make_unique<const NArrowType>(paramType->clone(), returnType->clone());
+    auto copy =
+        std::make_unique<NArrowType>(paramType->clone(), returnType->clone());
+    copy->loc = loc;
+    return copy;
   }
   void accept(Visitor &visitor) const override;
 };
@@ -151,7 +156,9 @@ public:
     std::vector<std::unique_ptr<const NTypeSpec>> cloned;
     cloned.reserve(types.size());
     for (const auto& t : types) { cloned.push_back(t->clone()); }
-    return std::make_unique<const NProductType>(std::move(cloned));
+    auto copy = std::make_unique<NProductType>(std::move(cloned));
+    copy->loc = loc;
+    return copy;
   }
   void accept(Visitor &visitor) const override;
 };
@@ -163,7 +170,9 @@ public:
   explicit NTypeVar(std::string name) : name(std::move(name)) {}
   [[nodiscard]] std::string getTypeName() const override { return name; }
   [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
-    return std::make_unique<const NTypeVar>(name);
+    auto copy = std::make_unique<NTypeVar>(name);
+    copy->loc = loc;
+    return copy;
   }
   void accept(Visitor &visitor) const override;
 };
@@ -194,7 +203,9 @@ public:
     return result;
   }
   [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
-    return std::make_unique<const NForallType>(typeVars, innerType->clone());
+    auto copy = std::make_unique<NForallType>(typeVars, innerType->clone());
+    copy->loc = loc;
+    return copy;
   }
   void accept(Visitor &visitor) const override;
 };
