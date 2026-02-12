@@ -156,8 +156,9 @@ public:
     auto value = lookupVariable(node.name);
     if (value) {
       result = *value;
-      auto* type = lookupType(node.name);
-      resultType = type ? type->clone() : makeTypeSpec(TypeNames::I64);
+      const auto* type = lookupType(node.name);
+      resultType =
+          (type != nullptr) ? type->clone() : makeTypeSpec(TypeNames::I64);
       return;
     }
 
@@ -172,8 +173,9 @@ public:
     auto value = lookupVariable(mangled);
     if (value) {
       result = *value;
-      auto* type = lookupType(mangled);
-      resultType = type ? type->clone() : makeTypeSpec(TypeNames::I64);
+      const auto* type = lookupType(mangled);
+      resultType =
+          (type != nullptr) ? type->clone() : makeTypeSpec(TypeNames::I64);
       return;
     }
 
@@ -818,8 +820,8 @@ public:
         auto value = lookupVariable(mangled);
         if (value) {
           immutableValues[localName] = *value;
-          auto* type = lookupType(mangled);
-          if (type) {
+          const auto* type = lookupType(mangled);
+          if (type != nullptr) {
             typeTable[localName] = type->clone();
           }
         }
