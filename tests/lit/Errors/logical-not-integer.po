@@ -1,0 +1,7 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* Test logical not on integer - should error *)
+(* CHECK: error: cannot apply unary '!' to type 'i64'
+*)
+!42

@@ -1,0 +1,27 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test unary negation on integer *)
+(* CHECK: -42 : i64
+*)
+-42
+
+(* Test unary negation on positive integer *)
+(* CHECK: -10 : i64
+*)
+-10
+
+(* Test negation of expression *)
+(* CHECK: -15 : i64
+*)
+-(10 + 5)
+
+(* Test double negation *)
+(* CHECK: 7 : i64
+*)
+-(-7)
+
+(* Test negation in arithmetic *)
+(* CHECK: -5 : i64
+*)
+-10 + 5
