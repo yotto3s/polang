@@ -1,3 +1,12 @@
+# Runtime helper functions library (C code)
+add_library(PolangRuntime STATIC
+    src/runtime_helpers.c
+)
+
+target_include_directories(PolangRuntime PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
 # MLIR backend codegen library
 add_library(PolangMLIRCodegen STATIC
     src/mlir_codegen.cpp
@@ -22,6 +31,7 @@ target_compile_options(PolangMLIRCodegen PRIVATE -Wno-overloaded-virtual)
 target_link_libraries(PolangMLIRCodegen PUBLIC
     PolangParser
     PolangMLIR
+    PolangRuntime
     MLIRExecutionEngine
     MLIRLLVMToLLVMIRTranslation
     MLIRBuiltinToLLVMIRTranslation
