@@ -548,16 +548,18 @@ void TypeChecker::visit(const NBinaryOperator& node) {
   // Special handling for modulo operator - only allows integers
   if (node.op == yy::parser::token::TMOD) {
     // Check that both operands are integer types (not float)
-    const bool lhsIsFloat = polang::isFloatType(lhsType) || lhsType == TypeNames::GENERIC_FLOAT;
-    const bool rhsIsFloat = polang::isFloatType(rhsType) || rhsType == TypeNames::GENERIC_FLOAT;
-    
+    const bool lhsIsFloat =
+        polang::isFloatType(lhsType) || lhsType == TypeNames::GENERIC_FLOAT;
+    const bool rhsIsFloat =
+        polang::isFloatType(rhsType) || rhsType == TypeNames::GENERIC_FLOAT;
+
     if (lhsIsFloat || rhsIsFloat) {
       reportError("Modulo operator '%' requires integer operands, not float",
                   node.loc);
       inferredType = TypeNames::UNKNOWN;
       return;
     }
-    
+
     // Apply the same type checking as other arithmetic operators
     checkArithmeticBinaryOp(node, lhsType, rhsType);
     return;

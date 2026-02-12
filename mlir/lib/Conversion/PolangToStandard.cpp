@@ -988,14 +988,13 @@ struct PolangToStandardPass
     PolangTypeConverter typeConverter;
     RewritePatternSet patterns(&getContext());
 
-    patterns
-        .add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
-             ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
-             MulOpLowering, DivOpLowering, RemOpLowering, CastOpLowering, CmpOpLowering,
-             GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
-             CallOpLowering, ReturnOpLowering, IfOpLowering, YieldOpLowering,
-             GlobalOpLowering, GlobalLoadOpLowering, PrintOpLowering>(
-            typeConverter, &getContext());
+    patterns.add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
+                 ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
+                 MulOpLowering, DivOpLowering, RemOpLowering, CastOpLowering,
+                 CmpOpLowering, GenericFuncOpLowering, InstantiateOpLowering,
+                 FuncOpLowering, CallOpLowering, ReturnOpLowering, IfOpLowering,
+                 YieldOpLowering, GlobalOpLowering, GlobalLoadOpLowering,
+                 PrintOpLowering>(typeConverter, &getContext());
 
     if (failed(applyPartialConversion(moduleOp, target, std::move(patterns)))) {
       signalPassFailure();
