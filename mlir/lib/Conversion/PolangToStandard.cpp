@@ -236,7 +236,7 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
 
     // Check the original type to determine signedness
     auto origType = op.getLhs().getType();
-    
+
     // For floating-point division, no runtime check needed (produces inf/NaN per IEEE 754)
     if (isa<polang::FloatType>(origType)) {
       rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
@@ -246,7 +246,7 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
     // For integer types, insert runtime check for division by zero
     bool isInteger = isa<polang::IntegerType, polang::IndexType>(origType) ||
                      isa<mlir::IntegerType, mlir::IndexType>(lhs.getType());
-    
+
     if (!isInteger) {
       // Fallback to float division if type is unclear
       rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
@@ -279,19 +279,19 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
 
     // Create scf.if for the zero check
     auto ifOp = rewriter.create<scf::IfOp>(loc, TypeRange{}, isZero, false);
-    
+
     // Then block: call error function and exit
     {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-      
+
       // Create line and column constants
       auto lineConst = rewriter.create<arith::ConstantIntOp>(loc, line, rewriter.getI32Type());
       auto colConst = rewriter.create<arith::ConstantIntOp>(loc, column, rewriter.getI32Type());
-      
+
       // Call the error function
       rewriter.create<func::CallOp>(loc, errorFunc, ValueRange{lineConst, colConst});
-      
+
       // Note: The error function calls exit(), so we never return.
       // However, MLIR still requires a terminator. We use scf.yield.
       rewriter.create<scf::YieldOp>(loc);
@@ -338,11 +338,11 @@ struct RemOpLowering : public OpConversionPattern<RemOp> {
 
     // Check the original type to determine signedness
     auto origType = op.getLhs().getType();
-    
+
     // Remainder is only defined for integer types
     bool isInteger = isa<polang::IntegerType, polang::IndexType>(origType) ||
                      isa<mlir::IntegerType, mlir::IndexType>(lhs.getType());
-    
+
     if (!isInteger) {
       return op.emitError("remainder operation only supported for integer types");
     }
@@ -373,19 +373,19 @@ struct RemOpLowering : public OpConversionPattern<RemOp> {
 
     // Create scf.if for the zero check
     auto ifOp = rewriter.create<scf::IfOp>(loc, TypeRange{}, isZero, false);
-    
+
     // Then block: call error function and exit
     {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-      
+
       // Create line and column constants
       auto lineConst = rewriter.create<arith::ConstantIntOp>(loc, line, rewriter.getI32Type());
       auto colConst = rewriter.create<arith::ConstantIntOp>(loc, column, rewriter.getI32Type());
-      
+
       // Call the error function
       rewriter.create<func::CallOp>(loc, errorFunc, ValueRange{lineConst, colConst});
-      
+
       // Note: The error function calls exit(), so we never return.
       // However, MLIR still requires a terminator. We use scf.yield.
       rewriter.create<scf::YieldOp>(loc);
