@@ -487,6 +487,8 @@ Qualified names support arbitrary depth (`a.b`, `a.b.c`, `a.b.c.d`, etc.).
 
 A function call evaluates each argument expression, then invokes the named function. The number of arguments must match the function's parameter count; otherwise the program is ill-formed.
 
+The order in which argument expressions are evaluated is unspecified. The implementation may evaluate them in any order.
+
 Examples:
 
     add(1, 2)
@@ -723,7 +725,9 @@ Examples:
     LetBindings = LetBinding { "and" LetBinding } .
     LetBinding  = identifier "=" Expression
                 | identifier ":" identifier "=" Expression
-                | identifier "(" [ ParamList ] ")" [ ":" identifier ] "=" Expression .
+                | identifier "(" [ TypedParamList ] ")" [ ":" identifier ] "=" Expression .
+    TypedParamList = TypedParam { "," TypedParam } .
+    TypedParam     = identifier [ ":" identifier ] .
 
 A let-expression introduces one or more local bindings that are visible only within the body expression. The entire let-expression evaluates to the value of the body.
 
@@ -734,7 +738,7 @@ Bindings can be variable bindings or function bindings, and can be mixed:
     let f(n: i64): i64 = n + 1 in f(5)
     let x = 10 and double(y: i64): i64 = y * 2 in double(x)
 
-Multiple bindings separated by `and` are evaluated independently. Bindings within the same `let` group cannot reference each other.
+Multiple bindings separated by `and` are evaluated independently. Bindings within the same `let` group cannot reference each other. The order in which binding expressions are evaluated is unspecified.
 
 ## 11. Statements
 
