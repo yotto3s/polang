@@ -1,8 +1,10 @@
 #ifndef POLANG_TYPE_CHECKER_HPP
 #define POLANG_TYPE_CHECKER_HPP
 
+#include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -36,6 +38,7 @@ struct TypeCheckerSnapshot {
   std::map<std::string, std::set<std::string>> moduleExports;
   std::map<std::string, std::string> moduleAliases;
   std::map<std::string, std::string> importedSymbols;
+  std::map<std::string, std::unique_ptr<const NTypeSpec>> pendingTypeSignatures;
 };
 
 class TypeChecker : public Visitor {
@@ -115,12 +118,11 @@ private:
   std::map<std::string, std::string> importedSymbols;
 
   // Pending type signatures: name -> type expression
-  std::map<std::string, std::shared_ptr<const NTypeSpec>> pendingTypeSignatures;
+  std::map<std::string, std::unique_ptr<const NTypeSpec>> pendingTypeSignatures;
 
   // Apply a type signature to a function declaration
-  void
-  applyFunctionSignature(NFunctionDeclaration& node,
-                         const std::shared_ptr<const NTypeSpec>& signature);
+  void applyFunctionSignature(NFunctionDeclaration& node,
+                              std::unique_ptr<const NTypeSpec> signature);
 
   // Warn about type signatures with no corresponding definition
   void warnOrphanedTypeSignatures();
@@ -206,10 +208,12 @@ private:
 
   // Validate type names in a type expression tree.
   // Returns false if any errors were found.
-  // If usedTypeVars is non-null, collects all NTypeVar references found.
-  bool validateTypeNames(const NTypeSpec* typeSpec,
-                         const std::set<std::string>& declaredTypeVars,
-                         std::set<std::string>* usedTypeVars = nullptr);
+  // If usedTypeVars is provided, collects all NTypeVar references found.
+  bool
+  validateTypeNames(const NTypeSpec& typeSpec,
+                    const std::set<std::string>& declaredTypeVars,
+                    std::optional<std::reference_wrapper<std::set<std::string>>>
+                        usedTypeVars = std::nullopt);
 };
 
 #endif // POLANG_TYPE_CHECKER_HPP

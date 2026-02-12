@@ -200,15 +200,17 @@ TypeChecker::checkIncremental(const NBlock& newStatements) {
 }
 
 TypeCheckerSnapshot TypeChecker::saveState() const {
-  // Note: pendingTypeSignatures is intentionally not snapshotted. On rollback,
-  // signatures from the failed input are discarded, which is correct — the
-  // input failed so its side effects should not persist.
   TypeCheckerSnapshot snapshot;
   snapshot.localTypes = localTypes;
   snapshot.functionSignatures = functionSignatures;
   snapshot.moduleExports = moduleExports;
   snapshot.moduleAliases = moduleAliases;
   snapshot.importedSymbols = importedSymbols;
+  for (const auto& [key, val] : pendingTypeSignatures) {
+    if (val) {
+      snapshot.pendingTypeSignatures[key] = val->clone();
+    }
+  }
   return snapshot;
 }
 
@@ -218,6 +220,12 @@ void TypeChecker::restoreState(const TypeCheckerSnapshot& snapshot) {
   moduleExports = snapshot.moduleExports;
   moduleAliases = snapshot.moduleAliases;
   importedSymbols = snapshot.importedSymbols;
+  pendingTypeSignatures.clear();
+  for (const auto& [key, val] : snapshot.pendingTypeSignatures) {
+    if (val) {
+      pendingTypeSignatures[key] = val->clone();
+    }
+  }
 }
 
 void TypeChecker::reportError(const std::string& message) {
@@ -865,7 +873,7 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
   // Apply pending type signature if available
   auto sigIt = pendingTypeSignatures.find(varName);
   if (sigIt != pendingTypeSignatures.end()) {
-    mutableNode.type = sigIt->second;
+    mutableNode.type = std::move(sigIt->second);
     pendingTypeSignatures.erase(sigIt);
   } else if (scopeDepth == 0 && node.assignmentExpr != nullptr) {
     std::cerr << "Warning: missing type signature for '" << node.id->name
@@ -905,7 +913,7 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
       // Type was set to default by previous run, allow re-resolution
       needsInference = true;
       // Clear the type so it can be re-resolved
-      mutableNode.type = nullptr;
+      mutableNode.type.reset();
     }
   }
 
@@ -926,7 +934,7 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   // Apply pending type signature if available
   auto sigIt = pendingTypeSignatures.find(funcName);
   if (sigIt != pendingTypeSignatures.end()) {
-    applyFunctionSignature(mutableNode, sigIt->second);
+    applyFunctionSignature(mutableNode, std::move(sigIt->second));
     pendingTypeSignatures.erase(sigIt);
   } else if (scopeDepth == 0) {
     std::cerr << "Warning: missing type signature for '" << node.id->name
@@ -1364,16 +1372,16 @@ void TypeChecker::visit(const NImportStatement& node) {
 
 void TypeChecker::visit(const NTypeSignature& node) {
   const std::string name = mangledName(node.id->name);
-  pendingTypeSignatures[name] = node.typeExpr;
+  pendingTypeSignatures[name] =
+      std::move(const_cast<NTypeSignature&>(node).typeExpr);
 }
 
 void TypeChecker::applyFunctionSignature(
-    NFunctionDeclaration& node,
-    const std::shared_ptr<const NTypeSpec>& signature) {
+    NFunctionDeclaration& node, std::unique_ptr<const NTypeSpec> signature) {
   // Check if this is a forall type signature
   const auto* forallType = dynamic_cast<const NForallType*>(signature.get());
   std::set<std::string> declaredTypeVars;
-  std::shared_ptr<const NTypeSpec> innerSig = signature;
+  std::reference_wrapper<const NTypeSpec> innerSig = *signature;
 
   if (forallType != nullptr) {
     node.hasExplicitForall = true;
@@ -1398,13 +1406,13 @@ void TypeChecker::applyFunctionSignature(
       }
     }
 
-    innerSig = forallType->innerType;
+    innerSig = *forallType->innerType;
   }
 
   // Validate type names in the signature
   std::set<std::string> usedTypeVars;
   const size_t errorsBefore = errors.size();
-  validateTypeNames(innerSig.get(), declaredTypeVars, &usedTypeVars);
+  validateTypeNames(innerSig.get(), declaredTypeVars, usedTypeVars);
   if (errors.size() > errorsBefore) {
     return;
   }
@@ -1419,11 +1427,11 @@ void TypeChecker::applyFunctionSignature(
   }
 
   // Process the (inner) type as arrow type
-  const auto* arrowType = dynamic_cast<const NArrowType*>(innerSig.get());
+  const auto* arrowType = dynamic_cast<const NArrowType*>(&innerSig.get());
   if (arrowType == nullptr) {
     if (node.arguments.empty()) {
       // Zero-param function: non-arrow signature is just the return type
-      node.type = innerSig;
+      node.type = innerSig.get().clone();
       return;
     }
     reportError("type signature for '" + node.id->name +
@@ -1431,42 +1439,41 @@ void TypeChecker::applyFunctionSignature(
     return;
   }
 
-  // Extract parameter types
-  std::vector<std::shared_ptr<const NTypeSpec>> paramTypes;
+  // Extract parameter type references
+  std::vector<std::reference_wrapper<const NTypeSpec>> paramTypeRefs;
   const auto* productType =
       dynamic_cast<const NProductType*>(arrowType->paramType.get());
   if (productType != nullptr) {
-    paramTypes = productType->types;
+    for (const auto& t : productType->types) {
+      paramTypeRefs.push_back(std::cref(*t));
+    }
   } else {
-    paramTypes.push_back(arrowType->paramType);
+    paramTypeRefs.push_back(std::cref(*arrowType->paramType));
   }
 
   // Check arity matches
-  if (paramTypes.size() != node.arguments.size()) {
+  if (paramTypeRefs.size() != node.arguments.size()) {
     reportError("type signature for '" + node.id->name + "' has " +
-                std::to_string(paramTypes.size()) +
+                std::to_string(paramTypeRefs.size()) +
                 " parameters but definition has " +
                 std::to_string(node.arguments.size()));
     return;
   }
 
-  // Apply parameter types
-  for (size_t i = 0; i < paramTypes.size(); ++i) {
-    node.arguments[i]->type = paramTypes[i];
+  // Apply parameter types (clone from references)
+  for (size_t i = 0; i < paramTypeRefs.size(); ++i) {
+    node.arguments[i]->type = paramTypeRefs[i].get().clone();
   }
 
-  // Apply return type
-  node.type = arrowType->returnType;
+  // Apply return type (clone)
+  node.type = arrowType->returnType->clone();
 }
 
 bool TypeChecker::validateTypeNames(
-    const NTypeSpec* typeSpec, const std::set<std::string>& declaredTypeVars,
-    std::set<std::string>* usedTypeVars) {
-  if (typeSpec == nullptr) {
-    return true;
-  }
+    const NTypeSpec& typeSpec, const std::set<std::string>& declaredTypeVars,
+    std::optional<std::reference_wrapper<std::set<std::string>>> usedTypeVars) {
 
-  if (const auto* named = dynamic_cast<const NNamedType*>(typeSpec)) {
+  if (const auto* named = dynamic_cast<const NNamedType*>(&typeSpec)) {
     auto kind = polang::parseTypeName(named->name);
     if (!kind.has_value()) {
       reportError("unknown type '" + named->name + "'");
@@ -1475,9 +1482,9 @@ bool TypeChecker::validateTypeNames(
     return true;
   }
 
-  if (const auto* typeVar = dynamic_cast<const NTypeVar*>(typeSpec)) {
-    if (usedTypeVars != nullptr) {
-      usedTypeVars->insert(typeVar->name);
+  if (const auto* typeVar = dynamic_cast<const NTypeVar*>(&typeSpec)) {
+    if (usedTypeVars) {
+      usedTypeVars->get().insert(typeVar->name);
     }
     if (declaredTypeVars.find(typeVar->name) == declaredTypeVars.end()) {
       reportError("undeclared type variable " + typeVar->name);
@@ -1486,20 +1493,19 @@ bool TypeChecker::validateTypeNames(
     return true;
   }
 
-  if (const auto* arrow = dynamic_cast<const NArrowType*>(typeSpec)) {
-    bool valid = validateTypeNames(arrow->paramType.get(), declaredTypeVars,
-                                   usedTypeVars);
-    valid = validateTypeNames(arrow->returnType.get(), declaredTypeVars,
-                              usedTypeVars) &&
-            valid;
+  if (const auto* arrow = dynamic_cast<const NArrowType*>(&typeSpec)) {
+    bool valid =
+        validateTypeNames(*arrow->paramType, declaredTypeVars, usedTypeVars);
+    valid =
+        validateTypeNames(*arrow->returnType, declaredTypeVars, usedTypeVars) &&
+        valid;
     return valid;
   }
 
-  if (const auto* product = dynamic_cast<const NProductType*>(typeSpec)) {
+  if (const auto* product = dynamic_cast<const NProductType*>(&typeSpec)) {
     bool valid = true;
     for (const auto& t : product->types) {
-      valid =
-          validateTypeNames(t.get(), declaredTypeVars, usedTypeVars) && valid;
+      valid = validateTypeNames(*t, declaredTypeVars, usedTypeVars) && valid;
     }
     return valid;
   }
@@ -1508,7 +1514,7 @@ bool TypeChecker::validateTypeNames(
 }
 
 void TypeChecker::warnOrphanedTypeSignatures() {
-  for (const auto& [name, typeExpr] : pendingTypeSignatures) {
+  for (const auto& [name, unused] : pendingTypeSignatures) {
     // Unmangle the name for display: strip module prefix (everything up to
     // and including the last "$$")
     std::string displayName = name;

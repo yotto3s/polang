@@ -101,7 +101,7 @@ buildDefinition(std::unique_ptr<NExpression> lhs,
 // Returns nullptr if LHS is not an identifier.
 static std::unique_ptr<NStatement>
 buildTypeSignature(std::unique_ptr<NExpression> lhs,
-                   std::shared_ptr<const NTypeSpec> typeExpr) {
+                   std::unique_ptr<const NTypeSpec> typeExpr) {
   auto* lhsIdent = dynamic_cast<NIdentifier*>(lhs.get());
   if (lhsIdent == nullptr) {
     return nullptr;
@@ -156,8 +156,8 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
 
 // Nonterminal types with smart pointers
 %type <std::unique_ptr<NIdentifier>> ident
-%type <std::shared_ptr<const NTypeSpec>> type_spec type_expr type_product type_atom
-%type <std::vector<std::shared_ptr<const NTypeSpec>>> type_product_list
+%type <std::unique_ptr<const NTypeSpec>> type_spec type_expr type_product type_atom
+%type <std::vector<std::unique_ptr<const NTypeSpec>>> type_product_list
 %type <std::vector<TypeVarDecl>> type_var_list
 %type <TypeVarDecl> type_var_decl
 %type <std::unique_ptr<NExpression>> numeric expr boolean
@@ -372,18 +372,18 @@ ident : TIDENTIFIER { $$ = std::make_unique<NIdentifier>($1); SET_LOC($$, @$); }
       ;
 
 type_spec : ident {
-              $$ = std::make_shared<const NNamedType>($1->name);
+              $$ = std::make_unique<const NNamedType>($1->name);
             }
           ;
 
 /* Type expressions for type signatures */
 type_expr : TFORALL type_var_list TDOT type_expr {
               /* Forall quantifier: forall 'a, 'b:Numeric. 'a -> 'b */
-              $$ = std::make_shared<const NForallType>(std::move($2), std::move($4));
+              $$ = std::make_unique<const NForallType>(std::move($2), std::move($4));
             }
           | type_product TARROW type_expr {
               /* Function type: a -> b (right-associative) */
-              $$ = std::make_shared<const NArrowType>(std::move($1), std::move($3));
+              $$ = std::make_unique<const NArrowType>(std::move($1), std::move($3));
             }
           | type_product {
               $$ = std::move($1);
@@ -414,12 +414,12 @@ type_product : type_atom {
                  $$ = std::move($1);
                }
              | type_product_list {
-                 $$ = std::make_shared<const NProductType>(std::move($1));
+                 $$ = std::make_unique<const NProductType>(std::move($1));
                }
              ;
 
 type_product_list : type_atom TMUL type_atom {
-                      $$ = std::vector<std::shared_ptr<const NTypeSpec>>();
+                      $$ = std::vector<std::unique_ptr<const NTypeSpec>>();
                       $$.push_back(std::move($1));
                       $$.push_back(std::move($3));
                     }
@@ -430,11 +430,11 @@ type_product_list : type_atom TMUL type_atom {
                   ;
 
 type_atom : ident {
-              $$ = std::make_shared<const NNamedType>($1->name);
+              $$ = std::make_unique<const NNamedType>($1->name);
             }
           | TTYPEVAR {
               /* Type variable reference: 'a */
-              $$ = std::make_shared<const NTypeVar>($1);
+              $$ = std::make_unique<const NTypeVar>($1);
             }
           | TLPAREN type_expr TRPAREN {
               $$ = std::move($2);

@@ -117,20 +117,16 @@ public:
 // Arrow type for function signatures: paramType -> returnType
 class NArrowType : public NTypeSpec {
 public:
-  std::shared_ptr<const NTypeSpec> paramType;
-  std::shared_ptr<const NTypeSpec> returnType;
-  NArrowType(std::shared_ptr<const NTypeSpec> param,
-             std::shared_ptr<const NTypeSpec> ret)
+  std::unique_ptr<const NTypeSpec> paramType;
+  std::unique_ptr<const NTypeSpec> returnType;
+  NArrowType(std::unique_ptr<const NTypeSpec> param,
+             std::unique_ptr<const NTypeSpec> ret)
       : paramType(std::move(param)), returnType(std::move(ret)) {}
   [[nodiscard]] std::string getTypeName() const override {
     return paramType->getTypeName() + " -> " + returnType->getTypeName();
   }
   [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
-    auto clonedParam = paramType->clone();
-    auto clonedRet = returnType->clone();
-    return std::make_unique<const NArrowType>(
-        std::shared_ptr<const NTypeSpec>(std::move(clonedParam)),
-        std::shared_ptr<const NTypeSpec>(std::move(clonedRet)));
+    return std::make_unique<const NArrowType>(paramType->clone(), returnType->clone());
   }
   void accept(Visitor &visitor) const override;
 };
@@ -138,8 +134,8 @@ public:
 // Product type for multi-param signatures: type1 * type2 * ...
 class NProductType : public NTypeSpec {
 public:
-  std::vector<std::shared_ptr<const NTypeSpec>> types;
-  explicit NProductType(std::vector<std::shared_ptr<const NTypeSpec>> types)
+  std::vector<std::unique_ptr<const NTypeSpec>> types;
+  explicit NProductType(std::vector<std::unique_ptr<const NTypeSpec>> types)
       : types(std::move(types)) {}
   [[nodiscard]] std::string getTypeName() const override {
     std::string result;
@@ -152,11 +148,9 @@ public:
     return result;
   }
   [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
-    std::vector<std::shared_ptr<const NTypeSpec>> cloned;
+    std::vector<std::unique_ptr<const NTypeSpec>> cloned;
     cloned.reserve(types.size());
-    for (const auto& t : types) {
-      cloned.push_back(std::shared_ptr<const NTypeSpec>(t->clone()));
-    }
+    for (const auto& t : types) { cloned.push_back(t->clone()); }
     return std::make_unique<const NProductType>(std::move(cloned));
   }
   void accept(Visitor &visitor) const override;
@@ -181,9 +175,9 @@ public:
 class NForallType : public NTypeSpec {
 public:
   std::vector<TypeVarDecl> typeVars;
-  std::shared_ptr<const NTypeSpec> innerType;
+  std::unique_ptr<const NTypeSpec> innerType;
   NForallType(std::vector<TypeVarDecl> typeVars,
-              std::shared_ptr<const NTypeSpec> innerType)
+              std::unique_ptr<const NTypeSpec> innerType)
       : typeVars(std::move(typeVars)), innerType(std::move(innerType)) {}
   [[nodiscard]] std::string getTypeName() const override {
     std::string result = "forall ";
@@ -200,25 +194,23 @@ public:
     return result;
   }
   [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
-    return std::make_unique<const NForallType>(
-        typeVars,
-        std::shared_ptr<const NTypeSpec>(innerType->clone()));
+    return std::make_unique<const NForallType>(typeVars, innerType->clone());
   }
   void accept(Visitor &visitor) const override;
 };
 
 /// Helper to create an NTypeSpec from a type name string.
-[[nodiscard]] inline std::shared_ptr<const NTypeSpec>
+[[nodiscard]] inline std::unique_ptr<const NTypeSpec>
 makeTypeSpec(const std::string& typeName) {
-  return std::make_shared<const NNamedType>(typeName);
+  return std::make_unique<const NNamedType>(typeName);
 }
 
-// Capture entry for closures (owns its type and id via shared_ptr/unique_ptr)
+// Capture entry for closures (owns its type and id via unique_ptr)
 // Mutability is derived from the type annotation (e.g., "mut i64" prefix)
 struct CaptureEntry {
-  std::shared_ptr<const NTypeSpec> type;
+  std::unique_ptr<const NTypeSpec> type;
   std::unique_ptr<NIdentifier> id;
-  CaptureEntry(std::shared_ptr<const NTypeSpec> type, std::unique_ptr<NIdentifier> id)
+  CaptureEntry(std::unique_ptr<const NTypeSpec> type, std::unique_ptr<NIdentifier> id)
       : type(std::move(type)), id(std::move(id)) {}
 };
 
@@ -265,7 +257,7 @@ public:
   ExpressionList arguments;
   // Type bindings for instantiating polymorphic functions (filled by type checker)
   // e.g., {"'a" -> NNamedType("i64")} when calling identity(42)
-  std::map<std::string, std::shared_ptr<const NTypeSpec>> typeBindings;
+  std::map<std::string, std::unique_ptr<const NTypeSpec>> typeBindings;
   NMethodCall(std::unique_ptr<NIdentifier> id, ExpressionList arguments)
       : id(std::move(id)), qualifiedId(nullptr), arguments(std::move(arguments)) {}
   explicit NMethodCall(std::unique_ptr<NIdentifier> id)
@@ -298,9 +290,9 @@ public:
 class NCastExpression : public NExpression {
 public:
   std::unique_ptr<NExpression> expression;
-  std::shared_ptr<const NTypeSpec> targetType;
+  std::unique_ptr<const NTypeSpec> targetType;
   NCastExpression(std::unique_ptr<NExpression> expr,
-                  std::shared_ptr<const NTypeSpec> type)
+                  std::unique_ptr<const NTypeSpec> type)
       : expression(std::move(expr)), targetType(std::move(type)) {}
   void accept(Visitor &visitor) const override;
 };
@@ -344,7 +336,7 @@ public:
 
 class NVariableDeclaration : public NStatement {
 public:
-  std::shared_ptr<const NTypeSpec> type;  // nullptr when type should be inferred
+  std::unique_ptr<const NTypeSpec> type;  // nullptr when type should be inferred
   std::unique_ptr<NIdentifier> id;
   std::unique_ptr<NExpression> assignmentExpr;
   // Mutability is derived from type annotation (e.g., "mut i64" prefix)
@@ -354,7 +346,7 @@ public:
                        std::unique_ptr<NExpression> assignmentExpr)
       : type(nullptr), id(std::move(id)), assignmentExpr(std::move(assignmentExpr)) {}
   // Constructor for explicit type annotation
-  NVariableDeclaration(std::shared_ptr<const NTypeSpec> type,
+  NVariableDeclaration(std::unique_ptr<const NTypeSpec> type,
                        std::unique_ptr<NIdentifier> id,
                        std::unique_ptr<NExpression> assignmentExpr)
       : type(std::move(type)), id(std::move(id)),
@@ -364,7 +356,7 @@ public:
 
 class NFunctionDeclaration : public NStatement {
 public:
-  std::shared_ptr<const NTypeSpec> type;  // nullptr when return type should be inferred
+  std::unique_ptr<const NTypeSpec> type;  // nullptr when return type should be inferred
   std::unique_ptr<NIdentifier> id;
   VariableList arguments;
   std::unique_ptr<NBlock> block;
@@ -383,7 +375,7 @@ public:
       : type(nullptr), id(std::move(id)), arguments(std::move(arguments)),
         block(std::move(block)) {}
   // Constructor for explicit return type
-  NFunctionDeclaration(std::shared_ptr<const NTypeSpec> type,
+  NFunctionDeclaration(std::unique_ptr<const NTypeSpec> type,
                        std::unique_ptr<NIdentifier> id, VariableList arguments,
                        std::unique_ptr<NBlock> block)
       : type(std::move(type)), id(std::move(id)), arguments(std::move(arguments)),
@@ -454,9 +446,9 @@ public:
 class NTypeSignature : public NStatement {
 public:
   std::unique_ptr<NIdentifier> id;
-  std::shared_ptr<const NTypeSpec> typeExpr;
+  std::unique_ptr<const NTypeSpec> typeExpr;
   NTypeSignature(std::unique_ptr<NIdentifier> id,
-                 std::shared_ptr<const NTypeSpec> typeExpr)
+                 std::unique_ptr<const NTypeSpec> typeExpr)
       : id(std::move(id)), typeExpr(std::move(typeExpr)) {}
   void accept(Visitor &visitor) const override;
 };
