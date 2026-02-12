@@ -375,12 +375,15 @@ Expressions can be:
 
 ### Arithmetic Operators
 
-| Operator | Description    | Example   |
-|----------|----------------|-----------|
-| `+`      | Addition       | `a + b`   |
-| `-`      | Subtraction    | `a - b`   |
-| `*`      | Multiplication | `a * b`   |
-| `/`      | Division       | `a / b`   |
+| Operator | Description    | Example   | Notes                                           |
+|----------|----------------|-----------|------------------------------------------------|
+| `+`      | Addition       | `a + b`   |                                                 |
+| `-`      | Subtraction    | `a - b`   |                                                 |
+| `*`      | Multiplication | `a * b`   |                                                 |
+| `/`      | Division       | `a / b`   | Runtime error if `b` is zero (integers only)    |
+| `%`      | Remainder      | `a % b`   | Runtime error if `b` is zero (integers only)    |
+
+Integer division or remainder by zero causes a runtime error with the source location and exits with status 1. Floating-point division by zero produces infinity or NaN per IEEE 754.
 
 ### Comparison Operators
 
@@ -420,7 +423,7 @@ From highest to lowest:
 
 1. Unary `-`, `!` (negation, logical not)
 2. `as` (type conversion)
-3. `*`, `/` (multiplication, division)
+3. `*`, `/`, `%` (multiplication, division, remainder)
 4. `+`, `-` (addition, subtraction)
 5. `==`, `!=`, `<`, `<=`, `>`, `>=` (comparisons)
 

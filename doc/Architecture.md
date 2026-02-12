@@ -314,8 +314,9 @@ Note: Integer and float constants use the specific type at their point of use. D
 | `polang.sub` | Subtraction | `%2 = polang.sub %0, %1 : !polang.integer<64, signed>` |
 | `polang.mul` | Multiplication | `%2 = polang.mul %0, %1 : !polang.integer<64, signed>` |
 | `polang.div` | Division | `%2 = polang.div %0, %1 : !polang.integer<64, signed>` |
+| `polang.rem` | Remainder | `%2 = polang.rem %0, %1 : !polang.integer<64, signed>` |
 
-Arithmetic operations work with any integer or float type of the same width and signedness.
+Arithmetic operations work with any integer or float type of the same width and signedness. Integer division and remainder operations include runtime checks for division by zero.
 
 #### Comparison
 
@@ -460,9 +461,11 @@ The `PolangToStandardPass` lowers Polang dialect operations to standard MLIR dia
 | `polang.sub` (float) | `arith.subf` |
 | `polang.mul` (integer) | `arith.muli` |
 | `polang.mul` (float) | `arith.mulf` |
-| `polang.div` (signed integer) | `arith.divsi` |
-| `polang.div` (unsigned integer) | `arith.divui` |
+| `polang.div` (signed integer) | `scf.if` + `func.call` + `arith.divsi` |
+| `polang.div` (unsigned integer) | `scf.if` + `func.call` + `arith.divui` |
 | `polang.div` (float) | `arith.divf` |
+| `polang.rem` (signed integer) | `scf.if` + `func.call` + `arith.remsi` |
+| `polang.rem` (unsigned integer) | `scf.if` + `func.call` + `arith.remui` |
 | `polang.cmp` (signed integer) | `arith.cmpi` (signed predicates) |
 | `polang.cmp` (unsigned integer) | `arith.cmpi` (unsigned predicates) |
 | `polang.cmp` (float) | `arith.cmpf` |
@@ -475,6 +478,15 @@ The `PolangToStandardPass` lowers Polang dialect operations to standard MLIR dia
 | `polang.ref.create` (immutable) | passthrough |
 | `polang.ref.deref` | `memref.load` |
 | `polang.ref.store` | `memref.store` |
+
+**Runtime Checks:**
+
+Integer division and remainder operations insert runtime checks for division by zero. The lowering pattern:
+1. Uses `scf.if` to check if the divisor equals zero
+2. If zero, calls the runtime helper function `__polang_divzero_error(line, col)`
+3. Otherwise, performs the division/remainder operation
+
+The runtime helper is defined in `compiler/src/runtime_helpers.c` and automatically linked with JIT-compiled code.
 
 **Type Conversions:**
 
