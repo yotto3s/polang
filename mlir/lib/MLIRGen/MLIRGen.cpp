@@ -107,6 +107,7 @@ public:
   void visit(const NProductType& /*node*/) override {}
   void visit(const NTypeVar& /*node*/) override {}
   void visit(const NForallType& /*node*/) override {}
+  void visit(const NUnitType& /*node*/) override {}
 
   // Expression Visitor implementations
   void visit(const NInteger& node) override {
@@ -500,6 +501,10 @@ public:
     node.body->accept(*this);
 
     --nestedScopeDepth;
+  }
+
+  void visit(const NUnitLiteral& /*node*/) override {
+    // Unit literal — no-op at MLIR level
   }
 
   void visit(const NExpressionStatement& node) override {

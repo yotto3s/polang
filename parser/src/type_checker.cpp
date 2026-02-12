@@ -48,6 +48,7 @@ public:
   void visit(const NProductType& /*node*/) override {}
   void visit(const NTypeVar& /*node*/) override {}
   void visit(const NForallType& /*node*/) override {}
+  void visit(const NUnitType& /*node*/) override {}
   void visit(const NInteger& /*node*/) override {}
   void visit(const NDouble& /*node*/) override {}
   void visit(const NBoolean& /*node*/) override {}
@@ -125,6 +126,7 @@ public:
     localNames.insert(node.id->name);
   }
 
+  void visit(const NUnitLiteral& /*node*/) override {}
   void visit(const NModuleDeclaration& /*node*/) override {}
   void visit(const NImportStatement& /*node*/) override {}
   void visit(const NTypeSignature& /*node*/) override {}
@@ -157,6 +159,12 @@ void TypeChecker::visit(const NTypeVar& node) {
 void TypeChecker::visit(const NForallType& /*node*/) {
   // Forall types are handled in applyFunctionSignature, not directly visited
 }
+
+void TypeChecker::visit(const NUnitType& /*node*/) {
+  // Unit type in type signatures — handled via applyFunctionSignature
+}
+
+void TypeChecker::visit(const NUnitLiteral& /*node*/) { inferredType = "()"; }
 
 std::string TypeChecker::mangledName(const std::string& name) const {
   if (modulePath.empty()) {

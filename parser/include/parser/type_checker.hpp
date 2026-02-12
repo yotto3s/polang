@@ -51,6 +51,7 @@ public:
   void visit(const NProductType& node) override;
   void visit(const NTypeVar& node) override;
   void visit(const NForallType& node) override;
+  void visit(const NUnitType& node) override;
 
   // Expression Visitor methods
   void visit(const NInteger& node) override;
@@ -64,6 +65,7 @@ public:
   void visit(const NBlock& node) override;
   void visit(const NIfExpression& node) override;
   void visit(const NLetExpression& node) override;
+  void visit(const NUnitLiteral& node) override;
   void visit(const NExpressionStatement& node) override;
   void visit(const NVariableDeclaration& node) override;
   void visit(const NFunctionDeclaration& node) override;

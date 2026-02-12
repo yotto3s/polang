@@ -49,6 +49,10 @@ void NTypeVar::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NForallType::accept(Visitor& visitor) const { visitor.visit(*this); }
 
+void NUnitType::accept(Visitor& visitor) const { visitor.visit(*this); }
+
+void NUnitLiteral::accept(Visitor& visitor) const { visitor.visit(*this); }
+
 void NImportStatement::accept(Visitor& visitor) const { visitor.visit(*this); }
 
 void NTypeSignature::accept(Visitor& visitor) const { visitor.visit(*this); }

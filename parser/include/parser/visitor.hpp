@@ -22,6 +22,8 @@ class NArrowType;
 class NProductType;
 class NTypeVar;
 class NForallType;
+class NUnitType;
+class NUnitLiteral;
 class NImportStatement;
 class NTypeSignature;
 
@@ -80,6 +82,7 @@ public:
   virtual void visit(const NProductType& node) = 0;
   virtual void visit(const NTypeVar& node) = 0;
   virtual void visit(const NForallType& node) = 0;
+  virtual void visit(const NUnitType& node) = 0;
   /// @}
 
   /// @name Expression Visitors
@@ -95,6 +98,7 @@ public:
   virtual void visit(const NBlock& node) = 0;
   virtual void visit(const NIfExpression& node) = 0;
   virtual void visit(const NLetExpression& node) = 0;
+  virtual void visit(const NUnitLiteral& node) = 0;
   /// @}
 
   /// @name Statement Visitors

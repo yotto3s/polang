@@ -28,6 +28,8 @@ class NArrowType;
 class NProductType;
 class NTypeVar;
 class NForallType;
+class NUnitType;
+class NUnitLiteral;
 class NQualifiedName;
 class NVariableDeclaration;
 class NFunctionDeclaration;
@@ -436,6 +438,10 @@ type_atom : ident {
               /* Type variable reference: 'a */
               $$ = std::make_unique<const NTypeVar>($1);
             }
+          | TLPAREN TRPAREN {
+              /* () unit type */
+              $$ = std::make_unique<const NUnitType>();
+            }
           | TLPAREN type_expr TRPAREN {
               $$ = std::move($2);
             }
@@ -516,6 +522,10 @@ expr : ident TLPAREN call_args TRPAREN {
        }
      | expr TAS type_spec {
          $$ = std::make_unique<NCastExpression>(std::move($1), std::move($3));
+         SET_LOC($$, @$);
+       }
+     | TLPAREN TRPAREN {
+         $$ = std::make_unique<NUnitLiteral>();
          SET_LOC($$, @$);
        }
      | TLPAREN expr TRPAREN { $$ = std::move($2); }

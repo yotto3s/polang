@@ -59,6 +59,10 @@ void ASTPrinter::visit(const NForallType& /*node*/) {
   // Types are printed via getTypeName() in parent visitors
 }
 
+void ASTPrinter::visit(const NUnitType& /*node*/) {
+  // Types are printed via getTypeName() in parent visitors
+}
+
 void ASTPrinter::visit(const NInteger& node) {
   printPrefix();
   out << "NInteger " << node.value << "\n";
@@ -182,6 +186,11 @@ void ASTPrinter::visit(const NIfExpression& node) {
       node.elseExpr->accept(*this);
     }
   }
+}
+
+void ASTPrinter::visit(const NUnitLiteral& /*node*/) {
+  printPrefix();
+  out << "NUnitLiteral ()\n";
 }
 
 void ASTPrinter::visit(const NLetExpression& node) {

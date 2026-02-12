@@ -210,6 +210,26 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
+// Unit type for type expressions: ()
+class NUnitType : public NTypeSpec {
+public:
+  NUnitType() = default;
+  [[nodiscard]] std::string getTypeName() const override { return "()"; }
+  [[nodiscard]] std::unique_ptr<const NTypeSpec> clone() const override {
+    auto copy = std::make_unique<NUnitType>();
+    copy->loc = loc;
+    return copy;
+  }
+  void accept(Visitor &visitor) const override;
+};
+
+// Unit literal expression: ()
+class NUnitLiteral : public NExpression {
+public:
+  NUnitLiteral() = default;
+  void accept(Visitor &visitor) const override;
+};
+
 /// Helper to create an NTypeSpec from a type name string.
 [[nodiscard]] inline std::unique_ptr<const NTypeSpec>
 makeTypeSpec(const std::string& typeName) {

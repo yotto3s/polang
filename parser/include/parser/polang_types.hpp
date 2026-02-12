@@ -74,6 +74,7 @@ struct TypeNames {
   static constexpr const char* FUNCTION = "function";
   static constexpr const char* TYPEVAR = "typevar";
   static constexpr const char* UNKNOWN = "unknown";
+  static constexpr const char* UNIT = "()";
 };
 
 /// Parse a type name string into a TypeKind enum.
@@ -117,6 +118,9 @@ parseTypeName(const std::string& name) noexcept {
     return TypeKind::TypeVar;
   }
   if (name == TypeNames::UNKNOWN || name == "unknown") {
+    return TypeKind::Unknown;
+  }
+  if (name == TypeNames::UNIT || name == "()") {
     return TypeKind::Unknown;
   }
   // Also accept kind names for round-trip testing
