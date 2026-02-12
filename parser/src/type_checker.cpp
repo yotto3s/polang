@@ -1017,8 +1017,11 @@ void TypeChecker::inferFunction(
   }
 
   // Pre-register signature with TYPEVAR return for recursive call support
-  functionSignatures[funcName] =
-      polang::MonoSignature{paramTypes, TypeNames::TYPEVAR};
+  // Only register if not already present (from type signature forward reference)
+  if (functionSignatures.find(funcName) == functionSignatures.end()) {
+    functionSignatures[funcName] =
+        polang::MonoSignature{paramTypes, TypeNames::TYPEVAR};
+  }
 
   // For explicit forall: pre-unify params that share the same type variable,
   // and build the type param -> uni var mapping
@@ -1392,6 +1395,88 @@ void TypeChecker::visit(const NImportStatement& node) {
 void TypeChecker::visit(const NTypeSignature& node) {
   const std::string name = mangledName(node.id->name);
   pendingTypeSignatures[name] = node.typeExpr->clone();
+  
+  // Eagerly register the signature to enable forward references
+  registerTypeSignature(name, *node.typeExpr);
+}
+
+bool TypeChecker::registerTypeSignature(const std::string& name,
+                                        const NTypeSpec& signature) {
+  // Parse the type signature to extract function/variable type
+  const auto* forallType = dynamic_cast<const NForallType*>(&signature);
+  std::set<std::string> declaredTypeVars;
+  std::reference_wrapper<const NTypeSpec> innerSig = signature;
+
+  if (forallType != nullptr) {
+    // Extract declared type variables
+    for (const auto& tv : forallType->typeVars) {
+      declaredTypeVars.insert(tv.name);
+    }
+    innerSig = *forallType->innerType;
+  }
+
+  // Validate type names in the signature
+  std::set<std::string> usedTypeVars;
+  const size_t errorsBefore = errors.size();
+  validateTypeNames(innerSig.get(), declaredTypeVars, usedTypeVars);
+  if (errors.size() > errorsBefore) {
+    return false;
+  }
+
+  // Check if this is an arrow type (function signature)
+  const auto* arrowType = dynamic_cast<const NArrowType*>(&innerSig.get());
+  if (arrowType != nullptr) {
+    // Extract parameter types
+    std::vector<std::string> paramTypes;
+    const auto* unitParam =
+        dynamic_cast<const NUnitType*>(arrowType->paramType.get());
+    if (unitParam != nullptr) {
+      // () -> T: zero-param function
+      // paramTypes remains empty
+    } else {
+      const auto* productType =
+          dynamic_cast<const NProductType*>(arrowType->paramType.get());
+      if (productType != nullptr) {
+        for (const auto& t : productType->types) {
+          paramTypes.push_back(t->getTypeName());
+        }
+      } else {
+        paramTypes.push_back(arrowType->paramType->getTypeName());
+      }
+    }
+
+    // Extract return type
+    std::string returnType = arrowType->returnType->getTypeName();
+
+    // Register the function signature
+    if (forallType != nullptr) {
+      // Polymorphic signature
+      polang::PolymorphicSignature sig;
+      sig.typeParams.reserve(forallType->typeVars.size());
+      for (const auto& tv : forallType->typeVars) {
+        sig.typeParams.push_back(tv.name);
+        if (!tv.bound.empty()) {
+          auto traitBound = polang::stringToTraitBound(tv.bound);
+          if (traitBound) {
+            sig.paramBounds[tv.name].insert(*traitBound);
+          }
+        }
+      }
+      sig.paramTypes = std::move(paramTypes);
+      sig.returnType = std::move(returnType);
+      functionSignatures[name] = sig;
+    } else {
+      // Monomorphic signature
+      functionSignatures[name] =
+          polang::MonoSignature{std::move(paramTypes), std::move(returnType)};
+    }
+    return true;
+  }
+
+  // Not an arrow type - must be a variable type signature
+  // Register in localTypes
+  localTypes[name] = innerSig.get().getTypeName();
+  return true;
 }
 
 void TypeChecker::applyFunctionSignature(
@@ -1562,8 +1647,8 @@ void TypeChecker::warnOrphanedTypeSignatures() {
     if (pos != std::string::npos) {
       displayName = name.substr(pos + 2);
     }
-    std::cerr << "Warning: type signature for '" << displayName
-              << "' has no corresponding definition\n";
+    reportError("type signature for '" + displayName +
+                "' has no corresponding definition");
   }
   pendingTypeSignatures.clear();
 }

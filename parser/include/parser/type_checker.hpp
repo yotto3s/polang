@@ -126,6 +126,11 @@ private:
   void applyFunctionSignature(NFunctionDeclaration& node,
                               std::unique_ptr<const NTypeSpec> signature);
 
+  // Parse and register a type signature for forward references
+  // Returns true if the signature was successfully registered
+  [[nodiscard]] bool registerTypeSignature(const std::string& name,
+                                           const NTypeSpec& signature);
+
   // Warn about type signatures with no corresponding definition
   void warnOrphanedTypeSignatures();
 
