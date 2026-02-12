@@ -768,8 +768,15 @@ public:
       ++argIdx;
     }
 
-    // Generate function body
-    node.block->accept(*this);
+    // Generate function body.
+    // Set expectedLiteralType to the declared return type so that integer/float
+    // literals in the body adopt the correct type (e.g., 3 becomes i32 when
+    // the function declares () -> i32).
+    {
+      ExpectedTypeScope typeScope(*this,
+                                  node.type ? node.type->clone() : nullptr);
+      node.block->accept(*this);
+    }
 
     // Add return
     if (result) {

@@ -592,8 +592,11 @@ void TypeChecker::visit(const NBlock& node) {
   // Resolve any remaining generic types to defaults at end of block
   resolveRemainingGenerics();
 
-  // Also resolve the block's inferred type if it's still generic
-  if (containsGenericType(inferredType)) {
+  // Also resolve the block's inferred type if it's still generic.
+  // Skip resolution inside function bodies (scopeDepth > 0) so that
+  // inferFunction can use the declared return type as context instead of
+  // defaulting {int} to i64 / {float} to f64.
+  if (scopeDepth == 0 && containsGenericType(inferredType)) {
     inferredType = resolveAllGenericsToDefault(inferredType);
   }
 
@@ -1192,7 +1195,12 @@ void TypeChecker::inferFunction(
       auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
       mutableArg.type = makeTypeSpec(resolvedParamTypes[i]);
     }
-    resolvedBodyType = polang::resolveGenericToDefault(resolvedBodyType);
+    if (node.type != nullptr) {
+      resolvedBodyType = polang::resolveGenericType(resolvedBodyType,
+                                                    node.type->getTypeName());
+    } else {
+      resolvedBodyType = polang::resolveGenericToDefault(resolvedBodyType);
+    }
 
     std::string returnType;
     if (node.type == nullptr) {
@@ -1249,6 +1257,9 @@ void TypeChecker::inferFunction(
     auto retIt = uniVarToTypeParam.find(resolvedBodyType);
     if (retIt != uniVarToTypeParam.end()) {
       resolvedBodyType = retIt->second;
+    } else if (node.type != nullptr) {
+      resolvedBodyType = polang::resolveGenericType(resolvedBodyType,
+                                                    node.type->getTypeName());
     } else {
       resolvedBodyType = polang::resolveGenericToDefault(resolvedBodyType);
     }
