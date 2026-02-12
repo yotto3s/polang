@@ -90,7 +90,7 @@ LLVM::GlobalOp getOrCreateErrorMessage(ModuleOp module, StringRef message,
 //===----------------------------------------------------------------------===//
 
 /// Base pattern for inserting overflow checks
-template <typename ArithOp, typename SignedIntrinsic, typename UnsignedIntrinsic>
+template <typename ArithOp>
 struct InsertOverflowCheckPattern : public OpRewritePattern<ArithOp> {
   using OpRewritePattern<ArithOp>::OpRewritePattern;
 
@@ -170,13 +170,10 @@ struct InsertOverflowCheckPattern : public OpRewritePattern<ArithOp> {
     std::string message = "integer overflow";
     auto errorMsg = getOrCreateErrorMessage(module, message, rewriter);
     
-    // Get pointer to the message
+    // Get address of the global string
     auto i8PtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-    auto zero = rewriter.create<LLVM::ConstantOp>(
-        loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-    auto msgPtr = rewriter.create<LLVM::GEPOp>(
-        loc, i8PtrType, errorMsg.getType(), errorMsg,
-        ArrayRef<LLVM::GEPArg>{0, 0}, /*inbounds=*/true);
+    auto msgPtr = rewriter.create<LLVM::AddressOfOp>(
+        loc, i8PtrType, errorMsg.getSymName());
 
     // Extract line and column from location (placeholder for now)
     auto line = rewriter.create<LLVM::ConstantOp>(
@@ -193,18 +190,18 @@ struct InsertOverflowCheckPattern : public OpRewritePattern<ArithOp> {
 
     // Continue block - replace original op with the result
     rewriter.setInsertionPointToStart(continueBlock);
-    rewriter.replaceOp(op, result.getResult());
+    rewriter.replaceOp(op, result);
 
     return success();
   }
 };
 
 using InsertAddOverflowCheck =
-    InsertOverflowCheckPattern<AddIOp, void, void>;
+    InsertOverflowCheckPattern<AddIOp>;
 using InsertSubOverflowCheck =
-    InsertOverflowCheckPattern<SubIOp, void, void>;
+    InsertOverflowCheckPattern<SubIOp>;
 using InsertMulOverflowCheck =
-    InsertOverflowCheckPattern<MulIOp, void, void>;
+    InsertOverflowCheckPattern<MulIOp>;
 
 //===----------------------------------------------------------------------===//
 // InsertOverflowChecksPass
