@@ -168,6 +168,7 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
 %type <std::unique_ptr<NVariableDeclaration>> func_param
 %type <std::unique_ptr<NLetBinding>> let_binding
 %type <std::unique_ptr<NQualifiedName>> qualified_name
+%type <std::unique_ptr<NQualifiedName>> qualified_name_multi
 
 // Vector types (by value, not pointer)
 %type <VariableList> func_decl_args func_param_list
@@ -194,9 +195,8 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
    1. expr . "(" in call_args (function call vs grouped expr)
    2. ident . "(" in module (export list vs module_body expr)
    3. ident . "(" in stmts (function call vs grouped expr)
-   4. ident "." ident . "(" (qualified call vs qualified name + grouped expr)
 */
-%expect 4
+%expect 3
 
 %start program
 
@@ -352,6 +352,20 @@ qualified_name : ident {
                  }
                ;
 
+/* Qualified name with at least 2 parts (guaranteed to have a dot) */
+qualified_name_multi : ident TDOT ident {
+                         StringList parts;
+                         parts.push_back($1->name);
+                         parts.push_back($3->name);
+                         $$ = std::make_unique<NQualifiedName>(std::move(parts));
+                         SET_LOC($$, @$);
+                       }
+                     | qualified_name_multi TDOT ident {
+                         $1->parts.push_back($3->name);
+                         $$ = std::move($1);
+                       }
+                     ;
+
 import_items : ident {
                  $$ = ImportItemList();
                  $$.push_back(ImportItem($1->name));
@@ -460,43 +474,14 @@ expr : ident TLPAREN call_args TRPAREN {
          SET_LOC($$, @$);
        }
      | ident { $$ = std::move($1); }
-     | ident TDOT ident TLPAREN call_args TRPAREN {
-         /* Qualified function call: Math.add(1, 2) */
-         StringList parts;
-         parts.push_back($1->name);
-         parts.push_back($3->name);
-         auto qname = std::make_unique<NQualifiedName>(std::move(parts));
-         SET_LOC(qname, @1);
-         $$ = std::make_unique<NMethodCall>(std::move(qname), std::move($5));
+     | qualified_name_multi TLPAREN call_args TRPAREN {
+         /* Qualified function call with arbitrary depth: Math.add(1, 2), A.B.C.func() */
+         $$ = std::make_unique<NMethodCall>(std::move($1), std::move($3));
          SET_LOC($$, @$);
        }
-     | ident TDOT ident TDOT ident TLPAREN call_args TRPAREN {
-         /* Nested qualified function call: Math.Internal.helper(5) */
-         StringList parts;
-         parts.push_back($1->name);
-         parts.push_back($3->name);
-         parts.push_back($5->name);
-         auto qname = std::make_unique<NQualifiedName>(std::move(parts));
-         SET_LOC(qname, @1);
-         $$ = std::make_unique<NMethodCall>(std::move(qname), std::move($7));
-         SET_LOC($$, @$);
-       }
-     | ident TDOT ident {
-         /* Qualified variable access: Math.PI */
-         StringList parts;
-         parts.push_back($1->name);
-         parts.push_back($3->name);
-         $$ = std::make_unique<NQualifiedName>(std::move(parts));
-         SET_LOC($$, @$);
-       }
-     | ident TDOT ident TDOT ident {
-         /* Nested qualified variable access: Math.Internal.PI */
-         StringList parts;
-         parts.push_back($1->name);
-         parts.push_back($3->name);
-         parts.push_back($5->name);
-         $$ = std::make_unique<NQualifiedName>(std::move(parts));
-         SET_LOC($$, @$);
+     | qualified_name_multi {
+         /* Qualified variable access with arbitrary depth: Math.PI, A.B.C.value */
+         $$ = std::move($1);
        }
      | numeric { $$ = std::move($1); }
      | boolean { $$ = std::move($1); }
