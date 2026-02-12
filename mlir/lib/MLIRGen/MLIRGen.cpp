@@ -28,6 +28,7 @@ using polang::TypeNames;
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Verifier.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/StringRef.h"
@@ -342,6 +343,32 @@ public:
     }
   }
 
+  void visit(const NUnaryOperator& node) override {
+    node.operand->accept(*this);
+    if (!result) {
+      return;
+    }
+    Value operand = result;
+    Type operandType = operand.getType();
+
+    switch (node.op) {
+    case yy::parser::token::TMINUS:
+      // Unary negation
+      result = builder.create<NegOp>(loc(node.loc), operandType, operand);
+      // resultType remains the same as operand type
+      break;
+    case yy::parser::token::TNOT:
+      // Logical not
+      result = builder.create<NotOp>(loc(node.loc), operand);
+      resultType = makeTypeSpec(TypeNames::BOOL);
+      break;
+    default:
+      emitError(loc(node.loc)) << "Unknown unary operator: " << node.op;
+      result = nullptr;
+      break;
+    }
+  }
+
   void visit(const NBinaryOperator& node) override {
     node.lhs->accept(*this);
     if (!result) {
@@ -401,6 +428,51 @@ public:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::ge, lhs, rhs);
       resultType = makeTypeSpec(TypeNames::BOOL);
       break;
+    // Logical operations with short-circuit evaluation
+    case yy::parser::token::TLAND: {
+      // a && b: if a then b else false
+      // Only evaluate b if a is true
+      Type boolType = builder.getType<BoolType>();
+      auto ifOp = builder.create<mlir::scf::IfOp>(
+          loc(node.loc), boolType, lhs, /*withElseRegion=*/true);
+      
+      // Then region: return rhs
+      builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+      builder.create<mlir::scf::YieldOp>(loc(node.loc), rhs);
+      
+      // Else region: return false
+      builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+      Value falseVal = builder.create<ConstantBoolOp>(loc(node.loc), false);
+      builder.create<mlir::scf::YieldOp>(loc(node.loc), falseVal);
+      
+      // Restore insertion point and set result
+      builder.setInsertionPointAfter(ifOp);
+      result = ifOp.getResult(0);
+      resultType = makeTypeSpec(TypeNames::BOOL);
+      break;
+    }
+    case yy::parser::token::TLOR: {
+      // a || b: if a then true else b
+      // Only evaluate b if a is false
+      Type boolType = builder.getType<BoolType>();
+      auto ifOp = builder.create<mlir::scf::IfOp>(
+          loc(node.loc), boolType, lhs, /*withElseRegion=*/true);
+      
+      // Then region: return true
+      builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+      Value trueVal = builder.create<ConstantBoolOp>(loc(node.loc), true);
+      builder.create<mlir::scf::YieldOp>(loc(node.loc), trueVal);
+      
+      // Else region: return rhs
+      builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+      builder.create<mlir::scf::YieldOp>(loc(node.loc), rhs);
+      
+      // Restore insertion point and set result
+      builder.setInsertionPointAfter(ifOp);
+      result = ifOp.getResult(0);
+      resultType = makeTypeSpec(TypeNames::BOOL);
+      break;
+    }
     default:
       emitError(loc(node.loc)) << "Unknown binary operator: " << node.op;
       result = nullptr;

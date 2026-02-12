@@ -690,6 +690,22 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
 }
 
 //===----------------------------------------------------------------------===//
+// NegOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult NegOp::verify() {
+  Type operandType = getOperand().getType();
+  Type resultType = getResult().getType();
+
+  if (!typesAreCompatible(operandType, resultType)) {
+    return emitOpError("operand and result types must be compatible, got ")
+           << operandType << " and " << resultType;
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // Arithmetic operation verifiers
 //===----------------------------------------------------------------------===//
 
