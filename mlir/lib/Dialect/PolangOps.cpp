@@ -749,6 +749,18 @@ LogicalResult DivOp::verify() {
   return success();
 }
 
+LogicalResult RemOp::verify() {
+  if (!typesAreCompatible(getLhs().getType(), getRhs().getType())) {
+    return emitOpError("operand types must be compatible");
+  }
+  if (!typesAreCompatible(getLhs().getType(), getResult().getType())) {
+    return emitOpError("result type must be compatible with operands");
+  }
+  // Remainder is only valid for integer types (checked at type checking phase)
+  // Here we just verify type compatibility
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // CastOp verifier
 //===----------------------------------------------------------------------===//

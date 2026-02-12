@@ -1,0 +1,7 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test modulo with unsigned integers *)
+(* CHECK: 2 : u32
+*)
+(17 as u32) % (5 as u32)
