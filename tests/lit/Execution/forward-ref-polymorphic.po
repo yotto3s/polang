@@ -1,0 +1,14 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test forward references with polymorphic functions *)
+(* CHECK: 5 : i64
+*)
+
+identity : forall 'a. 'a -> 'a
+apply : forall 'a 'b. ('a -> 'b) * 'a -> 'b
+
+identity(x) = x
+apply(f, x) = f(x)
+
+apply(identity, 5)
