@@ -1,0 +1,9 @@
+(* RUN: %polang_compiler %s | %FileCheck %s
+*)
+
+(* Test modulo operation LLVM IR generation *)
+(* CHECK:        define i64 @__polang_entry() {
+*)
+(* CHECK:          ret i64 1
+*)
+10 % 3

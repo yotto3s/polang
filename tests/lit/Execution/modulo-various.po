@@ -1,0 +1,7 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test modulo with different operands *)
+(* CHECK: 2 : i64
+*)
+17 % 5
