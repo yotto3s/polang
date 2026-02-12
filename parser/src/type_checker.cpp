@@ -566,6 +566,74 @@ void TypeChecker::checkComparisonBinaryOp(const NBinaryOperator& node,
   inferredType = TypeNames::BOOL;
 }
 
+void TypeChecker::checkLogicalBinaryOp(const NBinaryOperator& node,
+                                       const std::string& lhsType,
+                                       const std::string& rhsType) {
+  const bool lhsIsTypevar = lhsType == TypeNames::TYPEVAR;
+  const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
+
+  // Both operands must be bool
+  if (!lhsIsTypevar && lhsType != TypeNames::BOOL) {
+    reportError("operator '" + operatorToString(node.op) +
+                    "' requires operands of type 'bool', but got '" +
+                    resolveGenericToDefault(lhsType) + "'",
+                node.loc);
+  }
+  if (!rhsIsTypevar && rhsType != TypeNames::BOOL) {
+    reportError("operator '" + operatorToString(node.op) +
+                    "' requires operands of type 'bool', but got '" +
+                    resolveGenericToDefault(rhsType) + "'",
+                node.loc);
+  }
+
+  inferredType = TypeNames::BOOL;
+}
+
+void TypeChecker::visit(const NUnaryOperator& node) {
+  node.operand->accept(*this);
+  const std::string operandType = inferredType;
+
+  if (operandType == TypeNames::UNKNOWN) {
+    inferredType = TypeNames::UNKNOWN;
+    return;
+  }
+
+  switch (node.op) {
+  case yy::parser::token::TMINUS:
+    // Unary negation: operand must be numeric
+    if (operandType != TypeNames::TYPEVAR &&
+        !polang::isUnificationVar(operandType)) {
+      if (!polang::isNumericType(operandType)) {
+        reportError("cannot apply unary '-' to type '" +
+                        resolveGenericToDefault(operandType) + "'",
+                    node.loc);
+      }
+    }
+    // Result type is same as operand
+    inferredType = operandType;
+    break;
+
+  case yy::parser::token::TNOT:
+    // Logical not: operand must be bool
+    if (operandType != TypeNames::TYPEVAR &&
+        !polang::isUnificationVar(operandType)) {
+      if (operandType != TypeNames::BOOL) {
+        reportError("cannot apply unary '!' to type '" +
+                        resolveGenericToDefault(operandType) + "'",
+                    node.loc);
+      }
+    }
+    // Result type is bool
+    inferredType = TypeNames::BOOL;
+    break;
+
+  default:
+    reportError("Unknown unary operator", node.loc);
+    inferredType = TypeNames::UNKNOWN;
+    break;
+  }
+}
+
 void TypeChecker::visit(const NBinaryOperator& node) {
   node.lhs->accept(*this);
   const std::string lhsType = inferredType;
@@ -584,6 +652,9 @@ void TypeChecker::visit(const NBinaryOperator& node) {
     break;
   case polang::OperatorCategory::Comparison:
     checkComparisonBinaryOp(node, lhsType, rhsType);
+    break;
+  case polang::OperatorCategory::Logical:
+    checkLogicalBinaryOp(node, lhsType, rhsType);
     break;
   case polang::OperatorCategory::Unknown:
     // Unknown operator - leave type as is
