@@ -467,7 +467,7 @@ A qualified name accesses a module member:
     Math.PI
     Outer.Inner.foo
 
-Qualified names support up to three levels of nesting (`a.b` and `a.b.c`).
+Qualified names support arbitrary depth (`a.b`, `a.b.c`, `a.b.c.d`, etc.).
 
 ### 10.2 Function Calls
 
