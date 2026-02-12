@@ -1,0 +1,11 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* Test error for type signature without corresponding definition *)
+(* CHECK: Type error: type signature for 'foo' has no corresponding definition
+*)
+
+foo : i64 -> i64
+
+(* No definition for foo *)
+42
