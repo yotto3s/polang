@@ -197,7 +197,9 @@ Polang provides signed and unsigned integer types with explicit widths:
 | `u32`   | Unsigned 32-bit integer  | 32-bit  | 0 to 4294967295                          |
 | `u64`   | Unsigned 64-bit integer  | 64-bit  | 0 to 2^64-1                              |
 
-Integer arithmetic uses two's complement representation for signed types and standard binary representation for unsigned types. Overflow behavior for signed integers is wrap-around (two's complement).
+Integer arithmetic uses two's complement representation for signed types and standard binary representation for unsigned types.
+
+Integer overflow (both signed and unsigned) shall cause the program to print a runtime error message including the source location and exit with a non-zero status. This applies to `+`, `-`, `*`, and unary `-`. Division overflow (the sole case being `MIN_INT / -1` for signed types) is also a runtime error.
 
 ### 6.2 Floating-Point Types
 
