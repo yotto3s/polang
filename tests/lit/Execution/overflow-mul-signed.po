@@ -1,0 +1,9 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s *)
+
+(* Test signed integer overflow on multiplication *)
+(* Should trigger runtime error *)
+
+(* CHECK: Runtime error: integer overflow *)
+
+main : i64
+main = 9223372036854775807 * 2
