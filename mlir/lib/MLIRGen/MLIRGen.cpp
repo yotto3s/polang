@@ -504,7 +504,9 @@ public:
   }
 
   void visit(const NUnitLiteral& /*node*/) override {
-    // Unit literal — no-op at MLIR level
+    // Unit literal has no MLIR representation — clear result to avoid stale
+    // values
+    result = nullptr;
   }
 
   void visit(const NExpressionStatement& node) override {

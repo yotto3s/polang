@@ -1,0 +1,7 @@
+(* RUN: %polang_compiler --dump-ast %s 2>&1 | %FileCheck %s
+*)
+
+(* Test nested arrow type () -> (i64 -> i64) parses correctly *)
+(* CHECK: NTypeSignature 'f' : () -> i64 -> i64
+*)
+f : () -> i64 -> i64
