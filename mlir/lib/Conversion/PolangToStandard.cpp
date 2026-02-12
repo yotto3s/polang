@@ -163,11 +163,76 @@ static func::FuncOp getOrCreateDivZeroErrorFunc(ModuleOp module,
   return func;
 }
 
+/// Check if a value type represents an integer (for div/rem operations).
+static bool isIntegerType(Type origType, Type convertedType) {
+  return isa<polang::IntegerType, polang::IndexType>(origType) ||
+         isa<mlir::IntegerType, mlir::IndexType>(convertedType);
+}
+
+/// Extract source location information from an MLIR location.
+static std::pair<int, int> extractLineColumn(Location loc) {
+  int line = 0;
+  int column = 0;
+  if (auto fileLoc = llvm::dyn_cast<FileLineColLoc>(loc)) {
+    line = fileLoc.getLine();
+    column = fileLoc.getColumn();
+  }
+  return {line, column};
+}
+
+/// Insert a runtime check for division by zero.
+/// Returns true if the check was inserted, false if the operation is not integer division.
+static bool insertDivZeroCheck(Operation* op, Value rhs, Location loc,
+                                ConversionPatternRewriter& rewriter) {
+  // Get the parent module to insert the runtime function declaration
+  auto module = op->getParentOfType<ModuleOp>();
+  if (!module) {
+    return false;
+  }
+
+  // Get or create the runtime error function
+  auto errorFunc = getOrCreateDivZeroErrorFunc(module, rewriter);
+
+  // Create constant zero of the same type as divisor
+  auto zeroConst = rewriter.create<arith::ConstantIntOp>(loc, 0, rhs.getType());
+
+  // Check if divisor is zero
+  auto isZero = rewriter.create<arith::CmpIOp>(
+      loc, arith::CmpIPredicate::eq, rhs, zeroConst);
+
+  // Create scf.if for the zero check
+  auto ifOp = rewriter.create<scf::IfOp>(loc, TypeRange{}, isZero, false);
+
+  // Then block: call error function and exit
+  {
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
+
+    // Extract line and column from location
+    auto [line, column] = extractLineColumn(loc);
+
+    // Create line and column constants
+    auto lineConst = rewriter.create<arith::ConstantIntOp>(loc, line, rewriter.getI32Type());
+    auto colConst = rewriter.create<arith::ConstantIntOp>(loc, column, rewriter.getI32Type());
+
+    // Call the error function
+    rewriter.create<func::CallOp>(loc, errorFunc, ValueRange{lineConst, colConst});
+
+    // Note: The error function calls exit(), so we never return.
+    // However, MLIR still requires a terminator. We use scf.yield.
+    rewriter.create<scf::YieldOp>(loc);
+  }
+
+  // Set insertion point after the if for the actual division
+  rewriter.setInsertionPointAfter(ifOp);
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
-// Arithmetic Lowering
+// Constant Lowering
 //===----------------------------------------------------------------------===//
 
-struct AddOpLowering : public OpConversionPattern<AddOp> {
+struct ConstantIntegerOpLowering
   using OpConversionPattern<AddOp>::OpConversionPattern;
 
   LogicalResult
@@ -233,8 +298,6 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
     auto loc = op.getLoc();
-
-    // Check the original type to determine signedness
     auto origType = op.getLhs().getType();
 
     // For floating-point division, no runtime check needed (produces inf/NaN per IEEE 754)
@@ -244,61 +307,16 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
     }
 
     // For integer types, insert runtime check for division by zero
-    bool isInteger = isa<polang::IntegerType, polang::IndexType>(origType) ||
-                     isa<mlir::IntegerType, mlir::IndexType>(lhs.getType());
-
-    if (!isInteger) {
+    if (!isIntegerType(origType, lhs.getType())) {
       // Fallback to float division if type is unclear
       rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
       return success();
     }
 
-    // Extract line and column from location
-    int line = 0;
-    int column = 0;
-    if (auto fileLoc = llvm::dyn_cast<FileLineColLoc>(loc)) {
-      line = fileLoc.getLine();
-      column = fileLoc.getColumn();
+    // Insert zero check and error handling
+    if (!insertDivZeroCheck(op, rhs, loc, rewriter)) {
+      return op.emitError("failed to insert division by zero check");
     }
-
-    // Get the parent module to insert the runtime function declaration
-    auto module = op->getParentOfType<ModuleOp>();
-    if (!module) {
-      return op.emitError("operation not inside a module");
-    }
-
-    // Get or create the runtime error function
-    auto errorFunc = getOrCreateDivZeroErrorFunc(module, rewriter);
-
-    // Create constant zero of the same type as divisor
-    auto zeroConst = rewriter.create<arith::ConstantIntOp>(loc, 0, rhs.getType());
-
-    // Check if divisor is zero
-    auto isZero = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::eq, rhs, zeroConst);
-
-    // Create scf.if for the zero check
-    auto ifOp = rewriter.create<scf::IfOp>(loc, TypeRange{}, isZero, false);
-
-    // Then block: call error function and exit
-    {
-      OpBuilder::InsertionGuard guard(rewriter);
-      rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-
-      // Create line and column constants
-      auto lineConst = rewriter.create<arith::ConstantIntOp>(loc, line, rewriter.getI32Type());
-      auto colConst = rewriter.create<arith::ConstantIntOp>(loc, column, rewriter.getI32Type());
-
-      // Call the error function
-      rewriter.create<func::CallOp>(loc, errorFunc, ValueRange{lineConst, colConst});
-
-      // Note: The error function calls exit(), so we never return.
-      // However, MLIR still requires a terminator. We use scf.yield.
-      rewriter.create<scf::YieldOp>(loc);
-    }
-
-    // Insert the actual division after the if
-    rewriter.setInsertionPointAfter(ifOp);
 
     // Determine which division operation to use based on signedness
     Value divResult;
@@ -335,64 +353,17 @@ struct RemOpLowering : public OpConversionPattern<RemOp> {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
     auto loc = op.getLoc();
-
-    // Check the original type to determine signedness
     auto origType = op.getLhs().getType();
 
     // Remainder is only defined for integer types
-    bool isInteger = isa<polang::IntegerType, polang::IndexType>(origType) ||
-                     isa<mlir::IntegerType, mlir::IndexType>(lhs.getType());
-
-    if (!isInteger) {
+    if (!isIntegerType(origType, lhs.getType())) {
       return op.emitError("remainder operation only supported for integer types");
     }
 
-    // Extract line and column from location
-    int line = 0;
-    int column = 0;
-    if (auto fileLoc = llvm::dyn_cast<FileLineColLoc>(loc)) {
-      line = fileLoc.getLine();
-      column = fileLoc.getColumn();
+    // Insert zero check and error handling
+    if (!insertDivZeroCheck(op, rhs, loc, rewriter)) {
+      return op.emitError("failed to insert division by zero check");
     }
-
-    // Get the parent module to insert the runtime function declaration
-    auto module = op->getParentOfType<ModuleOp>();
-    if (!module) {
-      return op.emitError("operation not inside a module");
-    }
-
-    // Get or create the runtime error function
-    auto errorFunc = getOrCreateDivZeroErrorFunc(module, rewriter);
-
-    // Create constant zero of the same type as divisor
-    auto zeroConst = rewriter.create<arith::ConstantIntOp>(loc, 0, rhs.getType());
-
-    // Check if divisor is zero
-    auto isZero = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::eq, rhs, zeroConst);
-
-    // Create scf.if for the zero check
-    auto ifOp = rewriter.create<scf::IfOp>(loc, TypeRange{}, isZero, false);
-
-    // Then block: call error function and exit
-    {
-      OpBuilder::InsertionGuard guard(rewriter);
-      rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-
-      // Create line and column constants
-      auto lineConst = rewriter.create<arith::ConstantIntOp>(loc, line, rewriter.getI32Type());
-      auto colConst = rewriter.create<arith::ConstantIntOp>(loc, column, rewriter.getI32Type());
-
-      // Call the error function
-      rewriter.create<func::CallOp>(loc, errorFunc, ValueRange{lineConst, colConst});
-
-      // Note: The error function calls exit(), so we never return.
-      // However, MLIR still requires a terminator. We use scf.yield.
-      rewriter.create<scf::YieldOp>(loc);
-    }
-
-    // Insert the actual remainder operation after the if
-    rewriter.setInsertionPointAfter(ifOp);
 
     // Determine which remainder operation to use based on signedness
     Value remResult;
