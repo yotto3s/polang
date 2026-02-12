@@ -381,6 +381,16 @@ Expressions can be:
 | `-`      | Subtraction    | `a - b`   |
 | `*`      | Multiplication | `a * b`   |
 | `/`      | Division       | `a / b`   |
+| `%`      | Modulo (remainder) | `a % b`   |
+
+The modulo operator `%` computes the remainder of integer division (truncated division). The result has the same sign as the dividend. Float operands are not permitted with `%`; the program is ill-formed. Integer division and remainder by zero is undefined behavior.
+
+Examples:
+```
+17 % 5     (* 2 *)
+20 % 10    (* 0 *)
+10 % 3     (* 1 *)
+```
 
 ### Comparison Operators
 
@@ -420,7 +430,7 @@ From highest to lowest:
 
 1. Unary `-`, `!` (negation, logical not)
 2. `as` (type conversion)
-3. `*`, `/` (multiplication, division)
+3. `*`, `/`, `%` (multiplication, division, modulo)
 4. `+`, `-` (addition, subtraction)
 5. `==`, `!=`, `<`, `<=`, `>`, `>=` (comparisons)
 
@@ -428,6 +438,7 @@ Parentheses can be used to override precedence:
 
 ```
 (1 + 2) * 3    (* 9, not 7 *)
+10 % 3 + 1     (* 2, modulo has higher precedence *)
 ```
 
 ## Comments
