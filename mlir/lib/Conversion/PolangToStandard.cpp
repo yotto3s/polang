@@ -237,6 +237,41 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
   }
 };
 
+struct RemOpLowering : public OpConversionPattern<RemOp> {
+  using OpConversionPattern<RemOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(RemOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    auto lhs = adaptor.getLhs();
+    auto rhs = adaptor.getRhs();
+
+    // Check the original type to determine signedness
+    auto origType = op.getLhs().getType();
+    // Remainder is only valid for integer types
+    if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
+      if (intType.isUnsigned()) {
+        rewriter.replaceOpWithNewOp<arith::RemUIOp>(op, lhs, rhs);
+      } else {
+        rewriter.replaceOpWithNewOp<arith::RemSIOp>(op, lhs, rhs);
+      }
+    } else if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
+      if (indexType.isUnsigned()) {
+        rewriter.replaceOpWithNewOp<arith::RemUIOp>(op, lhs, rhs);
+      } else {
+        rewriter.replaceOpWithNewOp<arith::RemSIOp>(op, lhs, rhs);
+      }
+    } else if (isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
+      // Fallback for already converted types - assume signed
+      rewriter.replaceOpWithNewOp<arith::RemSIOp>(op, lhs, rhs);
+    } else {
+      // This should not happen if type checking is correct
+      return failure();
+    }
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Cast Lowering
 //===----------------------------------------------------------------------===//
@@ -956,7 +991,7 @@ struct PolangToStandardPass
     patterns
         .add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
              ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
-             MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
+             MulOpLowering, DivOpLowering, RemOpLowering, CastOpLowering, CmpOpLowering,
              GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
              CallOpLowering, ReturnOpLowering, IfOpLowering, YieldOpLowering,
              GlobalOpLowering, GlobalLoadOpLowering, PrintOpLowering>(

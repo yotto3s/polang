@@ -137,6 +137,7 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
 %token TMINUS "-"
 %token TMUL "*"
 %token TDIV "/"
+%token TMOD "%"
 %token TLET "let"
 %token TFUN "fun"
 %token TIN "in"
@@ -186,7 +187,7 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
 %right TEQUAL
 %nonassoc COMPARISON TCEQ TCNE TCLT TCLE TCGT TCGE
 %left TPLUS TMINUS
-%left TMUL TDIV
+%left TMUL TDIV TMOD
 %left TAS
 %left TDOT
 
@@ -518,6 +519,10 @@ expr : ident TLPAREN call_args TRPAREN {
        }
      | expr TDIV expr {
          $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TDIV, std::move($3));
+         SET_LOC($$, @$);
+       }
+     | expr TMOD expr {
+         $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TMOD, std::move($3));
          SET_LOC($$, @$);
        }
      | expr TAS type_spec {
