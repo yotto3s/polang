@@ -1,0 +1,12 @@
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
+
+(* Test that forall type signatures produce correct AST nodes. *)
+(* CHECK:      NBlock
+*)
+(* CHECK-NEXT: |-NTypeSignature 'identity' : forall 'a. 'a -> 'a
+*)
+(* CHECK-NEXT: `-NFunctionDeclaration 'identity' (x)
+*)
+identity : forall 'a. 'a -> 'a
+identity(x) = x

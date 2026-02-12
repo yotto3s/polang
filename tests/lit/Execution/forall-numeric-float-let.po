@@ -1,0 +1,11 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test: let-bound float literal used in polymorphic call *)
+
+add : forall 'a:Numeric. 'a * 'a -> 'a
+add(x, y) = x + y
+
+(* CHECK: 4 : f32
+*)
+let a : f32 = 1.0 as f32 and b = 3.0 in add(a, b)

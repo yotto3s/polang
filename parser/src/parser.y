@@ -16,15 +16,24 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include "parser/type_var_decl.hpp"
 // Forward declarations for node types
 class NBlock;
 class NExpression;
 class NStatement;
 class NIdentifier;
 class NTypeSpec;
+class NNamedType;
+class NArrowType;
+class NProductType;
+class NTypeVar;
+class NForallType;
+class NUnitType;
+class NUnitLiteral;
 class NQualifiedName;
 class NVariableDeclaration;
 class NFunctionDeclaration;
+class NTypeSignature;
 struct NLetBinding;
 struct ImportItem;
 
@@ -54,6 +63,55 @@ yy::parser::symbol_type yylex();
 // Macro to set source location on a node
 #define SET_LOC(node, bisonLoc) \
   do { if (node) (node)->setLocation((bisonLoc).begin.line, (bisonLoc).begin.column); } while(0)
+
+// Build a definition (variable or function) from LHS = RHS expressions.
+// Returns nullptr if LHS is not a valid definition target.
+static std::unique_ptr<NStatement>
+buildDefinition(std::unique_ptr<NExpression> lhs,
+                std::unique_ptr<NExpression> rhs) {
+  auto* lhsIdent = dynamic_cast<NIdentifier*>(lhs.get());
+  if (lhsIdent != nullptr) {
+    auto id = std::unique_ptr<NIdentifier>(
+        static_cast<NIdentifier*>(lhs.release()));
+    return std::make_unique<NVariableDeclaration>(std::move(id), std::move(rhs));
+  }
+  auto* lhsCall = dynamic_cast<NMethodCall*>(lhs.get());
+  if (lhsCall != nullptr && lhsCall->qualifiedId == nullptr) {
+    VariableList params;
+    for (auto& arg : lhsCall->arguments) {
+      auto* argIdent = dynamic_cast<NIdentifier*>(arg.get());
+      if (argIdent == nullptr) {
+        return nullptr; // caller should report error
+      }
+      auto paramId = std::unique_ptr<NIdentifier>(
+          static_cast<NIdentifier*>(arg.release()));
+      params.push_back(std::make_unique<NVariableDeclaration>(
+          std::move(paramId), nullptr));
+    }
+    auto funcId = std::unique_ptr<NIdentifier>(
+        static_cast<NIdentifier*>(lhsCall->id.release()));
+    auto body = std::make_unique<NBlock>();
+    auto exprStmt = std::make_unique<NExpressionStatement>(std::move(rhs));
+    body->statements.push_back(std::move(exprStmt));
+    return std::make_unique<NFunctionDeclaration>(
+        std::move(funcId), std::move(params), std::move(body));
+  }
+  return nullptr;
+}
+
+// Build a type signature from LHS : type_expr.
+// Returns nullptr if LHS is not an identifier.
+static std::unique_ptr<NStatement>
+buildTypeSignature(std::unique_ptr<NExpression> lhs,
+                   std::unique_ptr<const NTypeSpec> typeExpr) {
+  auto* lhsIdent = dynamic_cast<NIdentifier*>(lhs.get());
+  if (lhsIdent == nullptr) {
+    return nullptr;
+  }
+  auto id = std::unique_ptr<NIdentifier>(
+      static_cast<NIdentifier*>(lhs.release()));
+  return std::make_unique<NTypeSignature>(std::move(id), std::move(typeExpr));
+}
 }
 
 // Tokens with string values
@@ -80,7 +138,6 @@ yy::parser::symbol_type yylex();
 %token TMUL "*"
 %token TDIV "/"
 %token TLET "let"
-%token TDEF "def"
 %token TFUN "fun"
 %token TIN "in"
 %token TCOLON ":"
@@ -96,13 +153,18 @@ yy::parser::symbol_type yylex();
 %token TIMPORT "import"
 %token TFROM "from"
 %token TAS "as"
+%token TFORALL "forall"
+%token <std::string> TTYPEVAR "typevar"
 
 // Nonterminal types with smart pointers
 %type <std::unique_ptr<NIdentifier>> ident
-%type <std::shared_ptr<const NTypeSpec>> type_spec
+%type <std::unique_ptr<const NTypeSpec>> type_spec type_expr type_product type_atom
+%type <std::vector<std::unique_ptr<const NTypeSpec>>> type_product_list
+%type <std::vector<TypeVarDecl>> type_var_list
+%type <TypeVarDecl> type_var_decl
 %type <std::unique_ptr<NExpression>> numeric expr boolean
 %type <std::unique_ptr<NBlock>> program stmts
-%type <std::unique_ptr<NStatement>> stmt var_decl func_decl module_decl import_stmt
+%type <std::unique_ptr<NStatement>> stmt type_sig module_decl import_stmt
 %type <std::unique_ptr<NVariableDeclaration>> func_param
 %type <std::unique_ptr<NLetBinding>> let_binding
 %type <std::unique_ptr<NQualifiedName>> qualified_name
@@ -128,11 +190,13 @@ yy::parser::symbol_type yylex();
 %left TAS
 %left TDOT
 
-/* Expected conflicts:
-   - ident TLPAREN (function call vs expr + (expr)) x2
-   - ident TDOT (qualified name vs expr DOT)
+/* Expected shift/reduce conflicts (all on TLPAREN):
+   1. expr . "(" in call_args (function call vs grouped expr)
+   2. ident . "(" in module (export list vs module_body expr)
+   3. ident . "(" in stmts (function call vs grouped expr)
+   4. ident "." ident . "(" (qualified call vs qualified name + grouped expr)
 */
-%expect 3
+%expect 4
 
 %start program
 
@@ -145,46 +209,29 @@ stmts : %empty { $$ = std::make_unique<NBlock>(); SET_LOC($$, @$); }
       | stmts stmt { $1->statements.push_back(std::move($2)); $$ = std::move($1); }
       ;
 
-stmt : var_decl { $$ = std::move($1); }
-     | func_decl { $$ = std::move($1); }
+stmt : expr TEQUAL expr {
+         $$ = buildDefinition(std::move($1), std::move($3));
+         if ($$ == nullptr) {
+           error(@1, "invalid left-hand side of definition");
+           YYERROR;
+         }
+         SET_LOC($$, @$);
+       }
+     | type_sig { $$ = std::move($1); }
      | module_decl { $$ = std::move($1); }
      | import_stmt { $$ = std::move($1); }
      | expr { $$ = std::make_unique<NExpressionStatement>(std::move($1)); SET_LOC($$, @$); }
      ;
 
-var_decl : TDEF ident TEQUAL expr {
-             /* def x = expr (immutable, type to be inferred) */
-             $$ = std::make_unique<NVariableDeclaration>(std::move($2), std::move($4));
-             SET_LOC($$, @$);
-           }
-         | TDEF ident TCOLON type_spec TEQUAL expr {
-             /* def x : type = expr (immutable) */
-             $$ = std::make_unique<NVariableDeclaration>(std::move($4), std::move($2), std::move($6));
+type_sig : expr TCOLON type_expr {
+             $$ = buildTypeSignature(std::move($1), std::move($3));
+             if ($$ == nullptr) {
+               error(@1, "type signature must be for an identifier");
+               YYERROR;
+             }
              SET_LOC($$, @$);
            }
          ;
-
-func_decl : TDEF ident func_decl_args TCOLON type_spec TEQUAL expr {
-              /* def fname (x : type) ... : rettype = expr */
-              auto body = std::make_unique<NBlock>();
-              SET_LOC(body, @7);
-              auto exprStmt = std::make_unique<NExpressionStatement>(std::move($7));
-              SET_LOC(exprStmt, @7);
-              body->statements.push_back(std::move(exprStmt));
-              $$ = std::make_unique<NFunctionDeclaration>(std::move($5), std::move($2), std::move($3), std::move(body));
-              SET_LOC($$, @$);
-            }
-          | TDEF ident func_decl_args TEQUAL expr {
-              /* def fname (x : type) ... = expr (return type to be inferred) */
-              auto body = std::make_unique<NBlock>();
-              SET_LOC(body, @5);
-              auto exprStmt = std::make_unique<NExpressionStatement>(std::move($5));
-              SET_LOC(exprStmt, @5);
-              body->statements.push_back(std::move(exprStmt));
-              $$ = std::make_unique<NFunctionDeclaration>(std::move($2), std::move($3), std::move(body));
-              SET_LOC($$, @$);
-            }
-          ;
 
 func_decl_args : TLPAREN func_param_list TRPAREN {
               /* (x: type, y: type, ...) */
@@ -234,9 +281,30 @@ module_decl : TMODULE ident TLPAREN ident_list TRPAREN module_body TENDMODULE {
             ;
 
 module_body : %empty { $$ = StatementList(); }
-            | module_body var_decl { $1.push_back(std::move($2)); $$ = std::move($1); }
-            | module_body func_decl { $1.push_back(std::move($2)); $$ = std::move($1); }
-            | module_body module_decl { $1.push_back(std::move($2)); $$ = std::move($1); }
+            | module_body expr TEQUAL expr {
+                auto stmt = buildDefinition(std::move($2), std::move($4));
+                if (stmt == nullptr) {
+                  error(@2, "invalid definition in module");
+                  YYERROR;
+                }
+                SET_LOC(stmt, @2);
+                $1.push_back(std::move(stmt));
+                $$ = std::move($1);
+              }
+            | module_body expr TCOLON type_expr {
+                auto stmt = buildTypeSignature(std::move($2), std::move($4));
+                if (stmt == nullptr) {
+                  error(@2, "type signature must be for an identifier");
+                  YYERROR;
+                }
+                SET_LOC(stmt, @2);
+                $1.push_back(std::move(stmt));
+                $$ = std::move($1);
+              }
+            | module_body module_decl {
+                $1.push_back(std::move($2));
+                $$ = std::move($1);
+              }
             ;
 
 ident_list : ident {
@@ -306,7 +374,76 @@ ident : TIDENTIFIER { $$ = std::make_unique<NIdentifier>($1); SET_LOC($$, @$); }
       ;
 
 type_spec : ident {
-              $$ = std::make_shared<const NNamedType>($1->name);
+              $$ = std::make_unique<const NNamedType>($1->name);
+            }
+          ;
+
+/* Type expressions for type signatures */
+type_expr : TFORALL type_var_list TDOT type_expr {
+              /* Forall quantifier: forall 'a, 'b:Numeric. 'a -> 'b */
+              $$ = std::make_unique<const NForallType>(std::move($2), std::move($4));
+            }
+          | type_product TARROW type_expr {
+              /* Function type: a -> b (right-associative) */
+              $$ = std::make_unique<const NArrowType>(std::move($1), std::move($3));
+            }
+          | type_product {
+              $$ = std::move($1);
+            }
+          ;
+
+type_var_list : type_var_decl {
+                  $$ = std::vector<TypeVarDecl>();
+                  $$.push_back(std::move($1));
+                }
+              | type_var_list TCOMMA type_var_decl {
+                  $1.push_back(std::move($3));
+                  $$ = std::move($1);
+                }
+              ;
+
+type_var_decl : TTYPEVAR {
+                  /* 'a (unconstrained type variable) */
+                  $$ = TypeVarDecl($1);
+                }
+              | TTYPEVAR TCOLON ident {
+                  /* 'a:Numeric (constrained type variable) */
+                  $$ = TypeVarDecl($1, $3->name);
+                }
+              ;
+
+type_product : type_atom {
+                 $$ = std::move($1);
+               }
+             | type_product_list {
+                 $$ = std::make_unique<const NProductType>(std::move($1));
+               }
+             ;
+
+type_product_list : type_atom TMUL type_atom {
+                      $$ = std::vector<std::unique_ptr<const NTypeSpec>>();
+                      $$.push_back(std::move($1));
+                      $$.push_back(std::move($3));
+                    }
+                  | type_product_list TMUL type_atom {
+                      $1.push_back(std::move($3));
+                      $$ = std::move($1);
+                    }
+                  ;
+
+type_atom : ident {
+              $$ = std::make_unique<const NNamedType>($1->name);
+            }
+          | TTYPEVAR {
+              /* Type variable reference: 'a */
+              $$ = std::make_unique<const NTypeVar>($1);
+            }
+          | TLPAREN TRPAREN {
+              /* () unit type */
+              $$ = std::make_unique<const NUnitType>();
+            }
+          | TLPAREN type_expr TRPAREN {
+              $$ = std::move($2);
             }
           ;
 
@@ -385,6 +522,10 @@ expr : ident TLPAREN call_args TRPAREN {
        }
      | expr TAS type_spec {
          $$ = std::make_unique<NCastExpression>(std::move($1), std::move($3));
+         SET_LOC($$, @$);
+       }
+     | TLPAREN TRPAREN {
+         $$ = std::make_unique<NUnitLiteral>();
          SET_LOC($$, @$);
        }
      | TLPAREN expr TRPAREN { $$ = std::move($2); }

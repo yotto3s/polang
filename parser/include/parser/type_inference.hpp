@@ -78,13 +78,60 @@ public:
   [[nodiscard]] std::set<TraitBound> getBounds(const std::string& var) const;
 
   /// Check if a concrete type satisfies a set of trait bounds.
-  [[nodiscard]] static bool
-  satisfies(const std::string& concreteType,
-            const std::set<TraitBound>& bounds) noexcept;
+  /// Delegates to TraitRegistry for consistent type-to-trait membership checks.
+  [[nodiscard]] static bool satisfies(const std::string& concreteType,
+                                      const std::set<TraitBound>& bounds);
 
 private:
   std::map<std::string, std::set<TraitBound>> bounds;
 };
+
+/// Method signature within a trait definition.
+struct TraitMethodSignature {
+  std::string methodName;              // e.g., "+" or "show"
+  std::vector<std::string> paramTypes; // e.g., ["'self", "'self"]
+  std::string returnType;              // e.g., "'self" or "bool"
+};
+
+/// Definition of a trait with its methods and satisfying types.
+struct TraitDefinition {
+  std::string name;                          // e.g., "Numeric"
+  std::vector<TraitMethodSignature> methods; // trait methods
+  std::set<std::string> satisfyingTypes;     // concrete types that satisfy
+};
+
+/// Registry of known traits. Replaces hardcoded trait checks with data-driven
+/// lookups. Currently populated with built-in traits (Numeric, Integer, Float);
+/// designed for future extension with user-defined traits.
+class TraitRegistry {
+public:
+  TraitRegistry();
+
+  /// Register a new trait definition.
+  void registerTrait(TraitDefinition def);
+
+  /// Check if a trait name is registered.
+  [[nodiscard]] bool isKnownTrait(const std::string& name) const;
+
+  /// Check if a concrete type satisfies a trait.
+  [[nodiscard]] bool satisfies(const std::string& concreteType,
+                               const std::string& traitName) const;
+
+  /// Look up which trait provides a given method/operator.
+  /// Returns nullopt if no trait provides it.
+  [[nodiscard]] std::optional<std::string>
+  traitForMethod(const std::string& method) const;
+
+  /// Get a trait definition by name.
+  [[nodiscard]] const TraitDefinition* getTrait(const std::string& name) const;
+
+private:
+  std::map<std::string, TraitDefinition> traits;
+  std::map<std::string, std::string> methodToTrait; // reverse index
+};
+
+/// Get the global trait registry (singleton, initialized with built-ins).
+[[nodiscard]] TraitRegistry& getTraitRegistry();
 
 /// Monomorphic function signature: concrete param types and return type.
 /// Example: (i64, i64) -> i64

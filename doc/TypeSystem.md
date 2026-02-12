@@ -77,6 +77,28 @@ Index types map to the platform-native pointer width. `usize` is intended for ar
 |------|-------------|------|-----------|-----------|
 | `bool` | Boolean | 1-bit | `!polang.bool` | `i1` |
 
+### Unit Type
+
+| Type | Description | Size | MLIR Type | LLVM Type |
+|------|-------------|------|-----------|-----------|
+| `()` | Unit type (single value) | 0-bit | `!polang.unit` | n/a |
+
+The unit type `()` has exactly one value, also written `()`. It is used in function type signatures:
+
+- **Zero-parameter functions**: `f : () -> i64` declares a function `f` that takes no arguments and returns `i64`
+- **Side-effect functions**: `f : () -> ()` declares a function that takes no arguments and returns no meaningful value
+
+In type signatures, `()` appears as the parameter type for zero-parameter functions. Previously, zero-parameter functions used bare return type syntax (e.g., `f : i64`); the `() -> T` form makes the function nature explicit.
+
+```polang
+(* Zero-parameter function *)
+get_value : () -> i64
+get_value() = 42
+
+(* Side-effect function (future use) *)
+do_something : () -> ()
+```
+
 ### Type Constants
 
 Type names are defined as compile-time constants in `parser/include/parser/polang_types.hpp`:
@@ -108,6 +130,7 @@ struct TypeNames {
   static constexpr const char* FUNCTION = "function";
   static constexpr const char* TYPEVAR = "typevar";
   static constexpr const char* UNKNOWN = "unknown";
+  static constexpr const char* UNIT = "()";
 };
 ```
 
@@ -135,11 +158,16 @@ expression as TargetType
 **Examples:**
 
 ```polang
-let a: i32 = 1000
-let b: i64 = a as i64       ; widen i32 to i64
-let c: i8 = a as i8         ; narrow i32 to i8 (truncates)
-let d: f64 = a as f64       ; convert integer to float
-let e: i32 = 3.14 as i32    ; convert float to integer (truncates toward zero)
+a : i32
+a = 1000
+b : i64
+b = a as i64                 (* widen i32 to i64 *)
+c : i8
+c = a as i8                  (* narrow i32 to i8 (truncates) *)
+d : f64
+d = a as f64                 (* convert integer to float *)
+e : i32
+e = 3.14 as i32              (* convert float to integer (truncates toward zero) *)
 ```
 
 ### Operator Precedence
@@ -160,10 +188,10 @@ The `as` operator has higher precedence than arithmetic operators but lower prec
 **Precedence examples:**
 
 ```polang
-a + b as i32        ; means: a + (b as i32)
--x as i32           ; means: (-x) as i32
-a * b as f64 + c    ; means: (a * (b as f64)) + c
-(a + b) as i32      ; parentheses override precedence
+a + b as i32        (* means: a + (b as i32) *)
+-x as i32           (* means: (-x) as i32 *)
+a * b as f64 + c    (* means: (a * (b as f64)) + c *)
+(a + b) as i32      (* parentheses override precedence *)
 ```
 
 ### Allowed Conversions
@@ -187,8 +215,10 @@ Only numeric-to-numeric conversions are permitted:
 **Type error examples:**
 
 ```polang
-let x: i32 = true as i32    ; Error: cannot convert bool to i32
-let b: bool = 1 as bool     ; Error: cannot convert i32 to bool
+x : i32
+x = true as i32              (* Error: cannot convert bool to i32 *)
+b : bool
+b = 1 as bool                (* Error: cannot convert i32 to bool *)
 ```
 
 ### Conversion Semantics
@@ -209,14 +239,20 @@ Converting to a larger integer type preserves the value exactly:
 Converting to a smaller integer type truncates the value, keeping only the low-order bits (wrap-around behavior):
 
 ```polang
-let a: i32 = 256
-let b: i8 = a as i8          ; b = 0 (256 mod 256)
+a : i32
+a = 256
+b : i8
+b = a as i8                  (* b = 0 (256 mod 256) *)
 
-let c: i32 = 257
-let d: i8 = c as i8          ; d = 1 (257 mod 256)
+c : i32
+c = 257
+d : i8
+d = c as i8                  (* d = 1 (257 mod 256) *)
 
-let e: i32 = -1
-let f: u8 = e as u8          ; f = 255 (bit pattern preserved)
+e : i32
+e = -1
+f : u8
+f = e as u8                  (* f = 255 (bit pattern preserved) *)
 ```
 
 #### Sign Reinterpretation
@@ -224,11 +260,15 @@ let f: u8 = e as u8          ; f = 255 (bit pattern preserved)
 Converting between signed and unsigned types of the same width reinterprets the bit pattern:
 
 ```polang
-let a: i32 = -1
-let b: u32 = a as u32        ; b = 4294967295 (same bits, different interpretation)
+a : i32
+a = -1
+b : u32
+b = a as u32                 (* b = 4294967295 (same bits, different interpretation) *)
 
-let c: u32 = 4294967295
-let d: i32 = c as i32        ; d = -1
+c : u32
+c = 4294967295
+d : i32
+d = c as i32                 (* d = -1 *)
 ```
 
 #### Float Widening
@@ -236,8 +276,10 @@ let d: i32 = c as i32        ; d = -1
 Converting `f32` to `f64` is always exact with no precision loss:
 
 ```polang
-let a: f32 = 3.14
-let b: f64 = a as f64        ; exact conversion
+a : f32
+a = 3.14
+b : f64
+b = a as f64                 (* exact conversion *)
 ```
 
 #### Float Narrowing
@@ -245,8 +287,10 @@ let b: f64 = a as f64        ; exact conversion
 Converting `f64` to `f32` rounds to the nearest representable value (IEEE 754 round-to-nearest, ties-to-even):
 
 ```polang
-let a: f64 = 3.141592653589793
-let b: f32 = a as f32        ; rounded to f32 precision
+a : f64
+a = 3.141592653589793
+b : f32
+b = a as f32                 (* rounded to f32 precision *)
 ```
 
 Very large `f64` values may overflow to `±infinity` when converted to `f32`.
@@ -256,11 +300,15 @@ Very large `f64` values may overflow to `±infinity` when converted to `f32`.
 Integer values are converted to the nearest representable floating-point value:
 
 ```polang
-let a: i64 = 42
-let b: f64 = a as f64        ; b = 42.0
+a : i64
+a = 42
+b : f64
+b = a as f64                 (* b = 42.0 *)
 
-let c: i64 = 9007199254740993   ; larger than f64 can represent exactly
-let d: f64 = c as f64           ; may lose precision
+c : i64
+c = 9007199254740993         (* larger than f64 can represent exactly *)
+d : f64
+d = c as f64                 (* may lose precision *)
 ```
 
 Note: `f64` has 53 bits of mantissa precision, so `i64` values larger than 2^53 may not be exactly representable.
@@ -274,22 +322,31 @@ Float-to-integer conversion uses **saturating truncation toward zero**:
 3. **NaN handling**: `NaN` converts to `0`
 
 ```polang
-; Truncation toward zero
-let a: i32 = 3.7 as i32      ; a = 3
-let b: i32 = -3.7 as i32     ; b = -3
+(* Truncation toward zero *)
+a : i32
+a = 3.7 as i32               (* a = 3 *)
+b : i32
+b = -3.7 as i32              (* b = -3 *)
 
-; Saturation at bounds
-let c: i8 = 1000.0 as i8     ; c = 127 (i8 max)
-let d: i8 = -1000.0 as i8    ; d = -128 (i8 min)
-let e: u8 = -1.0 as u8       ; e = 0 (u8 min, since negative)
-let f: u8 = 1000.0 as u8     ; f = 255 (u8 max)
+(* Saturation at bounds *)
+c : i8
+c = 1000.0 as i8             (* c = 127 (i8 max) *)
+d : i8
+d = -1000.0 as i8            (* d = -128 (i8 min) *)
+e : u8
+e = -1.0 as u8               (* e = 0 (u8 min, since negative) *)
+f : u8
+f = 1000.0 as u8             (* f = 255 (u8 max) *)
 
-; Infinity handling
-let g: i32 = (1.0 / 0.0) as i32   ; g = 2147483647 (i32 max)
-let h: i32 = (-1.0 / 0.0) as i32  ; h = -2147483648 (i32 min)
+(* Infinity handling *)
+g : i32
+g = (1.0 / 0.0) as i32      (* g = 2147483647 (i32 max) *)
+h : i32
+h = (-1.0 / 0.0) as i32     (* h = -2147483648 (i32 min) *)
 
-; NaN handling
-let i: i32 = (0.0 / 0.0) as i32   ; i = 0
+(* NaN handling *)
+i : i32
+i = (0.0 / 0.0) as i32      (* i = 0 *)
 ```
 
 #### Integer to Index
@@ -297,9 +354,12 @@ let i: i32 = (0.0 / 0.0) as i32   ; i = 0
 Converting an integer to `isize` or `usize` uses `arith.index_cast` (signed) or `arith.index_castui` (unsigned):
 
 ```polang
-def a: i64 = 42
-def b: isize = a as isize       ; signed index cast
-def c: usize = a as usize       ; unsigned index cast
+a : i64
+a = 42
+b : isize
+b = a as isize                   (* signed index cast *)
+c : usize
+c = a as usize                   (* unsigned index cast *)
 ```
 
 #### Index to Integer
@@ -307,8 +367,10 @@ def c: usize = a as usize       ; unsigned index cast
 Converting `isize` or `usize` to an integer type uses the corresponding signed or unsigned index cast:
 
 ```polang
-def a: isize = 42 as isize
-def b: i64 = a as i64           ; signed index cast to i64
+a : isize
+a = 42 as isize
+b : i64
+b = a as i64                     (* signed index cast to i64 *)
 ```
 
 #### Float to/from Index
@@ -316,11 +378,15 @@ def b: i64 = a as i64           ; signed index cast to i64
 Float-to-index and index-to-float conversions use a two-step process via `i64`:
 
 ```polang
-def a: f64 = 3.14
-def b: isize = a as isize       ; float → i64 (saturating truncation) → index
+a : f64
+a = 3.14
+b : isize
+b = a as isize                   (* float → i64 (saturating truncation) → index *)
 
-def c: isize = 42 as isize
-def d: f64 = c as f64           ; index → i64 → float
+c : isize
+c = 42 as isize
+d : f64
+d = c as f64                     (* index → i64 → float *)
 ```
 
 ### Literal Type Inference
@@ -328,32 +394,41 @@ def d: f64 = c as f64           ; index → i64 → float
 Numeric literals adapt to their declared type context when the value fits:
 
 ```polang
-let a: i8 = 42               ; OK: 42 fits in i8, literal is i8
-let b: i16 = 1000            ; OK: 1000 fits in i16, literal is i16
-let c: f32 = 3.14            ; OK: literal becomes f32
-let d: u8 = 200              ; OK: 200 fits in u8
+a : i8
+a = 42                       (* OK: 42 fits in i8, literal is i8 *)
+b : i16
+b = 1000                     (* OK: 1000 fits in i16, literal is i16 *)
+c : f32
+c = 3.14                     (* OK: literal becomes f32 *)
+d : u8
+d = 200                      (* OK: 200 fits in u8 *)
 ```
 
 **Compile-time error** if the literal value doesn't fit in the target type:
 
 ```polang
-let x: i8 = 1000             ; Error: 1000 doesn't fit in i8 (-128 to 127)
-let y: u8 = 256              ; Error: 256 doesn't fit in u8 (0 to 255)
-let z: u8 = -1               ; Error: -1 doesn't fit in u8 (unsigned)
+x : i8
+x = 1000                     (* Error: 1000 doesn't fit in i8 (-128 to 127) *)
+y : u8
+y = 256                      (* Error: 256 doesn't fit in u8 (0 to 255) *)
+z : u8
+z = -1                       (* Error: -1 doesn't fit in u8 (unsigned) *)
 ```
 
 Integer literals also adapt to index type contexts:
 
 ```polang
-def x: isize = 42            ; OK: literal becomes isize
-def y: usize = 100           ; OK: literal becomes usize
+x : isize
+x = 42                          (* OK: literal becomes isize *)
+y : usize
+y = 100                         (* OK: literal becomes usize *)
 ```
 
 When no type context is available, literals default to `i64` (integers) or `f64` (floats):
 
 ```polang
-let a = 42                   ; a: i64
-let b = 3.14                 ; b: f64
+a = 42                       (* a: i64 *)
+b = 3.14                     (* b: f64 *)
 ```
 
 ### Boolean Conversions
@@ -361,11 +436,13 @@ let b = 3.14                 ; b: f64
 Boolean values cannot be converted to or from numeric types using `as`. Use explicit expressions instead:
 
 ```polang
-; Instead of: x as bool (not allowed)
-let is_nonzero: bool = x != 0
+(* Instead of: x as bool (not allowed) *)
+is_nonzero : bool
+is_nonzero = x != 0
 
-; Instead of: b as i32 (not allowed)
-let int_value: i32 = if b then 1 else 0
+(* Instead of: b as i32 (not allowed) *)
+int_value : i32
+int_value = if b then 1 else 0
 ```
 
 This design ensures that boolean semantics are always explicit in the code.
@@ -388,9 +465,9 @@ The parser's type checker (`parser/src/type_checker.cpp`) handles **error detect
 **Example:**
 
 ```polang
-let double_it(x) = x * 2    ; x marked as typevar, MLIR infers int
-let half(x) = x / 2.0       ; x marked as typevar, MLIR infers double
-let identity(x) = x         ; x marked as typevar, MLIR infers from call site
+double_it(x) = x * 2        (* x marked as typevar, MLIR infers int *)
+half(x) = x / 2.0           (* x marked as typevar, MLIR infers double *)
+identity(x) = x             (* x marked as typevar, MLIR infers from call site *)
 ```
 
 **Implementation:**
@@ -422,15 +499,15 @@ If-expressions in Polang are typed based on their branches:
 **Example:**
 
 ```polang
-let a = if true then 1 else 2        ; a is int (branches are int)
-let b = if false then 1.0 else 2.0   ; b is double (branches are double)
-let c = if true then true else false ; c is bool (branches are bool)
+a = if true then 1 else 2          (* a is int (branches are int) *)
+b = if false then 1.0 else 2.0     (* b is double (branches are double) *)
+c = if true then true else false    (* c is bool (branches are bool) *)
 ```
 
 **Type Error:**
 
 ```polang
-let x = if true then 1 else 2.0  ; Error: branches have different types
+x = if true then 1 else 2.0     (* Error: branches have different types *)
 ```
 
 The type checker validates branch type consistency in `TypeChecker::visit(const NIfExpression&)`.
@@ -442,14 +519,14 @@ All untyped parameters are marked as **type variables** by the parser. Type infe
 **Example:**
 
 ```polang
-let identity(x) = x     ; x marked as typevar
-identity(42)            ; call site constrains x to int
+identity(x) = x             (* x marked as typevar *)
+identity(42)                 (* call site constrains x to int *)
 ```
 
 **Pipeline:**
 
 ```
-Source: let identity(x) = x
+Source: identity(x) = x
            ↓
 Parser: x marked as TYPEVAR (type checker)
            ↓
@@ -619,7 +696,7 @@ LogicalResult ReturnOp::verify() {
 ### Example 1: Simple Type Inference
 
 ```polang
-let add(x: i64, y) = x + y
+add(x: i64, y) = x + y
 add(1, 2)
 ```
 
@@ -632,7 +709,7 @@ add(1, 2)
 ### Example 2: Polymorphic Identity
 
 ```polang
-let identity(x) = x
+identity(x) = x
 identity(42)
 ```
 
@@ -645,7 +722,7 @@ identity(42)
 ### Example 3: Multiple Parameters
 
 ```polang
-let first(x, y) = x
+first(x, y) = x
 first(1, 2.0)
 ```
 
@@ -657,7 +734,7 @@ first(1, 2.0)
 ### Example 4: Inference from Operations
 
 ```polang
-let is_positive(x) = x > 0
+is_positive(x) = x > 0
 is_positive(5)
 ```
 
@@ -670,7 +747,7 @@ is_positive(5)
 ### Example 5: Float Type Inference
 
 ```polang
-let add(x, y) = x + y
+add(x, y) = x + y
 add(1.5, 2.0)
 ```
 
@@ -694,9 +771,9 @@ Polymorphic functions are specialized (monomorphized) for each unique set of arg
 ### Example
 
 ```polang
-let identity(x) = x
-identity(42)     ; Creates identity$i64
-identity(true)   ; Creates identity$bool
+identity(x) = x
+identity(42)                 (* Creates identity$i64 *)
+identity(true)               (* Creates identity$bool *)
 ```
 
 **Generated MLIR:**
@@ -714,8 +791,8 @@ polang.func @identity$bool(%arg0: !polang.bool) -> !polang.bool { ... }
 Generic functions that are never instantiated remain as `polang.generic_func` in MLIR. They are erased during lowering to standard dialects (since there's no concrete type to lower to).
 
 ```polang
-let unused(x) = x  ; Kept as polang.generic_func, erased during lowering
-42                 ; No call to unused, so no specialization created
+unused(x) = x                (* Kept as polang.generic_func, erased during lowering *)
+42                           (* No call to unused, so no specialization created *)
 ```
 
 ## Error Handling
@@ -739,8 +816,9 @@ loc("<source>":line:column): error: <message>
 When types cannot be unified, the compiler reports an error:
 
 ```polang
-let f(x: i64) = x
-f(3.14)  ; Type error: argument 1 expects i64, got f64 at line 2, column 1
+f : i64 -> i64
+f(x) = x
+f(3.14)  (* Type error: argument 1 expects i64, got f64 *)
 ```
 
 ### Undeclared Variable Errors
@@ -748,7 +826,7 @@ f(3.14)  ; Type error: argument 1 expects i64, got f64 at line 2, column 1
 References to undefined variables report the location of the reference:
 
 ```polang
-x + 1  ; Type error: Undeclared variable: x at line 1, column 1
+x + 1  (* Type error: Undeclared variable: x *)
 ```
 
 ### Unresolved Type Variables

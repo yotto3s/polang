@@ -1,0 +1,8 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* Test arity mismatch between signature and definition *)
+(* CHECK: Type error: type signature for 'f' has 2 parameters but definition has 1
+*)
+f : i64 * i64 -> i64
+f(x) = x + 1

@@ -4,7 +4,9 @@
 (* Test function declaration *)
 (* CHECK:      NBlock
 *)
-(* CHECK-NEXT: `-NFunctionDeclaration 'add' (a: i64, b: i64) -> i64
+(* CHECK-NEXT: |-NTypeSignature 'add' : i64 * i64 -> i64
+*)
+(* CHECK-NEXT: `-NFunctionDeclaration 'add' (a, b)
 *)
 (* CHECK-NEXT:   `-NBlock
 *)
@@ -16,4 +18,5 @@
 *)
 (* CHECK-NEXT:         `-NIdentifier 'b'
 *)
-def add(a: i64, b: i64): i64 = a + b
+add : i64 * i64 -> i64
+add(a, b) = a + b

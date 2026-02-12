@@ -16,10 +16,10 @@
 (* CHECK-NOT: polang.generic_func
 *)
 
-def get_zero(x) = 0
+get_zero(x) = 0
 
 (* Define a polymorphic function that returns a float constant *)
-def get_pi(x) = 3.14
+get_pi(x) = 3.14
 
 (* Call sites to trigger monomorphization *)
 get_zero(1)

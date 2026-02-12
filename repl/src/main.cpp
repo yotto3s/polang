@@ -48,6 +48,38 @@ static void printResult(const EvalResult& result) noexcept {
   }
 }
 
+// Strip leading and trailing whitespace
+static std::string trim(const std::string& s) {
+  const auto start = s.find_first_not_of(" \t\r\n");
+  if (start == std::string::npos) {
+    return "";
+  }
+  const auto end = s.find_last_not_of(" \t\r\n");
+  return s.substr(start, end - start + 1);
+}
+
+// Read a multiline block delimited by :{ and :}
+static std::string readMultilineBlock(std::istream& in, bool interactive) {
+  std::string buffer;
+  std::string line;
+
+  while (std::getline(in, line)) {
+    if (trim(line) == ":}") {
+      break;
+    }
+    if (!buffer.empty()) {
+      buffer += "\n";
+    }
+    buffer += line;
+
+    if (interactive) {
+      std::cout << "| " << std::flush;
+    }
+  }
+
+  return buffer;
+}
+
 // Read input with multi-line support for incomplete expressions
 static std::string readInput(std::istream& in, bool interactive) {
   std::string buffer;
@@ -59,6 +91,14 @@ static std::string readInput(std::istream& in, bool interactive) {
   }
 
   while (std::getline(in, line)) {
+    // Check for multiline block start
+    if (trim(line) == ":{") {
+      if (interactive) {
+        std::cout << "| " << std::flush;
+      }
+      return readMultilineBlock(in, interactive);
+    }
+
     if (!buffer.empty()) {
       buffer += "\n";
     }

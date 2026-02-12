@@ -10,6 +10,7 @@
 *)
 
 module Math (add)
-  def add(x: i64, y: i64): i64 = x + y
+  add : i64 * i64 -> i64
+  add(x, y) = x + y
 endmodule
 import Math

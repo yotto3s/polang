@@ -10,7 +10,8 @@
 *)
 (* CHECK-NEXT: }
 *)
-def fsub(a: f64, b: f64): f64 = a - b
+fsub : f64 * f64 -> f64
+fsub(a, b) = a - b
 
 (* Test float multiplication LLVM IR *)
 (* CHECK:      define double @fmul(double %{{[0-9]+}}, double %{{[0-9]+}}) {
@@ -21,7 +22,8 @@ def fsub(a: f64, b: f64): f64 = a - b
 *)
 (* CHECK-NEXT: }
 *)
-def fmul(a: f64, b: f64): f64 = a * b
+fmul : f64 * f64 -> f64
+fmul(a, b) = a * b
 
 (* Test float division LLVM IR *)
 (* CHECK:      define double @fdiv(double %{{[0-9]+}}, double %{{[0-9]+}}) {
@@ -32,7 +34,8 @@ def fmul(a: f64, b: f64): f64 = a * b
 *)
 (* CHECK-NEXT: }
 *)
-def fdiv(a: f64, b: f64): f64 = a / b
+fdiv : f64 * f64 -> f64
+fdiv(a, b) = a / b
 
 (* Test float addition LLVM IR *)
 (* CHECK:      define double @fadd(double %{{[0-9]+}}, double %{{[0-9]+}}) {
@@ -43,4 +46,5 @@ def fdiv(a: f64, b: f64): f64 = a / b
 *)
 (* CHECK-NEXT: }
 *)
-def fadd(a: f64, b: f64): f64 = a + b
+fadd : f64 * f64 -> f64
+fadd(a, b) = a + b

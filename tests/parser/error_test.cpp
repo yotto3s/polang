@@ -64,7 +64,7 @@ private:
 
 TEST(ErrorTest, SyntaxErrorAtEndOfLine) {
   StderrCapture capture;
-  auto block = polang_parse("def x =");
+  auto block = polang_parse("x =");
   std::string error = capture.getCaptured();
 
   // Error should mention line 1
@@ -77,32 +77,32 @@ TEST(ErrorTest, SyntaxErrorAtEndOfLine) {
 
 TEST(ErrorTest, SyntaxErrorOnSecondLine) {
   StderrCapture capture;
-  auto block = polang_parse("def x: int = 5\ndef y =");
+  auto block = polang_parse("x : int\nx = 5\ny =");
   std::string error = capture.getCaptured();
 
-  // Error should be on line 2
-  EXPECT_TRUE(error.find("line 2") != std::string::npos)
-      << "Error should be on line 2. Got: " << error;
-}
-
-TEST(ErrorTest, SyntaxErrorOnThirdLine) {
-  StderrCapture capture;
-  auto block = polang_parse("def x: int = 1\ndef y: int = 2\ndef z =");
-  std::string error = capture.getCaptured();
-
-  // Error should be on line 3
+  // Error should be on line 3 (type sig on line 1, def on line 2, error on line 3)
   EXPECT_TRUE(error.find("line 3") != std::string::npos)
       << "Error should be on line 3. Got: " << error;
 }
 
-TEST(ErrorTest, SyntaxErrorColumnPosition) {
+TEST(ErrorTest, SyntaxErrorOnThirdLine) {
   StderrCapture capture;
-  auto block = polang_parse("def longname: int = )");
+  auto block = polang_parse("x : int\nx = 1\ny : int\ny = 2\nz =");
   std::string error = capture.getCaptured();
 
-  // Error should be around column 21 (where ')' appears)
-  EXPECT_TRUE(error.find("column 21") != std::string::npos)
-      << "Error should be at column 21. Got: " << error;
+  // Error should be on line 5
+  EXPECT_TRUE(error.find("line 5") != std::string::npos)
+      << "Error should be on line 5. Got: " << error;
+}
+
+TEST(ErrorTest, SyntaxErrorColumnPosition) {
+  StderrCapture capture;
+  auto block = polang_parse("longname : int\nlongname = )");
+  std::string error = capture.getCaptured();
+
+  // Error should be around column 12 (where ')' appears in "longname = )")
+  EXPECT_TRUE(error.find("column 12") != std::string::npos)
+      << "Error should be at column 12. Got: " << error;
 }
 
 TEST(ErrorTest, SyntaxErrorMissingThen) {
@@ -162,39 +162,39 @@ TEST(ErrorTest, UnknownTokenAtStart) {
 
 TEST(ErrorTest, UnknownTokenInMiddle) {
   StderrCapture capture;
-  auto block = polang_parse("def x = @");
+  auto block = polang_parse("x = @");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)
       << "Should report unknown token. Got: " << error;
   EXPECT_TRUE(error.find("'@'") != std::string::npos)
       << "Should show the unknown token '@'. Got: " << error;
-  EXPECT_TRUE(error.find("column 9") != std::string::npos)
-      << "Should report column 9. Got: " << error;
+  EXPECT_TRUE(error.find("column 5") != std::string::npos)
+      << "Should report column 5. Got: " << error;
 }
 
 TEST(ErrorTest, UnknownTokenOnSecondLine) {
   StderrCapture capture;
-  auto block = polang_parse("def x: int = 5\n@");
+  auto block = polang_parse("x : int\nx = 5\n@");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)
       << "Should report unknown token. Got: " << error;
-  EXPECT_TRUE(error.find("line 2") != std::string::npos)
-      << "Should report line 2. Got: " << error;
+  EXPECT_TRUE(error.find("line 3") != std::string::npos)
+      << "Should report line 3. Got: " << error;
   EXPECT_TRUE(error.find("column 1") != std::string::npos)
       << "Should report column 1. Got: " << error;
 }
 
 TEST(ErrorTest, UnknownTokenWithOffset) {
   StderrCapture capture;
-  auto block = polang_parse("def x: int = 5\n    @");
+  auto block = polang_parse("x : int\nx = 5\n    @");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)
       << "Should report unknown token. Got: " << error;
-  EXPECT_TRUE(error.find("line 2") != std::string::npos)
-      << "Should report line 2. Got: " << error;
+  EXPECT_TRUE(error.find("line 3") != std::string::npos)
+      << "Should report line 3. Got: " << error;
   EXPECT_TRUE(error.find("column 5") != std::string::npos)
       << "Should report column 5 (after 4 spaces). Got: " << error;
 }
@@ -219,11 +219,11 @@ TEST(ErrorTest, UnknownTokenDifferentChars) {
 TEST(ErrorTest, MultipleErrorsOnDifferentLines) {
   // First error terminates lexing, so we only get one error
   StderrCapture capture;
-  auto block = polang_parse("def x: int = @\ndef y: int = #");
+  auto block = polang_parse("x : int\nx = @\ny : int\ny = #");
   std::string error = capture.getCaptured();
 
   // Should get at least the first error
-  EXPECT_TRUE(error.find("line 1") != std::string::npos ||
+  EXPECT_TRUE(error.find("line 2") != std::string::npos ||
               error.find("unknown token") != std::string::npos)
       << "Should report at least first error. Got: " << error;
 }
@@ -237,7 +237,7 @@ TEST(ErrorTest, ValidCodeAfterError) {
 
   // Now parse valid code - it should work
   StderrCapture capture2;
-  auto block = polang_parse("def x: int = 5");
+  auto block = polang_parse("x : int\nx = 5");
   std::string error2 = capture2.getCaptured();
 
   EXPECT_TRUE(error2.empty() || error2.find("error") == std::string::npos)
@@ -246,13 +246,13 @@ TEST(ErrorTest, ValidCodeAfterError) {
 }
 
 TEST(ErrorTest, LocationResetBetweenParses) {
-  // First parse with error on line 2
+  // First parse with error on line 3
   {
     StderrCapture capture;
-    polang_parse("def x: int = 5\n@");
+    polang_parse("x : int\nx = 5\n@");
     std::string error = capture.getCaptured();
-    EXPECT_TRUE(error.find("line 2") != std::string::npos)
-        << "First parse error should be on line 2. Got: " << error;
+    EXPECT_TRUE(error.find("line 3") != std::string::npos)
+        << "First parse error should be on line 3. Got: " << error;
   }
 
   // Second parse with error on line 1 - should reset location
@@ -269,7 +269,7 @@ TEST(ErrorTest, LocationResetBetweenParses) {
 
 TEST(ErrorTest, ErrorInFunctionDeclaration) {
   StderrCapture capture;
-  auto block = polang_parse("def add(x: int, y: int) = @");
+  auto block = polang_parse("add(x, y) = @");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)
@@ -278,7 +278,7 @@ TEST(ErrorTest, ErrorInFunctionDeclaration) {
 
 TEST(ErrorTest, ErrorInNestedExpression) {
   StderrCapture capture;
-  auto block = polang_parse("def x = (1 + (2 * @))");
+  auto block = polang_parse("x = (1 + (2 * @))");
   std::string error = capture.getCaptured();
 
   EXPECT_TRUE(error.find("unknown token") != std::string::npos)

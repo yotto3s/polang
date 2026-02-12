@@ -1,8 +1,9 @@
 (* Let expressions for local bindings *)
-def result = let x = 10 and y = 20 in x + y  (* multiple bindings with 'and' *)
+result = let x = 10 and y = 20 in x + y  (* multiple bindings with 'and' *)
 
 (* Let expressions inside function body *)
-def compute(a: i64, b: i64): i64 =
+compute : i64 * i64 -> i64
+compute(a, b) =
   let sum = a + b and diff = a - b in  (* sum=8, diff=2 *)
   sum * diff                            (* 8 * 2 = 16 *)
 

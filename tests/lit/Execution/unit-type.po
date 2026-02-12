@@ -1,0 +1,9 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test zero-param function with () -> T type signature *)
+(* CHECK: 42 : i64
+*)
+f : () -> i64
+f() = 42
+f()

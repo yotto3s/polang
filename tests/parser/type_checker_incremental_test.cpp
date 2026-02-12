@@ -29,7 +29,7 @@ protected:
 
 TEST_F(IncrementalTypeCheckerTest, BasicVariableDeclaration) {
   // First evaluation: declare a variable
-  auto ast1 = parse("def x = 42");
+  auto ast1 = parse("x = 42");
   ASSERT_NE(ast1, nullptr);
   auto errors = tc.check(*ast1);
   EXPECT_TRUE(errors.empty());
@@ -37,7 +37,7 @@ TEST_F(IncrementalTypeCheckerTest, BasicVariableDeclaration) {
 
 TEST_F(IncrementalTypeCheckerTest, IncrementalCheckPreservesEnvironment) {
   // First evaluation: declare a variable
-  auto ast1 = parse("def x = 42");
+  auto ast1 = parse("x = 42");
   ASSERT_NE(ast1, nullptr);
   auto errors1 = tc.check(*ast1);
   EXPECT_TRUE(errors1.empty());
@@ -52,7 +52,7 @@ TEST_F(IncrementalTypeCheckerTest, IncrementalCheckPreservesEnvironment) {
 
 TEST_F(IncrementalTypeCheckerTest, IncrementalCheckDetectsUndeclaredVariable) {
   // First evaluation: declare x
-  auto ast1 = parse("def x = 42");
+  auto ast1 = parse("x = 42");
   ASSERT_NE(ast1, nullptr);
   auto errors1 = tc.check(*ast1);
   EXPECT_TRUE(errors1.empty());
@@ -66,7 +66,7 @@ TEST_F(IncrementalTypeCheckerTest, IncrementalCheckDetectsUndeclaredVariable) {
 
 TEST_F(IncrementalTypeCheckerTest, IncrementalFunctionDeclarationAndCall) {
   // First evaluation: declare a function
-  auto ast1 = parse("def f(x: i64): i64 = x + 1");
+  auto ast1 = parse("f : i64 -> i64\nf(x) = x + 1");
   ASSERT_NE(ast1, nullptr);
   auto errors1 = tc.check(*ast1);
   EXPECT_TRUE(errors1.empty());
@@ -81,12 +81,12 @@ TEST_F(IncrementalTypeCheckerTest, IncrementalFunctionDeclarationAndCall) {
 
 TEST_F(IncrementalTypeCheckerTest, MultipleIncrementalEvaluations) {
   // Eval 1: declare variable
-  auto ast1 = parse("def a = 10");
+  auto ast1 = parse("a = 10");
   ASSERT_NE(ast1, nullptr);
   EXPECT_TRUE(tc.check(*ast1).empty());
 
   // Eval 2: declare another variable using first
-  auto ast2 = parse("def b = 20");
+  auto ast2 = parse("b = 20");
   ASSERT_NE(ast2, nullptr);
   EXPECT_TRUE(tc.checkIncremental(*ast2).empty());
 
@@ -99,12 +99,12 @@ TEST_F(IncrementalTypeCheckerTest, MultipleIncrementalEvaluations) {
 
 TEST_F(IncrementalTypeCheckerTest, FunctionCallsAcrossEvaluations) {
   // Eval 1: declare add1
-  auto ast1 = parse("def add1(x: i64): i64 = x + 1");
+  auto ast1 = parse("add1 : i64 -> i64\nadd1(x) = x + 1");
   ASSERT_NE(ast1, nullptr);
   EXPECT_TRUE(tc.check(*ast1).empty());
 
   // Eval 2: declare add2 that calls add1
-  auto ast2 = parse("def add2(x: i64): i64 = add1(add1(x))");
+  auto ast2 = parse("add2 : i64 -> i64\nadd2(x) = add1(add1(x))");
   ASSERT_NE(ast2, nullptr);
   EXPECT_TRUE(tc.checkIncremental(*ast2).empty());
 
@@ -117,7 +117,7 @@ TEST_F(IncrementalTypeCheckerTest, FunctionCallsAcrossEvaluations) {
 
 TEST_F(IncrementalTypeCheckerTest, TypeMismatchDetected) {
   // Eval 1: declare integer variable
-  auto ast1 = parse("def x = 42");
+  auto ast1 = parse("x = 42");
   ASSERT_NE(ast1, nullptr);
   EXPECT_TRUE(tc.check(*ast1).empty());
 
@@ -130,7 +130,7 @@ TEST_F(IncrementalTypeCheckerTest, TypeMismatchDetected) {
 
 TEST_F(IncrementalTypeCheckerTest, PolymorphicFunctionAcrossEvaluations) {
   // Eval 1: declare polymorphic identity function
-  auto ast1 = parse("def identity(x) = x");
+  auto ast1 = parse("identity(x) = x");
   ASSERT_NE(ast1, nullptr);
   EXPECT_TRUE(tc.check(*ast1).empty());
 
@@ -143,7 +143,7 @@ TEST_F(IncrementalTypeCheckerTest, PolymorphicFunctionAcrossEvaluations) {
 
 TEST_F(IncrementalTypeCheckerTest, PolymorphicFunctionMultipleCallTypes) {
   // Eval 1: declare polymorphic identity function
-  auto ast1 = parse("def identity(x) = x");
+  auto ast1 = parse("identity(x) = x");
   ASSERT_NE(ast1, nullptr);
   EXPECT_TRUE(tc.check(*ast1).empty());
 
@@ -164,7 +164,7 @@ TEST_F(IncrementalTypeCheckerTest, PolymorphicFunctionMultipleCallTypes) {
 
 TEST_F(IncrementalTypeCheckerTest, SnapshotSaveAndRestore) {
   // Eval 1: declare variable
-  auto ast1 = parse("def x = 42");
+  auto ast1 = parse("x = 42");
   ASSERT_NE(ast1, nullptr);
   EXPECT_TRUE(tc.check(*ast1).empty());
 
@@ -172,7 +172,7 @@ TEST_F(IncrementalTypeCheckerTest, SnapshotSaveAndRestore) {
   auto snapshot = tc.saveState();
 
   // Eval 2: declare another variable incrementally
-  auto ast2 = parse("def y = 100");
+  auto ast2 = parse("y = 100");
   ASSERT_NE(ast2, nullptr);
   EXPECT_TRUE(tc.checkIncremental(*ast2).empty());
 
@@ -193,7 +193,7 @@ TEST_F(IncrementalTypeCheckerTest, SnapshotSaveAndRestore) {
 
 TEST_F(IncrementalTypeCheckerTest, SnapshotRollbackOnError) {
   // Eval 1: declare x
-  auto ast1 = parse("def x = 42");
+  auto ast1 = parse("x = 42");
   ASSERT_NE(ast1, nullptr);
   EXPECT_TRUE(tc.check(*ast1).empty());
 
@@ -218,7 +218,7 @@ TEST_F(IncrementalTypeCheckerTest, SnapshotRollbackOnError) {
 
 TEST_F(IncrementalTypeCheckerTest, SnapshotPreservesFunctionSchemes) {
   // Eval 1: declare polymorphic function
-  auto ast1 = parse("def identity(x) = x");
+  auto ast1 = parse("identity(x) = x");
   ASSERT_NE(ast1, nullptr);
   EXPECT_TRUE(tc.check(*ast1).empty());
 
@@ -226,7 +226,7 @@ TEST_F(IncrementalTypeCheckerTest, SnapshotPreservesFunctionSchemes) {
   auto snapshot = tc.saveState();
 
   // Eval 2: declare something else
-  auto ast2 = parse("def y = 100");
+  auto ast2 = parse("y = 100");
   ASSERT_NE(ast2, nullptr);
   EXPECT_TRUE(tc.checkIncremental(*ast2).empty());
 
@@ -240,11 +240,60 @@ TEST_F(IncrementalTypeCheckerTest, SnapshotPreservesFunctionSchemes) {
   EXPECT_EQ(tc.getInferredType(), "i64");
 }
 
+TEST_F(IncrementalTypeCheckerTest,
+       SnapshotRollbackRestoresPendingTypeSignatures) {
+  // Input 1: Add a type signature via checkIncremental (not check(), which
+  // would call warnOrphanedTypeSignatures() and clear the pending map).
+  auto sig = parse("foo : i64 -> i64\n");
+  ASSERT_NE(sig, nullptr);
+  auto errors1 = tc.checkIncremental(*sig);
+  EXPECT_TRUE(errors1.empty());
+
+  // Save state — foo's pending signature should be captured in the snapshot
+  auto snapshot = tc.saveState();
+
+  // Input 2: A definition that consumes foo's pending signature, then fails.
+  // applyFunctionSignature sets x to i64 (from the signature), then
+  // "x + 1.0" is i64 + f64 which is a type mismatch.
+  auto bad = parse("foo(x) = x + 1.0\n");
+  ASSERT_NE(bad, nullptr);
+  auto errors2 = tc.checkIncremental(*bad);
+  EXPECT_FALSE(errors2.empty()) << "i64 + f64 should be a type mismatch";
+
+  // Rollback — foo's pending signature should be restored to pendingTypeSignatures
+  tc.restoreState(snapshot);
+
+  // Input 3: Define foo with a body that succeeds for any parameter type.
+  // If the pending signature was restored, applyFunctionSignature will
+  // constrain x to i64 and foo becomes monomorphic i64 -> i64.
+  // If the pending signature was lost (the bug), foo will be inferred as
+  // polymorphic (identity function).
+  auto def = parse("foo(x) = x\n");
+  ASSERT_NE(def, nullptr);
+  auto errors3 = tc.checkIncremental(*def);
+  EXPECT_TRUE(errors3.empty());
+
+  // Input 4: Call foo with a float argument.
+  // If foo is monomorphic i64 -> i64 (signature was correctly restored),
+  // passing f64 should produce a type error.
+  // If foo is polymorphic (signature was lost due to the bug),
+  // foo(3.14) would succeed — and this assertion would FAIL,
+  // exposing the missing snapshot/rollback of pendingTypeSignatures.
+  auto call = parse("foo(3.14)\n");
+  ASSERT_NE(call, nullptr);
+  auto errors4 = tc.checkIncremental(*call);
+  EXPECT_FALSE(errors4.empty())
+      << "foo should be monomorphic (i64 -> i64) after rollback restored its "
+         "pending type signature, so calling with f64 should fail. "
+         "If this passes, pendingTypeSignatures was not saved/restored "
+         "by saveState()/restoreState().";
+}
+
 // ============== Edge Cases ==============
 
 TEST_F(IncrementalTypeCheckerTest, EmptyBlockIncremental) {
   // First check establishes environment
-  auto ast1 = parse("def x = 42");
+  auto ast1 = parse("x = 42");
   ASSERT_NE(ast1, nullptr);
   EXPECT_TRUE(tc.check(*ast1).empty());
 
@@ -261,12 +310,12 @@ TEST_F(IncrementalTypeCheckerTest, EmptyBlockIncremental) {
 
 TEST_F(IncrementalTypeCheckerTest, ClosureWithCrossEvalCapture) {
   // Eval 1: declare a variable
-  auto ast1 = parse("def base = 100");
+  auto ast1 = parse("base = 100");
   ASSERT_NE(ast1, nullptr);
   EXPECT_TRUE(tc.check(*ast1).empty());
 
   // Eval 2: declare a function that captures base
-  auto ast2 = parse("def add(x: i64) = x + base");
+  auto ast2 = parse("add : i64 -> i64\nadd(x) = x + base");
   ASSERT_NE(ast2, nullptr);
   EXPECT_TRUE(tc.checkIncremental(*ast2).empty());
 
@@ -279,7 +328,7 @@ TEST_F(IncrementalTypeCheckerTest, ClosureWithCrossEvalCapture) {
 
 TEST_F(IncrementalTypeCheckerTest, DoubleDeclaration) {
   // Eval 1: declare x = 3.14
-  auto ast1 = parse("def x = 3.14");
+  auto ast1 = parse("x = 3.14");
   ASSERT_NE(ast1, nullptr);
   EXPECT_TRUE(tc.check(*ast1).empty());
 

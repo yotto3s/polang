@@ -1,0 +1,9 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test that integer literal in function body adopts declared return type i32 *)
+(* CHECK: 3 : i32
+*)
+f : () -> i32
+f() = 3
+f()

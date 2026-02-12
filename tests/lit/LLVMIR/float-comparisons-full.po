@@ -11,7 +11,8 @@
 *)
 (* CHECK-NEXT: }
 *)
-def fle(a: f64, b: f64): bool = a <= b
+fle : f64 * f64 -> bool
+fle(a, b) = a <= b
 
 (* CHECK:      define i1 @fge(double %{{[0-9]+}}, double %{{[0-9]+}}) {
 *)
@@ -21,7 +22,8 @@ def fle(a: f64, b: f64): bool = a <= b
 *)
 (* CHECK-NEXT: }
 *)
-def fge(a: f64, b: f64): bool = a >= b
+fge : f64 * f64 -> bool
+fge(a, b) = a >= b
 
 (* CHECK:      define i1 @fne(double %{{[0-9]+}}, double %{{[0-9]+}}) {
 *)
@@ -31,4 +33,5 @@ def fge(a: f64, b: f64): bool = a >= b
 *)
 (* CHECK-NEXT: }
 *)
-def fne(a: f64, b: f64): bool = a != b
+fne : f64 * f64 -> bool
+fne(a, b) = a != b

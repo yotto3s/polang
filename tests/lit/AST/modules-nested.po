@@ -6,7 +6,9 @@
 *)
 (* CHECK-NEXT: `-NModuleDeclaration 'Outer' (inner_func)
 *)
-(* CHECK-NEXT:   |-NFunctionDeclaration 'inner_func' (x: i64) -> i64
+(* CHECK-NEXT:   |-NTypeSignature 'inner_func' : i64 -> i64
+*)
+(* CHECK-NEXT:   |-NFunctionDeclaration 'inner_func' (x)
 *)
 (* CHECK-NEXT:   | `-NBlock
 *)
@@ -16,7 +18,9 @@
 *)
 (* CHECK-NEXT:   `-NModuleDeclaration 'Inner' (nested_func)
 *)
-(* CHECK-NEXT:     `-NFunctionDeclaration 'nested_func' (y: i64) -> i64
+(* CHECK-NEXT:     |-NTypeSignature 'nested_func' : i64 -> i64
+*)
+(* CHECK-NEXT:     `-NFunctionDeclaration 'nested_func' (y)
 *)
 (* CHECK-NEXT:       `-NBlock
 *)
@@ -30,8 +34,12 @@
 *)
 
 module Outer (inner_func)
-  def inner_func(x: i64): i64 = x
+  inner_func : i64 -> i64
+  inner_func(x) =
+x
   module Inner (nested_func)
-    def nested_func(y: i64): i64 = y * 2
+    nested_func : i64 -> i64
+    nested_func(y) =
+y * 2
   endmodule
 endmodule

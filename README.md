@@ -4,7 +4,7 @@ A simple programming language with ML-inspired syntax and an MLIR/LLVM backend.
 
 ## Features
 
-- **ML-inspired syntax**: Let bindings, type annotations, first-class functions
+- **ML-inspired syntax**: Haskell-style definitions, type annotations, first-class functions
 - **Type inference**: Hindley-Milner style type inference with polymorphism
 - **MLIR backend**: Custom Polang dialect lowered through MLIR to LLVM IR
 - **Interactive REPL**: JIT compilation with state persistence
@@ -45,10 +45,10 @@ $ ./build/bin/PolangRepl
 Polang REPL (type 'exit' or Ctrl+D to quit)
 > 1 + 2
 3 : i64
-> def x = 5
+> x = 5
 > x * 2
 10 : i64
-> def double (n: i64): i64 = n * 2
+> double(n) = n * 2
 > double(21)
 42 : i64
 > if x > 3 then true else false
@@ -58,7 +58,7 @@ true : bool
 
 **Compile to LLVM IR:**
 ```bash
-echo "def x = 42" | ./build/bin/PolangCompiler
+echo "x = 42" | ./build/bin/PolangCompiler
 ```
 
 **Run a source file:**

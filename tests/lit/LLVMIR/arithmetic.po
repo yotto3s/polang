@@ -10,7 +10,8 @@
 *)
 (* CHECK-NEXT: }
 *)
-def add(a: i64, b: i64): i64 = a + b
+add : i64 * i64 -> i64
+add(a, b) = a + b
 
 (* CHECK:      define i64 @sub(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
 *)
@@ -20,7 +21,8 @@ def add(a: i64, b: i64): i64 = a + b
 *)
 (* CHECK-NEXT: }
 *)
-def sub(a: i64, b: i64): i64 = a - b
+sub : i64 * i64 -> i64
+sub(a, b) = a - b
 
 (* CHECK:      define i64 @mul(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
 *)
@@ -30,7 +32,8 @@ def sub(a: i64, b: i64): i64 = a - b
 *)
 (* CHECK-NEXT: }
 *)
-def mul(a: i64, b: i64): i64 = a * b
+mul : i64 * i64 -> i64
+mul(a, b) = a * b
 
 (* CHECK:      define i64 @div(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
 *)
@@ -40,4 +43,5 @@ def mul(a: i64, b: i64): i64 = a * b
 *)
 (* CHECK-NEXT: }
 *)
-def div(a: i64, b: i64): i64 = a / b
+div : i64 * i64 -> i64
+div(a, b) = a / b

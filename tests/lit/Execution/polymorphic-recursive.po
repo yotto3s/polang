@@ -6,5 +6,5 @@
 (* Test recursive polymorphic function execution. *)
 (* Factorial function with polymorphic parameter type inference. *)
 
-def fact(n) = if n == 0 then 1 else n * fact(n - 1)
+fact(n) = if n == 0 then 1 else n * fact(n - 1)
 fact(5)

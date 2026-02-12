@@ -1,0 +1,18 @@
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
+
+(* Test () -> T type signature for zero-param function *)
+(* CHECK:      NBlock
+*)
+(* CHECK-NEXT: |-NTypeSignature 'f' : () -> i64
+*)
+(* CHECK-NEXT: `-NFunctionDeclaration 'f' ()
+*)
+(* CHECK-NEXT:   `-NBlock
+*)
+(* CHECK-NEXT:     `-NExpressionStatement
+*)
+(* CHECK-NEXT:       `-NInteger 42
+*)
+f : () -> i64
+f() = 42

@@ -7,22 +7,17 @@
 (* Function resolved to integer (x * 2 constrains x to integer) *)
 (* CHECK: {{.*}}polang.func @double_it(%{{.*}}: !polang.integer<64, signed>){{.*}}
 *)
-def double_it(x) = x * 2
+double_it(x) = x * 2
 
 (* Function resolved to float (x / 2.0 constrains x to float) *)
 (* CHECK: {{.*}}polang.func @half(%{{.*}}: !polang.float<64>){{.*}}
 *)
-def half(x) = x / 2.0
+half(x) = x / 2.0
 
 (* Function resolved to integer (x == 0 constrains x to integer) *)
 (* CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.integer<64, signed>){{.*}}
 *)
-def is_zero(x) = x == 0
-
-(* Partially typed function (both resolve to i64) *)
-(* CHECK: {{.*}}polang.func @add(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>){{.*}}
-*)
-def add(x: i64, y) = x + y
+is_zero(x) = x == 0
 
 (* Entry point (required for valid program) *)
 0

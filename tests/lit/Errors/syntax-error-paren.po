@@ -4,4 +4,4 @@
 (* Test error when parenthesis is malformed *)
 (* CHECK: ERROR: syntax error, {{.*}}
 *)
-def foo (: i64 = 1
+foo (: i64 = 1

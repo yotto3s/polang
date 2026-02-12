@@ -1,0 +1,13 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test that isize satisfies Numeric constraint *)
+add : forall 'a:Numeric. 'a * 'a -> 'a
+add(x, y) = x + y
+
+result : isize
+result = add(10 as isize, 20 as isize)
+
+(* CHECK: 30 : isize
+*)
+result

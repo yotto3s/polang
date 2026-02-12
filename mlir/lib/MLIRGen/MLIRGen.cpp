@@ -67,9 +67,12 @@ public:
     module = ModuleOp::create(builder.getUnknownLoc());
   }
 
-  /// Get a Polang type from annotation, or a fresh type variable if none
-  Type getTypeOrFresh(const NTypeSpec* typeAnnotation) {
-    return typeConverter.getTypeOrFresh(typeAnnotation);
+  /// Get a fresh type variable (when no type annotation is present)
+  Type getTypeFresh() { return typeConverter.getTypeOrFresh(nullptr); }
+
+  /// Get a Polang type from a type annotation
+  Type getType(const NTypeSpec& typeAnnotation) {
+    return typeConverter.getPolangType(typeAnnotation);
   }
 
   /// Generate MLIR for the given AST block
@@ -100,6 +103,11 @@ public:
     // Type specifications are not directly visited during MLIR generation
     // They are accessed via getTypeName() when processing declarations
   }
+  void visit(const NArrowType& /*node*/) override {}
+  void visit(const NProductType& /*node*/) override {}
+  void visit(const NTypeVar& /*node*/) override {}
+  void visit(const NForallType& /*node*/) override {}
+  void visit(const NUnitType& /*node*/) override {}
 
   // Expression Visitor implementations
   void visit(const NInteger& node) override {
@@ -111,13 +119,13 @@ public:
         auto type = getPolangType(*expectedLiteralType);
         result =
             builder.create<ConstantIntegerOp>(loc(node.loc), type, node.value);
-        resultType = expectedLiteralType;
+        resultType = expectedLiteralType->clone();
         return;
       }
     }
     auto type = getDefaultType();
     result = builder.create<ConstantIntegerOp>(loc(node.loc), type, node.value);
-    resultType = std::make_shared<const NNamedType>(TypeNames::GENERIC_INT);
+    resultType = makeTypeSpec(TypeNames::GENERIC_INT);
   }
 
   void visit(const NDouble& node) override {
@@ -129,28 +137,28 @@ public:
         auto type = polang::FloatType::get(builder.getContext(), meta.width);
         result =
             builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
-        resultType = expectedLiteralType;
+        resultType = expectedLiteralType->clone();
         return;
       }
     }
     auto type =
         polang::FloatType::get(builder.getContext(), DEFAULT_FLOAT_WIDTH);
     result = builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
-    resultType = std::make_shared<const NNamedType>(TypeNames::GENERIC_FLOAT);
+    resultType = makeTypeSpec(TypeNames::GENERIC_FLOAT);
   }
 
   void visit(const NBoolean& node) override {
     result = builder.create<ConstantBoolOp>(loc(node.loc), node.value);
-    resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+    resultType = makeTypeSpec(TypeNames::BOOL);
   }
 
   void visit(const NIdentifier& node) override {
     auto value = lookupVariable(node.name);
     if (value) {
       result = *value;
-      auto type = lookupType(node.name);
+      const auto* type = lookupType(node.name);
       resultType =
-          type ? type : std::make_shared<const NNamedType>(TypeNames::I64);
+          (type != nullptr) ? type->clone() : makeTypeSpec(TypeNames::I64);
       return;
     }
 
@@ -165,9 +173,9 @@ public:
     auto value = lookupVariable(mangled);
     if (value) {
       result = *value;
-      auto type = lookupType(mangled);
+      const auto* type = lookupType(mangled);
       resultType =
-          type ? type : std::make_shared<const NNamedType>(TypeNames::I64);
+          (type != nullptr) ? type->clone() : makeTypeSpec(TypeNames::I64);
       return;
     }
 
@@ -186,10 +194,37 @@ public:
       funcName = importIt->second;
     }
 
-    // Collect arguments
+    // Look up parameter types for literal type inference
+    const std::vector<std::unique_ptr<const NTypeSpec>>* paramTypes = nullptr;
+    auto paramTypesIt = functionParamTypes.find(funcName);
+    if (paramTypesIt != functionParamTypes.end()) {
+      paramTypes = &paramTypesIt->second;
+    }
+
+    // Collect arguments, propagating parameter types to literals
     SmallVector<Value> args;
-    for (const auto& arg : node.arguments) {
-      arg->accept(*this);
+    for (size_t i = 0; i < node.arguments.size(); ++i) {
+      std::unique_ptr<const NTypeSpec> effectiveParamType;
+      if (paramTypes != nullptr && i < paramTypes->size() &&
+          (*paramTypes)[i] != nullptr) {
+        effectiveParamType = (*paramTypes)[i]->clone();
+        // For polymorphic calls, resolve type parameters to concrete bindings
+        if (!node.typeBindings.empty()) {
+          const std::string paramTypeName = effectiveParamType->getTypeName();
+          if (polang::isTypeParameter(paramTypeName)) {
+            auto bindingIt = node.typeBindings.find(paramTypeName);
+            if (bindingIt != node.typeBindings.end()) {
+              effectiveParamType = bindingIt->second->clone();
+            }
+          }
+        }
+      }
+      if (effectiveParamType != nullptr) {
+        ExpectedTypeScope scope(*this, std::move(effectiveParamType));
+        node.arguments[i]->accept(*this);
+      } else {
+        node.arguments[i]->accept(*this);
+      }
       if (!result) {
         return;
       }
@@ -216,9 +251,9 @@ public:
       // Set resultType if we have it
       auto funcRetTypeIt = functionReturnTypes.find(funcName);
       if (funcRetTypeIt != functionReturnTypes.end()) {
-        resultType = funcRetTypeIt->second;
+        resultType = funcRetTypeIt->second->clone();
       } else {
-        resultType = std::make_shared<const NNamedType>(TypeNames::UNKNOWN);
+        resultType = makeTypeSpec(TypeNames::UNKNOWN);
       }
     } else {
       // Fallback to NTypeSpec-based lookup
@@ -229,11 +264,11 @@ public:
           result = nullptr;
           return;
         }
-        resultType = funcRetTypeIt->second;
+        resultType = funcRetTypeIt->second->clone();
       } else {
         // Function not found - use default type for unknown function
         resultTy = getDefaultType();
-        resultType = std::make_shared<const NNamedType>(TypeNames::UNKNOWN);
+        resultType = makeTypeSpec(TypeNames::UNKNOWN);
       }
     }
 
@@ -313,7 +348,7 @@ public:
       return;
     }
     Value lhs = result;
-    std::shared_ptr<const NTypeSpec> lhsType = std::move(resultType);
+    std::unique_ptr<const NTypeSpec> lhsType = std::move(resultType);
 
     node.rhs->accept(*this);
     if (!result) {
@@ -344,27 +379,27 @@ public:
     // Comparison operations - result is always bool
     case yy::parser::token::TCEQ:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::eq, lhs, rhs);
-      resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+      resultType = makeTypeSpec(TypeNames::BOOL);
       break;
     case yy::parser::token::TCNE:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::ne, lhs, rhs);
-      resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+      resultType = makeTypeSpec(TypeNames::BOOL);
       break;
     case yy::parser::token::TCLT:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::lt, lhs, rhs);
-      resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+      resultType = makeTypeSpec(TypeNames::BOOL);
       break;
     case yy::parser::token::TCLE:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::le, lhs, rhs);
-      resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+      resultType = makeTypeSpec(TypeNames::BOOL);
       break;
     case yy::parser::token::TCGT:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::gt, lhs, rhs);
-      resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+      resultType = makeTypeSpec(TypeNames::BOOL);
       break;
     case yy::parser::token::TCGE:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::ge, lhs, rhs);
-      resultType = std::make_shared<const NNamedType>(TypeNames::BOOL);
+      resultType = makeTypeSpec(TypeNames::BOOL);
       break;
     default:
       emitError(loc(node.loc)) << "Unknown binary operator: " << node.op;
@@ -390,7 +425,7 @@ public:
 
     // Create the cast operation
     result = builder.create<CastOp>(loc(node.loc), targetType, inputValue);
-    resultType = node.targetType;
+    resultType = node.targetType->clone();
   }
 
   void visit(const NBlock& node) override {
@@ -416,7 +451,7 @@ public:
 
     // Infer result type from the type checker
     node.thenExpr->accept(*this);
-    std::shared_ptr<const NTypeSpec> ifResultType = std::move(resultType);
+    std::unique_ptr<const NTypeSpec> ifResultType = std::move(resultType);
 
     // Create if operation
     Type resultTy =
@@ -470,6 +505,12 @@ public:
     --nestedScopeDepth;
   }
 
+  void visit(const NUnitLiteral& /*node*/) override {
+    // Unit literal has no MLIR representation — clear result to avoid stale
+    // values
+    result = nullptr;
+  }
+
   void visit(const NExpressionStatement& node) override {
     node.expression->accept(*this);
   }
@@ -482,10 +523,8 @@ public:
     // Nested scopes (let-expression bindings, closures) use normal SSA values.
     if (isIncremental() && isInsideEntryFunction && nestedScopeDepth == 0) {
       // Determine the type - prefer type annotation from type checker
-      std::shared_ptr<const NTypeSpec> typeSpec =
-          node.type != nullptr
-              ? node.type
-              : std::make_shared<const NNamedType>(TypeNames::I64);
+      auto typeSpec = node.type != nullptr ? node.type->clone()
+                                           : makeTypeSpec(TypeNames::I64);
 
       Type mlirType = getPolangType(*typeSpec);
       if (!mlirType) {
@@ -523,7 +562,8 @@ public:
 
         builder.setInsertionPointToStart(initBlock);
         {
-          ExpectedTypeScope scope(*this, node.type);
+          ExpectedTypeScope scope(*this,
+                                  node.type ? node.type->clone() : nullptr);
           node.assignmentExpr->accept(*this);
         }
 
@@ -550,22 +590,21 @@ public:
       auto loadOp = builder.create<GlobalLoadOp>(builder.getUnknownLoc(),
                                                  mlirType, varName);
       immutableValues[varName] = loadOp.getResult();
-      typeTable[varName] = typeSpec;
+      typeTable[varName] = typeSpec->clone();
 
       result = loadOp.getResult();
-      resultType = typeSpec;
+      resultType = std::move(typeSpec);
       return;
     }
 
     // Non-incremental path: evaluate expression and use SSA value directly
-    std::shared_ptr<const NTypeSpec> typeSpec =
-        node.type != nullptr
-            ? node.type
-            : std::make_shared<const NNamedType>(TypeNames::I64);
+    auto typeSpec = node.type != nullptr ? node.type->clone()
+                                         : makeTypeSpec(TypeNames::I64);
     Value initValue = nullptr;
     if (node.assignmentExpr != nullptr) {
       {
-        ExpectedTypeScope scope(*this, node.type);
+        ExpectedTypeScope scope(*this,
+                                node.type ? node.type->clone() : nullptr);
         node.assignmentExpr->accept(*this);
       }
       initValue = result;
@@ -577,10 +616,10 @@ public:
 
     // All variables are immutable - store SSA value directly
     immutableValues[varName] = initValue;
-    typeTable[varName] = typeSpec;
+    typeTable[varName] = typeSpec->clone();
 
     result = initValue;
-    resultType = typeSpec;
+    resultType = std::move(typeSpec);
   }
 
   void visit(const NFunctionDeclaration& node) override {
@@ -596,7 +635,7 @@ public:
     std::vector<Type> argMLIRTypes;
 
     for (const auto& arg : node.arguments) {
-      Type argType = getTypeOrFresh(arg->type.get());
+      Type argType = arg->type ? getType(*arg->type) : getTypeFresh();
       argTypes.push_back(argType);
       argMLIRTypes.push_back(argType);
       argNames.push_back(arg->id->name);
@@ -606,7 +645,7 @@ public:
     std::vector<std::string> captureNames;
     std::vector<Type> captureMLIRTypes;
     for (const auto& capture : node.captures) {
-      Type captureType = getTypeOrFresh(capture.type.get());
+      Type captureType = capture.type ? getType(*capture.type) : getTypeFresh();
       argTypes.push_back(captureType);
       captureMLIRTypes.push_back(captureType);
       captureNames.push_back(capture.id->name);
@@ -615,10 +654,17 @@ public:
     // Store captures for call site (using mangled name)
     functionCaptures[funcName] = captureNames;
 
+    // Store parameter types for literal type inference at call sites
+    std::vector<std::unique_ptr<const NTypeSpec>> paramTypeSpecs;
+    for (const auto& arg : node.arguments) {
+      paramTypeSpecs.push_back(arg->type ? arg->type->clone() : nullptr);
+    }
+    functionParamTypes[funcName] = std::move(paramTypeSpecs);
+
     // Return type
-    Type returnType = getTypeOrFresh(node.type.get());
+    Type returnType = node.type ? getType(*node.type) : getTypeFresh();
     if (node.type != nullptr) {
-      functionReturnTypes[funcName] = node.type;
+      functionReturnTypes[funcName] = node.type->clone();
     }
     functionReturnMLIRTypes[funcName] = returnType;
 
@@ -706,7 +752,7 @@ public:
       argValues[arg->id->name] = entryBlock->getArgument(argIdx);
       typeVarTable[arg->id->name] = argMLIRTypes[i];
       if (arg->type != nullptr) {
-        typeTable[arg->id->name] = arg->type;
+        typeTable[arg->id->name] = arg->type->clone();
       }
       ++argIdx;
     }
@@ -717,13 +763,20 @@ public:
       argValues[capture.id->name] = entryBlock->getArgument(argIdx);
       typeVarTable[capture.id->name] = captureMLIRTypes[i];
       if (capture.type != nullptr) {
-        typeTable[capture.id->name] = capture.type;
+        typeTable[capture.id->name] = capture.type->clone();
       }
       ++argIdx;
     }
 
-    // Generate function body
-    node.block->accept(*this);
+    // Generate function body.
+    // Set expectedLiteralType to the declared return type so that integer/float
+    // literals in the body adopt the correct type (e.g., 3 becomes i32 when
+    // the function declares () -> i32).
+    {
+      ExpectedTypeScope typeScope(*this,
+                                  node.type ? node.type->clone() : nullptr);
+      node.block->accept(*this);
+    }
 
     // Add return
     if (result) {
@@ -774,20 +827,29 @@ public:
         auto value = lookupVariable(mangled);
         if (value) {
           immutableValues[localName] = *value;
-          auto type = lookupType(mangled);
-          if (type) {
-            typeTable[localName] = type;
+          const auto* type = lookupType(mangled);
+          if (type != nullptr) {
+            typeTable[localName] = type->clone();
           }
         }
 
         // Copy function info from mangled name to local name
         auto retIt = functionReturnTypes.find(mangled);
         if (retIt != functionReturnTypes.end()) {
-          functionReturnTypes[localName] = retIt->second;
+          functionReturnTypes[localName] = retIt->second->clone();
         }
         auto retMLIRIt = functionReturnMLIRTypes.find(mangled);
         if (retMLIRIt != functionReturnMLIRTypes.end()) {
           functionReturnMLIRTypes[localName] = retMLIRIt->second;
+        }
+        auto paramIt = functionParamTypes.find(mangled);
+        if (paramIt != functionParamTypes.end()) {
+          std::vector<std::unique_ptr<const NTypeSpec>> cloned;
+          cloned.reserve(paramIt->second.size());
+          for (const auto& t : paramIt->second) {
+            cloned.push_back(t ? t->clone() : nullptr);
+          }
+          functionParamTypes[localName] = std::move(cloned);
         }
         auto captIt = functionCaptures.find(mangled);
         if (captIt != functionCaptures.end()) {
@@ -828,6 +890,11 @@ public:
     result = nullptr; // Import statements don't produce a value
   }
 
+  void visit(const NTypeSignature& /*node*/) override {
+    // Type signatures are handled by the type checker, not MLIR generation
+    result = nullptr;
+  }
+
 private:
   OpBuilder builder;
   PolangTypeConverter typeConverter;
@@ -864,11 +931,11 @@ private:
 
   // Current result value and type
   Value result;
-  std::shared_ptr<const NTypeSpec> resultType;
+  std::unique_ptr<const NTypeSpec> resultType;
 
   // Expected type for literal expressions (set by variable declarations with
   // type annotations to propagate the annotation type to literal visitors)
-  std::shared_ptr<const NTypeSpec> expectedLiteralType;
+  std::unique_ptr<const NTypeSpec> expectedLiteralType;
 
   // Module path for name mangling (e.g., ["Math", "Internal"])
   std::vector<std::string> currentModulePath;
@@ -889,12 +956,14 @@ private:
   // Symbol tables
   std::map<std::string, Value> argValues;       // Function arguments
   std::map<std::string, Value> immutableValues; // Immutable variable SSA values
-  std::map<std::string, std::shared_ptr<const NTypeSpec>>
+  std::map<std::string, std::unique_ptr<const NTypeSpec>>
       typeTable; // Variable types
   std::map<std::string, Type>
       typeVarTable; // Variable types as MLIR types (for type vars)
   std::map<std::string, std::vector<std::string>> functionCaptures;
-  std::map<std::string, std::shared_ptr<const NTypeSpec>> functionReturnTypes;
+  std::map<std::string, std::unique_ptr<const NTypeSpec>> functionReturnTypes;
+  std::map<std::string, std::vector<std::unique_ptr<const NTypeSpec>>>
+      functionParamTypes; // Function parameter types for literal inference
   std::map<std::string, Type>
       functionReturnMLIRTypes; // Function return types as MLIR types
   std::map<std::string, std::string>
@@ -908,10 +977,14 @@ private:
   class SymbolTableScope {
   public:
     SymbolTableScope(MLIRGenVisitor& visitor, bool clearAllTables = false)
-        : visitor(visitor), savedTypeTable(visitor.typeTable),
-          savedTypeVarTable(visitor.typeVarTable),
+        : visitor(visitor), savedTypeVarTable(visitor.typeVarTable),
           savedArgValues(visitor.argValues),
           savedImmutableValues(visitor.immutableValues) {
+      for (const auto& [key, val] : visitor.typeTable) {
+        if (val) {
+          savedTypeTable[key] = val->clone();
+        }
+      }
       if (clearAllTables) {
         visitor.typeTable.clear();
         visitor.typeVarTable.clear();
@@ -923,7 +996,10 @@ private:
     // NOLINTNEXTLINE(modernize-use-equals-default) - destructor restores saved
     // state
     ~SymbolTableScope() {
-      visitor.typeTable = savedTypeTable;
+      visitor.typeTable.clear();
+      for (auto& [key, val] : savedTypeTable) {
+        visitor.typeTable[key] = std::move(val);
+      }
       visitor.typeVarTable = savedTypeVarTable;
       visitor.argValues = savedArgValues;
       visitor.immutableValues = savedImmutableValues;
@@ -931,7 +1007,7 @@ private:
 
   private:
     MLIRGenVisitor& visitor;
-    std::map<std::string, std::shared_ptr<const NTypeSpec>> savedTypeTable;
+    std::map<std::string, std::unique_ptr<const NTypeSpec>> savedTypeTable;
     std::map<std::string, Type> savedTypeVarTable;
     std::map<std::string, Value> savedArgValues;
     std::map<std::string, Value> savedImmutableValues;
@@ -941,7 +1017,7 @@ private:
   /// Saves the current value and restores it on destruction.
   class ExpectedTypeScope {
   public:
-    ExpectedTypeScope(MLIRGenVisitor& v, std::shared_ptr<const NTypeSpec> type)
+    ExpectedTypeScope(MLIRGenVisitor& v, std::unique_ptr<const NTypeSpec> type)
         : visitor(v), saved(std::move(v.expectedLiteralType)) {
       visitor.expectedLiteralType = std::move(type);
     }
@@ -951,7 +1027,7 @@ private:
 
   private:
     MLIRGenVisitor& visitor;
-    std::shared_ptr<const NTypeSpec> saved;
+    std::unique_ptr<const NTypeSpec> saved;
   };
 
   /// Create MLIR location from source location
@@ -1013,7 +1089,7 @@ private:
         auto loadOp = builder.create<GlobalLoadOp>(builder.getUnknownLoc(),
                                                    mlirType, resolvedName);
         immutableValues[name] = loadOp.getResult();
-        typeTable[name] = globalTypeSpec;
+        typeTable[name] = std::move(globalTypeSpec);
         return loadOp.getResult();
       }
     }
@@ -1023,11 +1099,10 @@ private:
 
   /// Look up a variable's type by name.
   /// Returns nullptr if not found.
-  [[nodiscard]] std::shared_ptr<const NTypeSpec>
-  lookupType(const std::string& name) {
+  [[nodiscard]] const NTypeSpec* lookupType(const std::string& name) {
     auto it = typeTable.find(name);
-    if (it != typeTable.end()) {
-      return it->second;
+    if (it != typeTable.end() && it->second) {
+      return it->second.get();
     }
     return nullptr;
   }
@@ -1160,10 +1235,18 @@ private:
         continue;
       }
 
-      // Pre-populate return type and captures (but don't emit FuncOp yet)
-      functionReturnTypes[name] = retTypeSpec;
+      // Pre-populate return type, param types, and captures
+      functionReturnTypes[name] = std::move(retTypeSpec);
       functionReturnMLIRTypes[name] = returnType;
       functionCaptures[name] = func.captureNames;
+
+      // Pre-populate parameter types for literal type inference
+      std::vector<std::unique_ptr<const NTypeSpec>> paramTypeSpecs;
+      paramTypeSpecs.reserve(func.paramTypes.size());
+      for (const auto& paramType : func.paramTypes) {
+        paramTypeSpecs.push_back(makeTypeSpec(paramType));
+      }
+      functionParamTypes[name] = std::move(paramTypeSpecs);
     }
 
     // 3. Restore import mappings (local name → mangled name)
@@ -1173,11 +1256,20 @@ private:
       // Copy function metadata from mangled name to local name
       auto retIt = functionReturnTypes.find(mangledName);
       if (retIt != functionReturnTypes.end()) {
-        functionReturnTypes[localName] = retIt->second;
+        functionReturnTypes[localName] = retIt->second->clone();
       }
       auto retMLIRIt = functionReturnMLIRTypes.find(mangledName);
       if (retMLIRIt != functionReturnMLIRTypes.end()) {
         functionReturnMLIRTypes[localName] = retMLIRIt->second;
+      }
+      auto paramIt = functionParamTypes.find(mangledName);
+      if (paramIt != functionParamTypes.end()) {
+        std::vector<std::unique_ptr<const NTypeSpec>> cloned;
+        cloned.reserve(paramIt->second.size());
+        for (const auto& t : paramIt->second) {
+          cloned.push_back(t ? t->clone() : nullptr);
+        }
+        functionParamTypes[localName] = std::move(cloned);
       }
       auto captIt = functionCaptures.find(mangledName);
       if (captIt != functionCaptures.end()) {
@@ -1189,8 +1281,7 @@ private:
       if (globalIt != symbols().globals.end()) {
         // Register the mangled global as the canonical name
         // and alias the local name to it
-        auto typeSpec = makeTypeSpec(globalIt->second.type);
-        typeTable[localName] = typeSpec;
+        typeTable[localName] = makeTypeSpec(globalIt->second.type);
       }
     }
 

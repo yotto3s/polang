@@ -3,6 +3,6 @@
 
 (* CHECK: error: unterminated comment at line 7, column 1
 *)
-def x = 42
+x = 42
 (* this comment is never closed
 x

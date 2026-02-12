@@ -4,5 +4,6 @@
 (* Test function declarations and calls *)
 (* CHECK: 25 : i64
 *)
-def square(x: i64): i64 = x * x
+square : i64 -> i64
+square(x) = x * x
 square(5)

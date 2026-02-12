@@ -1,0 +1,15 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* CHECK: 25 : i64
+*)
+
+square : i64 -> i64
+square(n) = n * n
+
+add : i64 * i64 -> i64
+add(a, b) = a + b
+
+result : i64
+result = add(square(3), square(4))
+result

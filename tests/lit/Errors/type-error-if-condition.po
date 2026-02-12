@@ -4,4 +4,5 @@
 (* Test error when if condition is not boolean *)
 (* CHECK: Type error: If condition must be bool{{.*}}
 *)
-def x: i64 = if 1 then 2 else 3
+x : i64
+x = if 1 then 2 else 3

@@ -54,6 +54,14 @@ Index types map to the platform-native pointer width. `usize` is intended for ar
 |--------|---------------|--------|
 | `bool` | Boolean value | 1-bit  |
 
+### Unit Type
+
+| Type   | Description                              | Size   |
+|--------|------------------------------------------|--------|
+| `()`   | Unit type with a single value `()`       | 0-bit  |
+
+The unit type `()` represents the absence of a meaningful value. It is used in function type signatures to indicate zero-parameter functions (e.g., `() -> i64`).
+
 ### Default Literal Types
 
 - Integer literals (e.g., `42`) default to `i64`
@@ -97,51 +105,79 @@ false
 
 ### Variable Declaration
 
-Variables are declared using the `def` keyword. All variables in Polang are **immutable**:
+Variables are declared by binding names to expressions. All variables in Polang are **immutable**:
 
 ```
-def x = 5           (* type inferred as i64 *)
-def y = 3.14        (* type inferred as f64 *)
-def z = true        (* type inferred as bool *)
-def w : i64 = 10    (* explicit type annotation *)
+x = 5           (* type inferred as i64 *)
+y = 3.14        (* type inferred as f64 *)
+z = true        (* type inferred as bool *)
+```
+
+An optional **type signature** can be placed on the line before the definition:
+
+```
+w : i64
+w = 10          (* explicit type via separate type signature *)
 ```
 
 **Syntax:**
 ```
-def <identifier> = <expression>
-def <identifier> : <type> = <expression>
+<identifier> = <expression>
 ```
 
-- When type is omitted, it is **inferred from the initializer expression**
+With optional type signature on a preceding line:
+```
+<identifier> : <type>
+<identifier> = <expression>
+```
+
+- When no type signature is provided, the type is **inferred from the initializer expression**
 - Variables must be initialized at declaration
-- **No implicit type conversion**: `def x: f64 = 42` is an error (must write `42.0`)
+- **No implicit type conversion**: a variable with type signature `i64` cannot be initialized with `42.0`
 - Variables cannot be reassigned after declaration
+- Type signatures for top-level definitions are recommended; the compiler warns if they are missing
 
 ## Functions
 
 ### Function Declaration
 
-Functions are declared using `def` with parameter lists:
+Functions are declared by binding a name with a parameter list to an expression. An optional **type signature** on a preceding line specifies parameter and return types using arrow notation:
 
 ```
-def add(x: i64, y: i64): i64 = x + y   (* explicit types *)
-def square(n: i64) = n * n              (* return type inferred as i64 *)
-def double(x) = x * 2                   (* parameter type inferred from body (i64) *)
-def half(x) = x / 2.0                   (* parameter type inferred as f64 *)
+add : i64 * i64 -> i64                  (* type signature: two i64 params, returns i64 *)
+add(x, y) = x + y                      (* definition *)
+
+square(n) = n * n                       (* no type signature; types inferred *)
+double(x) = x * 2                      (* parameter type inferred from body (i64) *)
+half(x) = x / 2.0                      (* parameter type inferred as f64 *)
 ```
 
 **Syntax:**
+
+With type signature (recommended):
 ```
-def <name>(<param>: <type>, ...): <return_type> = <expression>
-def <name>(<param>: <type>, ...) = <expression>
-def <name>(<param>, ...) = <expression>    (* types inferred *)
+<name> : <type_expr>
+<name>(<param>, ...) = <expression>
 ```
 
+Without type signature (types inferred):
+```
+<name>(<param>, ...) = <expression>
+```
+
+**Type signature syntax:**
+- Single parameter: `name : param_type -> return_type`
+- Multiple parameters: `name : type1 * type2 -> return_type`
+- No parameters: `name : () -> return_type`
+- Arrow `->` is right-associative
+- `*` (product) binds tighter than `->`
+
 - Parameters are comma-separated within parentheses
-- Parameter type annotations are optional; when omitted, types are **inferred from usage**
-- Return type can be omitted and will be **inferred from the body expression**
+- Parameter types come from the type signature; when no signature is provided, types are **inferred from usage**
+- Return type comes from the type signature; when omitted, it is **inferred from the body expression**
 - Function body is a single expression
-- **No implicit type conversion**: explicit type annotations must match inferred types exactly
+- **No implicit type conversion**: type signatures must match inferred types exactly
+- The compiler warns if a top-level function definition is missing a type signature
 
 ### Parameter Type Inference
 
@@ -153,10 +189,10 @@ Polang uses Hindley-Milner style type inference to determine parameter types. Wh
 **Local inference examples:**
 
 ```
-def double(x) = x * 2       (* x inferred as i64 (from * 2) *)
-def half(x) = x / 2.0       (* x inferred as f64 (from / 2.0) *)
-def is_zero(x) = x == 0     (* x inferred as i64 (from == 0) *)
-def add(x: i64, y) = x + y  (* y inferred as i64 (from + x) *)
+double(x) = x * 2       (* x inferred as i64 (from * 2) *)
+half(x) = x / 2.0       (* x inferred as f64 (from / 2.0) *)
+is_zero(x) = x == 0     (* x inferred as i64 (from == 0) *)
+add(x, y) = x + y       (* both inferred from usage *)
 ```
 
 **Local inference rules:**
@@ -171,13 +207,13 @@ def add(x: i64, y) = x + y  (* y inferred as i64 (from + x) *)
 When a parameter's type cannot be determined from local usage, Polang infers it from the call site:
 
 ```
-def identity(x) = x         (* x is polymorphic (type variable) *)
-identity(42)                (* x inferred as i64 from call site *)
+identity(x) = x         (* x is polymorphic (type variable) *)
+identity(42)             (* x inferred as i64 from call site *)
 ```
 
 ```
-def unused(x) = 42          (* x is polymorphic (type variable) *)
-unused(1)                   (* x inferred as i64 from call site *)
+unused(x) = 42           (* x is polymorphic (type variable) *)
+unused(1)                (* x inferred as i64 from call site *)
 ```
 
 This enables polymorphic functions where the same function definition can work with different types based on how it's called. The type inference happens at the MLIR level using a unification-based algorithm.
@@ -222,9 +258,14 @@ if <condition> then <then_expr> else <else_expr>
 **Examples:**
 
 ```
-def max(a: i64, b: i64): i64 = if a > b then a else b
-def abs(x: i64): i64 = if x < 0 then 0 - x else x
-def sign(n: i64): i64 = if n > 0 then 1 else if n < 0 then 0 - 1 else 0
+max : i64 * i64 -> i64
+max(a, b) = if a > b then a else b
+
+abs : i64 -> i64
+abs(x) = if x < 0 then 0 - x else x
+
+sign : i64 -> i64
+sign(n) = if n > 0 then 1 else if n < 0 then 0 - 1 else 0
 ```
 
 ### Let Expression
@@ -286,9 +327,9 @@ let inc(n: i64) = n + 1 in inc(41)
 Functions can capture variables from their enclosing scope:
 
 ```
-def x = 10
-def f() = x + 1   (* f captures x *)
-f()               (* returns 11 *)
+x = 10
+f() = x + 1   (* f captures x *)
+f()            (* returns 11 *)
 ```
 
 **Capture Semantics:**
@@ -299,20 +340,20 @@ f()               (* returns 11 *)
 
 ```
 (* Simple capture *)
-def multiplier = 3
-def scale(n: i64) = n * multiplier
+multiplier = 3
+scale(n) = n * multiplier
 scale(10)  (* returns 30 *)
 
 (* Capture in let expression *)
-def result =
+result =
   let base = 100 and
       add(x: i64) = base + x
   in add(5)  (* returns 105 *)
 
 (* Multiple captures *)
-def a = 1
-def b = 2
-def sum() = a + b
+a = 1
+b = 2
+sum() = a + b
 sum()  (* returns 3 *)
 ```
 
@@ -361,10 +402,14 @@ Expressions can be:
 The `as` operator converts a value from one numeric type to another. Only numeric-to-numeric conversions are allowed; boolean conversions are not permitted.
 
 ```
-def a: i64 = 1000
-def b: i32 = a as i32           (* narrow i64 to i32 *)
-def c: f64 = a as f64           (* convert integer to float *)
-def d: i32 = 3.7 as i32         (* convert float to integer (truncates to 3) *)
+a : i64
+a = 1000
+b : i32
+b = a as i32           (* narrow i64 to i32 *)
+c : f64
+c = a as f64           (* convert integer to float *)
+d : i32
+d = 3.7 as i32         (* convert float to integer (truncates to 3) *)
 ```
 
 See [Type Conversions](TypeSystem.md#type-conversions) for detailed conversion semantics.
@@ -391,7 +436,7 @@ Polang uses OCaml-style block comments with `(* ... *)` delimiters:
 
 ```
 (* This is a comment *)
-def x = 5  (* inline comment after code *)
+x = 5  (* inline comment after code *)
 
 (* Comments can span
    multiple lines *)
@@ -413,9 +458,13 @@ Modules are declared using the `module`/`endmodule` keywords with a Haskell-styl
 
 ```
 module Math (add, PI)
-  def PI = 3.14159
-  def add(x: i64, y: i64): i64 = x + y
-  def internal_helper(x: i64): i64 = x * 2  (* not exported *)
+  PI : f64
+  PI = 3.14159
+
+  add : i64 * i64 -> i64
+  add(x, y) = x + y
+
+  internal_helper(x) = x * 2  (* not exported *)
 endmodule
 ```
 
@@ -429,7 +478,7 @@ endmodule
 - The export list in parentheses specifies which symbols are public
 - Symbols not in the export list are private to the module
 - A module without an export list has no public symbols
-- Modules can contain variables, functions, and nested modules
+- Modules can contain type signatures, variables, functions, and nested modules
 
 ### Qualified Access
 
@@ -437,8 +486,8 @@ Module members are accessed using dot notation:
 
 ```
 module Math (add, PI)
-  def PI = 3.14159
-  def add(x: i64, y: i64): i64 = x + y
+  PI = 3.14159
+  add(x, y) = x + y
 endmodule
 
 Math.PI              (* access exported variable *)
@@ -484,9 +533,13 @@ from <module> import *
 **Basic module with function and variable:**
 ```
 module Math (add, mul, PI)
-  def PI = 3.14159
-  def add(x: i64, y: i64): i64 = x + y
-  def mul(x: i64, y: i64): i64 = x * y
+  PI = 3.14159
+
+  add : i64 * i64 -> i64
+  add(x, y) = x + y
+
+  mul : i64 * i64 -> i64
+  mul(x, y) = x * y
 endmodule
 
 (* Using qualified access *)
@@ -501,10 +554,12 @@ mul(2, add(1, 2))            (* returns 6 *)
 ```
 module Utils (process)
   (* Public function *)
-  def process(x: i64): i64 = helper(x) + helper(x)
+  process : i64 -> i64
+  process(x) = helper(x) + helper(x)
 
   (* Private helper (not exported) *)
-  def helper(x: i64): i64 = x * 2
+  helper : i64 -> i64
+  helper(x) = x * 2
 endmodule
 
 Utils.process(5)   (* returns 20 *)
@@ -515,7 +570,8 @@ Utils.helper(5)    (* ERROR: helper is not exported *)
 ```
 module Outer (Inner)
   module Inner (foo)
-    def foo(x: i64): i64 = x + 1
+    foo : i64 -> i64
+    foo(x) = x + 1
   endmodule
 endmodule
 
@@ -527,24 +583,24 @@ Outer.Inner.foo(5)  (* returns 6 *)
 ```ebnf
 program     ::= statement*
 
-statement   ::= var_decl
+statement   ::= type_signature
+              | var_decl
               | func_decl
               | module_decl
               | import_stmt
               | expression
 
-var_decl    ::= "def" identifier "=" expression
-              | "def" identifier ":" type "=" expression
+type_signature ::= identifier ":" type_expr
 
-func_decl   ::= "def" identifier "(" param_list ")" ":" type "=" expression
-              | "def" identifier "(" param_list ")" "=" expression
-              | "def" identifier "()" ":" type "=" expression
-              | "def" identifier "()" "=" expression
+var_decl    ::= identifier "=" expression
+
+func_decl   ::= identifier "(" param_list ")" "=" expression
+              | identifier "()" "=" expression
 
 module_decl ::= "module" identifier "(" ident_list ")" module_body "endmodule"
               | "module" identifier module_body "endmodule"
 
-module_body ::= (var_decl | func_decl | module_decl)*
+module_body ::= (type_signature | var_decl | func_decl | module_decl)*
 
 import_stmt ::= "import" qualified_name
               | "import" qualified_name "as" identifier
@@ -559,8 +615,7 @@ ident_list  ::= identifier ("," identifier)*
 
 param_list  ::= param ("," param)*
 
-param       ::= identifier ":" type
-              | identifier
+param       ::= identifier
 
 expression  ::= qualified_name "(" call_args ")"
               | identifier "(" call_args ")"
@@ -601,11 +656,26 @@ boolean     ::= "true" | "false"
 
 type        ::= base_type
 
+type_expr    ::= "forall" type_var_list "." type_expr   (* quantified type *)
+               | type_product "->" type_expr            (* right-associative *)
+               | type_product
+type_var_list ::= type_var_decl { "," type_var_decl }
+type_var_decl ::= typevar                 (* unconstrained: 'a *)
+                | typevar ":" identifier  (* constrained: 'a:Numeric *)
+typevar      ::= "'" [a-z] [a-zA-Z0-9_]*
+type_product ::= type_atom "*" type_product   (* `*` binds tighter than `->` *)
+               | type_atom
+type_atom    ::= type
+               | typevar
+               | "()"
+               | "(" type_expr ")"
+
 base_type   ::= "i8" | "i16" | "i32" | "i64"
               | "u8" | "u16" | "u32" | "u64"
               | "f32" | "f64"
               | "isize" | "usize"
               | "bool"
+              | "()"
 
 comment      ::= "(*" comment_body "*)"
 comment_body ::= { any_char | comment }    (* nested comments allowed *)
@@ -617,68 +687,88 @@ any_char     ::= ? any character other than "(*", "*)", or EOF ?
 ### Simple Variable
 
 ```
-def x = 42
+x = 42
 ```
 
 ### Arithmetic Expression
 
 ```
-def a = 10
-def b = 20
-def sum = a + b
+a = 10
+b = 20
+sum = a + b
 ```
 
 ### Function Definition and Call
 
 ```
-def multiply(x: i64, y: i64): i64 = x * y
-def result = multiply(6, 7)
+multiply : i64 * i64 -> i64
+multiply(x, y) = x * y
+
+result = multiply(6, 7)
 ```
 
 ### Comparison
 
 ```
-def a = 5
-def b = 10
-def is_less : bool = a < b
+a = 5
+b = 10
+
+is_less : bool
+is_less = a < b
 ```
 
 ### Complex Expression
 
 ```
-def compute(a: i64, b: i64, c: i64): i64 = (a + b) * c
-def answer = compute(1, 2, 3)
+compute : i64 * i64 * i64 -> i64
+compute(a, b, c) = (a + b) * c
+
+answer = compute(1, 2, 3)
 ```
 
 ### If Expression
 
 ```
-def max(a: i64, b: i64): i64 = if a > b then a else b
-def larger = max(10, 20)
+max : i64 * i64 -> i64
+max(a, b) = if a > b then a else b
+
+larger = max(10, 20)
 ```
 
 ### Type Conversions
 
 ```
 (* Integer narrowing (truncates) *)
-def big: i64 = 1000
-def small: i8 = big as i8        (* small = -24 (1000 mod 256, interpreted as signed) *)
+big : i64
+big = 1000
+small : i8
+small = big as i8        (* small = -24 (1000 mod 256, interpreted as signed) *)
 
 (* Integer to float *)
-def n: i32 = 42
-def f: f64 = n as f64            (* f = 42.0 *)
+n : i32
+n = 42
+f : f64
+f = n as f64            (* f = 42.0 *)
 
 (* Float to integer (truncates toward zero, saturates at bounds) *)
-def pi: f64 = 3.14159
-def rounded: i32 = pi as i32     (* rounded = 3 *)
+pi : f64
+pi = 3.14159
+rounded : i32
+rounded = pi as i32     (* rounded = 3 *)
 
 (* Mixed arithmetic with conversions *)
-def a: i32 = 10
-def b: i64 = 20
-def sum: i64 = a as i64 + b      (* convert a to i64 before adding *)
+a : i32
+a = 10
+b : i64
+b = 20
+sum : i64
+sum = a as i64 + b      (* convert a to i64 before adding *)
 
 (* Index type conversions *)
-def idx: isize = 42 as isize     (* convert integer to isize *)
-def n2: i64 = idx as i64         (* convert isize back to integer *)
-def uidx: usize = 10 as usize   (* convert integer to usize *)
+idx : isize
+idx = 42 as isize       (* convert integer to isize *)
+n2 : i64
+n2 = idx as i64         (* convert isize back to integer *)
+uidx : usize
+uidx = 10 as usize      (* convert integer to usize *)
 ```

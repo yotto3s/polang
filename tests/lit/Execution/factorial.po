@@ -4,7 +4,7 @@
 (* Test factorial calculation with let expressions *)
 (* CHECK: 120 : i64
 *)
-def fact5 =
+fact5 =
   let n1 = 1 in
   let n2 = n1 * 2 in
   let n3 = n2 * 3 in

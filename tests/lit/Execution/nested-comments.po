@@ -4,5 +4,5 @@
 (* Test nested block comments (* inner comment *) *)
 (* CHECK: 10 : i64
 *)
-def x = 5 (* (* nested *) comment *)
+x = 5 (*  (* nested *) comment *)
 x + x

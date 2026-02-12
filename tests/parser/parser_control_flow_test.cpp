@@ -55,7 +55,7 @@ TEST(ParserTest, NestedIfExpression) {
 }
 
 TEST(ParserTest, IfExpressionInVariableDeclaration) {
-  auto block = parseOrFail("def x = if a then 1 else 0");
+  auto block = parseOrFail("x = if a then 1 else 0");
   ASSERT_NE(block, nullptr);
 
   auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
@@ -67,11 +67,14 @@ TEST(ParserTest, IfExpressionInVariableDeclaration) {
 }
 
 TEST(ParserTest, IfExpressionInFunctionBody) {
-  auto block =
-      parseOrFail("def max(a: int, b: int): int = if a > b then a else b");
+  auto block = parseOrFail(
+      "max : int * int -> int\nmax(a, b) = if a > b then a else b");
   ASSERT_NE(block, nullptr);
 
-  auto* funcDecl = getFirstStatement<NFunctionDeclaration>(block.get());
+  // First statement is type signature, second is function declaration
+  ASSERT_GE(block->statements.size(), 2);
+  auto* funcDecl =
+      dynamic_cast<NFunctionDeclaration*>(block->statements[1].get());
   ASSERT_NE(funcDecl, nullptr);
   EXPECT_EQ(funcDecl->id->name, "max");
 
@@ -193,7 +196,7 @@ TEST(ParserTest, NestedLetExpression) {
 }
 
 TEST(ParserTest, LetExpressionInVariableDeclaration) {
-  auto block = parseOrFail("def a = let x = 5 in x + 1");
+  auto block = parseOrFail("a = let x = 5 in x + 1");
   ASSERT_NE(block, nullptr);
 
   auto* varDecl = getFirstStatement<NVariableDeclaration>(block.get());
@@ -207,10 +210,13 @@ TEST(ParserTest, LetExpressionInVariableDeclaration) {
 }
 
 TEST(ParserTest, LetExpressionInFunctionBody) {
-  auto block = parseOrFail("def f(a: int): int = let b = 2 in a * b");
+  auto block = parseOrFail("f : int -> int\nf(a) = let b = 2 in a * b");
   ASSERT_NE(block, nullptr);
 
-  auto* funcDecl = getFirstStatement<NFunctionDeclaration>(block.get());
+  // First statement is type signature, second is function declaration
+  ASSERT_GE(block->statements.size(), 2);
+  auto* funcDecl =
+      dynamic_cast<NFunctionDeclaration*>(block->statements[1].get());
   ASSERT_NE(funcDecl, nullptr);
   EXPECT_EQ(funcDecl->id->name, "f");
 

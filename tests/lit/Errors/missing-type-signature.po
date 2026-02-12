@@ -1,0 +1,9 @@
+(* RUN: %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* CHECK: Warning: missing type signature for 'x'
+*)
+(* CHECK: Warning: missing type signature for 'square'
+*)
+x = 10
+square(n) = n * n

@@ -11,13 +11,13 @@ using ::testing::HasSubstr;
 // Basic type and arithmetic tests are covered by lit tests in tests/lit/LLVMIR/
 
 TEST(CompilerIntegration, ComparisonInFunction) {
-  const auto result = runCompiler("def lt(a: i64, b: i64): bool = a < b");
+  const auto result = runCompiler("lt : i64 * i64 -> bool\nlt(a, b) = a < b");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("icmp"));
 }
 
 TEST(CompilerIntegration, FunctionDeclaration) {
-  const auto result = runCompiler("def add(a: i64, b: i64): i64 = a + b");
+  const auto result = runCompiler("add : i64 * i64 -> i64\nadd(a, b) = a + b");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("define"));
   EXPECT_THAT(result.stdout_output, HasSubstr("@add"));
@@ -26,7 +26,7 @@ TEST(CompilerIntegration, FunctionDeclaration) {
 TEST(CompilerIntegration, IfExpressionInFunction) {
   // Use function to test if-expression without constant folding
   const auto result =
-      runCompiler("def abs(x: i64): i64 = if x < 0 then 0 - x else x");
+      runCompiler("abs : i64 -> i64\nabs(x) = if x < 0 then 0 - x else x");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("br"));
   EXPECT_THAT(result.stdout_output, HasSubstr("icmp"));
@@ -35,7 +35,7 @@ TEST(CompilerIntegration, IfExpressionInFunction) {
 TEST(CompilerIntegration, ConstantFoldedExpression) {
   // MLIR backend performs constant folding for immutable bindings
   // Result: 1 + 2 = 3 is computed at compile time
-  const auto result = runCompiler("def y: i64 = let x = 1 in x + 2");
+  const auto result = runCompiler("y : i64\ny = let x = 1 in x + 2");
   EXPECT_EQ(result.exit_code, 0);
   // Check for constant-folded result (ret i64 3)
   EXPECT_THAT(result.stdout_output, HasSubstr("ret i64 3"));
@@ -44,7 +44,7 @@ TEST(CompilerIntegration, ConstantFoldedExpression) {
 TEST(CompilerIntegration, LetExpressionMultipleBindings) {
   // MLIR backend performs constant folding for immutable bindings
   // Result: 1 + 2 = 3 is computed at compile time
-  const auto result = runCompiler("def z: i64 = let x = 1 and y = 2 in x + y");
+  const auto result = runCompiler("z : i64\nz = let x = 1 and y = 2 in x + y");
   EXPECT_EQ(result.exit_code, 0);
   // Check for constant-folded result (ret i64 3)
   EXPECT_THAT(result.stdout_output, HasSubstr("ret i64 3"));
@@ -52,13 +52,13 @@ TEST(CompilerIntegration, LetExpressionMultipleBindings) {
 
 TEST(CompilerIntegration, FunctionDeclarationAndCall) {
   const auto result =
-      runCompiler("def double(x: i64): i64 = x * 2\ndef y: i64 = double(5)");
+      runCompiler("double : i64 -> i64\ndouble(x) = x * 2\ny : i64\ny = double(5)");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("call"));
 }
 
 TEST(CompilerIntegration, ModuleDefinition) {
-  const auto result = runCompiler("def x = 1");
+  const auto result = runCompiler("x = 1");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("ModuleID"));
   EXPECT_THAT(result.stdout_output, HasSubstr("define"));
@@ -99,7 +99,7 @@ TEST(CompilerIntegration, NestedLetExpression) {
 
 TEST(CompilerIntegration, FunctionWithMultipleParams) {
   const auto result =
-      runCompiler("def add(a: i64, b: i64, c: i64): i64 = a + b + c");
+      runCompiler("add : i64 * i64 * i64 -> i64\nadd(a, b, c) = a + b + c");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("@add"));
   // MLIR backend uses SSA style (no allocas for params)
@@ -135,7 +135,7 @@ TEST(CompilerCLI, UnknownOption) {
 
 TEST(CompilerCLI, EmitMlirFlag) {
   // Test --emit-mlir produces Polang dialect MLIR
-  const auto result = runCompiler("def x = 42");
+  const auto result = runCompiler("x = 42");
   // Default output is LLVM IR
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("define"));
@@ -143,7 +143,7 @@ TEST(CompilerCLI, EmitMlirFlag) {
 
 TEST(CompilerCLI, DumpAstFlag) {
   // Verify --dump-ast with stdin input
-  const auto result = runCompiler("def x = 42");
+  const auto result = runCompiler("x = 42");
   EXPECT_EQ(result.exit_code, 0);
 }
 
@@ -163,63 +163,63 @@ TEST(CompilerIntegration, TypeErrorExitsWithCode1) {
 TEST(CompilerIntegration, FloatArithmetic) {
   // Test float operations produce fcmp/fadd instructions
   const auto result =
-      runCompiler("def fsub(a: f64, b: f64): f64 = a - b");
+      runCompiler("fsub : f64 * f64 -> f64\nfsub(a, b) = a - b");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("fsub"));
 }
 
 TEST(CompilerIntegration, FloatMultiplication) {
   const auto result =
-      runCompiler("def fmul(a: f64, b: f64): f64 = a * b");
+      runCompiler("fmul : f64 * f64 -> f64\nfmul(a, b) = a * b");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("fmul"));
 }
 
 TEST(CompilerIntegration, FloatDivision) {
   const auto result =
-      runCompiler("def fdiv(a: f64, b: f64): f64 = a / b");
+      runCompiler("fdiv : f64 * f64 -> f64\nfdiv(a, b) = a / b");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("fdiv"));
 }
 
 TEST(CompilerIntegration, IntegerDivision) {
   const auto result =
-      runCompiler("def idiv(a: i64, b: i64): i64 = a / b");
+      runCompiler("idiv : i64 * i64 -> i64\nidiv(a, b) = a / b");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("sdiv"));
 }
 
 TEST(CompilerIntegration, FloatComparison) {
   const auto result =
-      runCompiler("def fle(a: f64, b: f64): bool = a <= b");
+      runCompiler("fle : f64 * f64 -> bool\nfle(a, b) = a <= b");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("fcmp ole"));
 }
 
 TEST(CompilerIntegration, FloatNotEqual) {
   const auto result =
-      runCompiler("def fne(a: f64, b: f64): bool = a != b");
+      runCompiler("fne : f64 * f64 -> bool\nfne(a, b) = a != b");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("fcmp one"));
 }
 
 TEST(CompilerIntegration, FloatGreaterEqual) {
   const auto result =
-      runCompiler("def fge(a: f64, b: f64): bool = a >= b");
+      runCompiler("fge : f64 * f64 -> bool\nfge(a, b) = a >= b");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("fcmp oge"));
 }
 
 TEST(CompilerIntegration, CastIntToFloat) {
   const auto result =
-      runCompiler("def to_f64(x: i64): f64 = x as f64");
+      runCompiler("to_f64 : i64 -> f64\nto_f64(x) = x as f64");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("sitofp"));
 }
 
 TEST(CompilerIntegration, CastFloatToInt) {
   const auto result =
-      runCompiler("def to_i64(x: f64): i64 = x as i64");
+      runCompiler("to_i64 : f64 -> i64\nto_i64(x) = x as i64");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("fptosi.sat"));
 }

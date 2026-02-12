@@ -1,0 +1,12 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test: polymorphic function with isize arg and integer literal *)
+(* The literal 3 should unify with isize, not default to i64 *)
+
+add : forall 'a:Numeric. 'a * 'a -> 'a
+add(x, y) = x + y
+
+(* CHECK: 4 : isize
+*)
+add(1 as isize, 3)

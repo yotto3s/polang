@@ -1,0 +1,16 @@
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
+
+(* Test that forall with Numeric constraint produces correct monomorphized MLIR. *)
+
+(* Specialized add for i64 *)
+(* CHECK-DAG: {{.*}}polang.func @add$i64_i64(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+*)
+
+(* Original generic erased *)
+(* CHECK-NOT: polang.generic_func
+*)
+
+add : forall 'a:Numeric. 'a * 'a -> 'a
+add(x, y) = x + y
+add(1, 2)

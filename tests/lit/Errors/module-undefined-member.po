@@ -6,6 +6,6 @@
 *)
 
 module Math (PI)
-  def PI = 3.14
+  PI = 3.14
 endmodule
 Math.unknown

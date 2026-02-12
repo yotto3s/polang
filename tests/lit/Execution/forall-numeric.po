@@ -1,0 +1,10 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+(* CHECK: 3 : i64
+*)
+
+(* Test forall with Numeric constraint on integer arguments. *)
+
+add : forall 'a:Numeric. 'a * 'a -> 'a
+add(x, y) = x + y
+add(1, 2)

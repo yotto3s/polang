@@ -61,7 +61,6 @@ bool polang_lexer_has_error() {
 [ \t]+                  { /* skip spaces and tabs */ }
 \n                      { yycolumn = 1; /* newline resets column */ }
 "let"                   { return yy::parser::make_TLET(LOC); }
-"def"                   { return yy::parser::make_TDEF(LOC); }
 "fun"                   { return yy::parser::make_TFUN(LOC); }
 "in"                    { return yy::parser::make_TIN(LOC); }
 "and"                   { return yy::parser::make_TAND(LOC); }
@@ -75,6 +74,8 @@ bool polang_lexer_has_error() {
 "import"                { return yy::parser::make_TIMPORT(LOC); }
 "from"                  { return yy::parser::make_TFROM(LOC); }
 "as"                    { return yy::parser::make_TAS(LOC); }
+"forall"                { return yy::parser::make_TFORALL(LOC); }
+'[a-z][a-zA-Z0-9_]*    { return yy::parser::make_TTYPEVAR(std::string(yytext, yyleng), LOC); }
 [a-zA-Z_][a-zA-Z0-9_]*  { return yy::parser::make_TIDENTIFIER(std::string(yytext, yyleng), LOC); }
 [0-9]+\.[0-9]*          { return yy::parser::make_TDOUBLE(std::string(yytext, yyleng), LOC); }
 [0-9]+                  { return yy::parser::make_TINTEGER(std::string(yytext, yyleng), LOC); }

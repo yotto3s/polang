@@ -138,11 +138,11 @@ When modifying code under `mlir/`, in PLAN mode, **read** the official MLIR docu
 
 | Directory | Count | Description |
 |-----------|-------|-------------|
-| `tests/lit/AST/` | 18 | AST dump tests (`--dump-ast`) |
-| `tests/lit/MLIR/` | 46 | MLIR output tests (`--emit-mlir`) |
+| `tests/lit/AST/` | 22 | AST dump tests (`--dump-ast`) |
+| `tests/lit/MLIR/` | 44 | MLIR output tests (`--emit-mlir`) |
 | `tests/lit/LLVMIR/` | 16 | LLVM IR generation |
-| `tests/lit/Execution/` | 55 | REPL execution |
-| `tests/lit/Errors/` | 15 | Error handling |
+| `tests/lit/Execution/` | 76 | REPL execution |
+| `tests/lit/Errors/` | 25 | Error handling |
 
 ## Expected Example Outputs
 

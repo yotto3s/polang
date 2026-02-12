@@ -6,10 +6,11 @@
 (* This test verifies u64 function definitions work in MLIR generation *)
 
 (* Define u64 functions (MLIR generation test) *)
-def add_u64(a: u64, b: u64): u64 = a + b
+add_u64 : u64 * u64 -> u64
+add_u64(a, b) = a + b
 
 (* For execution we use a polymorphic function that can work with any numeric type *)
-def add(x, y) = x + y
+add(x, y) = x + y
 
 (* Final result using polymorphic function *)
 (* CHECK: 30000 : i64

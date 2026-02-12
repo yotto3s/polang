@@ -8,4 +8,4 @@
 *)
 (* CHECK-NEXT:   `-NInteger 42
 *)
-def x = 42
+x = 42

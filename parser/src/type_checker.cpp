@@ -44,6 +44,11 @@ public:
   }
 
   void visit(const NNamedType& /*node*/) override {}
+  void visit(const NArrowType& /*node*/) override {}
+  void visit(const NProductType& /*node*/) override {}
+  void visit(const NTypeVar& /*node*/) override {}
+  void visit(const NForallType& /*node*/) override {}
+  void visit(const NUnitType& /*node*/) override {}
   void visit(const NInteger& /*node*/) override {}
   void visit(const NDouble& /*node*/) override {}
   void visit(const NBoolean& /*node*/) override {}
@@ -121,8 +126,10 @@ public:
     localNames.insert(node.id->name);
   }
 
+  void visit(const NUnitLiteral& /*node*/) override {}
   void visit(const NModuleDeclaration& /*node*/) override {}
   void visit(const NImportStatement& /*node*/) override {}
+  void visit(const NTypeSignature& /*node*/) override {}
 
 private:
   std::set<std::string> localNames;
@@ -135,6 +142,29 @@ void TypeChecker::visit(const NNamedType& node) {
   // Named types just set inferredType to their name
   inferredType = node.name;
 }
+
+void TypeChecker::visit(const NArrowType& /*node*/) {
+  // Arrow types are used in type signatures, not directly visited
+}
+
+void TypeChecker::visit(const NProductType& /*node*/) {
+  // Product types are used in type signatures, not directly visited
+}
+
+void TypeChecker::visit(const NTypeVar& node) {
+  // Type variables in signatures set inferredType to "typevar"
+  inferredType = node.getTypeName();
+}
+
+void TypeChecker::visit(const NForallType& /*node*/) {
+  // Forall types are handled in applyFunctionSignature, not directly visited
+}
+
+void TypeChecker::visit(const NUnitType& /*node*/) {
+  // Unit type in type signatures — handled via applyFunctionSignature
+}
+
+void TypeChecker::visit(const NUnitLiteral& /*node*/) { inferredType = "()"; }
 
 std::string TypeChecker::mangledName(const std::string& name) const {
   if (modulePath.empty()) {
@@ -152,18 +182,25 @@ std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   errors.clear();
   localTypes.clear();
   functionSignatures.clear();
+  pendingTypeSignatures.clear();
+  scopeDepth = 0;
   subst = polang::Substitution();
   traitConstraints = polang::TraitConstraints();
   polang::resetUnificationVarCounter();
   ast.accept(*this);
+  warnOrphanedTypeSignatures();
   return errors;
 }
 
 std::vector<TypeCheckError>
 TypeChecker::checkIncremental(const NBlock& newStatements) {
   // Clear transient state but preserve persistent environment
-  // (localTypes, functionSignatures)
+  // (localTypes, functionSignatures).
+  // Note: we intentionally do NOT call warnOrphanedTypeSignatures() here
+  // because the REPL is incremental — a type signature entered in one input
+  // may have its corresponding definition provided in a subsequent input.
   errors.clear();
+  scopeDepth = 0;
   subst = polang::Substitution();
   traitConstraints = polang::TraitConstraints();
   newStatements.accept(*this);
@@ -177,6 +214,11 @@ TypeCheckerSnapshot TypeChecker::saveState() const {
   snapshot.moduleExports = moduleExports;
   snapshot.moduleAliases = moduleAliases;
   snapshot.importedSymbols = importedSymbols;
+  for (const auto& [key, val] : pendingTypeSignatures) {
+    if (val) {
+      snapshot.pendingTypeSignatures[key] = val->clone();
+    }
+  }
   return snapshot;
 }
 
@@ -186,6 +228,12 @@ void TypeChecker::restoreState(const TypeCheckerSnapshot& snapshot) {
   moduleExports = snapshot.moduleExports;
   moduleAliases = snapshot.moduleAliases;
   importedSymbols = snapshot.importedSymbols;
+  pendingTypeSignatures.clear();
+  for (const auto& [key, val] : snapshot.pendingTypeSignatures) {
+    if (val) {
+      pendingTypeSignatures[key] = val->clone();
+    }
+  }
 }
 
 void TypeChecker::reportError(const std::string& message) {
@@ -345,11 +393,10 @@ void TypeChecker::instantiateCall(NMethodCall& node,
   // Unify argument types with instantiated parameter types
   for (size_t i = 0; i < argTypes.size(); ++i) {
     std::string instantiatedParam = callSubst.apply(scheme.paramTypes[i]);
-    std::string resolvedArg = resolveWithDefaults(argTypes[i]);
-    if (resolvedArg == TypeNames::UNKNOWN) {
+    if (argTypes[i] == TypeNames::UNKNOWN) {
       continue;
     }
-    if (!callUnifier.unify(instantiatedParam, resolvedArg, callSubst)) {
+    if (!callUnifier.unify(instantiatedParam, argTypes[i], callSubst)) {
       reportError("Function '" + funcName + "' argument " +
                       std::to_string(i + 1) + ": type mismatch",
                   node.loc);
@@ -358,11 +405,24 @@ void TypeChecker::instantiateCall(NMethodCall& node,
     }
   }
 
+  // Propagate resolved types back to arguments with generic types
+  for (size_t i = 0; i < argTypes.size(); ++i) {
+    std::string resolvedParam = callSubst.apply(scheme.paramTypes[i]);
+    resolvedParam = polang::resolveGenericToDefault(resolvedParam);
+    if (!isGenericType(resolvedParam) && resolvedParam != TypeNames::UNKNOWN &&
+        resolvedParam != TypeNames::TYPEVAR &&
+        !polang::isTypeParameter(resolvedParam) &&
+        !polang::isUnificationVar(resolvedParam)) {
+      propagateTypeToSource(node.arguments[i].get(), resolvedParam);
+      node.arguments[i]->accept(*this);
+    }
+  }
+
   // Resolve all type param bindings to concrete types
   node.typeBindings.clear();
   for (const auto& tp : scheme.typeParams) {
     std::string resolved = callSubst.apply(tp);
-    resolved = resolveWithDefaults(resolved);
+    resolved = polang::resolveGenericToDefault(resolved);
 
     // Validate trait bounds
     auto boundsIt = scheme.paramBounds.find(tp);
@@ -373,7 +433,16 @@ void TypeChecker::instantiateCall(NMethodCall& node,
         msg += funcName;
         msg += "': type ";
         msg += resolved;
-        msg += " does not satisfy trait bounds for ";
+        msg += " does not satisfy [";
+        bool first = true;
+        for (auto b : boundsIt->second) {
+          if (!first) {
+            msg += ", ";
+          }
+          msg += polang::traitBoundToString(b);
+          first = false;
+        }
+        msg += "] for ";
         msg += tp;
         reportError(msg, node.loc);
       }
@@ -384,7 +453,7 @@ void TypeChecker::instantiateCall(NMethodCall& node,
 
   // Resolve return type
   std::string resolvedReturn = callSubst.apply(scheme.returnType);
-  resolvedReturn = resolveWithDefaults(resolvedReturn);
+  resolvedReturn = polang::resolveGenericToDefault(resolvedReturn);
   inferredType = resolvedReturn;
 }
 
@@ -492,6 +561,8 @@ void TypeChecker::visit(const NBinaryOperator& node) {
 void TypeChecker::visit(const NCastExpression& node) {
   // Visit the inner expression to collect any free variables and check types
   node.expression->accept(*this);
+  // Resolve generic for validation only — don't propagate back to the source
+  // variable, since a cast is a type conversion, not a type constraint.
   const std::string sourceType = polang::resolveGenericToDefault(inferredType);
   const std::string targetType = node.targetType->getTypeName();
 
@@ -512,7 +583,6 @@ void TypeChecker::visit(const NCastExpression& node) {
 
 void TypeChecker::visit(const NBlock& node) {
   // Save tracking maps for nested scope handling
-  const auto savedUnresolvedGenerics = unresolvedGenerics;
   const auto savedVarDeclNodes = varDeclNodes;
 
   for (const auto& stmt : node.statements) {
@@ -522,8 +592,15 @@ void TypeChecker::visit(const NBlock& node) {
   // Resolve any remaining generic types to defaults at end of block
   resolveRemainingGenerics();
 
+  // Also resolve the block's inferred type if it's still generic.
+  // Skip resolution inside function bodies (scopeDepth > 0) so that
+  // inferFunction can use the declared return type as context instead of
+  // defaulting {int} to i64 / {float} to f64.
+  if (scopeDepth == 0 && containsGenericType(inferredType)) {
+    inferredType = resolveAllGenericsToDefault(inferredType);
+  }
+
   // Restore tracking maps for outer scope
-  unresolvedGenerics = savedUnresolvedGenerics;
   varDeclNodes = savedVarDeclNodes;
 }
 
@@ -660,10 +737,17 @@ void TypeChecker::typeCheckLetBindings(
       }
 
       if (var->type == nullptr) {
-        // Resolve generic types to defaults for inferred declarations
-        std::string resolvedType = resolveGenericToDefault(exprType);
-        mutableVar.type = makeTypeSpec(resolvedType);
-        bindingTypes.push_back(resolvedType);
+        // Keep generic types (e.g. {int}) — they will be resolved when used
+        // in a context that provides a concrete type, or defaulted at end of
+        // block.
+        if (containsGenericType(exprType)) {
+          // Raw name is intentional: let-bindings use raw names in localTypes
+          // (via addLetBindingsToScope), unlike top-level decls which use
+          // mangled names.
+          varDeclNodes[var->id->name] = &mutableVar;
+        }
+        mutableVar.type = makeTypeSpec(exprType);
+        bindingTypes.push_back(exprType);
       } else {
         std::string declaredType = var->type->getTypeName();
         if (!areTypesCompatible(exprType, declaredType)) {
@@ -748,20 +832,16 @@ void TypeChecker::typeCheckVarDeclNoInit(NVariableDeclaration& node,
 void TypeChecker::typeCheckVarDeclInferType(NVariableDeclaration& node,
                                             const std::string& varName,
                                             const std::string& exprType) {
-  // For deferred type inference: resolve to default but track for potential
-  // re-resolution
-  std::string resolvedType = resolveAllGenericsToDefault(exprType);
-
-  // Track types containing generics for later resolution
+  // Track variables with generic types for deferred resolution at block end
   if (containsGenericType(exprType)) {
-    unresolvedGenerics[varName] = exprType;
     varDeclNodes[varName] = &node;
   }
 
-  // Always set node.type so MLIR has valid types
-  node.type = makeTypeSpec(resolvedType);
-  localTypes[varName] = resolvedType;
-  inferredType = resolvedType;
+  // Keep generic types (e.g. {int}) — they will be resolved when used in a
+  // context that provides a concrete type, or defaulted at end of block.
+  node.type = makeTypeSpec(exprType);
+  localTypes[varName] = exprType;
+  inferredType = exprType;
 }
 
 void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
@@ -771,9 +851,9 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
 
   const std::string& expectedType = declType;
 
-  // If actual type could be re-resolved (source is in unresolvedGenerics) and
+  // If actual type could be re-resolved (source has generic type) and
   // expected is concrete, propagate back. We check by trying to propagate - if
-  // the source variable is in unresolvedGenerics, it will be resolved;
+  // the source variable has a generic type, it will be resolved;
   // otherwise nothing happens.
   std::string actualType = exprType;
   if (!isGenericType(expectedType) && expectedType != TypeNames::TYPEVAR) {
@@ -801,6 +881,16 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
   auto& mutableNode = const_cast<NVariableDeclaration&>(node);
   const std::string varName = mangledName(node.id->name);
 
+  // Apply pending type signature if available
+  auto sigIt = pendingTypeSignatures.find(varName);
+  if (sigIt != pendingTypeSignatures.end()) {
+    mutableNode.type = std::move(sigIt->second);
+    pendingTypeSignatures.erase(sigIt);
+  } else if (scopeDepth == 0 && node.assignmentExpr != nullptr) {
+    std::cerr << "Warning: missing type signature for '" << node.id->name
+              << "'\n";
+  }
+
   if (node.assignmentExpr == nullptr) {
     typeCheckVarDeclNoInit(mutableNode, varName);
     return;
@@ -826,14 +916,15 @@ void TypeChecker::visit(const NVariableDeclaration& node) {
   bool needsInference = node.type == nullptr;
   if (!needsInference && containsGenericType(exprType)) {
     // Check if the current node type matches what we'd get from default
-    // resolution
+    // resolution. This relies on defaults being stable ({int}->i64,
+    // {float}->f64). If defaults ever change, update this check.
     std::string defaultType = resolveGenericToDefault(exprType);
     std::string nodeTypeName = node.type->getTypeName();
     if (nodeTypeName == defaultType) {
       // Type was set to default by previous run, allow re-resolution
       needsInference = true;
       // Clear the type so it can be re-resolved
-      mutableNode.type = nullptr;
+      mutableNode.type.reset();
     }
   }
 
@@ -850,6 +941,17 @@ void TypeChecker::visit(const NFunctionDeclaration& node) {
   auto& mutableNode = const_cast<NFunctionDeclaration&>(node);
 
   const std::string funcName = mangledName(node.id->name);
+
+  // Apply pending type signature if available
+  auto sigIt = pendingTypeSignatures.find(funcName);
+  if (sigIt != pendingTypeSignatures.end()) {
+    applyFunctionSignature(mutableNode, std::move(sigIt->second));
+    pendingTypeSignatures.erase(sigIt);
+  } else if (scopeDepth == 0) {
+    std::cerr << "Warning: missing type signature for '" << node.id->name
+              << "'\n";
+  }
+
   const auto savedLocals = localTypes;
 
   inferFunction(mutableNode, funcName, savedLocals);
@@ -918,9 +1020,115 @@ void TypeChecker::inferFunction(
   functionSignatures[funcName] =
       polang::MonoSignature{paramTypes, TypeNames::TYPEVAR};
 
+  // For explicit forall: pre-unify params that share the same type variable,
+  // and build the type param -> uni var mapping
+  std::map<std::string, std::string> typeParamToUniVar;
+  if (node.hasExplicitForall) {
+    for (const auto& arg : node.arguments) {
+      if (arg->type != nullptr &&
+          polang::isTypeParameter(arg->type->getTypeName())) {
+        std::string tp = arg->type->getTypeName();
+        auto uvIt = paramUniVars.find(arg->id->name);
+        if (uvIt != paramUniVars.end()) {
+          auto existingIt = typeParamToUniVar.find(tp);
+          if (existingIt != typeParamToUniVar.end()) {
+            // Same type param → unify the uni vars
+            unifier.unify(existingIt->second, uvIt->second, subst);
+          } else {
+            typeParamToUniVar[tp] = uvIt->second;
+          }
+        }
+      }
+    }
+  }
+
   // Type-check function body
+  ++scopeDepth;
   node.block->accept(*this);
+  --scopeDepth;
   std::string bodyType = inferredType;
+
+  // Handle explicit forall: validate bounds and build signature from declared
+  // params
+  if (node.hasExplicitForall) {
+    // Validate: body trait constraints ⊆ declared bounds
+    for (const auto& [typeParam, uniVar] : typeParamToUniVar) {
+      std::string resolved = subst.apply(uniVar);
+      auto accBounds = traitConstraints.getBounds(uniVar);
+      // Also check bounds on the resolved var (in case of unification)
+      auto resolvedBounds = traitConstraints.getBounds(resolved);
+      accBounds.insert(resolvedBounds.begin(), resolvedBounds.end());
+
+      for (auto bound : accBounds) {
+        auto declIt = node.typeParamBounds.find(typeParam);
+        bool isDeclared = declIt != node.typeParamBounds.end() &&
+                          declIt->second.count(bound) > 0;
+        if (!isDeclared) {
+          reportError("type variable " + typeParam + " requires " +
+                          polang::traitBoundToString(bound) +
+                          " bound for arithmetic operations",
+                      node.loc);
+        }
+      }
+    }
+
+    // Build param types using declared type param names
+    std::vector<std::string> sigParamTypes;
+    for (size_t i = 0; i < paramTypes.size(); ++i) {
+      std::string resolved = subst.apply(paramTypes[i]);
+      // Check if this uni var maps to a declared type param
+      bool mapped = false;
+      for (const auto& [tp, uv] : typeParamToUniVar) {
+        if (subst.apply(uv) == resolved || uv == paramTypes[i]) {
+          sigParamTypes.push_back(tp);
+          mapped = true;
+          break;
+        }
+      }
+      if (!mapped) {
+        sigParamTypes.push_back(polang::resolveGenericToDefault(resolved));
+      }
+      auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
+      mutableArg.type = makeTypeSpec(sigParamTypes.back());
+    }
+
+    // Resolve return type
+    std::string resolvedReturn = subst.apply(bodyType);
+    std::string returnType;
+    // Check if return type maps to a declared type param
+    bool retMapped = false;
+    for (const auto& [tp, uv] : typeParamToUniVar) {
+      if (subst.apply(uv) == resolvedReturn || uv == resolvedReturn) {
+        returnType = tp;
+        retMapped = true;
+        break;
+      }
+    }
+    if (!retMapped) {
+      if (node.type != nullptr &&
+          polang::isTypeParameter(node.type->getTypeName())) {
+        returnType = node.type->getTypeName();
+      } else {
+        returnType = polang::resolveGenericToDefault(resolvedReturn);
+      }
+    }
+    node.type = makeTypeSpec(returnType);
+
+    // Store polymorphic signature
+    polang::PolymorphicSignature sig;
+    sig.typeParams = node.typeParams;
+    for (const auto& [tp, bounds] : node.typeParamBounds) {
+      sig.paramBounds[tp] = bounds;
+    }
+    sig.paramTypes = sigParamTypes;
+    sig.returnType = returnType;
+    functionSignatures[funcName] = sig;
+
+    // Restore HM state
+    subst = savedSubst;
+    traitConstraints = savedTraitConstraints;
+    return;
+  }
 
   if (!hasUntypedParams) {
     // Monomorphic function
@@ -982,11 +1190,17 @@ void TypeChecker::inferFunction(
   if (unresolvedVars.empty()) {
     // All vars resolved to concrete types — function is monomorphic
     for (size_t i = 0; i < resolvedParamTypes.size(); ++i) {
-      resolvedParamTypes[i] = resolveWithDefaults(resolvedParamTypes[i]);
+      resolvedParamTypes[i] =
+          polang::resolveGenericToDefault(resolvedParamTypes[i]);
       auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
       mutableArg.type = makeTypeSpec(resolvedParamTypes[i]);
     }
-    resolvedBodyType = resolveWithDefaults(resolvedBodyType);
+    if (node.type != nullptr) {
+      resolvedBodyType = polang::resolveGenericType(resolvedBodyType,
+                                                    node.type->getTypeName());
+    } else {
+      resolvedBodyType = polang::resolveGenericToDefault(resolvedBodyType);
+    }
 
     std::string returnType;
     if (node.type == nullptr) {
@@ -1032,7 +1246,8 @@ void TypeChecker::inferFunction(
       if (it != uniVarToTypeParam.end()) {
         resolvedParamTypes[i] = it->second;
       } else {
-        resolvedParamTypes[i] = resolveWithDefaults(resolvedParamTypes[i]);
+        resolvedParamTypes[i] =
+            polang::resolveGenericToDefault(resolvedParamTypes[i]);
       }
       auto& mutableArg = const_cast<NVariableDeclaration&>(*node.arguments[i]);
       mutableArg.type = makeTypeSpec(resolvedParamTypes[i]);
@@ -1042,8 +1257,11 @@ void TypeChecker::inferFunction(
     auto retIt = uniVarToTypeParam.find(resolvedBodyType);
     if (retIt != uniVarToTypeParam.end()) {
       resolvedBodyType = retIt->second;
+    } else if (node.type != nullptr) {
+      resolvedBodyType = polang::resolveGenericType(resolvedBodyType,
+                                                    node.type->getTypeName());
     } else {
-      resolvedBodyType = resolveWithDefaults(resolvedBodyType);
+      resolvedBodyType = polang::resolveGenericToDefault(resolvedBodyType);
     }
 
     std::string returnType;
@@ -1074,16 +1292,6 @@ void TypeChecker::inferFunction(
   // Restore HM state
   subst = savedSubst;
   traitConstraints = savedTraitConstraints;
-}
-
-std::string TypeChecker::resolveWithDefaults(const std::string& type) const {
-  if (polang::isGenericIntegerType(type)) {
-    return TypeNames::I64;
-  }
-  if (polang::isGenericFloatType(type)) {
-    return TypeNames::F64;
-  }
-  return resolveGenericToDefault(type);
 }
 
 void TypeChecker::visit(const NModuleDeclaration& node) {
@@ -1181,6 +1389,185 @@ void TypeChecker::visit(const NImportStatement& node) {
   }
 }
 
+void TypeChecker::visit(const NTypeSignature& node) {
+  const std::string name = mangledName(node.id->name);
+  pendingTypeSignatures[name] = node.typeExpr->clone();
+}
+
+void TypeChecker::applyFunctionSignature(
+    NFunctionDeclaration& node, std::unique_ptr<const NTypeSpec> signature) {
+  // Check if this is a forall type signature
+  const auto* forallType = dynamic_cast<const NForallType*>(signature.get());
+  std::set<std::string> declaredTypeVars;
+  std::reference_wrapper<const NTypeSpec> innerSig = *signature;
+
+  if (forallType != nullptr) {
+    node.hasExplicitForall = true;
+    node.typeParams.clear();
+    node.typeParamBounds.clear();
+
+    auto& registry = polang::getTraitRegistry();
+
+    for (const auto& tv : forallType->typeVars) {
+      declaredTypeVars.insert(tv.name);
+      node.typeParams.push_back(tv.name);
+
+      if (!tv.bound.empty()) {
+        if (!registry.isKnownTrait(tv.bound)) {
+          reportError("unknown type class '" + tv.bound + "'");
+          return;
+        }
+        auto traitBound = polang::stringToTraitBound(tv.bound);
+        if (traitBound) {
+          node.typeParamBounds[tv.name].insert(*traitBound);
+        }
+      }
+    }
+
+    innerSig = *forallType->innerType;
+  }
+
+  // Validate type names in the signature
+  std::set<std::string> usedTypeVars;
+  const size_t errorsBefore = errors.size();
+  validateTypeNames(innerSig.get(), declaredTypeVars, usedTypeVars);
+  if (errors.size() > errorsBefore) {
+    return;
+  }
+
+  // Warn about unused type variables (only for forall signatures)
+  if (forallType != nullptr) {
+    for (const auto& tv : forallType->typeVars) {
+      if (usedTypeVars.find(tv.name) == usedTypeVars.end()) {
+        std::cerr << "Warning: unused type variable " << tv.name << "\n";
+      }
+    }
+  }
+
+  // Process the (inner) type as arrow type
+  const auto* arrowType = dynamic_cast<const NArrowType*>(&innerSig.get());
+  if (arrowType == nullptr) {
+    if (node.arguments.empty()) {
+      // Non-arrow type for zero-param function is no longer valid.
+      // Must use () -> T syntax.
+      reportError("type signature for '" + node.id->name + "' must use () -> " +
+                  innerSig.get().getTypeName() +
+                  " for zero-parameter functions");
+      return;
+    }
+    reportError("type signature for '" + node.id->name +
+                "' is not a function type");
+    return;
+  }
+
+  // Check for unit type parameter: () -> T means zero-param function
+  const auto* unitParam =
+      dynamic_cast<const NUnitType*>(arrowType->paramType.get());
+  if (unitParam != nullptr) {
+    // () -> T: zero-param function
+    if (!node.arguments.empty()) {
+      reportError("type signature for '" + node.id->name +
+                  "' has () parameter but definition has " +
+                  std::to_string(node.arguments.size()) + " parameters");
+      return;
+    }
+    node.type = arrowType->returnType->clone();
+    return;
+  }
+
+  // Extract parameter type references
+  std::vector<std::reference_wrapper<const NTypeSpec>> paramTypeRefs;
+  const auto* productType =
+      dynamic_cast<const NProductType*>(arrowType->paramType.get());
+  if (productType != nullptr) {
+    for (const auto& t : productType->types) {
+      paramTypeRefs.push_back(std::cref(*t));
+    }
+  } else {
+    paramTypeRefs.push_back(std::cref(*arrowType->paramType));
+  }
+
+  // Check arity matches
+  if (paramTypeRefs.size() != node.arguments.size()) {
+    reportError("type signature for '" + node.id->name + "' has " +
+                std::to_string(paramTypeRefs.size()) +
+                " parameters but definition has " +
+                std::to_string(node.arguments.size()));
+    return;
+  }
+
+  // Apply parameter types (clone from references)
+  for (size_t i = 0; i < paramTypeRefs.size(); ++i) {
+    node.arguments[i]->type = paramTypeRefs[i].get().clone();
+  }
+
+  // Apply return type (clone)
+  node.type = arrowType->returnType->clone();
+}
+
+bool TypeChecker::validateTypeNames(
+    const NTypeSpec& typeSpec, const std::set<std::string>& declaredTypeVars,
+    std::optional<std::reference_wrapper<std::set<std::string>>> usedTypeVars) {
+
+  if (const auto* named = dynamic_cast<const NNamedType*>(&typeSpec)) {
+    auto kind = polang::parseTypeName(named->name);
+    if (!kind.has_value()) {
+      reportError("unknown type '" + named->name + "'");
+      return false;
+    }
+    return true;
+  }
+
+  if (const auto* typeVar = dynamic_cast<const NTypeVar*>(&typeSpec)) {
+    if (usedTypeVars) {
+      usedTypeVars->get().insert(typeVar->name);
+    }
+    if (declaredTypeVars.find(typeVar->name) == declaredTypeVars.end()) {
+      reportError("undeclared type variable " + typeVar->name);
+      return false;
+    }
+    return true;
+  }
+
+  if (const auto* arrow = dynamic_cast<const NArrowType*>(&typeSpec)) {
+    bool valid =
+        validateTypeNames(*arrow->paramType, declaredTypeVars, usedTypeVars);
+    valid =
+        validateTypeNames(*arrow->returnType, declaredTypeVars, usedTypeVars) &&
+        valid;
+    return valid;
+  }
+
+  if (const auto* product = dynamic_cast<const NProductType*>(&typeSpec)) {
+    bool valid = true;
+    for (const auto& t : product->types) {
+      valid = validateTypeNames(*t, declaredTypeVars, usedTypeVars) && valid;
+    }
+    return valid;
+  }
+
+  if (dynamic_cast<const NUnitType*>(&typeSpec) != nullptr) {
+    return true; // Unit type is always valid
+  }
+
+  return true;
+}
+
+void TypeChecker::warnOrphanedTypeSignatures() {
+  for (const auto& [name, unused] : pendingTypeSignatures) {
+    // Unmangle the name for display: strip module prefix (everything up to
+    // and including the last "$$")
+    std::string displayName = name;
+    const auto pos = name.rfind("$$");
+    if (pos != std::string::npos) {
+      displayName = name.substr(pos + 2);
+    }
+    std::cerr << "Warning: type signature for '" << displayName
+              << "' has no corresponding definition\n";
+  }
+  pendingTypeSignatures.clear();
+}
+
 std::set<std::string> TypeChecker::collectFreeVariables(
     const NBlock& block, const std::set<std::string>& localNames) const {
   FreeVariableCollector collector(localNames);
@@ -1205,14 +1592,14 @@ void TypeChecker::propagateTypeToSource(const NExpression* expr,
 
 void TypeChecker::resolveGenericVariable(const std::string& varName,
                                          const std::string& concreteType) {
-  // Find variable in unresolvedGenerics
-  auto it = unresolvedGenerics.find(varName);
-  if (it == unresolvedGenerics.end()) {
-    // Variable is not tracked as having a generic type - nothing to do
+  // Check if the variable has a generic type in localTypes
+  auto localIt = localTypes.find(varName);
+  if (localIt == localTypes.end() || !containsGenericType(localIt->second)) {
+    // Variable doesn't exist or doesn't have a generic type - nothing to do
     return;
   }
 
-  const std::string& genericType = it->second;
+  const std::string& genericType = localIt->second;
 
   // Check compatibility between generic and concrete type
   if (!areTypesCompatible(genericType, concreteType)) {
@@ -1230,27 +1617,32 @@ void TypeChecker::resolveGenericVariable(const std::string& varName,
     nodeIt->second->type = makeTypeSpec(concreteType);
   }
 
-  // Remove from unresolvedGenerics
-  unresolvedGenerics.erase(it);
+  // Clean up tracking
   varDeclNodes.erase(varName);
 }
 
 void TypeChecker::resolveRemainingGenerics() {
-  // Since we now always set node.type to defaults immediately,
-  // this function mainly handles updating localTypes when variables
-  // weren't resolved by context propagation
-  for (auto& entry : unresolvedGenerics) {
-    const std::string& varName = entry.first;
-
-    // Update localTypes with resolved type
+  // Resolve any variables whose types still contain generics to defaults.
+  // This handles variables that were never used in a context that provided
+  // a concrete type (e.g. top-level `a = 3.14` → f64).
+  for (auto& [varName, nodePtr] : varDeclNodes) {
     auto localIt = localTypes.find(varName);
-    if (localIt != localTypes.end()) {
-      // Resolve all generics in the type, including those in reference types
-      localTypes[varName] = resolveAllGenericsToDefault(localIt->second);
+    if (localIt == localTypes.end()) {
+      continue;
+    }
+    if (!containsGenericType(localIt->second)) {
+      continue;
+    }
+    // Resolve all generics in the type, including those in reference types
+    std::string resolved = resolveAllGenericsToDefault(localIt->second);
+    localTypes[varName] = resolved;
+
+    // Update AST node type so MLIR sees the resolved type
+    if (nodePtr != nullptr) {
+      nodePtr->type = makeTypeSpec(resolved);
     }
   }
 
   // Clear tracking maps
-  unresolvedGenerics.clear();
   varDeclNodes.clear();
 }

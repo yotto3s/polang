@@ -3,14 +3,14 @@
 
 (* Test polymorphic functions with float operations *)
 
-def add(x, y) = x + y
-def mul(x, y) = x * y
+add(x, y) = x + y
+mul(x, y) = x * y
 
 (* Call with integers first *)
-def int_result = add(10, 20)
+int_result = add(10, 20)
 
 (* Call same function with floats *)
-def float_result = add(1.5, 2.5)
+float_result = add(1.5, 2.5)
 
 (* Test polymorphic multiplication with floats *)
 (* CHECK: 7.5 : f64

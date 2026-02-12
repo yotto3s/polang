@@ -4,7 +4,9 @@
 *)
 
 module Math (add, mul)
-  def add(x: i64, y: i64): i64 = x + y
-  def mul(x: i64, y: i64): i64 = x * y
+  add : i64 * i64 -> i64
+  add(x, y) = x + y
+  mul : i64 * i64 -> i64
+  mul(x, y) = x * y
 endmodule
 Math.add(2, Math.mul(2, 3))

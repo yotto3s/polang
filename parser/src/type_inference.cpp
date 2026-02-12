@@ -1,6 +1,8 @@
 #include "parser/type_inference.hpp"
 #include "parser/polang_types.hpp"
 
+#include <algorithm>
+
 namespace polang {
 
 namespace {
@@ -117,10 +119,10 @@ bool Unifier::unify(const std::string& t1, const std::string& t2,
   }
 
   // Handle generic types: {int} is compatible with concrete integer types
-  if (isGenericIntegerType(s1) && isIntegerType(s2)) {
+  if (isGenericIntegerType(s1) && (isIntegerType(s2) || isIndexType(s2))) {
     return true;
   }
-  if (isGenericIntegerType(s2) && isIntegerType(s1)) {
+  if (isGenericIntegerType(s2) && (isIntegerType(s1) || isIndexType(s1))) {
     return true;
   }
   if (isGenericFloatType(s1) && isFloatType(s2)) {
@@ -155,29 +157,100 @@ std::set<TraitBound> TraitConstraints::getBounds(const std::string& var) const {
   return {};
 }
 
-bool TraitConstraints::satisfies(
-    const std::string& concreteType,
-    const std::set<TraitBound>& boundsSet) noexcept {
-  for (TraitBound bound : boundsSet) {
-    switch (bound) {
-    case TraitBound::Numeric:
-      if (!isNumericType(concreteType)) {
-        return false;
-      }
-      break;
-    case TraitBound::Integer:
-      if (!isIntegerType(concreteType)) {
-        return false;
-      }
-      break;
-    case TraitBound::Float:
-      if (!isFloatType(concreteType)) {
-        return false;
-      }
-      break;
-    }
+bool TraitConstraints::satisfies(const std::string& concreteType,
+                                 const std::set<TraitBound>& boundsSet) {
+  auto& registry = getTraitRegistry();
+  return std::all_of(
+      boundsSet.begin(), boundsSet.end(), [&](const TraitBound& bound) {
+        return registry.satisfies(concreteType, traitBoundToString(bound));
+      });
+}
+
+// ============== TraitRegistry ==============
+
+TraitRegistry::TraitRegistry() {
+  // Built-in Numeric trait: all integer and float types
+  TraitDefinition numeric;
+  numeric.name = "Numeric";
+  numeric.methods = {
+      {"+", {"'self", "'self"}, "'self"},
+      {"-", {"'self", "'self"}, "'self"},
+      {"*", {"'self", "'self"}, "'self"},
+      {"/", {"'self", "'self"}, "'self"},
+  };
+  numeric.satisfyingTypes = {
+      TypeNames::I8,    TypeNames::I16,   TypeNames::I32, TypeNames::I64,
+      TypeNames::U8,    TypeNames::U16,   TypeNames::U32, TypeNames::U64,
+      TypeNames::ISIZE, TypeNames::USIZE, TypeNames::F32, TypeNames::F64,
+  };
+  registerTrait(std::move(numeric));
+
+  // Built-in Integer trait: integer types only
+  TraitDefinition integer;
+  integer.name = "Integer";
+  integer.methods = {
+      {"%", {"'self", "'self"}, "'self"},
+  };
+  integer.satisfyingTypes = {
+      TypeNames::I8,    TypeNames::I16,   TypeNames::I32, TypeNames::I64,
+      TypeNames::U8,    TypeNames::U16,   TypeNames::U32, TypeNames::U64,
+      TypeNames::ISIZE, TypeNames::USIZE,
+  };
+  registerTrait(std::move(integer));
+
+  // Built-in Float trait: float types only
+  TraitDefinition floatTrait;
+  floatTrait.name = "Float";
+  floatTrait.methods = {};
+  floatTrait.satisfyingTypes = {
+      TypeNames::F32,
+      TypeNames::F64,
+  };
+  registerTrait(std::move(floatTrait));
+}
+
+void TraitRegistry::registerTrait(TraitDefinition def) {
+  std::string name = def.name;
+  // Build reverse index from method names to trait
+  for (const auto& method : def.methods) {
+    methodToTrait[method.methodName] = name;
   }
-  return true;
+  traits[std::move(name)] = std::move(def);
+}
+
+bool TraitRegistry::isKnownTrait(const std::string& name) const {
+  return traits.find(name) != traits.end();
+}
+
+bool TraitRegistry::satisfies(const std::string& concreteType,
+                              const std::string& traitName) const {
+  auto it = traits.find(traitName);
+  if (it == traits.end()) {
+    return false;
+  }
+  return it->second.satisfyingTypes.count(concreteType) > 0;
+}
+
+std::optional<std::string>
+TraitRegistry::traitForMethod(const std::string& method) const {
+  auto it = methodToTrait.find(method);
+  if (it != methodToTrait.end()) {
+    return it->second;
+  }
+  return std::nullopt;
+}
+
+const TraitDefinition* TraitRegistry::getTrait(const std::string& name) const {
+  auto it = traits.find(name);
+  if (it != traits.end()) {
+    return &it->second;
+  }
+  return nullptr;
+}
+
+TraitRegistry& getTraitRegistry() {
+  static TraitRegistry registry;
+  return registry;
 }
 
 } // namespace polang

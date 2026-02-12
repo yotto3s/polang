@@ -8,17 +8,17 @@
 (* Function with bool parameter (resolved from call site) *)
 (* CHECK: {{.*}}polang.func @is_truthy(%{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
 *)
-def is_truthy(x) = if x then 1 else 0
+is_truthy(x) = if x then 1 else 0
 
 (* Function with two bool parameters *)
 (* CHECK: {{.*}}polang.func @both_true(%{{.*}}: !polang.bool, %{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
 *)
-def both_true(x, y) = if x then (if y then 1 else 0) else 0
+both_true(x, y) = if x then (if y then 1 else 0) else 0
 
 (* Function with bool parameter *)
 (* CHECK: {{.*}}polang.func @negate(%{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
 *)
-def negate(x) = if x then 0 else 1
+negate(x) = if x then 0 else 1
 
 (* Call the functions with bool arguments *)
 is_truthy(true)

@@ -5,6 +5,6 @@
 
 (* Test polymorphic function with captured variable execution. *)
 
-def base = 10
-def add_base(x) = x + base
+base = 10
+add_base(x) = x + base
 add_base(5)

@@ -1,8 +1,10 @@
 #ifndef POLANG_TYPE_CHECKER_HPP
 #define POLANG_TYPE_CHECKER_HPP
 
+#include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -14,6 +16,10 @@
 class Node;
 class NBlock;
 class NExpression;
+class NTypeSpec;
+class NArrowType;
+class NProductType;
+class NFunctionDeclaration;
 struct NLetBinding;
 struct SourceLocation;
 
@@ -32,6 +38,7 @@ struct TypeCheckerSnapshot {
   std::map<std::string, std::set<std::string>> moduleExports;
   std::map<std::string, std::string> moduleAliases;
   std::map<std::string, std::string> importedSymbols;
+  std::map<std::string, std::unique_ptr<const NTypeSpec>> pendingTypeSignatures;
 };
 
 class TypeChecker : public Visitor {
@@ -40,6 +47,11 @@ public:
 
   // Type Specification Visitor methods
   void visit(const NNamedType& node) override;
+  void visit(const NArrowType& node) override;
+  void visit(const NProductType& node) override;
+  void visit(const NTypeVar& node) override;
+  void visit(const NForallType& node) override;
+  void visit(const NUnitType& node) override;
 
   // Expression Visitor methods
   void visit(const NInteger& node) override;
@@ -53,11 +65,13 @@ public:
   void visit(const NBlock& node) override;
   void visit(const NIfExpression& node) override;
   void visit(const NLetExpression& node) override;
+  void visit(const NUnitLiteral& node) override;
   void visit(const NExpressionStatement& node) override;
   void visit(const NVariableDeclaration& node) override;
   void visit(const NFunctionDeclaration& node) override;
   void visit(const NModuleDeclaration& node) override;
   void visit(const NImportStatement& node) override;
+  void visit(const NTypeSignature& node) override;
 
   // Get the inferred type of the last visited node
   [[nodiscard]] std::string getInferredType() const noexcept {
@@ -90,6 +104,9 @@ private:
   std::map<std::string, std::string> localTypes;
   std::vector<TypeCheckError> errors;
 
+  // Scope depth: 0 = top level, >0 = inside function body
+  int scopeDepth = 0;
+
   // Module path for name mangling (e.g., ["Math", "Internal"])
   std::vector<std::string> modulePath;
 
@@ -101,6 +118,16 @@ private:
 
   // Imported symbols: local name -> mangled module symbol name
   std::map<std::string, std::string> importedSymbols;
+
+  // Pending type signatures: name -> type expression
+  std::map<std::string, std::unique_ptr<const NTypeSpec>> pendingTypeSignatures;
+
+  // Apply a type signature to a function declaration
+  void applyFunctionSignature(NFunctionDeclaration& node,
+                              std::unique_ptr<const NTypeSpec> signature);
+
+  // Warn about type signatures with no corresponding definition
+  void warnOrphanedTypeSignatures();
 
   // Get mangled name for a symbol within current module context
   [[nodiscard]] std::string mangledName(const std::string& name) const;
@@ -154,11 +181,8 @@ private:
                                const std::string& lhsType,
                                const std::string& rhsType);
 
-  // Deferred type inference for generic types
-  // Variables with unresolved generic types (name -> generic type)
-  std::map<std::string, std::string> unresolvedGenerics;
-
-  // Track AST nodes for updating types later (name -> node pointer)
+  // Track AST nodes for variables with generic types needing deferred
+  // resolution
   std::map<std::string, NVariableDeclaration*> varDeclNodes;
 
   // Helper methods for deferred type resolution
@@ -184,8 +208,14 @@ private:
                        const polang::PolymorphicSignature& scheme,
                        const std::vector<std::string>& argTypes);
 
-  // Resolve defaults for constrained unification vars
-  [[nodiscard]] std::string resolveWithDefaults(const std::string& type) const;
+  // Validate type names in a type expression tree.
+  // Returns false if any errors were found.
+  // If usedTypeVars is provided, collects all NTypeVar references found.
+  bool
+  validateTypeNames(const NTypeSpec& typeSpec,
+                    const std::set<std::string>& declaredTypeVars,
+                    std::optional<std::reference_wrapper<std::set<std::string>>>
+                        usedTypeVars = std::nullopt);
 };
 
 #endif // POLANG_TYPE_CHECKER_HPP

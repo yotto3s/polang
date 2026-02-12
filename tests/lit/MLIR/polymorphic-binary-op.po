@@ -12,5 +12,5 @@
 (* CHECK-NOT: polang.generic_func
 *)
 
-def double_val(x) = x + x
+double_val(x) = x + x
 double_val(21)

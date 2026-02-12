@@ -12,5 +12,5 @@
 (* CHECK-NOT: @unused_identity
 *)
 
-def unused_identity(x) = x
+unused_identity(x) = x
 42

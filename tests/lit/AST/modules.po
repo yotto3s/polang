@@ -10,7 +10,9 @@
 *)
 (* CHECK-NEXT:   | `-NDouble 3.14159
 *)
-(* CHECK-NEXT:   |-NFunctionDeclaration 'add' (x: i64, y: i64) -> i64
+(* CHECK-NEXT:   |-NTypeSignature 'add' : i64 * i64 -> i64
+*)
+(* CHECK-NEXT:   |-NFunctionDeclaration 'add' (x, y)
 *)
 (* CHECK-NEXT:   | `-NBlock
 *)
@@ -22,7 +24,9 @@
 *)
 (* CHECK-NEXT:   |       `-NIdentifier 'y'
 *)
-(* CHECK-NEXT:   |-NFunctionDeclaration 'sub' (x: i64, y: i64) -> i64
+(* CHECK-NEXT:   |-NTypeSignature 'sub' : i64 * i64 -> i64
+*)
+(* CHECK-NEXT:   |-NFunctionDeclaration 'sub' (x, y)
 *)
 (* CHECK-NEXT:   | `-NBlock
 *)
@@ -34,7 +38,9 @@
 *)
 (* CHECK-NEXT:   |       `-NIdentifier 'y'
 *)
-(* CHECK-NEXT:   `-NFunctionDeclaration 'internal_helper' (x: i64) -> i64
+(* CHECK-NEXT:   |-NTypeSignature 'internal_helper' : i64 -> i64
+*)
+(* CHECK-NEXT:   `-NFunctionDeclaration 'internal_helper' (x)
 *)
 (* CHECK-NEXT:     `-NBlock
 *)
@@ -48,8 +54,11 @@
 *)
 
 module Math (add, sub, PI)
-  def PI = 3.14159
-  def add(x: i64, y: i64): i64 = x + y
-  def sub(x: i64, y: i64): i64 = x - y
-  def internal_helper(x: i64): i64 = x * 2
+  PI = 3.14159
+  add : i64 * i64 -> i64
+  add(x, y) = x + y
+  sub : i64 * i64 -> i64
+  sub(x, y) = x - y
+  internal_helper : i64 -> i64
+  internal_helper(x) = x * 2
 endmodule

@@ -1,0 +1,9 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test that float literal in function body adopts declared return type f32 *)
+(* CHECK: 3.14{{.*}} : f32
+*)
+g : () -> f32
+g() = 3.14
+g()

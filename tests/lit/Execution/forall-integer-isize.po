@@ -1,0 +1,18 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test that isize satisfies Integer constraint via Numeric+Integer *)
+double : forall 'a:Numeric. 'a -> 'a
+double(x) = x + x
+
+(* Use Integer bound to verify isize is in the Integer satisfying set *)
+(* Integer is a stricter subset that excludes floats *)
+identity_int : forall 'a:Integer. 'a -> 'a
+identity_int(x) = x
+
+result : isize
+result = identity_int(double(21 as isize))
+
+(* CHECK: 42 : isize
+*)
+result

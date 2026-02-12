@@ -1,0 +1,10 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test: inferred polymorphic function (no forall) with isize + literal *)
+
+add(x, y) = x + y
+
+(* CHECK: 4 : isize
+*)
+add(1 as isize, 3)

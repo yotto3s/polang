@@ -1,0 +1,10 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+(* CHECK: 42 : i64
+*)
+
+(* Test forall with multiple type variables. *)
+
+first : forall 'a, 'b. 'a * 'b -> 'a
+first(x, y) = x
+first(42, true)

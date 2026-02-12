@@ -2,7 +2,8 @@
 *)
 
 (* Test error when calling function with wrong number of arguments *)
-(* CHECK: Type error: Function 'add' expects 1 argument(s), got 2 at line 8, column 1
+(* CHECK: Type error: Function 'add' expects 1 argument(s), got 2 at line 9, column 1
 *)
-def add(a: i64): i64 = a
+add : i64 -> i64
+add(a) = a
 add(1, 2)

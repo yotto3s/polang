@@ -10,7 +10,8 @@
 *)
 (* CHECK-NEXT: }
 *)
-def cmp_lt(a: i64, b: i64): bool = a < b
+cmp_lt : i64 * i64 -> bool
+cmp_lt(a, b) = a < b
 
 (* Test less-or-equal comparison *)
 (* CHECK:      define i1 @cmp_le(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
@@ -21,7 +22,8 @@ def cmp_lt(a: i64, b: i64): bool = a < b
 *)
 (* CHECK-NEXT: }
 *)
-def cmp_le(a: i64, b: i64): bool = a <= b
+cmp_le : i64 * i64 -> bool
+cmp_le(a, b) = a <= b
 
 (* Test greater-than comparison *)
 (* CHECK:      define i1 @cmp_gt(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
@@ -32,7 +34,8 @@ def cmp_le(a: i64, b: i64): bool = a <= b
 *)
 (* CHECK-NEXT: }
 *)
-def cmp_gt(a: i64, b: i64): bool = a > b
+cmp_gt : i64 * i64 -> bool
+cmp_gt(a, b) = a > b
 
 (* Test greater-or-equal comparison *)
 (* CHECK:      define i1 @cmp_ge(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
@@ -43,7 +46,8 @@ def cmp_gt(a: i64, b: i64): bool = a > b
 *)
 (* CHECK-NEXT: }
 *)
-def cmp_ge(a: i64, b: i64): bool = a >= b
+cmp_ge : i64 * i64 -> bool
+cmp_ge(a, b) = a >= b
 
 (* Test equality comparison *)
 (* CHECK:      define i1 @cmp_eq(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
@@ -54,7 +58,8 @@ def cmp_ge(a: i64, b: i64): bool = a >= b
 *)
 (* CHECK-NEXT: }
 *)
-def cmp_eq(a: i64, b: i64): bool = a == b
+cmp_eq : i64 * i64 -> bool
+cmp_eq(a, b) = a == b
 
 (* Test not-equal comparison *)
 (* CHECK:      define i1 @cmp_ne(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
@@ -65,4 +70,5 @@ def cmp_eq(a: i64, b: i64): bool = a == b
 *)
 (* CHECK-NEXT: }
 *)
-def cmp_ne(a: i64, b: i64): bool = a != b
+cmp_ne : i64 * i64 -> bool
+cmp_ne(a, b) = a != b

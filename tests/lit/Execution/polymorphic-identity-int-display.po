@@ -5,5 +5,5 @@
 
 (* Test that polymorphic function calls display int results correctly. *)
 
-def identity(x) = x
+identity(x) = x
 identity(42)

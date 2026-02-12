@@ -13,7 +13,7 @@
 (* CHECK-NOT: polang.generic_func
 *)
 
-def unused(x) = 42
+unused(x) = 42
 
 (* Entry point - call the function with an int *)
 unused(1)

@@ -14,7 +14,7 @@
 (* CHECK-NOT: polang.generic_func
 *)
 
-def identity(x) = x
+identity(x) = x
 (* Call with int and bool to create both specialized versions *)
 identity(42)
 identity(true)

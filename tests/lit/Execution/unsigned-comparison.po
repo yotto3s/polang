@@ -2,14 +2,17 @@
 *)
 
 (* Test unsigned comparison operators *)
-def lt_u64(a: u64, b: u64): bool = a < b
-def gt_u64(a: u64, b: u64): bool = a > b
+lt_u64 : u64 * u64 -> bool
+lt_u64(a, b) = a < b
+gt_u64 : u64 * u64 -> bool
+gt_u64(a, b) = a > b
 
-def btoi(b: bool): i64 = if b then 1 else 0
+btoi : bool -> i64
+btoi(b) = if b then 1 else 0
 
 (* For unsigned: 0 < 100 should be true, 100 > 0 should be true *)
 (* Cast literals to u64 since integer literals default to i64 *)
-def result = btoi(lt_u64(0 as u64, 100 as u64)) + btoi(gt_u64(100 as u64, 0 as u64))
+result = btoi(lt_u64(0 as u64, 100 as u64)) + btoi(gt_u64(100 as u64, 0 as u64))
 
 (* CHECK: 2 : i64
 *)
