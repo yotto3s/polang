@@ -139,6 +139,31 @@ struct ConstantBoolOpLowering : public OpConversionPattern<ConstantBoolOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// Division/Remainder helper functions
+//===----------------------------------------------------------------------===//
+
+/// Get or create the __polang_divzero_error runtime function declaration.
+/// The function has signature: void __polang_divzero_error(i32 line, i32 column)
+static func::FuncOp getOrCreateDivZeroErrorFunc(ModuleOp module,
+                                                 PatternRewriter& rewriter) {
+  const char* funcName = "__polang_divzero_error";
+  if (auto existing = module.lookupSymbol<func::FuncOp>(funcName)) {
+    return existing;
+  }
+
+  // Create function type: (i32, i32) -> ()
+  auto i32Type = rewriter.getI32Type();
+  auto funcType = rewriter.getFunctionType({i32Type, i32Type}, {});
+
+  // Insert function declaration at module level
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPointToStart(module.getBody());
+  auto func = rewriter.create<func::FuncOp>(module.getLoc(), funcName, funcType);
+  func.setPrivate();
+  return func;
+}
+
+//===----------------------------------------------------------------------===//
 // Arithmetic Lowering
 //===----------------------------------------------------------------------===//
 
@@ -207,32 +232,96 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
                   ConversionPatternRewriter& rewriter) const override {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
+    auto loc = op.getLoc();
 
     // Check the original type to determine signedness
     auto origType = op.getLhs().getType();
-    // clang-format off
-    // NOLINTNEXTLINE(bugprone-branch-clone) - different div ops for different types
+    
+    // For floating-point division, no runtime check needed (produces inf/NaN per IEEE 754)
     if (isa<polang::FloatType>(origType)) {
       rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
-    } else if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
+      return success();
+    }
+
+    // For integer types, insert runtime check for division by zero
+    bool isInteger = isa<polang::IntegerType, polang::IndexType>(origType) ||
+                     isa<mlir::IntegerType, mlir::IndexType>(lhs.getType());
+    
+    if (!isInteger) {
+      // Fallback to float division if type is unclear
+      rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
+      return success();
+    }
+
+    // Extract line and column from location
+    int line = 0;
+    int column = 0;
+    if (auto fileLoc = llvm::dyn_cast<FileLineColLoc>(loc)) {
+      line = fileLoc.getLine();
+      column = fileLoc.getColumn();
+    }
+
+    // Get the parent module to insert the runtime function declaration
+    auto module = op->getParentOfType<ModuleOp>();
+    if (!module) {
+      return op.emitError("operation not inside a module");
+    }
+
+    // Get or create the runtime error function
+    auto errorFunc = getOrCreateDivZeroErrorFunc(module, rewriter);
+
+    // Create constant zero of the same type as divisor
+    auto zeroConst = rewriter.create<arith::ConstantIntOp>(loc, 0, rhs.getType());
+
+    // Check if divisor is zero
+    auto isZero = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::eq, rhs, zeroConst);
+
+    // Create scf.if for the zero check
+    auto ifOp = rewriter.create<scf::IfOp>(loc, TypeRange{}, isZero, false);
+    
+    // Then block: call error function and exit
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
+      
+      // Create line and column constants
+      auto lineConst = rewriter.create<arith::ConstantIntOp>(loc, line, rewriter.getI32Type());
+      auto colConst = rewriter.create<arith::ConstantIntOp>(loc, column, rewriter.getI32Type());
+      
+      // Call the error function
+      rewriter.create<func::CallOp>(loc, errorFunc, ValueRange{lineConst, colConst});
+      
+      // Note: The error function calls exit(), so we never return.
+      // However, MLIR still requires a terminator. We use scf.yield.
+      rewriter.create<scf::YieldOp>(loc);
+    }
+
+    // Insert the actual division after the if
+    rewriter.setInsertionPointAfter(ifOp);
+
+    // Determine which division operation to use based on signedness
+    Value divResult;
+    // clang-format off
+    if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
       if (intType.isUnsigned()) {
-        rewriter.replaceOpWithNewOp<arith::DivUIOp>(op, lhs, rhs);
+        divResult = rewriter.create<arith::DivUIOp>(loc, lhs, rhs);
       } else {
-        rewriter.replaceOpWithNewOp<arith::DivSIOp>(op, lhs, rhs);
+        divResult = rewriter.create<arith::DivSIOp>(loc, lhs, rhs);
       }
     } else if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
       if (indexType.isUnsigned()) {
-        rewriter.replaceOpWithNewOp<arith::DivUIOp>(op, lhs, rhs);
+        divResult = rewriter.create<arith::DivUIOp>(loc, lhs, rhs);
       } else {
-        rewriter.replaceOpWithNewOp<arith::DivSIOp>(op, lhs, rhs);
+        divResult = rewriter.create<arith::DivSIOp>(loc, lhs, rhs);
       }
-    } else if (isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
-      // Fallback for already converted types - assume signed
-      rewriter.replaceOpWithNewOp<arith::DivSIOp>(op, lhs, rhs);
     } else {
-      rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
+      // Fallback for already converted types - assume signed
+      divResult = rewriter.create<arith::DivSIOp>(loc, lhs, rhs);
     }
     // clang-format on
+
+    rewriter.replaceOp(op, divResult);
     return success();
   }
 };
@@ -245,30 +334,88 @@ struct RemOpLowering : public OpConversionPattern<RemOp> {
                   ConversionPatternRewriter& rewriter) const override {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
+    auto loc = op.getLoc();
 
     // Check the original type to determine signedness
     auto origType = op.getLhs().getType();
+    
     // Remainder is only defined for integer types
+    bool isInteger = isa<polang::IntegerType, polang::IndexType>(origType) ||
+                     isa<mlir::IntegerType, mlir::IndexType>(lhs.getType());
+    
+    if (!isInteger) {
+      return op.emitError("remainder operation only supported for integer types");
+    }
+
+    // Extract line and column from location
+    int line = 0;
+    int column = 0;
+    if (auto fileLoc = llvm::dyn_cast<FileLineColLoc>(loc)) {
+      line = fileLoc.getLine();
+      column = fileLoc.getColumn();
+    }
+
+    // Get the parent module to insert the runtime function declaration
+    auto module = op->getParentOfType<ModuleOp>();
+    if (!module) {
+      return op.emitError("operation not inside a module");
+    }
+
+    // Get or create the runtime error function
+    auto errorFunc = getOrCreateDivZeroErrorFunc(module, rewriter);
+
+    // Create constant zero of the same type as divisor
+    auto zeroConst = rewriter.create<arith::ConstantIntOp>(loc, 0, rhs.getType());
+
+    // Check if divisor is zero
+    auto isZero = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::eq, rhs, zeroConst);
+
+    // Create scf.if for the zero check
+    auto ifOp = rewriter.create<scf::IfOp>(loc, TypeRange{}, isZero, false);
+    
+    // Then block: call error function and exit
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
+      
+      // Create line and column constants
+      auto lineConst = rewriter.create<arith::ConstantIntOp>(loc, line, rewriter.getI32Type());
+      auto colConst = rewriter.create<arith::ConstantIntOp>(loc, column, rewriter.getI32Type());
+      
+      // Call the error function
+      rewriter.create<func::CallOp>(loc, errorFunc, ValueRange{lineConst, colConst});
+      
+      // Note: The error function calls exit(), so we never return.
+      // However, MLIR still requires a terminator. We use scf.yield.
+      rewriter.create<scf::YieldOp>(loc);
+    }
+
+    // Insert the actual remainder operation after the if
+    rewriter.setInsertionPointAfter(ifOp);
+
+    // Determine which remainder operation to use based on signedness
+    Value remResult;
     // clang-format off
     if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
       if (intType.isUnsigned()) {
-        rewriter.replaceOpWithNewOp<arith::RemUIOp>(op, lhs, rhs);
+        remResult = rewriter.create<arith::RemUIOp>(loc, lhs, rhs);
       } else {
-        rewriter.replaceOpWithNewOp<arith::RemSIOp>(op, lhs, rhs);
+        remResult = rewriter.create<arith::RemSIOp>(loc, lhs, rhs);
       }
     } else if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
       if (indexType.isUnsigned()) {
-        rewriter.replaceOpWithNewOp<arith::RemUIOp>(op, lhs, rhs);
+        remResult = rewriter.create<arith::RemUIOp>(loc, lhs, rhs);
       } else {
-        rewriter.replaceOpWithNewOp<arith::RemSIOp>(op, lhs, rhs);
+        remResult = rewriter.create<arith::RemSIOp>(loc, lhs, rhs);
       }
-    } else if (isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
-      // Fallback for already converted types - assume signed
-      rewriter.replaceOpWithNewOp<arith::RemSIOp>(op, lhs, rhs);
     } else {
-      return op.emitError("remainder operation only supported for integer types");
+      // Fallback for already converted types - assume signed
+      remResult = rewriter.create<arith::RemSIOp>(loc, lhs, rhs);
     }
     // clang-format on
+
+    rewriter.replaceOp(op, remResult);
     return success();
   }
 };
