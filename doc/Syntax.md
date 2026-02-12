@@ -54,6 +54,14 @@ Index types map to the platform-native pointer width. `usize` is intended for ar
 |--------|---------------|--------|
 | `bool` | Boolean value | 1-bit  |
 
+### Unit Type
+
+| Type   | Description                              | Size   |
+|--------|------------------------------------------|--------|
+| `()`   | Unit type with a single value `()`       | 0-bit  |
+
+The unit type `()` represents the absence of a meaningful value. It is used in function type signatures to indicate zero-parameter functions (e.g., `() -> i64`).
+
 ### Default Literal Types
 
 - Integer literals (e.g., `42`) default to `i64`
@@ -160,7 +168,7 @@ Without type signature (types inferred):
 **Type signature syntax:**
 - Single parameter: `name : param_type -> return_type`
 - Multiple parameters: `name : type1 * type2 -> return_type`
-- No parameters: `name : return_type`
+- No parameters: `name : () -> return_type`
 - Arrow `->` is right-associative
 - `*` (product) binds tighter than `->`
 
@@ -659,6 +667,7 @@ type_product ::= type_atom "*" type_product   (* `*` binds tighter than `->` *)
                | type_atom
 type_atom    ::= type
                | typevar
+               | "()"
                | "(" type_expr ")"
 
 base_type   ::= "i8" | "i16" | "i32" | "i64"
@@ -666,6 +675,7 @@ base_type   ::= "i8" | "i16" | "i32" | "i64"
               | "f32" | "f64"
               | "isize" | "usize"
               | "bool"
+              | "()"
 
 comment      ::= "(*" comment_body "*)"
 comment_body ::= { any_char | comment }    (* nested comments allowed *)

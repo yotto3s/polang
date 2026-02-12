@@ -77,6 +77,28 @@ Index types map to the platform-native pointer width. `usize` is intended for ar
 |------|-------------|------|-----------|-----------|
 | `bool` | Boolean | 1-bit | `!polang.bool` | `i1` |
 
+### Unit Type
+
+| Type | Description | Size | MLIR Type | LLVM Type |
+|------|-------------|------|-----------|-----------|
+| `()` | Unit type (single value) | 0-bit | `!polang.unit` | n/a |
+
+The unit type `()` has exactly one value, also written `()`. It is used in function type signatures:
+
+- **Zero-parameter functions**: `f : () -> i64` declares a function `f` that takes no arguments and returns `i64`
+- **Side-effect functions**: `f : () -> ()` declares a function that takes no arguments and returns no meaningful value
+
+In type signatures, `()` appears as the parameter type for zero-parameter functions. Previously, zero-parameter functions used bare return type syntax (e.g., `f : i64`); the `() -> T` form makes the function nature explicit.
+
+```polang
+(* Zero-parameter function *)
+get_value : () -> i64
+get_value() = 42
+
+(* Side-effect function (future use) *)
+do_something : () -> ()
+```
+
 ### Type Constants
 
 Type names are defined as compile-time constants in `parser/include/parser/polang_types.hpp`:
