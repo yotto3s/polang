@@ -22,6 +22,9 @@ namespace polang {
 /// Create a pass to monomorphize polymorphic functions.
 std::unique_ptr<mlir::Pass> createMonomorphizationPass();
 
+/// Create a pass to insert overflow checks for integer arithmetic.
+std::unique_ptr<mlir::Pass> createInsertOverflowChecksPass();
+
 } // namespace polang
 
 #endif // POLANG_TRANSFORMS_PASSES_H

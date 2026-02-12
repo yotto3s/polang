@@ -22,4 +22,4 @@ add_executable(PolangRepl src/main.cpp)
 target_include_directories(PolangRepl PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-target_link_libraries(PolangRepl PRIVATE PolangReplLib)
+target_link_libraries(PolangRepl PRIVATE PolangReplLib PolangRuntime)

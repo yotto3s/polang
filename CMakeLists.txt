@@ -71,6 +71,7 @@ add_definitions(${LLVM_DEFINITIONS})
 llvm_map_components_to_libnames(llvm_libs core support native OrcJIT)
 
 add_subdirectory(parser)
+add_subdirectory(runtime)
 add_subdirectory(mlir)
 add_subdirectory(compiler)
 add_subdirectory(repl)

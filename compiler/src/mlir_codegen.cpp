@@ -163,6 +163,9 @@ bool MLIRCodeGenContext::lowerToLLVM() {
   // Lower SCF to CF
   pm.addPass(createConvertSCFToCFPass());
 
+  // Insert overflow checks (must run before ArithToLLVM)
+  pm.addPass(polang::createInsertOverflowChecksPass());
+
   // Lower to LLVM
   pm.addPass(createConvertFuncToLLVMPass());
   pm.addPass(createArithToLLVMConversionPass());

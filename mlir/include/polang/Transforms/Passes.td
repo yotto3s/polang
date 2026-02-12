@@ -20,4 +20,23 @@ def Monomorphization : Pass<"polang-monomorphize", "mlir::ModuleOp"> {
   let dependentDialects = ["polang::PolangDialect"];
 }
 
+def InsertOverflowChecks : Pass<"polang-insert-overflow-checks", "mlir::ModuleOp"> {
+  let summary = "Insert runtime overflow checks for integer arithmetic";
+  let description = [{
+    This pass converts integer arithmetic operations (add, sub, mul) to
+    LLVM overflow intrinsics with runtime checks. When overflow is detected,
+    the program prints an error message with source location and exits.
+
+    This pass should run after all MLIR optimizations but before the final
+    ArithToLLVM conversion pass.
+  }];
+
+  let dependentDialects = [
+    "mlir::LLVM::LLVMDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::func::FuncDialect",
+    "mlir::cf::ControlFlowDialect"
+  ];
+}
+
 #endif // POLANG_TRANSFORMS_PASSES_TD
