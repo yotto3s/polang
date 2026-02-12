@@ -1,0 +1,15 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test incremental REPL mode with type signatures and definitions in sequence *)
+(* This should work: signatures can be in one input, definitions in next *)
+(* CHECK: true : bool
+*)
+
+isEven : i64 -> bool
+isOdd : i64 -> bool
+
+isEven(n) = if n == 0 then true else isOdd(n - 1)
+isOdd(n) = if n == 0 then false else isEven(n - 1)
+
+isEven(4)
