@@ -20,6 +20,9 @@ OperatorCategory getOperatorCategory(int op) noexcept {
   case yy::parser::token::TCGT:
   case yy::parser::token::TCGE:
     return OperatorCategory::Comparison;
+  case yy::parser::token::TLAND:
+  case yy::parser::token::TLOR:
+    return OperatorCategory::Logical;
   default:
     return OperatorCategory::Unknown;
   }
@@ -47,6 +50,12 @@ std::string operatorToString(int op) noexcept {
     return ">";
   case yy::parser::token::TCGE:
     return ">=";
+  case yy::parser::token::TLAND:
+    return "&&";
+  case yy::parser::token::TLOR:
+    return "||";
+  case yy::parser::token::TNOT:
+    return "!";
   default:
     return "?";
   }
@@ -58,6 +67,10 @@ bool isArithmeticOperator(int op) noexcept {
 
 bool isComparisonOperator(int op) noexcept {
   return getOperatorCategory(op) == OperatorCategory::Comparison;
+}
+
+bool isLogicalOperator(int op) noexcept {
+  return getOperatorCategory(op) == OperatorCategory::Logical;
 }
 
 } // namespace polang

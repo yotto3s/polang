@@ -307,6 +307,15 @@ public:
   void accept(Visitor &visitor) const override;
 };
 
+class NUnaryOperator : public NExpression {
+public:
+  int op;
+  std::unique_ptr<NExpression> operand;
+  NUnaryOperator(int op, std::unique_ptr<NExpression> operand)
+      : op(op), operand(std::move(operand)) {}
+  void accept(Visitor &visitor) const override;
+};
+
 class NBinaryOperator : public NExpression {
 public:
   int op;
