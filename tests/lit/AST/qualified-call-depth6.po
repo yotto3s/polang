@@ -6,7 +6,7 @@
 *)
 (* CHECK-NEXT: `-NExpressionStatement
 *)
-(* CHECK-NEXT:   `-NMethodCall 'A$$B$$C$$D$$E$$func'
+(* CHECK-NEXT:   `-NMethodCall 'A.B.C.D.E.func'
 *)
 
 A.B.C.D.E.func()
