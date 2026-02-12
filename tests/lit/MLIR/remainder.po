@@ -1,0 +1,9 @@
+(* RUN: %polang_compiler %s --emit-mlir | %FileCheck %s
+*)
+
+(* Test remainder operation MLIR generation *)
+rem_test : i64 * i64 -> i64
+rem_test(a, b) = a % b
+
+(* CHECK: polang.rem %{{.*}}, %{{.*}} : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+*)

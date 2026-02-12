@@ -1,0 +1,8 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test that float division by zero produces infinity, not an error *)
+(* IEEE 754: x/0.0 = inf for positive x *)
+(* CHECK: inf : f64
+*)
+5.0 / 0.0

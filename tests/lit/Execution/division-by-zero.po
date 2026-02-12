@@ -1,0 +1,7 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+
+(* Test integer division by zero runtime error *)
+(* CHECK: Runtime error: integer division by zero at line 7, column 1
+*)
+10 / 0
