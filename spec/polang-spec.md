@@ -97,6 +97,7 @@ The following words are reserved and must not be used as identifiers:
 The following character sequences represent operators and punctuation:
 
     +    -    *    /    %
+    &+   &-   &*
     ==   !=   <    <=   >    >=
     &&   ||   !
     =    :    ->   .    ,
@@ -512,6 +513,7 @@ Unary `-` computes the arithmetic negation of its operand. For signed integers, 
 
     BinaryExpr = Expression BinOp Expression .
     BinOp      = "+" | "-" | "*" | "/" | "%"
+               | "&+" | "&-" | "&*"
                | "==" | "!=" | "<" | "<=" | ">" | ">="
                | "&&" | "||" .
 
@@ -527,11 +529,23 @@ Unary `-` computes the arithmetic negation of its operand. For signed integers, 
 
 Both operands of `+`, `-`, `*`, `/` must have identical types. The result has the same type as the operands.
 
+#### 10.4.2 Wrapping Arithmetic Operators
+
+| Operator | Operation                 | Operand Types    | Result Type      |
+|----------|---------------------------|------------------|------------------|
+| `&+`     | Wrapping addition         | Integer          | Same as operands |
+| `&-`     | Wrapping subtraction      | Integer          | Same as operands |
+| `&*`     | Wrapping multiplication   | Integer          | Same as operands |
+
+Wrapping operators perform the same computation as their checked counterparts but silently wrap on overflow instead of causing a runtime error. They are intended for performance-critical code where overflow behavior is intentional (e.g., hash functions, bitwise algorithms).
+
+Wrapping operators are only available for integer types. Using them with floating-point operands is ill-formed.
+
 The `%` operator computes the remainder of integer division (truncated division). The result has the same sign as the dividend. Float operands are not permitted with `%`; the program is ill-formed.
 
 Integer division or remainder by zero shall cause the program to print a runtime error message including the source location and exit with a non-zero status. Floating-point division by zero produces infinity or NaN per IEEE 754.
 
-#### 10.4.2 Comparison Operators
+#### 10.4.3 Comparison Operators
 
 | Operator | Operation              | Operand Types       | Result Type |
 |----------|------------------------|---------------------|-------------|
@@ -546,7 +560,7 @@ Both operands must have identical numeric types. Boolean values cannot be compar
 
 For signed integers, comparisons use signed semantics. For unsigned integers, comparisons use unsigned semantics. For floating-point values, comparisons follow IEEE 754 ordering.
 
-#### 10.4.3 Logical Operators
+#### 10.4.4 Logical Operators
 
 | Operator | Operation   | Operand Types | Result Type |
 |----------|-------------|---------------|-------------|
@@ -572,8 +586,8 @@ Operators are listed from highest to lowest precedence:
 | 9          | `.` (member access)                 | Left            |
 | 8          | Unary `-`, `!`                      | Right (prefix)  |
 | 7          | `as` (type conversion)              | Left            |
-| 6          | `*`, `/`, `%`                       | Left            |
-| 5          | `+`, `-`                            | Left            |
+| 6          | `*`, `/`, `%`, `&*`                 | Left            |
+| 5          | `+`, `-`, `&+`, `&-`               | Left            |
 | 4          | `==`, `!=`, `<`, `<=`, `>`, `>=`    | Non-associative |
 | 3          | `&&`                                | Left            |
 | 2          | `\|\|`                              | Left            |
