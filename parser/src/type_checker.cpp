@@ -1437,12 +1437,30 @@ void TypeChecker::applyFunctionSignature(
   const auto* arrowType = dynamic_cast<const NArrowType*>(&innerSig.get());
   if (arrowType == nullptr) {
     if (node.arguments.empty()) {
-      // Zero-param function: non-arrow signature is just the return type
-      node.type = innerSig.get().clone();
+      // Non-arrow type for zero-param function is no longer valid.
+      // Must use () -> T syntax.
+      reportError("type signature for '" + node.id->name + "' must use () -> " +
+                  innerSig.get().getTypeName() +
+                  " for zero-parameter functions");
       return;
     }
     reportError("type signature for '" + node.id->name +
                 "' is not a function type");
+    return;
+  }
+
+  // Check for unit type parameter: () -> T means zero-param function
+  const auto* unitParam =
+      dynamic_cast<const NUnitType*>(arrowType->paramType.get());
+  if (unitParam != nullptr) {
+    // () -> T: zero-param function
+    if (!node.arguments.empty()) {
+      reportError("type signature for '" + node.id->name +
+                  "' has () parameter but definition has " +
+                  std::to_string(node.arguments.size()) + " parameters");
+      return;
+    }
+    node.type = arrowType->returnType->clone();
     return;
   }
 
@@ -1515,6 +1533,10 @@ bool TypeChecker::validateTypeNames(
       valid = validateTypeNames(*t, declaredTypeVars, usedTypeVars) && valid;
     }
     return valid;
+  }
+
+  if (dynamic_cast<const NUnitType*>(&typeSpec) != nullptr) {
+    return true; // Unit type is always valid
   }
 
   return true;

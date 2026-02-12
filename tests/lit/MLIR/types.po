@@ -10,7 +10,7 @@
 *)
 (* CHECK-NEXT: }
 *)
-double_val : f64
+double_val : () -> f64
 double_val() = 3.14
 
 (* Test bool constant *)
@@ -22,5 +22,5 @@ double_val() = 3.14
 *)
 (* CHECK-NEXT: }
 *)
-bool_val : bool
+bool_val : () -> bool
 bool_val() = true

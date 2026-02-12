@@ -8,7 +8,7 @@
 *)
 (* CHECK-NEXT: }
 *)
-bool_true : bool
+bool_true : () -> bool
 bool_true() = true
 
 (* CHECK:      define i1 @bool_false() {
@@ -17,5 +17,5 @@ bool_true() = true
 *)
 (* CHECK-NEXT: }
 *)
-bool_false : bool
+bool_false : () -> bool
 bool_false() = false

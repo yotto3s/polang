@@ -7,11 +7,11 @@ add_base(x) = x + base
 result1 = add_base(5)  (* 15 *)
 
 (* Multiple captures: function captures a, b, c *)
-(* Zero-param functions use a non-arrow type signature (just the return type) *)
+(* Zero-param functions use () -> return_type syntax *)
 a = 1
 b = 2
 c = 3
-sum_all : i64
+sum_all : () -> i64
 sum_all() = a + b + c
 result2 = sum_all()  (* 6 *)
 

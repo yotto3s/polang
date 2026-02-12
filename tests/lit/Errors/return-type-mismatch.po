@@ -4,5 +4,5 @@
 (* Test function return type mismatch *)
 (* CHECK: {{.*}}declared to return i64 but body has type f64{{.*}}
 *)
-f : i64
+f : () -> i64
 f() = 3.14
