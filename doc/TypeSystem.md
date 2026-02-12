@@ -174,7 +174,17 @@ e = 3.14 as i32              (* convert float to integer (truncates toward zero)
 
 The `as` operator has higher precedence than arithmetic operators but lower precedence than unary operators:
 
-| Precedence | Operators |
+| Precedence | Operators                           | Associativity   |
+|------------|-------------------------------------|-----------------|
+| 9          | `.` (member access)                 | Left            |
+| 8          | Unary `-`, `!`                      | Right (prefix)  |
+| 7          | `as` (type conversion)              | Left            |
+| 6          | `*`, `/`                            | Left            |
+| 5          | `+`, `-`                            | Left            |
+| 4          | `==`, `!=`, `<`, `<=`, `>`, `>=`    | Non-associative |
+| 3          | `&&`                                | Left            |
+| 2          | `||`                                | Left            |
+| 1          | `if`/`then`/`else`, `let`/`in`      | Right           |
 |------------|-----------|
 | Highest | Parentheses, function calls |
 | | Unary `-`, `!` |
