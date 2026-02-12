@@ -33,28 +33,29 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 /// Get or create the runtime error handler function declaration
-func::FuncOp getOrCreateRuntimeErrorHandler(ModuleOp module,
-                                            PatternRewriter& rewriter) {
+LLVM::LLVMFuncOp getOrCreateRuntimeErrorHandler(ModuleOp module,
+                                                PatternRewriter& rewriter) {
   // Check if function already exists
   if (auto existingFunc =
-          module.lookupSymbol<func::FuncOp>("__polang_runtime_error")) {
+          module.lookupSymbol<LLVM::LLVMFuncOp>("__polang_runtime_error")) {
     return existingFunc;
   }
 
-  // Create function type: (ptr<i8>, i32, i32) -> void
+  // Create function type: (ptr, i32, i32) -> void
   // Arguments: message (string pointer), line, column
   auto i8PtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
   auto i32Type = rewriter.getI32Type();
-  auto funcType = rewriter.getFunctionType(
-      {i8PtrType, i32Type, i32Type}, {});
+  auto voidType = LLVM::LLVMVoidType::get(rewriter.getContext());
+  auto funcType = LLVM::LLVMFunctionType::get(
+      voidType, {i8PtrType, i32Type, i32Type});
 
   // Create function declaration
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToStart(module.getBody());
 
-  auto funcOp = rewriter.create<func::FuncOp>(
+  auto funcOp = rewriter.create<LLVM::LLVMFuncOp>(
       module.getLoc(), "__polang_runtime_error", funcType);
-  funcOp.setPrivate();
+  funcOp.setLinkage(LLVM::Linkage::External);
 
   return funcOp;
 }
@@ -181,8 +182,8 @@ struct InsertOverflowCheckPattern : public OpRewritePattern<ArithOp> {
     auto column = rewriter.create<LLVM::ConstantOp>(
         loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
 
-    // Call error handler
-    rewriter.create<func::CallOp>(loc, errorHandler,
+    // Call error handler using LLVM call
+    rewriter.create<LLVM::CallOp>(loc, errorHandler,
                                  ValueRange{msgPtr, line, column});
     
     // Unreachable after error
