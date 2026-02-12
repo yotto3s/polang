@@ -214,12 +214,27 @@ Source Code (.po)
          ▼
 ┌─────────────────┐
 │PolangToStandard │  mlir/lib/Conversion/PolangToStandard.cpp
-└────────┬────────┘
+└────────┬────────┘  (attaches signedness attributes)
          │ Standard Dialects (arith, func, scf, memref)
          ▼
 ┌─────────────────┐
-│ Standard to LLVM│  Built-in MLIR passes
+│ Canonicalization│  Built-in MLIR pass
+└────────┬────────┘  (constant folding, CSE, etc.)
+         │ Optimized arith/func/scf
+         ▼
+┌─────────────────┐
+│  SCF to CF      │  Built-in MLIR pass
 └────────┬────────┘
+         │ Control Flow Dialect
+         ▼
+┌─────────────────┐
+│OverflowChecks   │  mlir/lib/Transforms/InsertOverflowChecks.cpp
+└────────┬────────┘  (arith ops → LLVM overflow intrinsics)
+         │ Mixed: LLVM dialect + remaining arith/func/cf
+         ▼
+┌─────────────────┐
+│ Standard to LLVM│  Built-in MLIR passes
+└────────┬────────┘  (func/arith/cf → LLVM dialect)
          │ LLVM Dialect
          ▼
 ┌─────────────────┐
