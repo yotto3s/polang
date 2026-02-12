@@ -6,7 +6,7 @@ Version: 0.1.0 (Draft)
 
 This is a reference manual for the Polang programming language.
 
-Polang is a statically typed, functional programming language with ML-inspired syntax and an LLVM backend. It features Hindley-Milner type inference, polymorphic functions via monomorphization, and immutable variables by default.
+Polang is a statically typed, functional programming language with ML-inspired syntax and an LLVM backend. It features Hindley-Milner type inference, polymorphic functions via monomorphization, and immutable variables.
 
 This document specifies the syntax and semantics of all currently implemented language features. It serves as the authoritative reference for the language; the implementation must conform to this specification.
 
@@ -504,7 +504,7 @@ Examples:
 |----------|-----------|------------------|------------------|
 | `-`      | Negation  | Integer or Float | Same as operand  |
 
-Unary `-` computes the arithmetic negation of its operand. For signed integers, negating the minimum value (e.g., `-128` for `i8`) wraps around. For unsigned integers, unary negation is not permitted; the program is ill-formed.
+Unary `-` computes the arithmetic negation of its operand. For signed integers, negating the minimum value (e.g., `-128` for `i8`) is an overflow and shall cause a runtime error (see [§6.1](#61-integer-types)). For unsigned integers, unary negation is not permitted; the program is ill-formed.
 
     -x                           (* negation of x *)
     -(a + b)                     (* negation of a sum *)
@@ -539,6 +539,10 @@ Unary `-` computes the arithmetic negation of its operand. For signed integers, 
 
 Both operands of `+`, `-`, `*`, `/` must have identical types. The result has the same type as the operands.
 
+The `%` operator computes the remainder of integer division (truncated division). The result has the same sign as the dividend. Float operands are not permitted with `%`; the program is ill-formed.
+
+Integer division or remainder by zero shall cause the program to print a runtime error message including the source location and exit with a non-zero status. Floating-point division by zero produces infinity or NaN per IEEE 754.
+
 #### 10.4.2 Wrapping Arithmetic Operators
 
 | Operator | Operation                 | Operand Types    | Result Type      |
@@ -550,10 +554,6 @@ Both operands of `+`, `-`, `*`, `/` must have identical types. The result has th
 Wrapping operators perform the same computation as their checked counterparts but silently wrap on overflow instead of causing a runtime error. They are intended for performance-critical code where overflow behavior is intentional (e.g., hash functions, bitwise algorithms).
 
 Wrapping operators are only available for integer types. Using them with floating-point operands is ill-formed.
-
-The `%` operator computes the remainder of integer division (truncated division). The result has the same sign as the dividend. Float operands are not permitted with `%`; the program is ill-formed.
-
-Integer division or remainder by zero shall cause the program to print a runtime error message including the source location and exit with a non-zero status. Floating-point division by zero produces infinity or NaN per IEEE 754.
 
 #### 10.4.3 Comparison Operators
 
@@ -603,6 +603,8 @@ Operators are listed from highest to lowest precedence:
 | 2          | `\|\|`                              | Left            |
 | 1          | `if`/`then`/`else`, `let`/`in`      | Right           |
 
+Note: The `=` symbol is a definition separator, not an expression operator, and does not appear in the precedence table.
+
 Parentheses override precedence:
 
     (1 + 2) * 3                  (* 9, not 7 *)
@@ -632,13 +634,9 @@ The `-1` in the example above is parsed as unary negation applied to `1`.
 
 ### 10.7 Type Conversions
 
-    CastExpr = Expression "as" TypeName .
-    TypeName = "i8" | "i16" | "i32" | "i64"
-             | "u8" | "u16" | "u32" | "u64"
-             | "f32" | "f64"
-             | "isize" | "usize" .
+    CastExpr = Expression "as" identifier .
 
-The `as` operator performs an explicit type conversion. Only numeric-to-numeric conversions are permitted. Boolean conversions are not allowed.
+The `as` operator performs an explicit type conversion. The target type must be a numeric type name (`i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f32`, `f64`, `isize`, `usize`). Only numeric-to-numeric conversions are permitted. Boolean conversions are not allowed. If the target type is not a valid numeric type, the program is ill-formed.
 
 #### 10.7.1 Allowed Conversions
 
@@ -724,8 +722,8 @@ Examples:
     LetExpr     = "let" LetBindings "in" Expression .
     LetBindings = LetBinding { "and" LetBinding } .
     LetBinding  = identifier "=" Expression
-                | identifier ":" TypeName "=" Expression
-                | identifier "(" [ ParamList ] ")" [ ":" TypeName ] "=" Expression .
+                | identifier ":" identifier "=" Expression
+                | identifier "(" [ ParamList ] ")" [ ":" identifier ] "=" Expression .
 
 A let-expression introduces one or more local bindings that are visible only within the body expression. The entire let-expression evaluates to the value of the body.
 
