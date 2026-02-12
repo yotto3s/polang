@@ -114,3 +114,59 @@ TEST(ParserTest, FunctionWithInferredReturnType) {
   EXPECT_EQ(funcDecl->id->name, "double");
   EXPECT_EQ(funcDecl->type, nullptr); // return type inferred, not yet set
 }
+
+// ============== Unit Type Tests ==============
+
+TEST(ParserTest, UnitTypeSignature) {
+  auto block = parseOrFail("f : () -> i64\nf() = 42");
+  ASSERT_NE(block, nullptr);
+  ASSERT_EQ(block->statements.size(), 2);
+
+  // First statement: type signature
+  auto* typeSig =
+      dynamic_cast<NTypeSignature*>(block->statements[0].get());
+  ASSERT_NE(typeSig, nullptr);
+  EXPECT_EQ(typeSig->id->name, "f");
+  // The type should be () -> i64
+  EXPECT_EQ(typeSig->typeExpr->getTypeName(), "() -> i64");
+  // The outer type should be NArrowType
+  auto* arrowType =
+      dynamic_cast<const NArrowType*>(typeSig->typeExpr.get());
+  ASSERT_NE(arrowType, nullptr);
+  // The param type should be NUnitType
+  auto* unitParam =
+      dynamic_cast<const NUnitType*>(arrowType->paramType.get());
+  ASSERT_NE(unitParam, nullptr);
+  EXPECT_EQ(unitParam->getTypeName(), "()");
+
+  // Second statement: function declaration
+  auto* funcDecl =
+      dynamic_cast<NFunctionDeclaration*>(block->statements[1].get());
+  ASSERT_NE(funcDecl, nullptr);
+  EXPECT_EQ(funcDecl->id->name, "f");
+  EXPECT_EQ(funcDecl->arguments.size(), 0);
+}
+
+TEST(ParserTest, UnitLiteralExpression) {
+  auto block = parseOrFail("()");
+  ASSERT_NE(block, nullptr);
+  ASSERT_EQ(block->statements.size(), 1);
+
+  auto* exprStmt =
+      dynamic_cast<NExpressionStatement*>(block->statements[0].get());
+  ASSERT_NE(exprStmt, nullptr);
+  auto* unitLit =
+      dynamic_cast<NUnitLiteral*>(exprStmt->expression.get());
+  ASSERT_NE(unitLit, nullptr);
+}
+
+TEST(ParserTest, UnitTypeCloneAndGetTypeName) {
+  NUnitType original;
+  EXPECT_EQ(original.getTypeName(), "()");
+
+  auto cloned = original.clone();
+  ASSERT_NE(cloned, nullptr);
+  EXPECT_EQ(cloned->getTypeName(), "()");
+  auto* clonedUnit = dynamic_cast<const NUnitType*>(cloned.get());
+  ASSERT_NE(clonedUnit, nullptr);
+}

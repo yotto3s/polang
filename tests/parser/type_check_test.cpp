@@ -433,3 +433,21 @@ TEST(TypeCheckTest, ClosureDoesNotCaptureLocalLetBinding) {
   // Local let binding should not be captured
   EXPECT_TRUE(hasNoTypeError("f() = let local = 5 in local + 1\nf()"));
 }
+
+// ============== Unit Type Signature Tests ==============
+
+TEST(TypeCheckTest, UnitTypeSignatureValid) {
+  EXPECT_TRUE(hasNoTypeError("f : () -> i64\nf() = 42"));
+  EXPECT_TRUE(hasNoTypeError("g : () -> bool\ng() = true"));
+  EXPECT_TRUE(hasNoTypeError("h : () -> f64\nh() = 3.14"));
+}
+
+TEST(TypeCheckTest, BareReturnTypeRejected) {
+  // f : i64 with f() = ... should now be an error
+  EXPECT_TRUE(hasTypeError("f : i64\nf() = 42"));
+}
+
+TEST(TypeCheckTest, UnitTypeArityMismatch) {
+  // () -> T with f(x) = ... should be an error
+  EXPECT_TRUE(hasTypeError("f : () -> i64\nf(x) = x"));
+}
