@@ -1473,9 +1473,9 @@ bool TypeChecker::registerTypeSignature(const std::string& name,
     return true;
   }
 
-  // Not an arrow type - must be a variable type signature
-  // Register in localTypes
-  localTypes[name] = innerSig.get().getTypeName();
+  // Not an arrow type - this is a variable type signature
+  // Do NOT register in localTypes - the variable must be defined before use
+  // The type signature will be applied when the variable declaration is visited
   return true;
 }
 
