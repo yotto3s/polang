@@ -394,6 +394,16 @@ Polang supports the following unary operators:
 | `-`      | Subtraction    | `a - b`   |
 | `*`      | Multiplication | `a * b`   |
 | `/`      | Division       | `a / b`   |
+| `%`      | Modulo (remainder) | `a % b`   |
+
+The modulo operator `%` computes the remainder of integer division (truncated division). The result has the same sign as the dividend. Float operands are not permitted with `%`; the program is ill-formed. Integer division and remainder by zero is undefined behavior.
+
+Examples:
+```
+17 % 5     (* 2 *)
+20 % 10    (* 0 *)
+10 % 3     (* 1 *)
+```
 
 ### Comparison Operators
 
@@ -436,7 +446,7 @@ Operators are listed from highest to lowest precedence:
 | 9          | `.` (member access)                 | Left            |
 | 8          | Unary `-`, `!`                      | Right (prefix)  |
 | 7          | `as` (type conversion)              | Left            |
-| 6          | `*`, `/`                            | Left            |
+| 6          | `*`, `/`, `%`                       | Left            |
 | 5          | `+`, `-`                            | Left            |
 | 4          | `==`, `!=`, `<`, `<=`, `>`, `>=`    | Non-associative |
 | 3          | `&&`                                | Left            |
@@ -449,6 +459,7 @@ Examples:
 -10 + 5             (* evaluated as: (-10) + 5 = -5 *)
 !false && true      (* evaluated as: (!false) && true = true *)
 a > 0 && a < 10 || b == 0    (* evaluated as: ((a > 0) && (a < 10)) || (b == 0) *)
+10 % 3 + 1          (* evaluated as: (10 % 3) + 1 = 2 *)
 ```
 
 Comparison operators are non-associative, meaning expressions like `a < b < c` are syntax errors and must use explicit parentheses:
