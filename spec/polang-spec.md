@@ -98,6 +98,7 @@ The following character sequences represent operators and punctuation:
 
     +    -    *    /
     ==   !=   <    <=   >    >=
+    &&   ||   !
     =    :    ->   .    ,
     (    )    {    }
 
@@ -277,7 +278,7 @@ Specifically:
 
 A value `v` of type `T` is assignable to a variable of type `U` if and only if `T` and `U` are identical types.
 
-There are no implicit type conversions. If `T` and `U` are different types, an explicit conversion using `as` is required (see [§10.6 Type Conversions](#106-type-conversions)).
+There are no implicit type conversions. If `T` and `U` are different types, an explicit conversion using `as` is required (see [§10.7 Type Conversions](#107-type-conversions)).
 
 ### 7.3 Type Compatibility for Operations
 
@@ -479,12 +480,40 @@ Examples:
     Math.add(1, 2)
     greet()
 
-### 10.3 Binary Operators
+### 10.3 Unary Operators
+
+    UnaryExpr = UnaryOp Expression .
+    UnaryOp   = "-" | "!" .
+
+#### 10.3.1 Arithmetic Negation
+
+| Operator | Operation | Operand Type     | Result Type      |
+|----------|-----------|------------------|------------------|
+| `-`      | Negation  | Integer or Float | Same as operand  |
+
+Unary `-` computes the arithmetic negation of its operand. For signed integers, negating the minimum value (e.g., `-128` for `i8`) wraps around. For unsigned integers, unary negation is not permitted; the program is ill-formed.
+
+    -x                           (* negation of x *)
+    -(a + b)                     (* negation of a sum *)
+
+#### 10.3.2 Logical Not
+
+| Operator | Operation   | Operand Type | Result Type |
+|----------|-------------|--------------|-------------|
+| `!`      | Logical not | `bool`       | `bool`      |
+
+    !true                        (* false *)
+    !false                       (* true *)
+    !(a > b)                     (* negation of comparison *)
+
+### 10.4 Binary Operators
 
     BinaryExpr = Expression BinOp Expression .
-    BinOp      = "+" | "-" | "*" | "/" | "==" | "!=" | "<" | "<=" | ">" | ">=" .
+    BinOp      = "+" | "-" | "*" | "/"
+               | "==" | "!=" | "<" | "<=" | ">" | ">="
+               | "&&" | "||" .
 
-#### 10.3.1 Arithmetic Operators
+#### 10.4.1 Arithmetic Operators
 
 | Operator | Operation      | Operand Types       | Result Type    |
 |----------|----------------|---------------------|----------------|
@@ -497,7 +526,7 @@ Both operands must have identical types. The result has the same type as the ope
 
 Integer division truncates toward zero. Division of a signed integer by zero is undefined behavior. Division of an unsigned integer by zero is undefined behavior. Floating-point division by zero produces infinity or NaN per IEEE 754.
 
-#### 10.3.2 Comparison Operators
+#### 10.4.2 Comparison Operators
 
 | Operator | Operation              | Operand Types       | Result Type |
 |----------|------------------------|---------------------|-------------|
@@ -512,28 +541,49 @@ Both operands must have identical numeric types. Boolean values cannot be compar
 
 For signed integers, comparisons use signed semantics. For unsigned integers, comparisons use unsigned semantics. For floating-point values, comparisons follow IEEE 754 ordering.
 
-### 10.4 Operator Precedence
+#### 10.4.3 Logical Operators
+
+| Operator | Operation   | Operand Types | Result Type |
+|----------|-------------|---------------|-------------|
+| `&&`     | Logical and | `bool`        | `bool`      |
+| `\|\|`   | Logical or  | `bool`        | `bool`      |
+
+Logical operators use **short-circuit evaluation**:
+
+- `a && b`: If `a` is `false`, the result is `false` and `b` is not evaluated.
+- `a || b`: If `a` is `true`, the result is `true` and `b` is not evaluated.
+
+Both operands must have type `bool`.
+
+    a > 0 && a < 100             (* true if a is in range (1, 99) *)
+    x == 0 || y == 0             (* true if either is zero *)
+
+### 10.5 Operator Precedence
 
 Operators are listed from highest to lowest precedence:
 
-| Precedence | Operators                           | Associativity  |
-|------------|-------------------------------------|----------------|
-| 7          | `.` (member access)                 | Left           |
-| 6          | `as` (type conversion)              | Left           |
-| 5          | `*`, `/`                            | Left           |
-| 4          | `+`, `-`                            | Left           |
-| 3          | `==`, `!=`, `<`, `<=`, `>`, `>=`    | Non-associative |
-| 2          | `if`/`then`/`else`                  | Right          |
-| 1          | `let`/`in`                          | Right          |
+| Precedence | Operators                           | Associativity   |
+|------------|-------------------------------------|-----------------|
+| 9          | `.` (member access)                 | Left            |
+| 8          | Unary `-`, `!`                      | Right (prefix)  |
+| 7          | `as` (type conversion)              | Left            |
+| 6          | `*`, `/`                            | Left            |
+| 5          | `+`, `-`                            | Left            |
+| 4          | `==`, `!=`, `<`, `<=`, `>`, `>=`    | Non-associative |
+| 3          | `&&`                                | Left            |
+| 2          | `\|\|`                              | Left            |
+| 1          | `if`/`then`/`else`, `let`/`in`      | Right           |
 
 Parentheses override precedence:
 
     (1 + 2) * 3                  (* 9, not 7 *)
     a + b as i32                 (* means: a + (b as i32) *)
+    !a && b                      (* means: (!a) && b *)
+    a > 0 && a < 10 || b == 0   (* means: ((a > 0) && (a < 10)) || (b == 0) *)
 
 Comparison operators are non-associative; chaining comparisons like `a < b < c` is a syntax error.
 
-### 10.5 If Expressions
+### 10.6 If Expressions
 
     IfExpr = "if" Expression "then" Expression "else" Expression .
 
@@ -549,9 +599,9 @@ If-expressions can be nested:
 
     if a > 0 then 1 else if a < 0 then -1 else 0
 
-Note: The literal `-1` in the example above is parsed as the binary expression `0 - 1` via the subtraction in the enclosing context; there is no unary negation operator.
+The `-1` in the example above is parsed as unary negation applied to `1`.
 
-### 10.6 Type Conversions
+### 10.7 Type Conversions
 
     CastExpr = Expression "as" TypeName .
     TypeName = "i8" | "i16" | "i32" | "i64"
@@ -561,7 +611,7 @@ Note: The literal `-1` in the example above is parsed as the binary expression `
 
 The `as` operator performs an explicit type conversion. Only numeric-to-numeric conversions are permitted. Boolean conversions are not allowed.
 
-#### 10.6.1 Allowed Conversions
+#### 10.7.1 Allowed Conversions
 
 | From              | To                | Allowed |
 |-------------------|-------------------|---------|
@@ -579,7 +629,7 @@ The `as` operator performs an explicit type conversion. Only numeric-to-numeric 
 
 If a conversion is not allowed, the program is ill-formed.
 
-#### 10.6.2 Integer Widening
+#### 10.7.2 Integer Widening
 
 Converting to a larger integer type preserves the value exactly:
 
@@ -592,33 +642,33 @@ Converting to a larger integer type preserves the value exactly:
     (255 as u8) as u64            (* 255: zero-extended *)
     (-1 as i8) as u64             (* 18446744073709551615: reinterpreted *)
 
-#### 10.6.3 Integer Narrowing
+#### 10.7.3 Integer Narrowing
 
 Converting to a smaller integer type truncates, keeping only the low-order bits (wrap-around):
 
     (256 as i32) as i8            (* 0: 256 mod 256 *)
     (257 as i32) as i8            (* 1: 257 mod 256 *)
 
-#### 10.6.4 Sign Reinterpretation
+#### 10.7.4 Sign Reinterpretation
 
 Converting between signed and unsigned types of the same width reinterprets the bit pattern without changing it:
 
     (-1 as i32) as u32            (* 4294967295 *)
     (4294967295 as u32) as i32    (* -1 *)
 
-#### 10.6.5 Float Widening
+#### 10.7.5 Float Widening
 
 Converting `f32` to `f64` is exact with no precision loss.
 
-#### 10.6.6 Float Narrowing
+#### 10.7.6 Float Narrowing
 
 Converting `f64` to `f32` rounds to the nearest representable value using IEEE 754 round-to-nearest, ties-to-even. Very large values may overflow to positive or negative infinity.
 
-#### 10.6.7 Integer to Float
+#### 10.7.7 Integer to Float
 
 The integer value is converted to the nearest representable floating-point value. Large integers (beyond the mantissa precision of the target float) may lose precision.
 
-#### 10.6.8 Float to Integer
+#### 10.7.8 Float to Integer
 
 Float-to-integer conversion uses **saturating truncation toward zero**:
 
@@ -633,14 +683,14 @@ Examples:
     1000.0 as i8                  (* 127: saturated at i8 max *)
     (-1000.0 as f64) as i8        (* -128: saturated at i8 min *)
 
-#### 10.6.9 Index Conversions
+#### 10.7.9 Index Conversions
 
 - **Integer to index**: Uses signed or unsigned index cast depending on the target type (`isize` or `usize`).
 - **Index to integer**: Uses the corresponding signed or unsigned cast.
 - **Float to index**: Two-step conversion: float to `i64` (saturating truncation), then `i64` to index.
 - **Index to float**: Two-step conversion: index to `i64`, then `i64` to float.
 
-### 10.7 Let Expressions
+### 10.8 Let Expressions
 
     LetExpr     = "let" LetBindings "in" Expression .
     LetBindings = LetBinding { "and" LetBinding } .
