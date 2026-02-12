@@ -527,7 +527,7 @@ Both operands of `+`, `-`, `*`, `/` must have identical types. The result has th
 
 The `%` operator computes the remainder of integer division (truncated division). The result has the same sign as the dividend. Float operands are not permitted with `%`; the program is ill-formed.
 
-Integer division and remainder by zero is undefined behavior. Floating-point division by zero produces infinity or NaN per IEEE 754.
+Integer division or remainder by zero shall cause the program to print a runtime error message including the source location and exit with a non-zero status. Floating-point division by zero produces infinity or NaN per IEEE 754.
 
 #### 10.4.2 Comparison Operators
 
