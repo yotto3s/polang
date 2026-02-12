@@ -376,6 +376,10 @@ public:
       result = builder.create<DivOp>(loc(node.loc), arithResultTy, lhs, rhs);
       resultType = std::move(lhsType);
       break;
+    case yy::parser::token::TREM:
+      result = builder.create<RemOp>(loc(node.loc), arithResultTy, lhs, rhs);
+      resultType = std::move(lhsType);
+      break;
     // Comparison operations - result is always bool
     case yy::parser::token::TCEQ:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::eq, lhs, rhs);

@@ -223,6 +223,19 @@ def Polang_DivOp : Polang_ArithOp<"div"> {
   }];
 }
 
+def Polang_RemOp : Polang_ArithOp<"rem"> {
+  let summary = "Remainder operation";
+  let description = [{
+    Computes the remainder of integer division (truncated division).
+    The result has the same sign as the dividend.
+
+    Example:
+    ```mlir
+    %0 = polang.rem %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+    ```
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Type conversion operations
 //===----------------------------------------------------------------------===//
