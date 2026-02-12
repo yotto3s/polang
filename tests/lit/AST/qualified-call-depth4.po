@@ -1,0 +1,14 @@
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
+
+(* Test 4-level deep qualified function call *)
+(* CHECK:      NBlock
+*)
+(* CHECK-NEXT: `-NExpressionStatement
+*)
+(* CHECK-NEXT:   `-NMethodCall 'A$$B$$C$$func'
+*)
+(* CHECK-NEXT:     `-NInteger 42
+*)
+
+A.B.C.func(42)
