@@ -119,6 +119,13 @@ void ASTPrinter::visit(const NMethodCall& node) {
   }
 }
 
+void ASTPrinter::visit(const NUnaryOperator& node) {
+  printPrefix();
+  out << "NUnaryOperator '" << operatorToString(node.op) << "'\n";
+  DepthScope scope(*this, false);
+  node.operand->accept(*this);
+}
+
 void ASTPrinter::visit(const NBinaryOperator& node) {
   printPrefix();
   out << "NBinaryOperator '" << operatorToString(node.op) << "'\n";

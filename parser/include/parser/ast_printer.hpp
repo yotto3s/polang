@@ -25,6 +25,7 @@ public:
   void visit(const NIdentifier& node) override;
   void visit(const NQualifiedName& node) override;
   void visit(const NMethodCall& node) override;
+  void visit(const NUnaryOperator& node) override;
   void visit(const NBinaryOperator& node) override;
   void visit(const NCastExpression& node) override;
   void visit(const NBlock& node) override;
