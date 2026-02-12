@@ -12,6 +12,7 @@ OperatorCategory getOperatorCategory(int op) noexcept {
   case yy::parser::token::TMINUS:
   case yy::parser::token::TMUL:
   case yy::parser::token::TDIV:
+  case yy::parser::token::TMOD:
     return OperatorCategory::Arithmetic;
   case yy::parser::token::TCEQ:
   case yy::parser::token::TCNE:
@@ -38,6 +39,8 @@ std::string operatorToString(int op) noexcept {
     return "*";
   case yy::parser::token::TDIV:
     return "/";
+  case yy::parser::token::TMOD:
+    return "%";
   case yy::parser::token::TCEQ:
     return "==";
   case yy::parser::token::TCNE:
