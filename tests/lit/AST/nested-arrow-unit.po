@@ -2,6 +2,6 @@
 *)
 
 (* Test nested arrow type () -> (i64 -> i64) parses correctly *)
-(* CHECK: NTypeSignature 'f' : () -> i64 -> i64
+(* CHECK: `-NTypeSignature 'f' : () -> i64 -> i64
 *)
 f : () -> i64 -> i64
