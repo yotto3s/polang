@@ -1,0 +1,51 @@
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
+
+(* Test logical or operator with short-circuit evaluation *)
+(* Short-circuit: if first operand is true, second is not evaluated *)
+(* CHECK:      polang.func @logical_or(%arg0: !polang.bool, %arg1: !polang.bool) -> !polang.bool {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = scf.if %arg0 -> (!polang.bool) {
+*)
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.bool true
+*)
+(* CHECK-NEXT:     scf.yield %{{[0-9]+}} : !polang.bool
+*)
+(* CHECK-NEXT:   } else {
+*)
+(* CHECK-NEXT:     scf.yield %arg1 : !polang.bool
+*)
+(* CHECK-NEXT:   }
+*)
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+*)
+(* CHECK-NEXT: }
+*)
+logical_or : bool * bool -> bool
+logical_or(a, b) = a || b
+
+(* Test compound logical or *)
+(* CHECK:      polang.func @compound_or(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.bool {
+*)
+(* CHECK:        %{{[0-9]+}} = polang.cmp eq, %arg0, %{{[0-9]+}} : !polang.integer<64, signed>, !polang.integer<64, signed>
+*)
+(* CHECK:        %{{[0-9]+}} = scf.if %{{[0-9]+}} -> (!polang.bool) {
+*)
+(* CHECK:          %{{[0-9]+}} = polang.constant.bool true
+*)
+(* CHECK:          scf.yield %{{[0-9]+}} : !polang.bool
+*)
+(* CHECK:        } else {
+*)
+(* CHECK:          %{{[0-9]+}} = polang.cmp eq, %arg1, %{{[0-9]+}} : !polang.integer<64, signed>, !polang.integer<64, signed>
+*)
+(* CHECK:          scf.yield %{{[0-9]+}} : !polang.bool
+*)
+(* CHECK:        }
+*)
+(* CHECK:        polang.return %{{[0-9]+}} : !polang.bool
+*)
+(* CHECK:      }
+*)
+compound_or : i64 * i64 -> bool
+compound_or(a, b) = a == 0 || b == 0

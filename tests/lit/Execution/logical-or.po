@@ -1,0 +1,37 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test basic logical or - both true *)
+(* CHECK: true : bool
+*)
+true || true
+
+(* Test logical or - first false *)
+(* CHECK: true : bool
+*)
+false || true
+
+(* Test logical or - second false *)
+(* CHECK: true : bool
+*)
+true || false
+
+(* Test logical or - both false *)
+(* CHECK: false : bool
+*)
+false || false
+
+(* Test logical or with comparisons *)
+(* CHECK: true : bool
+*)
+5 > 3 || 10 > 20
+
+(* Test logical or - both false conditions *)
+(* CHECK: false : bool
+*)
+5 < 3 || 10 > 20
+
+(* Test either-zero check with logical or *)
+(* CHECK: true : bool
+*)
+let x = 0 and y = 5 in x == 0 || y == 0
