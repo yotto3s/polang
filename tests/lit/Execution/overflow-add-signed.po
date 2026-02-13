@@ -1,8 +1,10 @@
-(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s *)
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
 
 (* Test signed integer overflow on addition *)
-(* Should trigger runtime error *)
 
-(* CHECK: Runtime error: integer overflow *)
+(* CHECK: {{.*}}Runtime error: integer overflow{{.*}}
+*)
 
-main = 9223372036854775807 + 1
+add(x, y) = x + y
+add(9223372036854775807, 1)

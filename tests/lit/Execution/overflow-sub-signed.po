@@ -1,9 +1,11 @@
-(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s *)
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
 
 (* Test signed integer overflow on subtraction *)
-(* Should trigger runtime error *)
+(* (0 - MAX_I64) - 2 = -MAX_I64 - 2 overflows i64 *)
 
-(* CHECK: Runtime error: integer overflow *)
+(* CHECK: {{.*}}Runtime error: integer overflow{{.*}}
+*)
 
-main : i64  
-main = (-9223372036854775808) - 1
+sub(x, y) = x - y
+sub(0 - 9223372036854775807, 2)

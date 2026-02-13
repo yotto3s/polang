@@ -1,40 +1,47 @@
 (* RUN: %polang_compiler %s | %FileCheck %s
 *)
 
-(* Test arithmetic operations in LLVM IR *)
+(* Test arithmetic operations in LLVM IR with overflow checks *)
 (* CHECK:      define i64 @add(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = add i64 %{{[0-9]+}}, %{{[0-9]+}}
+(* CHECK-NEXT:   %{{[0-9]+}} = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %{{[0-9]+}}, i64 %{{[0-9]+}})
 *)
-(* CHECK-NEXT:   ret i64 %{{[0-9]+}}
+(* CHECK-NEXT:   %{{[0-9]+}} = extractvalue { i64, i1 } %{{[0-9]+}}, 0
 *)
-(* CHECK-NEXT: }
+(* CHECK-NEXT:   %{{[0-9]+}} = extractvalue { i64, i1 } %{{[0-9]+}}, 1
+*)
+(* CHECK-NEXT:   br i1 %{{[0-9]+}}, label %{{[0-9]+}}, label %{{[0-9]+}}
 *)
 add : i64 * i64 -> i64
 add(a, b) = a + b
 
 (* CHECK:      define i64 @sub(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = sub i64 %{{[0-9]+}}, %{{[0-9]+}}
+(* CHECK-NEXT:   %{{[0-9]+}} = call { i64, i1 } @llvm.ssub.with.overflow.i64(i64 %{{[0-9]+}}, i64 %{{[0-9]+}})
 *)
-(* CHECK-NEXT:   ret i64 %{{[0-9]+}}
+(* CHECK-NEXT:   %{{[0-9]+}} = extractvalue { i64, i1 } %{{[0-9]+}}, 0
 *)
-(* CHECK-NEXT: }
+(* CHECK-NEXT:   %{{[0-9]+}} = extractvalue { i64, i1 } %{{[0-9]+}}, 1
+*)
+(* CHECK-NEXT:   br i1 %{{[0-9]+}}, label %{{[0-9]+}}, label %{{[0-9]+}}
 *)
 sub : i64 * i64 -> i64
 sub(a, b) = a - b
 
 (* CHECK:      define i64 @mul(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = mul i64 %{{[0-9]+}}, %{{[0-9]+}}
+(* CHECK-NEXT:   %{{[0-9]+}} = call { i64, i1 } @llvm.smul.with.overflow.i64(i64 %{{[0-9]+}}, i64 %{{[0-9]+}})
 *)
-(* CHECK-NEXT:   ret i64 %{{[0-9]+}}
+(* CHECK-NEXT:   %{{[0-9]+}} = extractvalue { i64, i1 } %{{[0-9]+}}, 0
 *)
-(* CHECK-NEXT: }
+(* CHECK-NEXT:   %{{[0-9]+}} = extractvalue { i64, i1 } %{{[0-9]+}}, 1
+*)
+(* CHECK-NEXT:   br i1 %{{[0-9]+}}, label %{{[0-9]+}}, label %{{[0-9]+}}
 *)
 mul : i64 * i64 -> i64
 mul(a, b) = a * b
 
+(* Division is not checked for overflow (no intrinsic exists for sdiv) *)
 (* CHECK:      define i64 @div(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
 *)
 (* CHECK-NEXT:   %{{[0-9]+}} = sdiv i64 %{{[0-9]+}}, %{{[0-9]+}}

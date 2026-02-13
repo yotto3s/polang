@@ -1,9 +1,14 @@
-(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s *)
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
 
 (* Test unsigned integer overflow on addition *)
-(* Should trigger runtime error *)
+(* 3 * (2^63 - 1) > 2^64, so the second addition overflows u64 *)
 
-(* CHECK: Runtime error: integer overflow *)
+(* CHECK: {{.*}}Runtime error: integer overflow{{.*}}
+*)
 
-main : u64
-main = 18446744073709551615 + 1
+:{
+addThree : u64 -> u64
+addThree(x) = x + x + x
+:}
+addThree(9223372036854775807)

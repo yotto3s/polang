@@ -1,9 +1,14 @@
-(* RUN: %polang_repl %s | %FileCheck %s *)
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
 
-(* Test that arithmetic operations near but not at overflow boundaries work correctly *)
+(* Test that arithmetic at overflow boundaries works without error *)
+(* MAX_I64 - 1 + 1 = MAX_I64, should NOT overflow *)
 
-(* CHECK: 9223372036854775806 : i64 *)
+(* CHECK: 9223372036854775807 : i64
+*)
 
-(* This is MAX_I64 - 1, so adding 1 should not overflow *)
-main : i64
-main = 9223372036854775806 + 0
+:{
+addOne : i64 -> i64
+addOne(x) = x + 1
+:}
+addOne(9223372036854775806)

@@ -14,12 +14,14 @@ square : i64 -> i64
 square(x) = x * x
 square(5)
 
-(* Test function definition *)
+(* Test function definition with overflow check *)
 (* CHECK:      define i64 @square(i64 %{{[0-9]+}}) {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = mul i64 %{{[0-9]+}}, %{{[0-9]+}}
+(* CHECK-NEXT:   %{{[0-9]+}} = call { i64, i1 } @llvm.smul.with.overflow.i64(i64 %{{[0-9]+}}, i64 %{{[0-9]+}})
 *)
-(* CHECK-NEXT:   ret i64 %{{[0-9]+}}
+(* CHECK-NEXT:   %{{[0-9]+}} = extractvalue { i64, i1 } %{{[0-9]+}}, 0
 *)
-(* CHECK-NEXT: }
+(* CHECK-NEXT:   %{{[0-9]+}} = extractvalue { i64, i1 } %{{[0-9]+}}, 1
+*)
+(* CHECK-NEXT:   br i1 %{{[0-9]+}}, label %{{[0-9]+}}, label %{{[0-9]+}}
 *)

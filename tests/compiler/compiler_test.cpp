@@ -102,8 +102,9 @@ TEST(CompilerIntegration, FunctionWithMultipleParams) {
       runCompiler("add : i64 * i64 * i64 -> i64\nadd(a, b, c) = a + b + c");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_THAT(result.stdout_output, HasSubstr("@add"));
-  // MLIR backend uses SSA style (no allocas for params)
-  EXPECT_THAT(result.stdout_output, HasSubstr("add i64"));
+  // Overflow-checked addition uses LLVM intrinsic
+  EXPECT_THAT(result.stdout_output,
+              HasSubstr("llvm.sadd.with.overflow.i64"));
 }
 
 TEST(CompilerIntegration, LetWithFunctionBinding) {
