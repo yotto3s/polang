@@ -291,12 +291,37 @@ void TypeChecker::visit(const NIdentifier& node) {
 void TypeChecker::visit(const NQualifiedName& node) {
   const std::string mangled = node.getMangledName();
   auto it = localTypes.find(mangled);
-  if (it != localTypes.end()) {
-    inferredType = it->second;
+  if (it == localTypes.end()) {
+    reportError("Undefined qualified name: " + node.getFullName(), node.loc);
+    inferredType = TypeNames::UNKNOWN;
     return;
   }
-  reportError("Undefined qualified name: " + node.getFullName(), node.loc);
-  inferredType = TypeNames::UNKNOWN;
+
+  // Check export visibility for qualified access (e.g., Math.PI)
+  if (node.parts.size() >= 2) {
+    std::string moduleMangled;
+    for (size_t i = 0; i < node.parts.size() - 1; ++i) {
+      if (i > 0) {
+        moduleMangled += "$$";
+      }
+      moduleMangled += node.parts[i];
+    }
+    const std::string& memberName = node.parts.back();
+    std::string moduleDotName;
+    for (size_t i = 0; i < node.parts.size() - 1; ++i) {
+      if (i > 0) {
+        moduleDotName += ".";
+      }
+      moduleDotName += node.parts[i];
+    }
+    if (!checkExportAccess(moduleMangled, memberName, moduleDotName,
+                           node.loc)) {
+      inferredType = TypeNames::UNKNOWN;
+      return;
+    }
+  }
+
+  inferredType = it->second;
 }
 
 void TypeChecker::visit(const NMethodCall& node) {
@@ -313,6 +338,31 @@ void TypeChecker::visit(const NMethodCall& node) {
     reportError(formatUndefinedFunc(funcName), node.loc);
     inferredType = TypeNames::UNKNOWN;
     return;
+  }
+
+  // Check export visibility for qualified function calls (e.g., Math.add(1, 2))
+  if (node.qualifiedId != nullptr && node.qualifiedId->parts.size() >= 2) {
+    const auto& parts = node.qualifiedId->parts;
+    std::string moduleMangled;
+    for (size_t i = 0; i < parts.size() - 1; ++i) {
+      if (i > 0) {
+        moduleMangled += "$$";
+      }
+      moduleMangled += parts[i];
+    }
+    const std::string& memberName = parts.back();
+    std::string moduleDotName;
+    for (size_t i = 0; i < parts.size() - 1; ++i) {
+      if (i > 0) {
+        moduleDotName += ".";
+      }
+      moduleDotName += parts[i];
+    }
+    if (!checkExportAccess(moduleMangled, memberName, moduleDotName,
+                           node.loc)) {
+      inferredType = TypeNames::UNKNOWN;
+      return;
+    }
   }
 
   if (std::holds_alternative<polang::PolymorphicSignature>(sigIt->second)) {
@@ -1315,6 +1365,23 @@ void TypeChecker::visit(const NModuleDeclaration& node) {
   modulePath.pop_back();
 }
 
+bool TypeChecker::checkExportAccess(const std::string& moduleMangled,
+                                    const std::string& memberName,
+                                    const std::string& moduleDotName,
+                                    const SourceLocation& loc) {
+  auto exportsIt = moduleExports.find(moduleMangled);
+  if (exportsIt == moduleExports.end()) {
+    return true; // Module not found in exports map — allow (defensive)
+  }
+  if (exportsIt->second.find(memberName) != exportsIt->second.end()) {
+    return true; // Member is exported
+  }
+  reportError("'" + memberName + "' is not exported from module '" +
+                  moduleDotName + "'",
+              loc);
+  return false;
+}
+
 void TypeChecker::handleModuleImport(const NImportStatement& node) {
   const std::string moduleName = node.modulePath->getMangledName();
   moduleAliases[node.modulePath->parts.back()] = moduleName;
@@ -1327,8 +1394,14 @@ void TypeChecker::handleModuleAliasImport(const NImportStatement& node) {
 
 void TypeChecker::handleItemsImport(const NImportStatement& node) {
   const std::string moduleName = node.modulePath->getMangledName();
+  const std::string moduleDotName = node.modulePath->getFullName();
 
   for (const auto& item : node.items) {
+    // Check export visibility for explicit imports
+    if (!checkExportAccess(moduleName, item.name, moduleDotName, node.loc)) {
+      continue;
+    }
+
     const std::string mangledItemName = moduleName + "$$" + item.name;
     const std::string localName = item.getEffectiveName();
 

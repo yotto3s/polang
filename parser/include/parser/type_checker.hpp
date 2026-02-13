@@ -173,6 +173,12 @@ private:
   void handleItemsImport(const NImportStatement& node);
   void handleWildcardImport(const NImportStatement& node);
 
+  // Check if a member is exported from a module; reports error if not
+  bool checkExportAccess(const std::string& moduleMangled,
+                         const std::string& memberName,
+                         const std::string& moduleDotName,
+                         const SourceLocation& loc);
+
   // Helper methods for NBinaryOperator type checking
   void checkArithmeticBinaryOp(const NBinaryOperator& node,
                                const std::string& lhsType,
