@@ -187,7 +187,7 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
 %right TLET TIN TAND
 %right TIF TTHEN TELSE
 %right TEQUAL
-%right TLOR
+%left TLOR
 %left TLAND
 %nonassoc COMPARISON TCEQ TCNE TCLT TCLE TCGT TCGE
 %left TPLUS TMINUS

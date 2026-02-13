@@ -252,7 +252,10 @@ struct NegOpLowering : public OpConversionPattern<NegOp> {
       // Integer negation: 0 - x
       auto zero = rewriter.create<arith::ConstantIntOp>(op.getLoc(), 0,
                                                         operand.getType());
-      rewriter.replaceOpWithNewOp<arith::SubIOp>(op, zero, operand);
+      auto subOp =
+          rewriter.replaceOpWithNewOp<arith::SubIOp>(op, zero, operand);
+      // Negation only applies to signed types
+      subOp->setAttr("polang.is_unsigned", rewriter.getBoolAttr(false));
     }
     return success();
   }
