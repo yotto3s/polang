@@ -1,0 +1,13 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* F2d: Negative literal in let binding with unsigned type annotation.
+   let x : u8 = -1 in x should be rejected at compile time.
+   checkLiteralRange only checks the top-level expression type (NInteger),
+   but -1 is NUnaryOperator wrapping NInteger(1), so the check is skipped.
+*)
+
+(* CHECK: {{.*}}does not fit in type u8{{.*}}
+*)
+
+let x : u8 = -1 in x

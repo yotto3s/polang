@@ -1883,18 +1883,37 @@ void TypeChecker::checkLiteralRange(const NExpression* expr,
   if (expr == nullptr) {
     return;
   }
+
+  long long value = 0;
+  SourceLocation loc;
+
   const auto* intLiteral = dynamic_cast<const NInteger*>(expr);
-  if (intLiteral == nullptr) {
-    return;
+  if (intLiteral != nullptr) {
+    value = intLiteral->value;
+    loc = intLiteral->loc;
+  } else {
+    // Handle negated integer literals: NUnaryOperator(TMINUS, NInteger(N))
+    const auto* unaryOp = dynamic_cast<const NUnaryOperator*>(expr);
+    if (unaryOp == nullptr || unaryOp->op != yy::parser::token::TMINUS) {
+      return;
+    }
+    const auto* innerInt =
+        dynamic_cast<const NInteger*>(unaryOp->operand.get());
+    if (innerInt == nullptr) {
+      return;
+    }
+    value = -innerInt->value;
+    loc = unaryOp->loc;
   }
+
   if (!polang::isIntegerType(targetType)) {
     return;
   }
-  if (polang::isLiteralInRange(intLiteral->value, targetType)) {
+  if (polang::isLiteralInRange(value, targetType)) {
     return;
   }
-  reportError("literal " + std::to_string(intLiteral->value) +
-                  " does not fit in type " + targetType + " (range " +
+  reportError("literal " + std::to_string(value) + " does not fit in type " +
+                  targetType + " (range " +
                   polang::getIntegerRangeString(targetType) + ")",
-              intLiteral->loc);
+              loc);
 }
