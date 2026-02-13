@@ -201,8 +201,10 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
    1. expr . "(" in call_args (function call vs grouped expr)
    2. ident . "(" in module (export list vs module_body expr)
    3. ident . "(" in stmts (function call vs grouped expr)
+   4. ident "." ident . "(" (qualified call vs qualified name + grouped expr)
+   5. expr . "-" (binary minus vs start of unary negation after newline)
 */
-%expect 3
+%expect 5
 
 %start program
 

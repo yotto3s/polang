@@ -237,6 +237,42 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
   }
 };
 
+struct NegOpLowering : public OpConversionPattern<NegOp> {
+  using OpConversionPattern<NegOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(NegOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    auto operand = adaptor.getOperand();
+    auto origType = op.getOperand().getType();
+
+    if (isa<polang::FloatType>(origType)) {
+      rewriter.replaceOpWithNewOp<arith::NegFOp>(op, operand);
+    } else {
+      // Integer negation: 0 - x
+      auto zero = rewriter.create<arith::ConstantIntOp>(op.getLoc(), 0,
+                                                        operand.getType());
+      rewriter.replaceOpWithNewOp<arith::SubIOp>(op, zero, operand);
+    }
+    return success();
+  }
+};
+
+struct NotOpLowering : public OpConversionPattern<NotOp> {
+  using OpConversionPattern<NotOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(NotOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    auto operand = adaptor.getOperand();
+    // Logical not: XOR with 1 (i1)
+    auto one = rewriter.create<arith::ConstantIntOp>(op.getLoc(), 1,
+                                                     rewriter.getI1Type());
+    rewriter.replaceOpWithNewOp<arith::XOrIOp>(op, operand, one);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Cast Lowering
 //===----------------------------------------------------------------------===//
@@ -953,14 +989,14 @@ struct PolangToStandardPass
     PolangTypeConverter typeConverter;
     RewritePatternSet patterns(&getContext());
 
-    patterns
-        .add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
-             ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
-             MulOpLowering, DivOpLowering, CastOpLowering, CmpOpLowering,
-             GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
-             CallOpLowering, ReturnOpLowering, IfOpLowering, YieldOpLowering,
-             GlobalOpLowering, GlobalLoadOpLowering, PrintOpLowering>(
-            typeConverter, &getContext());
+    patterns.add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
+                 ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
+                 MulOpLowering, DivOpLowering, NegOpLowering, NotOpLowering,
+                 CastOpLowering, CmpOpLowering, GenericFuncOpLowering,
+                 InstantiateOpLowering, FuncOpLowering, CallOpLowering,
+                 ReturnOpLowering, IfOpLowering, YieldOpLowering,
+                 GlobalOpLowering, GlobalLoadOpLowering, PrintOpLowering>(
+        typeConverter, &getContext());
 
     if (failed(applyPartialConversion(moduleOp, target, std::move(patterns)))) {
       signalPassFailure();

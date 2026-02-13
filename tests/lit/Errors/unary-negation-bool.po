@@ -2,6 +2,6 @@
 *)
 
 (* Test unary negation on boolean - should error *)
-(* CHECK: error: cannot apply unary '-' to type 'bool'
+(* CHECK: Type error: cannot apply unary '-' to type 'bool'{{.*}}
 *)
 -true

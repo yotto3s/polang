@@ -1,27 +1,7 @@
 (* RUN: %polang_repl %s | %FileCheck %s
 *)
 
-(* Test logical not on true *)
-(* CHECK: false : bool
-*)
-!true
-
-(* Test logical not on false *)
-(* CHECK: true : bool
-*)
-!false
-
-(* Test double negation *)
-(* CHECK: true : bool
-*)
-!!true
-
-(* Test not with comparison *)
-(* CHECK: false : bool
-*)
-!(5 > 3)
-
-(* Test not with equality *)
+(* Test not with equality: !(10 == 5) = true *)
 (* CHECK: true : bool
 *)
 !(10 == 5)

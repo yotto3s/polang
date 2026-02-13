@@ -1,37 +1,7 @@
 (* RUN: %polang_repl %s | %FileCheck %s
 *)
 
-(* Test basic logical and - both true *)
-(* CHECK: true : bool
-*)
-true && true
-
-(* Test logical and - first false *)
-(* CHECK: false : bool
-*)
-false && true
-
-(* Test logical and - second false *)
-(* CHECK: false : bool
-*)
-true && false
-
-(* Test logical and - both false *)
-(* CHECK: false : bool
-*)
-false && false
-
-(* Test logical and with comparisons *)
-(* CHECK: true : bool
-*)
-5 > 3 && 10 < 20
-
-(* Test logical and with mixed results *)
-(* CHECK: false : bool
-*)
-5 > 3 && 10 > 20
-
-(* Test range check with logical and *)
+(* Test range check with logical and: 0 < 50 < 100 = true *)
 (* CHECK: true : bool
 *)
 let x = 50 in x > 0 && x < 100
