@@ -216,6 +216,63 @@ struct MulOpLowering : public OpConversionPattern<MulOp> {
   }
 };
 
+/// Get or create the __polang_runtime_error function declaration in the module.
+func::FuncOp getOrCreateRuntimeErrorFunc(ModuleOp module, OpBuilder& builder) {
+  auto func = module.lookupSymbol<func::FuncOp>("__polang_runtime_error");
+  if (func) {
+    return func;
+  }
+
+  // Create function declaration: (ptr, i32, i32) -> ()
+  auto ptrType = LLVM::LLVMPointerType::get(builder.getContext());
+  auto funcType = builder.getFunctionType(
+      {ptrType, builder.getI32Type(), builder.getI32Type()}, {});
+
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(module.getBody());
+  func = builder.create<func::FuncOp>(builder.getUnknownLoc(),
+                                      "__polang_runtime_error", funcType);
+  func.setVisibility(SymbolTable::Visibility::Private);
+  return func;
+}
+
+/// Get or create a global string constant, returning its symbol name.
+/// The global is created in the module body as an LLVM::GlobalOp.
+StringRef getOrCreateGlobalString(Location loc, OpBuilder& builder,
+                                  ModuleOp module, StringRef name,
+                                  StringRef value) {
+  // Check if already exists
+  if (module.lookupSymbol<LLVM::GlobalOp>(name)) {
+    return name;
+  }
+
+  // Create global string constant
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(module.getBody());
+  auto type = LLVM::LLVMArrayType::get(
+      mlir::IntegerType::get(builder.getContext(), 8), value.size() + 1);
+
+  std::string nullTerminated = (Twine(value) + Twine('\0')).str();
+  builder.create<LLVM::GlobalOp>(loc, type, /*isConstant=*/true,
+                                 LLVM::Linkage::Internal, name,
+                                 builder.getStringAttr(nullTerminated));
+  return name;
+}
+
+/// Extract line and column from a Location. Returns (0, 0) for unknown.
+std::pair<int, int> extractLineColumn(Location loc) {
+  if (auto fileLoc = dyn_cast<FileLineColLoc>(loc)) {
+    return {static_cast<int>(fileLoc.getLine()),
+            static_cast<int>(fileLoc.getColumn())};
+  }
+  if (auto fusedLoc = dyn_cast<FusedLoc>(loc)) {
+    if (!fusedLoc.getLocations().empty()) {
+      return extractLineColumn(fusedLoc.getLocations().front());
+    }
+  }
+  return {0, 0};
+}
+
 struct DivOpLowering : public OpConversionPattern<DivOp> {
   using OpConversionPattern<DivOp>::OpConversionPattern;
 
@@ -224,32 +281,104 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
                   ConversionPatternRewriter& rewriter) const override {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
+    auto loc = op.getLoc();
 
-    // Check the original type to determine signedness
+    // Check the original type to determine signedness and type category
     auto origType = op.getLhs().getType();
-    // clang-format off
-    // NOLINTNEXTLINE(bugprone-branch-clone) - different div ops for different types
+
+    // Float division: no zero check (IEEE 754 produces inf/NaN)
     if (isa<polang::FloatType>(origType)) {
       rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
-    } else if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
-      if (intType.isUnsigned()) {
-        rewriter.replaceOpWithNewOp<arith::DivUIOp>(op, lhs, rhs);
-      } else {
-        rewriter.replaceOpWithNewOp<arith::DivSIOp>(op, lhs, rhs);
-      }
-    } else if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
-      if (indexType.isUnsigned()) {
-        rewriter.replaceOpWithNewOp<arith::DivUIOp>(op, lhs, rhs);
-      } else {
-        rewriter.replaceOpWithNewOp<arith::DivSIOp>(op, lhs, rhs);
-      }
-    } else if (isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
-      // Fallback for already converted types - assume signed
-      rewriter.replaceOpWithNewOp<arith::DivSIOp>(op, lhs, rhs);
-    } else {
-      rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
+      return success();
     }
-    // clang-format on
+
+    // For already-converted float types (fallback path)
+    if (!isa<polang::IntegerType, polang::IndexType>(origType) &&
+        !isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
+      rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
+      return success();
+    }
+
+    // Integer division: insert zero check
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+
+    // Ensure the runtime error function declaration exists
+    getOrCreateRuntimeErrorFunc(moduleOp, rewriter);
+
+    // Ensure the error message global string exists
+    getOrCreateGlobalString(loc, rewriter, moduleOp,
+                            "__polang_msg_integer_division_by_zero",
+                            "integer division by zero");
+
+    // Extract source location for error reporting
+    auto [line, col] = extractLineColumn(loc);
+
+    // Determine signedness
+    bool isUnsigned = false;
+    if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
+      isUnsigned = intType.isUnsigned();
+    } else if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
+      isUnsigned = indexType.isUnsigned();
+    }
+
+    // Create zero constant for comparison
+    Value zeroConst;
+    if (isa<mlir::IndexType>(rhs.getType())) {
+      zeroConst = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    } else {
+      zeroConst = rewriter.create<arith::ConstantIntOp>(loc, 0, rhs.getType());
+    }
+
+    // Compare divisor == 0
+    auto isZero = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                                 rhs, zeroConst);
+
+    // Create scf.if to guard the division
+    Type resultType = lhs.getType();
+    auto ifOp = rewriter.create<scf::IfOp>(loc, TypeRange{resultType}, isZero,
+                                           /*withElseRegion=*/true);
+
+    // Then block (divisor is zero - error path)
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
+
+      // Create pointer to error message global string
+      auto msgPtr = rewriter.create<LLVM::AddressOfOp>(
+          loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
+          "__polang_msg_integer_division_by_zero");
+      auto lineConst = rewriter.create<arith::ConstantIntOp>(
+          loc, line, rewriter.getI32Type());
+      auto colConst = rewriter.create<arith::ConstantIntOp>(
+          loc, col, rewriter.getI32Type());
+      rewriter.create<func::CallOp>(loc, "__polang_runtime_error", TypeRange{},
+                                    ValueRange{msgPtr, lineConst, colConst});
+
+      // Yield dummy value (unreachable - error handler calls exit)
+      Value dummy;
+      if (isa<mlir::IndexType>(resultType)) {
+        dummy = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+      } else {
+        dummy = rewriter.create<arith::ConstantIntOp>(loc, 0, resultType);
+      }
+      rewriter.create<scf::YieldOp>(loc, ValueRange{dummy});
+    }
+
+    // Else block (divisor is non-zero - normal division)
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
+
+      Value divResult;
+      if (isUnsigned) {
+        divResult = rewriter.create<arith::DivUIOp>(loc, lhs, rhs);
+      } else {
+        divResult = rewriter.create<arith::DivSIOp>(loc, lhs, rhs);
+      }
+      rewriter.create<scf::YieldOp>(loc, ValueRange{divResult});
+    }
+
+    rewriter.replaceOp(op, ifOp.getResults());
     return success();
   }
 };

@@ -1,11 +1,5 @@
 (* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
 *)
 x = 10 / 2
-(* CHECK: arith.cmpi eq
-*)
-(* CHECK: scf.if
-*)
-(* CHECK: func.call @__polang_runtime_error
-*)
-(* CHECK: arith.divsi
+(* CHECK: {{.*}}polang.div{{.*}}
 *)

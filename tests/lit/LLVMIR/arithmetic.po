@@ -44,11 +44,13 @@ mul(a, b) = a * b
 (* Division is not checked for overflow (no intrinsic exists for sdiv) *)
 (* CHECK:      define i64 @div(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}) {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = sdiv i64 %{{[0-9]+}}, %{{[0-9]+}}
+(* CHECK:      {{.*}}icmp eq i64 %{{.*}}, 0
 *)
-(* CHECK-NEXT:   ret i64 %{{[0-9]+}}
+(* CHECK:      {{.*}}call void @__polang_runtime_error({{.*}})
 *)
-(* CHECK-NEXT: }
+(* CHECK:      {{.*}}sdiv i64 %{{.*}}, %{{.*}}
+*)
+(* CHECK:      }
 *)
 div : i64 * i64 -> i64
 div(a, b) = a / b
