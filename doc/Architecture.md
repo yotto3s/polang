@@ -475,9 +475,9 @@ The `PolangToStandardPass` lowers Polang dialect operations to standard MLIR dia
 | `polang.sub` (float) | `arith.subf` |
 | `polang.mul` (integer) | `arith.muli` |
 | `polang.mul` (float) | `arith.mulf` |
-| `polang.div` (signed integer) | `arith.divsi` |
-| `polang.div` (unsigned integer) | `arith.divui` |
-| `polang.div` (float) | `arith.divf` |
+| `polang.div` (signed integer) | `arith.cmpi` eq + `scf.if` { error } else { `arith.divsi` } |
+| `polang.div` (unsigned integer) | `arith.cmpi` eq + `scf.if` { error } else { `arith.divui` } |
+| `polang.div` (float) | `arith.divf` (no zero check) |
 | `polang.cmp` (signed integer) | `arith.cmpi` (signed predicates) |
 | `polang.cmp` (unsigned integer) | `arith.cmpi` (unsigned predicates) |
 | `polang.cmp` (float) | `arith.cmpf` |
@@ -490,6 +490,10 @@ The `PolangToStandardPass` lowers Polang dialect operations to standard MLIR dia
 | `polang.ref.create` (immutable) | passthrough |
 | `polang.ref.deref` | `memref.load` |
 | `polang.ref.store` | `memref.store` |
+
+**Runtime Checks:**
+
+Integer division by zero is detected at runtime via a guard inserted during lowering. The `DivOpLowering` pattern emits an `arith.cmpi eq` to test if the divisor is zero, then wraps the division in an `scf.if` block. The error path calls `__polang_runtime_error` (from the `PolangRuntime` library in `runtime/`) with the error message and source location. The runtime helper is linked into the host process and resolved by the JIT via `DynamicLibrarySearchGenerator`.
 
 **Type Conversions:**
 
