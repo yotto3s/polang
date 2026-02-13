@@ -509,7 +509,7 @@ isLiteralInRange(long long value, const std::string& typeName) noexcept {
 /// Get the human-readable range string for an integer type.
 /// Returns empty string for non-fixed-width integer types.
 [[nodiscard]] inline std::string
-getIntegerRangeString(const std::string& typeName) noexcept {
+getIntegerRangeString(const std::string& typeName) {
   if (typeName == TypeNames::I8) {
     return "-128 to 127";
   }
