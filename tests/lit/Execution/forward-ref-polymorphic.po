@@ -2,13 +2,15 @@
 *)
 
 (* Test forward references with polymorphic functions *)
-(* CHECK: 5 : i64
+(* CHECK: 10 : i64
 *)
 
+:{
 identity : forall 'a. 'a -> 'a
-apply : forall 'a 'b. ('a -> 'b) * 'a -> 'b
+double : forall 'a:Numeric. 'a -> 'a
 
 identity(x) = x
-apply(f, x) = f(x)
+double(x) = x + x
+:}
 
-apply(identity, 5)
+double(identity(5))
