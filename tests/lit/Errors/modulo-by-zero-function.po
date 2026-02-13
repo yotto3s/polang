@@ -1,0 +1,15 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+
+(* F1: RemOpLowering is missing the division-by-zero guard.
+   When modulo is inside a function, the divisor is a parameter that
+   prevents constant folding. At runtime, zero divisor should produce
+   a "remainder by zero" error, but instead causes undefined behavior.
+   This mirrors the existing division-by-zero-function.po test.
+*)
+
+modrem : i64 * i64 -> i64
+modrem(a, b) = a % b
+result = modrem(42, 0)
+(* CHECK: {{.*}}Runtime error: integer {{.*}}by zero{{.*}}
+*)

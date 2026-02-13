@@ -1,0 +1,9 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+
+(* F1: RemOpLowering is missing the division-by-zero guard.
+   Unsigned modulo by zero should produce a runtime error.
+*)
+x = (10 as u64) % (0 as u64)
+(* CHECK: Runtime error: integer division by zero at line 1, column 5
+*)

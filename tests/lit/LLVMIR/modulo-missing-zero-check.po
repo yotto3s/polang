@@ -1,0 +1,21 @@
+(* RUN: %polang_compiler %s | %FileCheck %s
+*)
+
+(* F1: RemOpLowering is missing the division-by-zero guard.
+   DivOpLowering generates an "icmp eq ... 0" + "__polang_runtime_error" guard,
+   but RemOpLowering directly emits srem without any guard.
+   This test checks that the modulo function's LLVM IR contains a zero check
+   and call to __polang_runtime_error, just like division does.
+   Currently this test FAILS because the zero check is absent.
+*)
+
+rem_check : i64 * i64 -> i64
+rem_check(a, b) = a % b
+(* CHECK: define i64 @rem_check(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}){{.*}}
+*)
+(* CHECK: {{.*}}icmp eq i64 %{{.*}}, 0
+*)
+(* CHECK: {{.*}}call void @__polang_runtime_error({{.*}})
+*)
+(* CHECK: {{.*}}srem i64 %{{.*}}, %{{.*}}
+*)

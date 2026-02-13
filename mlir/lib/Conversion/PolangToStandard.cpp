@@ -415,29 +415,93 @@ struct RemOpLowering : public OpConversionPattern<RemOp> {
                   ConversionPatternRewriter& rewriter) const override {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
+    auto loc = op.getLoc();
 
     // Check the original type to determine signedness
     auto origType = op.getLhs().getType();
+
     // Remainder is only valid for integer types
-    if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
-      if (intType.isUnsigned()) {
-        rewriter.replaceOpWithNewOp<arith::RemUIOp>(op, lhs, rhs);
-      } else {
-        rewriter.replaceOpWithNewOp<arith::RemSIOp>(op, lhs, rhs);
-      }
-    } else if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
-      if (indexType.isUnsigned()) {
-        rewriter.replaceOpWithNewOp<arith::RemUIOp>(op, lhs, rhs);
-      } else {
-        rewriter.replaceOpWithNewOp<arith::RemSIOp>(op, lhs, rhs);
-      }
-    } else if (isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
-      // Fallback for already converted types - assume signed
-      rewriter.replaceOpWithNewOp<arith::RemSIOp>(op, lhs, rhs);
-    } else {
-      // This should not happen if type checking is correct
+    if (!isa<polang::IntegerType, polang::IndexType>(origType) &&
+        !isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
       return failure();
     }
+
+    // Insert zero check (same guard as DivOpLowering)
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+
+    getOrCreateRuntimeErrorFunc(moduleOp, rewriter);
+
+    getOrCreateGlobalString(loc, rewriter, moduleOp,
+                            "__polang_msg_integer_division_by_zero",
+                            "integer division by zero");
+
+    auto [line, col] = extractLineColumn(loc);
+
+    // Determine signedness
+    bool isUnsigned = false;
+    if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
+      isUnsigned = intType.isUnsigned();
+    } else if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
+      isUnsigned = indexType.isUnsigned();
+    }
+
+    // Create zero constant for comparison
+    Value zeroConst;
+    if (isa<mlir::IndexType>(rhs.getType())) {
+      zeroConst = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    } else {
+      zeroConst = rewriter.create<arith::ConstantIntOp>(loc, 0, rhs.getType());
+    }
+
+    // Compare divisor == 0
+    auto isZero = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                                 rhs, zeroConst);
+
+    // Create scf.if to guard the remainder
+    Type resultType = lhs.getType();
+    auto ifOp = rewriter.create<scf::IfOp>(loc, TypeRange{resultType}, isZero,
+                                           /*withElseRegion=*/true);
+
+    // Then block (divisor is zero - error path)
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
+
+      auto msgPtr = rewriter.create<LLVM::AddressOfOp>(
+          loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
+          "__polang_msg_integer_division_by_zero");
+      auto lineConst = rewriter.create<arith::ConstantIntOp>(
+          loc, line, rewriter.getI32Type());
+      auto colConst = rewriter.create<arith::ConstantIntOp>(
+          loc, col, rewriter.getI32Type());
+      rewriter.create<func::CallOp>(loc, "__polang_runtime_error", TypeRange{},
+                                    ValueRange{msgPtr, lineConst, colConst});
+
+      // Yield dummy value (unreachable - error handler calls exit)
+      Value dummy;
+      if (isa<mlir::IndexType>(resultType)) {
+        dummy = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+      } else {
+        dummy = rewriter.create<arith::ConstantIntOp>(loc, 0, resultType);
+      }
+      rewriter.create<scf::YieldOp>(loc, ValueRange{dummy});
+    }
+
+    // Else block (divisor is non-zero - normal remainder)
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
+
+      Value remResult;
+      if (isUnsigned) {
+        remResult = rewriter.create<arith::RemUIOp>(loc, lhs, rhs);
+      } else {
+        remResult = rewriter.create<arith::RemSIOp>(loc, lhs, rhs);
+      }
+      rewriter.create<scf::YieldOp>(loc, ValueRange{remResult});
+    }
+
+    rewriter.replaceOp(op, ifOp.getResults());
     return success();
   }
 };
