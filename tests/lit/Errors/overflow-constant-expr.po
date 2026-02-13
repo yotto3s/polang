@@ -1,0 +1,10 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+
+(* Test that constant-expression overflow is caught at compile time *)
+(* MAX_I64 + 1 should be detected before canonicalization folds it *)
+
+(* CHECK: {{.*}}integer overflow in constant expression{{.*}}
+*)
+
+9223372036854775807 + 1

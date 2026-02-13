@@ -141,6 +141,11 @@ bool MLIRCodeGenContext::lowerToStandard() {
   // Add the Polang to Standard lowering pass
   pm.addPass(createPolangToStandardPass());
 
+  // Check for overflow in constant expressions BEFORE canonicalization.
+  // Canonicalization would fold overflowing constants (e.g., MAX_INT + 1)
+  // into wrapped results, silently swallowing the overflow.
+  pm.addPass(polang::createCheckConstantOverflowPass());
+
   // Run canonicalization
   pm.addPass(createCanonicalizerPass());
 

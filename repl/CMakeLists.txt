@@ -23,11 +23,18 @@ target_include_directories(PolangRepl PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 # Export symbols so JIT-compiled code can resolve runtime library functions
-# (e.g., __polang_runtime_error). --whole-archive forces the linker to keep
-# all symbols from PolangRuntime even though nothing in PolangRepl calls them
-# directly. ENABLE_EXPORTS (-rdynamic) makes them visible to dlsym/JIT.
+# (e.g., __polang_runtime_error). We force the linker to keep all symbols from
+# PolangRuntime even though nothing in PolangRepl calls them directly.
+# ENABLE_EXPORTS (-rdynamic) makes them visible to dlsym/JIT.
 set_target_properties(PolangRepl PROPERTIES ENABLE_EXPORTS TRUE)
-target_link_libraries(PolangRepl PRIVATE
-    PolangReplLib
-    -Wl,--whole-archive PolangRuntime -Wl,--no-whole-archive
-)
+if(APPLE)
+  target_link_libraries(PolangRepl PRIVATE
+      PolangReplLib
+      -Wl,-all_load PolangRuntime
+  )
+else()
+  target_link_libraries(PolangRepl PRIVATE
+      PolangReplLib
+      -Wl,--whole-archive PolangRuntime -Wl,--no-whole-archive
+  )
+endif()
