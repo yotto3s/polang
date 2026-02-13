@@ -396,8 +396,13 @@ struct NegOpLowering : public OpConversionPattern<NegOp> {
       rewriter.replaceOpWithNewOp<arith::NegFOp>(op, operand);
     } else {
       // Integer negation: 0 - x
-      auto zero = rewriter.create<arith::ConstantIntOp>(op.getLoc(), 0,
-                                                        operand.getType());
+      auto loc = op.getLoc();
+      Value zero;
+      if (isa<mlir::IndexType>(operand.getType())) {
+        zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+      } else {
+        zero = rewriter.create<arith::ConstantIntOp>(loc, 0, operand.getType());
+      }
       auto subOp =
           rewriter.replaceOpWithNewOp<arith::SubIOp>(op, zero, operand);
       // Negation only applies to signed types
