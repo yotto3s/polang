@@ -138,6 +138,8 @@ struct CheckConstantOverflowPass
 
 /// Get or create the runtime error handler function declaration.
 LLVMFuncOp getOrCreateRuntimeErrorHandler(ModuleOp module, OpBuilder& builder) {
+  // Check for existing LLVM function declaration (may already exist if
+  // DivOpLowering created a func::FuncOp that FuncToLLVM converted)
   if (auto existingFunc =
           module.lookupSymbol<LLVMFuncOp>("__polang_runtime_error")) {
     return existingFunc;

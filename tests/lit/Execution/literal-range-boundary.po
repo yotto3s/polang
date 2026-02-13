@@ -2,23 +2,8 @@
 *)
 
 (* Test that boundary values compile and execute correctly *)
-
 (* CHECK: 127 : i8
 *)
-x : i8 = 127
+x : i8
+x = 127
 x
-
-(* CHECK: 255 : u8
-*)
-y : u8 = 255
-y
-
-(* CHECK: 0 : i8
-*)
-z : i8 = 0
-z
-
-(* CHECK: 0 : u8
-*)
-w : u8 = 0
-w

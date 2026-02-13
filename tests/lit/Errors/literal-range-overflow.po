@@ -5,24 +5,30 @@
 
 (* CHECK: {{.*}}literal 1000 does not fit in type i8 (range -128 to 127){{.*}}
 *)
-x : i8 = 1000
+x : i8
+x = 1000
 
 (* CHECK: {{.*}}literal 256 does not fit in type u8 (range 0 to 255){{.*}}
 *)
-y : u8 = 256
+y : u8
+y = 256
 
 (* CHECK: {{.*}}literal 40000 does not fit in type i16 (range -32768 to 32767){{.*}}
 *)
-z : i16 = 40000
+z : i16
+z = 40000
 
 (* CHECK: {{.*}}literal 70000 does not fit in type u16 (range 0 to 65535){{.*}}
 *)
-w : u16 = 70000
+w : u16
+w = 70000
 
 (* CHECK: {{.*}}literal 3000000000 does not fit in type i32 (range -2147483648 to 2147483647){{.*}}
 *)
-a : i32 = 3000000000
+a : i32
+a = 3000000000
 
 (* CHECK: {{.*}}literal 5000000000 does not fit in type u32 (range 0 to 4294967295){{.*}}
 *)
-b : u32 = 5000000000
+b : u32
+b = 5000000000

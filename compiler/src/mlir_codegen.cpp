@@ -168,11 +168,13 @@ bool MLIRCodeGenContext::lowerToLLVM() {
   // Lower SCF to CF
   pm.addPass(createConvertSCFToCFPass());
 
-  // Insert overflow checks (must run before ArithToLLVM)
-  pm.addPass(polang::createInsertOverflowChecksPass());
-
-  // Lower to LLVM
+  // Lower func dialect to LLVM first, so that any __polang_runtime_error
+  // created by DivOpLowering (as func::FuncOp) is converted to LLVMFuncOp
+  // before InsertOverflowChecks runs (which also needs that symbol).
   pm.addPass(createConvertFuncToLLVMPass());
+
+  // Insert overflow checks (must run after FuncToLLVM but before ArithToLLVM)
+  pm.addPass(polang::createInsertOverflowChecksPass());
   pm.addPass(createArithToLLVMConversionPass());
   pm.addPass(createConvertControlFlowToLLVMPass());
   pm.addPass(createFinalizeMemRefToLLVMConversionPass());
