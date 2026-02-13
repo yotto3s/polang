@@ -1,0 +1,6 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+x = 1.0 / 0.0
+x
+(* CHECK: inf : f64
+*)

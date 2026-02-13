@@ -1,0 +1,7 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+divide : i64 -> i64
+divide(x) = x / 0
+result = divide(42)
+(* CHECK: Runtime error: integer division by zero at line 4, column 13
+*)
