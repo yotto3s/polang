@@ -12,13 +12,11 @@
 #include "polang/Transforms/Passes.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #pragma GCC diagnostic pop
 
@@ -32,177 +30,176 @@ namespace {
 // Helper functions
 //===----------------------------------------------------------------------===//
 
-/// Get or create the runtime error handler function declaration
-LLVM::LLVMFuncOp getOrCreateRuntimeErrorHandler(ModuleOp module,
-                                                PatternRewriter& rewriter) {
-  // Check if function already exists
+/// Get or create the runtime error handler function declaration.
+LLVMFuncOp getOrCreateRuntimeErrorHandler(ModuleOp module, OpBuilder& builder) {
   if (auto existingFunc =
-          module.lookupSymbol<LLVM::LLVMFuncOp>("__polang_runtime_error")) {
+          module.lookupSymbol<LLVMFuncOp>("__polang_runtime_error")) {
     return existingFunc;
   }
 
-  // Create function type: (ptr, i32, i32) -> void
-  // Arguments: message (string pointer), line, column
-  auto i8PtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-  auto i32Type = rewriter.getI32Type();
-  auto voidType = LLVM::LLVMVoidType::get(rewriter.getContext());
-  auto funcType = LLVM::LLVMFunctionType::get(
-      voidType, {i8PtrType, i32Type, i32Type});
+  const auto i8PtrType = LLVMPointerType::get(builder.getContext());
+  const auto i32Type = builder.getI32Type();
+  const auto voidType = LLVMVoidType::get(builder.getContext());
+  const auto funcType =
+      LLVMFunctionType::get(voidType, {i8PtrType, i32Type, i32Type});
 
-  // Create function declaration
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointToStart(module.getBody());
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(module.getBody());
 
-  auto funcOp = rewriter.create<LLVM::LLVMFuncOp>(
-      module.getLoc(), "__polang_runtime_error", funcType);
-  funcOp.setLinkage(LLVM::Linkage::External);
+  auto funcOp = builder.create<LLVMFuncOp>(module.getLoc(),
+                                           "__polang_runtime_error", funcType);
+  funcOp.setLinkage(Linkage::External);
 
   return funcOp;
 }
 
-/// Get or create a global string constant for the error message
-LLVM::GlobalOp getOrCreateErrorMessage(ModuleOp module, StringRef message,
-                                       PatternRewriter& rewriter) {
-  // Create a unique name for this message
-  std::string globalName = "__polang_error_msg_" + message.str();
-  
-  // Check if it already exists
-  if (auto existing = module.lookupSymbol<LLVM::GlobalOp>(globalName)) {
+/// Get or create a global string constant for the error message.
+GlobalOp getOrCreateErrorMessage(ModuleOp module, StringRef message,
+                                 OpBuilder& builder) {
+  // Create a name with no spaces (replace spaces with underscores)
+  std::string globalName = "__polang_error_msg_";
+  for (const char c : message) {
+    globalName += (c == ' ') ? '_' : c;
+  }
+
+  if (auto existing = module.lookupSymbol<GlobalOp>(globalName)) {
     return existing;
   }
 
-  // Create the global string
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointToStart(module.getBody());
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(module.getBody());
 
-  auto loc = module.getLoc();
-  auto i8Type = rewriter.getI8Type();
-  auto arrayType = LLVM::LLVMArrayType::get(i8Type, message.size() + 1);
-  
-  auto globalOp = rewriter.create<LLVM::GlobalOp>(
-      loc, arrayType, /*isConstant=*/true, LLVM::Linkage::Private,
-      globalName, rewriter.getStringAttr(message.str() + '\0'));
+  const auto loc = module.getLoc();
+  const auto i8Type = builder.getI8Type();
+  const auto arrayType = LLVMArrayType::get(i8Type, message.size() + 1);
+
+  auto globalOp = builder.create<GlobalOp>(
+      loc, arrayType, /*isConstant=*/true, Linkage::Private, globalName,
+      builder.getStringAttr(message.str() + '\0'));
 
   return globalOp;
 }
 
-//===----------------------------------------------------------------------===//
-// Overflow check patterns
-//===----------------------------------------------------------------------===//
+/// Determine the overflow intrinsic name for the given operation.
+[[nodiscard]] std::string getOverflowIntrinsicName(Operation* op,
+                                                   bool isUnsigned,
+                                                   unsigned width) noexcept {
+  const auto opName = op->getName().getStringRef();
 
-/// Base pattern for inserting overflow checks
-template <typename ArithOp>
-struct InsertOverflowCheckPattern : public OpRewritePattern<ArithOp> {
-  using OpRewritePattern<ArithOp>::OpRewritePattern;
+  std::string prefix;
+  if (opName == "arith.addi") {
+    prefix = isUnsigned ? "llvm.uadd" : "llvm.sadd";
+  } else if (opName == "arith.subi") {
+    prefix = isUnsigned ? "llvm.usub" : "llvm.ssub";
+  } else if (opName == "arith.muli") {
+    prefix = isUnsigned ? "llvm.umul" : "llvm.smul";
+  }
 
-  LogicalResult matchAndRewrite(ArithOp op,
-                                PatternRewriter& rewriter) const override {
-    // Only process integer operations
-    auto resultType = dyn_cast<IntegerType>(op.getType());
-    if (!resultType) {
-      return failure();
-    }
+  return prefix + ".with.overflow.i" + std::to_string(width);
+}
 
-    // Check if this op has the signedness attribute
-    auto isUnsignedAttr = op->template getAttrOfType<BoolAttr>("polang.is_unsigned");
-    bool isUnsigned = isUnsignedAttr && isUnsignedAttr.getValue();
-
-    auto loc = op.getLoc();
-    auto module = op->template getParentOfType<ModuleOp>();
-    
-    // Get the overflow intrinsic based on signedness and width
-    unsigned width = resultType.getWidth();
-    auto i1Type = rewriter.getI1Type();
-    auto overflowResultType = LLVM::LLVMStructType::getLiteral(
-        rewriter.getContext(), {resultType, i1Type});
-
-    // Create the overflow intrinsic
-    Value overflowOp;
-    if (isUnsigned) {
-      std::string intrinsicName = "llvm.uadd.with.overflow.i" + std::to_string(width);
-      if (std::is_same<ArithOp, SubIOp>::value) {
-        intrinsicName = "llvm.usub.with.overflow.i" + std::to_string(width);
-      } else if (std::is_same<ArithOp, MulIOp>::value) {
-        intrinsicName = "llvm.umul.with.overflow.i" + std::to_string(width);
-      }
-      
-      overflowOp = rewriter.create<LLVM::CallIntrinsicOp>(
-          loc, overflowResultType, intrinsicName,
-          ValueRange{op.getLhs(), op.getRhs()});
-    } else {
-      std::string intrinsicName = "llvm.sadd.with.overflow.i" + std::to_string(width);
-      if (std::is_same<ArithOp, SubIOp>::value) {
-        intrinsicName = "llvm.ssub.with.overflow.i" + std::to_string(width);
-      } else if (std::is_same<ArithOp, MulIOp>::value) {
-        intrinsicName = "llvm.smul.with.overflow.i" + std::to_string(width);
-      }
-      
-      overflowOp = rewriter.create<LLVM::CallIntrinsicOp>(
-          loc, overflowResultType, intrinsicName,
-          ValueRange{op.getLhs(), op.getRhs()});
-    }
-
-    // Extract result and overflow flag
-    auto result = rewriter.create<LLVM::ExtractValueOp>(
-        loc, resultType, overflowOp, ArrayRef<int64_t>{0});
-    auto overflowFlag = rewriter.create<LLVM::ExtractValueOp>(
-        loc, i1Type, overflowOp, ArrayRef<int64_t>{1});
-
-    // Create blocks for overflow and no-overflow paths
-    Block* currentBlock = rewriter.getInsertionBlock();
-    Block* overflowBlock = rewriter.splitBlock(currentBlock,
-                                               rewriter.getInsertionPoint());
-    Block* continueBlock = rewriter.splitBlock(overflowBlock,
-                                              overflowBlock->begin());
-
-    // Insert conditional branch
-    rewriter.setInsertionPointToEnd(currentBlock);
-    rewriter.create<cf::CondBranchOp>(loc, overflowFlag, overflowBlock,
-                                     ArrayRef<Value>{}, continueBlock,
-                                     ArrayRef<Value>{});
-
-    // Fill in the overflow block - call error handler and exit
-    rewriter.setInsertionPointToStart(overflowBlock);
-    
-    // Get or create the error handler
-    auto errorHandler = getOrCreateRuntimeErrorHandler(module, rewriter);
-    
-    // Create error message
-    std::string message = "integer overflow";
-    auto errorMsg = getOrCreateErrorMessage(module, message, rewriter);
-    
-    // Get address of the global string
-    auto i8PtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-    auto msgPtr = rewriter.create<LLVM::AddressOfOp>(
-        loc, i8PtrType, errorMsg.getSymName());
-
-    // Extract line and column from location (placeholder for now)
-    auto line = rewriter.create<LLVM::ConstantOp>(
-        loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-    auto column = rewriter.create<LLVM::ConstantOp>(
-        loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-
-    // Call error handler using LLVM call
-    rewriter.create<LLVM::CallOp>(loc, errorHandler,
-                                 ValueRange{msgPtr, line, column});
-    
-    // Unreachable after error
-    rewriter.create<LLVM::UnreachableOp>(loc);
-
-    // Continue block - replace original op with the result
-    rewriter.setInsertionPointToStart(continueBlock);
-    rewriter.replaceOp(op, result);
-
+/// Insert an overflow check for a single arithmetic operation.
+/// Replaces the operation with an overflow intrinsic call, branching to
+/// an error handler on overflow.
+LogicalResult insertOverflowCheck(Operation* op, OpBuilder& builder,
+                                  ModuleOp module) {
+  // Only process integer operations
+  // TODO(#76): IndexType overflow checking requires converting to
+  // fixed-width integer first. Defer to a follow-up PR.
+  const auto resultType = dyn_cast<IntegerType>(op->getResult(0).getType());
+  if (!resultType) {
     return success();
   }
-};
 
-using InsertAddOverflowCheck =
-    InsertOverflowCheckPattern<AddIOp>;
-using InsertSubOverflowCheck =
-    InsertOverflowCheckPattern<SubIOp>;
-using InsertMulOverflowCheck =
-    InsertOverflowCheckPattern<MulIOp>;
+  // Check signedness attribute
+  const auto isUnsignedAttr = op->getAttrOfType<BoolAttr>("polang.is_unsigned");
+  const bool isUnsigned = isUnsignedAttr && isUnsignedAttr.getValue();
+
+  const auto loc = op->getLoc();
+  const unsigned width = resultType.getWidth();
+  const auto i1Type = builder.getI1Type();
+  const auto overflowResultType =
+      LLVMStructType::getLiteral(builder.getContext(), {resultType, i1Type});
+
+  // Determine intrinsic name
+  const std::string intrinsicName =
+      getOverflowIntrinsicName(op, isUnsigned, width);
+
+  // Get operands from the original op
+  Value lhs = op->getOperand(0);
+  Value rhs = op->getOperand(1);
+
+  // Insert the overflow intrinsic BEFORE the original op
+  builder.setInsertionPoint(op);
+
+  auto callOp = builder.create<CallIntrinsicOp>(
+      loc, overflowResultType, builder.getStringAttr(intrinsicName),
+      ValueRange{lhs, rhs});
+  Value overflowResult = callOp.getResult(0);
+
+  // Extract the computed value and overflow flag
+  auto result = builder.create<ExtractValueOp>(loc, resultType, overflowResult,
+                                               ArrayRef<int64_t>{0});
+  auto overflowFlag = builder.create<ExtractValueOp>(
+      loc, i1Type, overflowResult, ArrayRef<int64_t>{1});
+
+  // Split the block: op and everything after it goes to continueBlock
+  Block* currentBlock = op->getBlock();
+  Block* continueBlock = currentBlock->splitBlock(op);
+
+  // Create overflow error block between currentBlock and continueBlock
+  auto* overflowBlock = new Block();
+  currentBlock->getParent()->getBlocks().insertAfter(
+      currentBlock->getIterator(), overflowBlock);
+
+  // Terminate currentBlock with conditional branch
+  builder.setInsertionPointToEnd(currentBlock);
+  builder.create<cf::CondBranchOp>(loc, overflowFlag, overflowBlock,
+                                   ValueRange{}, continueBlock, ValueRange{});
+
+  // Fill in the overflow error block
+  builder.setInsertionPointToStart(overflowBlock);
+
+  auto errorHandler = getOrCreateRuntimeErrorHandler(module, builder);
+
+  const std::string message = "integer overflow";
+  auto errorMsg = getOrCreateErrorMessage(module, message, builder);
+
+  const auto i8PtrType = LLVMPointerType::get(builder.getContext());
+  auto msgPtr =
+      builder.create<AddressOfOp>(loc, i8PtrType, errorMsg.getSymName());
+
+  // Extract source location for meaningful error messages
+  int32_t lineNum = 0;
+  int32_t colNum = 0;
+  if (auto fileLoc = dyn_cast<FileLineColLoc>(op->getLoc())) {
+    lineNum = fileLoc.getLine();
+    colNum = fileLoc.getColumn();
+  } else if (auto fusedLoc = dyn_cast<FusedLoc>(op->getLoc())) {
+    for (auto innerLoc : fusedLoc.getLocations()) {
+      if (auto fileLoc = dyn_cast<FileLineColLoc>(innerLoc)) {
+        lineNum = fileLoc.getLine();
+        colNum = fileLoc.getColumn();
+        break;
+      }
+    }
+  }
+
+  auto line = builder.create<LLVM::ConstantOp>(
+      loc, builder.getI32Type(), builder.getI32IntegerAttr(lineNum));
+  auto column = builder.create<LLVM::ConstantOp>(
+      loc, builder.getI32Type(), builder.getI32IntegerAttr(colNum));
+
+  builder.create<CallOp>(loc, errorHandler, ValueRange{msgPtr, line, column});
+  builder.create<UnreachableOp>(loc);
+
+  // Replace all uses of the original op's result with the extracted value,
+  // then erase the original op
+  op->getResult(0).replaceAllUsesWith(result);
+  op->erase();
+
+  return success();
+}
 
 //===----------------------------------------------------------------------===//
 // InsertOverflowChecksPass
@@ -222,19 +219,32 @@ struct InsertOverflowChecksPass
 
   void getDependentDialects(DialectRegistry& registry) const override {
     registry.insert<arith::ArithDialect, func::FuncDialect,
-                    cf::ControlFlowDialect, LLVM::LLVMDialect>();
+                    cf::ControlFlowDialect, LLVMDialect>();
   }
 
   void runOnOperation() override {
     auto module = getOperation();
-    
-    // Apply overflow check patterns
-    RewritePatternSet patterns(&getContext());
-    patterns.add<InsertAddOverflowCheck, InsertSubOverflowCheck,
-                 InsertMulOverflowCheck>(&getContext());
 
-    if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
-      signalPassFailure();
+    // Collect ops first to avoid modifying the IR while iterating
+    SmallVector<Operation*> opsToRewrite;
+    module.walk([&](Operation* op) {
+      if (isa<AddIOp, SubIOp, MulIOp>(op)) {
+        if (isa<IntegerType>(op->getResult(0).getType())) {
+          opsToRewrite.push_back(op);
+        }
+      }
+    });
+
+    // TODO: Division overflow (MIN_INT / -1) requires an explicit
+    // comparison, not an overflow intrinsic. Defer to the division
+    // safety check pass.
+
+    OpBuilder builder(&getContext());
+    for (auto* op : opsToRewrite) {
+      if (failed(insertOverflowCheck(op, builder, module))) {
+        signalPassFailure();
+        return;
+      }
     }
   }
 };

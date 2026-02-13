@@ -65,6 +65,6 @@ Tests are located in `tests/lit/Execution/overflow-*.po` and verify:
 ## References
 
 - Spec: `spec/polang-spec.md` §6.1 (Integer Types)
-- Issue: yotto3s/polang#XX (Add runtime check for integer overflow)
+- Issue: yotto3s/polang#76 (Add runtime check for integer overflow)
 - Pass implementation: `mlir/lib/Transforms/InsertOverflowChecks.cpp`
 - Runtime handler: `runtime/src/runtime.c`

@@ -1,9 +1,14 @@
-(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s *)
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
 
 (* Test unsigned integer overflow on subtraction *)
-(* Should trigger runtime error *)
+(* 0 - 1 for u64 overflows *)
 
-(* CHECK: Runtime error: integer overflow *)
+(* CHECK: {{.*}}Runtime error: integer overflow{{.*}}
+*)
 
-main : u64
-main = 0 - 1
+:{
+subOne : u64 -> u64
+subOne(x) = x - 1
+:}
+subOne(0)

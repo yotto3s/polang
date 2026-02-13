@@ -142,6 +142,17 @@ struct ConstantBoolOpLowering : public OpConversionPattern<ConstantBoolOp> {
 // Arithmetic Lowering
 //===----------------------------------------------------------------------===//
 
+/// Check if the original Polang type is unsigned.
+[[nodiscard]] bool isOrigTypeUnsigned(Type origType) noexcept {
+  if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
+    return intType.isUnsigned();
+  }
+  if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
+    return indexType.isUnsigned();
+  }
+  return false;
+}
+
 struct AddOpLowering : public OpConversionPattern<AddOp> {
   using OpConversionPattern<AddOp>::OpConversionPattern;
 
@@ -153,19 +164,9 @@ struct AddOpLowering : public OpConversionPattern<AddOp> {
 
     // After type conversion, integer/index types use AddIOp, floats use AddFOp
     if (isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
-      // Check original type for signedness (for overflow checking)
-      auto origType = op.getLhs().getType();
-      bool isUnsigned = false;
-      if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
-        isUnsigned = intType.isUnsigned();
-      } else if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
-        isUnsigned = indexType.isUnsigned();
-      }
-
+      const bool isUnsigned = isOrigTypeUnsigned(op.getLhs().getType());
       auto addOp = rewriter.replaceOpWithNewOp<arith::AddIOp>(op, lhs, rhs);
-      // Attach signedness attribute for overflow checking pass
-      addOp->setAttr("polang.is_unsigned",
-                     rewriter.getBoolAttr(isUnsigned));
+      addOp->setAttr("polang.is_unsigned", rewriter.getBoolAttr(isUnsigned));
     } else {
       rewriter.replaceOpWithNewOp<arith::AddFOp>(op, lhs, rhs);
     }
@@ -184,19 +185,9 @@ struct SubOpLowering : public OpConversionPattern<SubOp> {
 
     // After type conversion, integer/index types use SubIOp, floats use SubFOp
     if (isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
-      // Check original type for signedness (for overflow checking)
-      auto origType = op.getLhs().getType();
-      bool isUnsigned = false;
-      if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
-        isUnsigned = intType.isUnsigned();
-      } else if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
-        isUnsigned = indexType.isUnsigned();
-      }
-
+      const bool isUnsigned = isOrigTypeUnsigned(op.getLhs().getType());
       auto subOp = rewriter.replaceOpWithNewOp<arith::SubIOp>(op, lhs, rhs);
-      // Attach signedness attribute for overflow checking pass
-      subOp->setAttr("polang.is_unsigned",
-                     rewriter.getBoolAttr(isUnsigned));
+      subOp->setAttr("polang.is_unsigned", rewriter.getBoolAttr(isUnsigned));
     } else {
       rewriter.replaceOpWithNewOp<arith::SubFOp>(op, lhs, rhs);
     }
@@ -215,19 +206,9 @@ struct MulOpLowering : public OpConversionPattern<MulOp> {
 
     // After type conversion, integer/index types use MulIOp, floats use MulFOp
     if (isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
-      // Check original type for signedness (for overflow checking)
-      auto origType = op.getLhs().getType();
-      bool isUnsigned = false;
-      if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
-        isUnsigned = intType.isUnsigned();
-      } else if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
-        isUnsigned = indexType.isUnsigned();
-      }
-
+      const bool isUnsigned = isOrigTypeUnsigned(op.getLhs().getType());
       auto mulOp = rewriter.replaceOpWithNewOp<arith::MulIOp>(op, lhs, rhs);
-      // Attach signedness attribute for overflow checking pass
-      mulOp->setAttr("polang.is_unsigned",
-                     rewriter.getBoolAttr(isUnsigned));
+      mulOp->setAttr("polang.is_unsigned", rewriter.getBoolAttr(isUnsigned));
     } else {
       rewriter.replaceOpWithNewOp<arith::MulFOp>(op, lhs, rhs);
     }
