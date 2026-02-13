@@ -2,6 +2,6 @@
 *)
 
 (* Test logical and with integer operands - should error *)
-(* CHECK: error: operator '&&' requires operands of type 'bool', but got 'i64'
+(* CHECK: Type error: operator '&&' requires operands of type 'bool', but got 'i64'{{.*}}
 *)
 5 && 10

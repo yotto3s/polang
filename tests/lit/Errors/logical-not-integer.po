@@ -2,6 +2,6 @@
 *)
 
 (* Test logical not on integer - should error *)
-(* CHECK: error: cannot apply unary '!' to type 'i64'
+(* CHECK: Type error: cannot apply unary '!' to type 'i64'{{.*}}
 *)
 !42

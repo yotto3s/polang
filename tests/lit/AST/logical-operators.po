@@ -1,20 +1,23 @@
 (* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
 *)
 
-(* Test AST for logical and *)
-(* CHECK: BinaryOperator: &&
+(* CHECK:      NBlock
 *)
-(* CHECK-NEXT: Boolean: true
+(* CHECK-NEXT: |-NExpressionStatement
 *)
-(* CHECK-NEXT: Boolean: false
+(* CHECK-NEXT: | `-NBinaryOperator '&&'
+*)
+(* CHECK-NEXT: |   |-NBoolean true
+*)
+(* CHECK-NEXT: |   `-NBoolean false
+*)
+(* CHECK-NEXT: `-NExpressionStatement
+*)
+(* CHECK-NEXT:   `-NBinaryOperator '||'
+*)
+(* CHECK-NEXT:     |-NBoolean true
+*)
+(* CHECK-NEXT:     `-NBoolean false
 *)
 true && false
-
-(* Test AST for logical or *)
-(* CHECK: BinaryOperator: ||
-*)
-(* CHECK-NEXT: Boolean: true
-*)
-(* CHECK-NEXT: Boolean: false
-*)
 true || false

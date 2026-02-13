@@ -185,15 +185,6 @@ The `as` operator has higher precedence than arithmetic operators but lower prec
 | 3          | `&&`                                | Left            |
 | 2          | `||`                                | Left            |
 | 1          | `if`/`then`/`else`, `let`/`in`      | Right           |
-|------------|-----------|
-| Highest | Parentheses, function calls |
-| | Unary `-`, `!` |
-| | **`as` (type conversion)** |
-| | `*`, `/`, `%` |
-| | `+`, `-` |
-| | `<`, `>`, `<=`, `>=`, `==`, `!=` |
-| | `&&` |
-| Lowest | `\|\|` |
 
 **Precedence examples:**
 

@@ -1,16 +1,19 @@
 (* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
 *)
 
-(* Test AST for unary negation *)
-(* CHECK: UnaryOperator: -
+(* CHECK:      NBlock
 *)
-(* CHECK-NEXT: Integer: 42
+(* CHECK-NEXT: |-NExpressionStatement
+*)
+(* CHECK-NEXT: | `-NUnaryOperator '-'
+*)
+(* CHECK-NEXT: |   `-NInteger 42
+*)
+(* CHECK-NEXT: `-NExpressionStatement
+*)
+(* CHECK-NEXT:   `-NUnaryOperator '!'
+*)
+(* CHECK-NEXT:     `-NBoolean true
 *)
 -42
-
-(* Test AST for logical not *)
-(* CHECK: UnaryOperator: !
-*)
-(* CHECK-NEXT: Boolean: true
-*)
 !true

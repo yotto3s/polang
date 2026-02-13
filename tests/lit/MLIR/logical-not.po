@@ -16,7 +16,7 @@ logical_not(x) = !x
 (* Test negation of boolean literal *)
 (* CHECK:      polang.func @not_true() -> !polang.bool {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.bool true
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.bool true : !polang.bool
 *)
 (* CHECK-NEXT:   %{{[0-9]+}} = polang.not %{{[0-9]+}} : !polang.bool
 *)

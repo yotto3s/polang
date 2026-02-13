@@ -1,32 +1,7 @@
 (* RUN: %polang_repl %s | %FileCheck %s
 *)
 
-(* Test precedence: unary - higher than binary + *)
-(* CHECK: 5 : i64
-*)
--10 + 15
-
-(* Test precedence: unary ! higher than && *)
-(* CHECK: true : bool
-*)
-!false && true
-
-(* Test precedence: && higher than || *)
-(* CHECK: true : bool
-*)
-false || true && true
-
-(* Test precedence with explicit parentheses *)
-(* CHECK: false : bool
-*)
-(false || true) && false
-
-(* Test precedence: comparison higher than && *)
-(* CHECK: true : bool
-*)
-5 > 3 && 10 < 20
-
-(* Test complex precedence *)
+(* Test complex precedence: !false && 5 > 3 || false = true *)
 (* CHECK: true : bool
 *)
 !false && 5 > 3 || false

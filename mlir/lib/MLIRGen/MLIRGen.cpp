@@ -24,11 +24,11 @@
 
 using polang::TypeNames;
 
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Verifier.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/StringRef.h"
@@ -377,6 +377,59 @@ public:
     Value lhs = result;
     std::unique_ptr<const NTypeSpec> lhsType = std::move(resultType);
 
+    // Handle short-circuit operators BEFORE evaluating RHS
+    if (node.op == yy::parser::token::TLAND) {
+      // a && b: if a then b else false
+      Type boolType = builder.getType<BoolType>();
+      auto ifOp = builder.create<IfOp>(loc(node.loc), boolType, lhs);
+
+      // Then region: evaluate rhs and yield it
+      {
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+        node.rhs->accept(*this);
+        builder.create<YieldOp>(loc(node.loc), result);
+      }
+
+      // Else region: yield false
+      {
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+        Value falseVal = builder.create<ConstantBoolOp>(loc(node.loc), false);
+        builder.create<YieldOp>(loc(node.loc), falseVal);
+      }
+
+      result = ifOp.getResult();
+      resultType = makeTypeSpec(TypeNames::BOOL);
+      return;
+    }
+    if (node.op == yy::parser::token::TLOR) {
+      // a || b: if a then true else b
+      Type boolType = builder.getType<BoolType>();
+      auto ifOp = builder.create<IfOp>(loc(node.loc), boolType, lhs);
+
+      // Then region: yield true
+      {
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+        Value trueVal = builder.create<ConstantBoolOp>(loc(node.loc), true);
+        builder.create<YieldOp>(loc(node.loc), trueVal);
+      }
+
+      // Else region: evaluate rhs and yield it
+      {
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+        node.rhs->accept(*this);
+        builder.create<YieldOp>(loc(node.loc), result);
+      }
+
+      result = ifOp.getResult();
+      resultType = makeTypeSpec(TypeNames::BOOL);
+      return;
+    }
+
+    // For all other operators, evaluate RHS eagerly
     node.rhs->accept(*this);
     if (!result) {
       return;
@@ -428,51 +481,6 @@ public:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::ge, lhs, rhs);
       resultType = makeTypeSpec(TypeNames::BOOL);
       break;
-    // Logical operations with short-circuit evaluation
-    case yy::parser::token::TLAND: {
-      // a && b: if a then b else false
-      // Only evaluate b if a is true
-      Type boolType = builder.getType<BoolType>();
-      auto ifOp = builder.create<mlir::scf::IfOp>(
-          loc(node.loc), boolType, lhs, /*withElseRegion=*/true);
-      
-      // Then region: return rhs
-      builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
-      builder.create<mlir::scf::YieldOp>(loc(node.loc), rhs);
-      
-      // Else region: return false
-      builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
-      Value falseVal = builder.create<ConstantBoolOp>(loc(node.loc), false);
-      builder.create<mlir::scf::YieldOp>(loc(node.loc), falseVal);
-      
-      // Restore insertion point and set result
-      builder.setInsertionPointAfter(ifOp);
-      result = ifOp.getResult(0);
-      resultType = makeTypeSpec(TypeNames::BOOL);
-      break;
-    }
-    case yy::parser::token::TLOR: {
-      // a || b: if a then true else b
-      // Only evaluate b if a is false
-      Type boolType = builder.getType<BoolType>();
-      auto ifOp = builder.create<mlir::scf::IfOp>(
-          loc(node.loc), boolType, lhs, /*withElseRegion=*/true);
-      
-      // Then region: return true
-      builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
-      Value trueVal = builder.create<ConstantBoolOp>(loc(node.loc), true);
-      builder.create<mlir::scf::YieldOp>(loc(node.loc), trueVal);
-      
-      // Else region: return rhs
-      builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
-      builder.create<mlir::scf::YieldOp>(loc(node.loc), rhs);
-      
-      // Restore insertion point and set result
-      builder.setInsertionPointAfter(ifOp);
-      result = ifOp.getResult(0);
-      resultType = makeTypeSpec(TypeNames::BOOL);
-      break;
-    }
     default:
       emitError(loc(node.loc)) << "Unknown binary operator: " << node.op;
       result = nullptr;
