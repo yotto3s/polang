@@ -405,6 +405,12 @@ Examples:
 10 % 3     (* 1 *)
 ```
 
+**Division by zero**: Integer division by zero produces a runtime error with source location:
+```
+Runtime error: integer division by zero at line <L>, column <C>
+```
+Float division by zero follows IEEE 754 and produces `inf` or `NaN`.
+
 ### Comparison Operators
 
 | Operator | Description              | Example   |
