@@ -17,12 +17,13 @@ The following operations are checked for overflow:
 
 ### Architecture
 
-The overflow checking is implemented as a late-stage MLIR transformation pass that runs after all optimizations but before final LLVM lowering:
+Overflow checking uses two complementary MLIR passes:
 
-1. **Early stages**: Use standard `arith.addi/subi/muli` operations
-2. **MLIR optimizations**: All standard optimizations run on these operations (affine analysis, constant folding, CSE, canonicalization)
-3. **InsertOverflowChecks pass**: Replaces arithmetic operations with LLVM overflow intrinsics
-4. **LLVM lowering**: Final conversion to LLVM IR
+1. **PolangToStandard lowering**: Generates `arith.addi/subi/muli` operations
+2. **CheckConstantOverflow pass**: Detects overflow in constant expressions at compile time (runs *before* canonicalization to catch cases that would otherwise be silently folded)
+3. **Canonicalization/CSE**: Standard MLIR optimizations
+4. **InsertOverflowChecks pass**: Replaces non-constant arithmetic operations with LLVM overflow intrinsics for runtime checks
+5. **LLVM lowering**: Final conversion to LLVM IR
 
 ### Signedness Tracking
 
@@ -46,9 +47,9 @@ Runtime error: integer overflow at line 5, column 10
 
 ## Performance
 
-While overflow checking adds runtime overhead, the late-stage transformation approach ensures:
-- MLIR optimizations can eliminate redundant checks
-- Constant expressions are folded at compile time (no runtime check)
+While overflow checking adds runtime overhead, the two-pass approach ensures:
+- Constant-expression overflows are caught at compile time with a clear diagnostic
+- MLIR optimizations can eliminate redundant runtime checks
 - LLVM can optimize the control flow
 - The intrinsics are well-optimized by LLVM
 

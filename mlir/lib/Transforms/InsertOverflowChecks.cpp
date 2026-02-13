@@ -1,7 +1,9 @@
 //===- InsertOverflowChecks.cpp - Insert overflow checks --------*- C++ -*-===//
 //
-// This file implements the pass that inserts runtime overflow checks for
-// integer arithmetic operations.
+// This file implements passes for integer overflow checking:
+// - CheckConstantOverflowPass: compile-time detection of constant-expression
+//   overflow (runs before canonicalization to catch cases that would be folded)
+// - InsertOverflowChecksPass: runtime overflow checks via LLVM intrinsics
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,6 +20,8 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
+#include "llvm/ADT/APInt.h"
+
 #pragma GCC diagnostic pop
 
 using namespace mlir;
@@ -25,6 +29,108 @@ using namespace mlir::arith;
 using namespace mlir::LLVM;
 
 namespace {
+
+//===----------------------------------------------------------------------===//
+// CheckConstantOverflowPass
+//===----------------------------------------------------------------------===//
+
+/// Check whether a constant integer arithmetic operation overflows.
+/// Returns true if overflow is detected.
+bool checkConstantArithOverflow(Operation* op, const llvm::APInt& lhs,
+                                const llvm::APInt& rhs, bool isUnsigned) {
+  bool overflow = false;
+  const auto opName = op->getName().getStringRef();
+
+  if (opName == "arith.addi") {
+    if (isUnsigned) {
+      (void)lhs.uadd_ov(rhs, overflow);
+    } else {
+      (void)lhs.sadd_ov(rhs, overflow);
+    }
+  } else if (opName == "arith.subi") {
+    if (isUnsigned) {
+      (void)lhs.usub_ov(rhs, overflow);
+    } else {
+      (void)lhs.ssub_ov(rhs, overflow);
+    }
+  } else if (opName == "arith.muli") {
+    if (isUnsigned) {
+      (void)lhs.umul_ov(rhs, overflow);
+    } else {
+      (void)lhs.smul_ov(rhs, overflow);
+    }
+  }
+
+  return overflow;
+}
+
+/// Get the APInt value from an arith.constant operation, if possible.
+std::optional<llvm::APInt> getConstantIntValue(Value value) {
+  auto defOp = value.getDefiningOp<arith::ConstantOp>();
+  if (!defOp) {
+    return std::nullopt;
+  }
+  auto intAttr = dyn_cast<IntegerAttr>(defOp.getValue());
+  if (!intAttr) {
+    return std::nullopt;
+  }
+  return intAttr.getValue();
+}
+
+/// Compile-time overflow check pass.
+/// Detects constant-expression overflow BEFORE canonicalization can fold it.
+struct CheckConstantOverflowPass
+    : public PassWrapper<CheckConstantOverflowPass, OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CheckConstantOverflowPass)
+
+  [[nodiscard]] StringRef getArgument() const override {
+    return "polang-check-constant-overflow";
+  }
+
+  [[nodiscard]] StringRef getDescription() const override {
+    return "Check for overflow in constant integer arithmetic expressions";
+  }
+
+  void getDependentDialects(DialectRegistry& registry) const override {
+    registry.insert<arith::ArithDialect>();
+  }
+
+  void runOnOperation() override {
+    auto module = getOperation();
+    bool hasError = false;
+
+    module.walk([&](Operation* op) {
+      if (!isa<AddIOp, SubIOp, MulIOp>(op)) {
+        return;
+      }
+
+      auto resultType = dyn_cast<IntegerType>(op->getResult(0).getType());
+      if (!resultType) {
+        return;
+      }
+
+      // Only check operations where both operands are constants
+      auto lhsVal = getConstantIntValue(op->getOperand(0));
+      auto rhsVal = getConstantIntValue(op->getOperand(1));
+      if (!lhsVal || !rhsVal) {
+        return;
+      }
+
+      const auto isUnsignedAttr =
+          op->getAttrOfType<BoolAttr>("polang.is_unsigned");
+      const bool isUnsigned = isUnsignedAttr && isUnsignedAttr.getValue();
+
+      if (checkConstantArithOverflow(op, *lhsVal, *rhsVal, isUnsigned)) {
+        op->emitError("integer overflow in constant expression");
+        hasError = true;
+      }
+    });
+
+    if (hasError) {
+      signalPassFailure();
+    }
+  }
+};
 
 //===----------------------------------------------------------------------===//
 // Helper functions
@@ -81,9 +187,8 @@ GlobalOp getOrCreateErrorMessage(ModuleOp module, StringRef message,
 }
 
 /// Determine the overflow intrinsic name for the given operation.
-[[nodiscard]] std::string getOverflowIntrinsicName(Operation* op,
-                                                   bool isUnsigned,
-                                                   unsigned width) noexcept {
+[[nodiscard]] std::string
+getOverflowIntrinsicName(Operation* op, bool isUnsigned, unsigned width) {
   const auto opName = op->getName().getStringRef();
 
   std::string prefix;
@@ -252,6 +357,10 @@ struct InsertOverflowChecksPass
 } // namespace
 
 namespace polang {
+
+std::unique_ptr<Pass> createCheckConstantOverflowPass() {
+  return std::make_unique<CheckConstantOverflowPass>();
+}
 
 std::unique_ptr<Pass> createInsertOverflowChecksPass() {
   return std::make_unique<InsertOverflowChecksPass>();
