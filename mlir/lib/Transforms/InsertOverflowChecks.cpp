@@ -280,13 +280,13 @@ LogicalResult insertOverflowCheck(Operation* op, OpBuilder& builder,
   int32_t lineNum = 0;
   int32_t colNum = 0;
   if (auto fileLoc = dyn_cast<FileLineColLoc>(op->getLoc())) {
-    lineNum = fileLoc.getLine();
-    colNum = fileLoc.getColumn();
+    lineNum = static_cast<int32_t>(fileLoc.getLine());
+    colNum = static_cast<int32_t>(fileLoc.getColumn());
   } else if (auto fusedLoc = dyn_cast<FusedLoc>(op->getLoc())) {
     for (auto innerLoc : fusedLoc.getLocations()) {
       if (auto fileLoc = dyn_cast<FileLineColLoc>(innerLoc)) {
-        lineNum = fileLoc.getLine();
-        colNum = fileLoc.getColumn();
+        lineNum = static_cast<int32_t>(fileLoc.getLine());
+        colNum = static_cast<int32_t>(fileLoc.getColumn());
         break;
       }
     }
