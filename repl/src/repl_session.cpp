@@ -62,10 +62,10 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   // Snapshot TypeChecker state for rollback on error
   const auto snapshot = typeChecker->saveState();
 
-  // Incrementally type-check only the new statements
-  const bool isFirstEval = (evalCounter == 0);
-  const auto errors = isFirstEval ? typeChecker->check(*newAst)
-                                  : typeChecker->checkIncremental(*newAst);
+  // Always use incremental type-checking in the REPL.
+  // check() calls warnOrphanedTypeSignatures() which would incorrectly
+  // report type signatures whose definitions come in a later evaluation.
+  const auto errors = typeChecker->checkIncremental(*newAst);
   if (!errors.empty()) {
     // Rollback TypeChecker state on error
     typeChecker->restoreState(snapshot);

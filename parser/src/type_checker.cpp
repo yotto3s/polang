@@ -1017,7 +1017,8 @@ void TypeChecker::inferFunction(
   }
 
   // Pre-register signature with TYPEVAR return for recursive call support
-  // Only register if not already present (from type signature forward reference)
+  // Only register if not already present (from type signature forward
+  // reference)
   if (functionSignatures.find(funcName) == functionSignatures.end()) {
     functionSignatures[funcName] =
         polang::MonoSignature{paramTypes, TypeNames::TYPEVAR};
@@ -1397,147 +1398,135 @@ void TypeChecker::visit(const NTypeSignature& node) {
   pendingTypeSignatures[name] = node.typeExpr->clone();
 
   // Eagerly register the signature to enable forward references
-  registerTypeSignature(name, *node.typeExpr);
+  static_cast<void>(registerTypeSignature(name, *node.typeExpr));
 }
 
-bool TypeChecker::registerTypeSignature(const std::string& name,
-                                        const NTypeSpec& signature) {
-  // Parse the type signature to extract function/variable type
+std::optional<TypeChecker::ParsedSignature>
+TypeChecker::parseTypeSignature(const NTypeSpec& signature) {
+  ParsedSignature result;
+
   const auto* forallType = dynamic_cast<const NForallType*>(&signature);
   std::set<std::string> declaredTypeVars;
   std::reference_wrapper<const NTypeSpec> innerSig = signature;
 
   if (forallType != nullptr) {
-    // Extract declared type variables
+    result.isPolymorphic = true;
     for (const auto& tv : forallType->typeVars) {
       declaredTypeVars.insert(tv.name);
+      result.typeParams.push_back(tv.name);
+      result.typeVarDecls.emplace_back(std::cref(tv));
+      if (!tv.bound.empty()) {
+        auto traitBound = polang::stringToTraitBound(tv.bound);
+        if (traitBound) {
+          result.paramBounds[tv.name].insert(*traitBound);
+        }
+      }
     }
     innerSig = *forallType->innerType;
   }
 
   // Validate type names in the signature
-  std::set<std::string> usedTypeVars;
   const size_t errorsBefore = errors.size();
-  validateTypeNames(innerSig.get(), declaredTypeVars, usedTypeVars);
+  validateTypeNames(innerSig.get(), declaredTypeVars, result.usedTypeVars);
   if (errors.size() > errorsBefore) {
-    return false;
+    return std::nullopt;
   }
 
   // Check if this is an arrow type (function signature)
   const auto* arrowType = dynamic_cast<const NArrowType*>(&innerSig.get());
   if (arrowType != nullptr) {
-    // Extract parameter types
-    std::vector<std::string> paramTypes;
+    result.isArrowType = true;
+    result.returnType = arrowType->returnType->getTypeName();
+    result.returnTypeSpec = arrowType->returnType.get();
+
     const auto* unitParam =
         dynamic_cast<const NUnitType*>(arrowType->paramType.get());
     if (unitParam != nullptr) {
-      // () -> T: zero-param function
-      // paramTypes remains empty
+      result.isUnitParam = true;
     } else {
       const auto* productType =
           dynamic_cast<const NProductType*>(arrowType->paramType.get());
       if (productType != nullptr) {
         for (const auto& t : productType->types) {
-          paramTypes.push_back(t->getTypeName());
+          result.paramTypes.push_back(t->getTypeName());
+          result.paramTypeSpecs.emplace_back(std::cref(*t));
         }
       } else {
-        paramTypes.push_back(arrowType->paramType->getTypeName());
+        result.paramTypes.push_back(arrowType->paramType->getTypeName());
+        result.paramTypeSpecs.emplace_back(std::cref(*arrowType->paramType));
       }
     }
-
-    // Extract return type
-    std::string returnType = arrowType->returnType->getTypeName();
-
-    // Register the function signature
-    if (forallType != nullptr) {
-      // Polymorphic signature
-      polang::PolymorphicSignature sig;
-      sig.typeParams.reserve(forallType->typeVars.size());
-      for (const auto& tv : forallType->typeVars) {
-        sig.typeParams.push_back(tv.name);
-        if (!tv.bound.empty()) {
-          auto traitBound = polang::stringToTraitBound(tv.bound);
-          if (traitBound) {
-            sig.paramBounds[tv.name].insert(*traitBound);
-          }
-        }
-      }
-      sig.paramTypes = std::move(paramTypes);
-      sig.returnType = std::move(returnType);
-      functionSignatures[name] = sig;
-    } else {
-      // Monomorphic signature
-      functionSignatures[name] =
-          polang::MonoSignature{std::move(paramTypes), std::move(returnType)};
-    }
-    return true;
   }
 
-  // Not an arrow type - this is a variable type signature
-  // Do NOT register in localTypes - the variable must be defined before use
-  // The type signature will be applied when the variable declaration is visited
+  return result;
+}
+
+bool TypeChecker::registerTypeSignature(const std::string& name,
+                                        const NTypeSpec& signature) {
+  auto parsed = parseTypeSignature(signature);
+  if (!parsed) {
+    return false;
+  }
+  if (!parsed->isArrowType) {
+    return true; // Variable signature — don't register
+  }
+
+  if (parsed->isPolymorphic) {
+    polang::PolymorphicSignature sig;
+    sig.typeParams = parsed->typeParams;
+    sig.paramBounds = parsed->paramBounds;
+    sig.paramTypes = std::move(parsed->paramTypes);
+    sig.returnType = std::move(parsed->returnType);
+    functionSignatures[name] = sig;
+  } else {
+    functionSignatures[name] = polang::MonoSignature{
+        std::move(parsed->paramTypes), std::move(parsed->returnType)};
+  }
   return true;
 }
 
 void TypeChecker::applyFunctionSignature(
     NFunctionDeclaration& node, std::unique_ptr<const NTypeSpec> signature) {
-  // Check if this is a forall type signature
-  const auto* forallType = dynamic_cast<const NForallType*>(signature.get());
-  std::set<std::string> declaredTypeVars;
-  std::reference_wrapper<const NTypeSpec> innerSig = *signature;
-
-  if (forallType != nullptr) {
-    node.hasExplicitForall = true;
-    node.typeParams.clear();
-    node.typeParamBounds.clear();
-
-    auto& registry = polang::getTraitRegistry();
-
-    for (const auto& tv : forallType->typeVars) {
-      declaredTypeVars.insert(tv.name);
-      node.typeParams.push_back(tv.name);
-
-      if (!tv.bound.empty()) {
-        if (!registry.isKnownTrait(tv.bound)) {
-          reportError("unknown type class '" + tv.bound + "'");
-          return;
-        }
-        auto traitBound = polang::stringToTraitBound(tv.bound);
-        if (traitBound) {
-          node.typeParamBounds[tv.name].insert(*traitBound);
-        }
-      }
-    }
-
-    innerSig = *forallType->innerType;
-  }
-
-  // Validate type names in the signature
-  std::set<std::string> usedTypeVars;
-  const size_t errorsBefore = errors.size();
-  validateTypeNames(innerSig.get(), declaredTypeVars, usedTypeVars);
-  if (errors.size() > errorsBefore) {
+  auto parsed = parseTypeSignature(*signature);
+  if (!parsed) {
     return;
   }
 
-  // Warn about unused type variables (only for forall signatures)
-  if (forallType != nullptr) {
-    for (const auto& tv : forallType->typeVars) {
-      if (usedTypeVars.find(tv.name) == usedTypeVars.end()) {
+  // Set forall flags on AST node
+  if (parsed->isPolymorphic) {
+    node.hasExplicitForall = true;
+    node.typeParams = parsed->typeParams;
+    node.typeParamBounds.clear();
+    for (const auto& [tp, bounds] : parsed->paramBounds) {
+      node.typeParamBounds[tp] = bounds;
+    }
+
+    // Warn about unused type variables
+    for (const auto& tvRef : parsed->typeVarDecls) {
+      const auto& tv = tvRef.get();
+      if (parsed->usedTypeVars.find(tv.name) == parsed->usedTypeVars.end()) {
         std::cerr << "Warning: unused type variable " << tv.name << "\n";
       }
     }
   }
 
-  // Process the (inner) type as arrow type
-  const auto* arrowType = dynamic_cast<const NArrowType*>(&innerSig.get());
-  if (arrowType == nullptr) {
+  // Validate trait bounds via registry (not in parseTypeSignature)
+  if (parsed->isPolymorphic) {
+    auto& registry = polang::getTraitRegistry();
+    for (const auto& tvRef : parsed->typeVarDecls) {
+      const auto& tv = tvRef.get();
+      if (!tv.bound.empty() && !registry.isKnownTrait(tv.bound)) {
+        reportError("unknown type class '" + tv.bound + "'");
+        return;
+      }
+    }
+  }
+
+  // Validate it's an arrow type
+  if (!parsed->isArrowType) {
     if (node.arguments.empty()) {
-      // Non-arrow type for zero-param function is no longer valid.
-      // Must use () -> T syntax.
       reportError("type signature for '" + node.id->name + "' must use () -> " +
-                  innerSig.get().getTypeName() +
-                  " for zero-parameter functions");
+                  signature->getTypeName() + " for zero-parameter functions");
       return;
     }
     reportError("type signature for '" + node.id->name +
@@ -1545,49 +1534,34 @@ void TypeChecker::applyFunctionSignature(
     return;
   }
 
-  // Check for unit type parameter: () -> T means zero-param function
-  const auto* unitParam =
-      dynamic_cast<const NUnitType*>(arrowType->paramType.get());
-  if (unitParam != nullptr) {
-    // () -> T: zero-param function
+  // Handle unit parameter: () -> T means zero-param function
+  if (parsed->isUnitParam) {
     if (!node.arguments.empty()) {
       reportError("type signature for '" + node.id->name +
                   "' has () parameter but definition has " +
                   std::to_string(node.arguments.size()) + " parameters");
       return;
     }
-    node.type = arrowType->returnType->clone();
+    node.type = parsed->returnTypeSpec->clone();
     return;
   }
 
-  // Extract parameter type references
-  std::vector<std::reference_wrapper<const NTypeSpec>> paramTypeRefs;
-  const auto* productType =
-      dynamic_cast<const NProductType*>(arrowType->paramType.get());
-  if (productType != nullptr) {
-    for (const auto& t : productType->types) {
-      paramTypeRefs.push_back(std::cref(*t));
-    }
-  } else {
-    paramTypeRefs.push_back(std::cref(*arrowType->paramType));
-  }
-
   // Check arity matches
-  if (paramTypeRefs.size() != node.arguments.size()) {
+  if (parsed->paramTypeSpecs.size() != node.arguments.size()) {
     reportError("type signature for '" + node.id->name + "' has " +
-                std::to_string(paramTypeRefs.size()) +
+                std::to_string(parsed->paramTypeSpecs.size()) +
                 " parameters but definition has " +
                 std::to_string(node.arguments.size()));
     return;
   }
 
   // Apply parameter types (clone from references)
-  for (size_t i = 0; i < paramTypeRefs.size(); ++i) {
-    node.arguments[i]->type = paramTypeRefs[i].get().clone();
+  for (size_t i = 0; i < parsed->paramTypeSpecs.size(); ++i) {
+    node.arguments[i]->type = parsed->paramTypeSpecs[i].get().clone();
   }
 
   // Apply return type (clone)
-  node.type = arrowType->returnType->clone();
+  node.type = parsed->returnTypeSpec->clone();
 }
 
 bool TypeChecker::validateTypeNames(

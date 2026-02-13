@@ -22,6 +22,7 @@ class NProductType;
 class NFunctionDeclaration;
 struct NLetBinding;
 struct SourceLocation;
+struct TypeVarDecl;
 
 struct TypeCheckError {
   std::string message;
@@ -122,6 +123,26 @@ private:
   // Pending type signatures: name -> type expression
   std::map<std::string, std::unique_ptr<const NTypeSpec>> pendingTypeSignatures;
 
+  // Parsed representation of a type signature (shared by register and apply)
+  struct ParsedSignature {
+    bool isPolymorphic = false;
+    bool isArrowType = false;
+    bool isUnitParam = false;
+    std::vector<std::string> typeParams;
+    std::map<std::string, std::set<polang::TraitBound>> paramBounds;
+    std::set<std::string> usedTypeVars;
+    std::vector<std::string> paramTypes;
+    std::string returnType;
+    std::vector<std::reference_wrapper<const NTypeSpec>> paramTypeSpecs;
+    const NTypeSpec* returnTypeSpec = nullptr;
+    std::vector<std::reference_wrapper<const TypeVarDecl>> typeVarDecls;
+  };
+
+  // Parse a type signature into a ParsedSignature, validating type names.
+  // Returns std::nullopt if validation fails.
+  [[nodiscard]] std::optional<ParsedSignature>
+  parseTypeSignature(const NTypeSpec& signature);
+
   // Apply a type signature to a function declaration
   void applyFunctionSignature(NFunctionDeclaration& node,
                               std::unique_ptr<const NTypeSpec> signature);
@@ -131,7 +152,7 @@ private:
   [[nodiscard]] bool registerTypeSignature(const std::string& name,
                                            const NTypeSpec& signature);
 
-  // Warn about type signatures with no corresponding definition
+  // Report errors for type signatures with no corresponding definition
   void warnOrphanedTypeSignatures();
 
   // Get mangled name for a symbol within current module context

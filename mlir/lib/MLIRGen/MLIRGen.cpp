@@ -890,8 +890,19 @@ public:
     result = nullptr; // Import statements don't produce a value
   }
 
-  void visit(const NTypeSignature& /*node*/) override {
-    // Type signatures are handled by the type checker, not MLIR generation
+  void visit(const NTypeSignature& node) override {
+    // Pre-register the function return type so forward-referenced calls
+    // produce the correct MLIR result type.
+    const NTypeSpec* innerType = node.typeExpr.get();
+    if (const auto* forall = dynamic_cast<const NForallType*>(innerType)) {
+      innerType = forall->innerType.get();
+    }
+    if (const auto* arrow = dynamic_cast<const NArrowType*>(innerType)) {
+      const std::string funcName = mangledName(node.id->name);
+      functionReturnTypes[funcName] = arrow->returnType->clone();
+      Type retTy = getType(*arrow->returnType);
+      functionReturnMLIRTypes[funcName] = retTy;
+    }
     result = nullptr;
   }
 
