@@ -1,0 +1,11 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* CHECK: Type error: 'secret' is not exported from module 'Math'
+*)
+
+module Math (PI)
+  PI = 3.14
+  secret = 42
+endmodule
+Math.secret
