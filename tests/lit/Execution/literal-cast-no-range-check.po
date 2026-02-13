@@ -1,0 +1,8 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Regression guard: as cast should NOT trigger range checking *)
+(* 300 as i8 is an explicit narrowing conversion, should truncate to 44 *)
+(* CHECK: 44 : i8
+*)
+300 as i8
