@@ -46,3 +46,8 @@ target_include_directories(PolangCompiler PRIVATE
 target_compile_definitions(PolangCompiler PRIVATE ${LLVM_DEFINITIONS_LIST})
 target_link_directories(PolangCompiler PRIVATE ${LLVM_LIBRARY_DIRS})
 target_link_libraries(PolangCompiler PRIVATE PolangMLIRCodegen)
+# Force-include PolangRuntime (no C++ code references it, only JIT-compiled code)
+# and export symbols to dynamic symbol table so JIT can resolve runtime helpers
+target_link_libraries(PolangCompiler PRIVATE
+    -Wl,--whole-archive PolangRuntime -Wl,--no-whole-archive)
+target_link_options(PolangCompiler PRIVATE -rdynamic)

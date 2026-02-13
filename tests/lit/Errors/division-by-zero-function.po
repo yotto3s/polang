@@ -3,5 +3,5 @@
 divide : i64 -> i64
 divide(x) = x / 0
 result = divide(42)
-(* CHECK: Runtime error: integer division by zero at line 4, column 13
+(* CHECK: Runtime error: integer division by zero at line 1, column 13
 *)

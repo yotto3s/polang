@@ -15,6 +15,7 @@
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
+#include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/IR/LLVMContext.h"
@@ -69,6 +70,20 @@ bool JITSession::initialize(std::string& error) {
   }
 
   impl->jit = std::move(*jitExpected);
+
+  // Add process symbols generator so JIT can resolve runtime helpers
+  // (e.g., __polang_runtime_error) that are linked into the host process
+  auto processSymbolsGenerator =
+      llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
+          impl->jit->getDataLayout().getGlobalPrefix());
+  if (!processSymbolsGenerator) {
+    error = "Failed to create process symbols generator: " +
+            llvm::toString(processSymbolsGenerator.takeError());
+    return false;
+  }
+  impl->jit->getMainJITDylib().addGenerator(
+      std::move(*processSymbolsGenerator));
+
   impl->latestDylib = &impl->jit->getMainJITDylib();
   impl->allDylibs.push_back(impl->latestDylib);
   return true;

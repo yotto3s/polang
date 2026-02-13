@@ -23,3 +23,8 @@ target_include_directories(PolangRepl PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_link_libraries(PolangRepl PRIVATE PolangReplLib)
+# Force-include PolangRuntime (no C++ code references it, only JIT-compiled code)
+# and export symbols to dynamic symbol table so JIT can resolve runtime helpers
+target_link_libraries(PolangRepl PRIVATE
+    -Wl,--whole-archive PolangRuntime -Wl,--no-whole-archive)
+target_link_options(PolangRepl PRIVATE -rdynamic)
