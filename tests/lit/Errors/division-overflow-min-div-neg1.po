@@ -1,0 +1,18 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+
+(* F2: DivOpLowering only checks for divisor == 0 but does not check for
+   the MIN_INT / -1 overflow case. The spec says: "Division overflow (the
+   sole case being MIN_INT / -1 for signed types) is also a runtime error."
+   Currently this causes undefined behavior (SIGFPE on x86) instead of a
+   clean runtime error.
+*)
+
+(* CHECK: {{.*}}Runtime error:{{.*}}
+*)
+
+:{
+divIt : i64 * i64 -> i64
+divIt(a, b) = a / b
+:}
+divIt(0 - 9223372036854775807 - 1, 0 - 1)

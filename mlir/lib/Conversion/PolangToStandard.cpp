@@ -305,10 +305,13 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
     // Ensure the runtime error function declaration exists
     getOrCreateRuntimeErrorFunc(moduleOp, rewriter);
 
-    // Ensure the error message global string exists
+    // Ensure the error message global strings exist
     getOrCreateGlobalString(loc, rewriter, moduleOp,
                             "__polang_msg_integer_division_by_zero",
                             "integer division by zero");
+    getOrCreateGlobalString(loc, rewriter, moduleOp,
+                            "__polang_msg_integer_overflow",
+                            "integer overflow");
 
     // Extract source location for error reporting
     auto [line, col] = extractLineColumn(loc);
@@ -369,13 +372,72 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
 
-      Value divResult;
       if (isUnsigned) {
-        divResult = rewriter.create<arith::DivUIOp>(loc, lhs, rhs);
+        // Unsigned division: no overflow possible
+        Value divResult = rewriter.create<arith::DivUIOp>(loc, lhs, rhs);
+        rewriter.create<scf::YieldOp>(loc, ValueRange{divResult});
+      } else if (auto intType = dyn_cast<mlir::IntegerType>(resultType)) {
+        // Signed integer division: check for MIN_INT / -1 overflow
+        unsigned bitWidth = intType.getWidth();
+
+        // Create MIN_VALUE and -1 constants
+        auto minConst = rewriter.create<arith::ConstantIntOp>(
+            loc, APInt::getSignedMinValue(bitWidth).getSExtValue(), resultType);
+        auto negOneConst =
+            rewriter.create<arith::ConstantIntOp>(loc, -1, resultType);
+
+        // Check lhs == MIN_VALUE && rhs == -1
+        auto isMin = rewriter.create<arith::CmpIOp>(
+            loc, arith::CmpIPredicate::eq, lhs, minConst);
+        auto isNegOne = rewriter.create<arith::CmpIOp>(
+            loc, arith::CmpIPredicate::eq, rhs, negOneConst);
+        auto isOverflow = rewriter.create<arith::AndIOp>(loc, isMin, isNegOne);
+
+        // Nested if: overflow → error, else → normal division
+        auto overflowIf =
+            rewriter.create<scf::IfOp>(loc, TypeRange{resultType}, isOverflow,
+                                       /*withElseRegion=*/true);
+
+        // Overflow path: call runtime error
+        {
+          OpBuilder::InsertionGuard innerGuard(rewriter);
+          rewriter.setInsertionPointToStart(
+              &overflowIf.getThenRegion().front());
+
+          auto msgPtr = rewriter.create<LLVM::AddressOfOp>(
+              loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
+              "__polang_msg_integer_overflow");
+          auto lineConst = rewriter.create<arith::ConstantIntOp>(
+              loc, line, rewriter.getI32Type());
+          auto colConst = rewriter.create<arith::ConstantIntOp>(
+              loc, col, rewriter.getI32Type());
+          rewriter.create<func::CallOp>(
+              loc, "__polang_runtime_error", TypeRange{},
+              ValueRange{msgPtr, lineConst, colConst});
+
+          // Yield dummy value (unreachable - error handler calls exit)
+          Value dummy =
+              rewriter.create<arith::ConstantIntOp>(loc, 0, resultType);
+          rewriter.create<scf::YieldOp>(loc, ValueRange{dummy});
+        }
+
+        // Normal division path
+        {
+          OpBuilder::InsertionGuard innerGuard(rewriter);
+          rewriter.setInsertionPointToStart(
+              &overflowIf.getElseRegion().front());
+
+          Value divResult = rewriter.create<arith::DivSIOp>(loc, lhs, rhs);
+          rewriter.create<scf::YieldOp>(loc, ValueRange{divResult});
+        }
+
+        rewriter.create<scf::YieldOp>(loc, overflowIf.getResults());
       } else {
-        divResult = rewriter.create<arith::DivSIOp>(loc, lhs, rhs);
+        // Signed index type: perform division without overflow check
+        // (index width is target-dependent)
+        Value divResult = rewriter.create<arith::DivSIOp>(loc, lhs, rhs);
+        rewriter.create<scf::YieldOp>(loc, ValueRange{divResult});
       }
-      rewriter.create<scf::YieldOp>(loc, ValueRange{divResult});
     }
 
     rewriter.replaceOp(op, ifOp.getResults());
