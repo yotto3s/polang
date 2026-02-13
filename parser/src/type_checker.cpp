@@ -375,6 +375,8 @@ void TypeChecker::visit(const NMethodCall& node) {
         unifier.unify(argTypes[i], paramTypes[i], subst);
         continue;
       }
+      // Check integer literal range for function arguments
+      checkLiteralRange(node.arguments[i].get(), paramTypes[i]);
       if (argTypes[i] != TypeNames::UNKNOWN &&
           paramTypes[i] != TypeNames::UNKNOWN &&
           argTypes[i] != TypeNames::TYPEVAR &&
@@ -440,6 +442,13 @@ void TypeChecker::instantiateCall(NMethodCall& node,
       propagateTypeToSource(node.arguments[i].get(), resolvedParam);
       node.arguments[i]->accept(*this);
     }
+  }
+
+  // Check integer literal ranges with resolved parameter types
+  for (size_t i = 0; i < argTypes.size(); ++i) {
+    std::string resolvedParam = callSubst.apply(scheme.paramTypes[i]);
+    resolvedParam = polang::resolveGenericToDefault(resolvedParam);
+    checkLiteralRange(node.arguments[i].get(), resolvedParam);
   }
 
   // Resolve all type param bindings to concrete types
@@ -774,6 +783,7 @@ void TypeChecker::typeCheckLetBindings(
         bindingTypes.push_back(exprType);
       } else {
         std::string declaredType = var->type->getTypeName();
+        checkLiteralRange(var->assignmentExpr.get(), declaredType);
         if (!areTypesCompatible(exprType, declaredType)) {
           reportError("Variable '" + var->id->name + "' declared as " +
                           var->type->getTypeName() + " but initialized with " +
@@ -872,6 +882,9 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
                                                  const std::string& varName,
                                                  const std::string& exprType) {
   const std::string declType = node.type->getTypeName();
+
+  // Check integer literal range before type compatibility check
+  checkLiteralRange(node.assignmentExpr.get(), declType);
 
   const std::string& expectedType = declType;
 
@@ -1762,4 +1775,25 @@ void TypeChecker::resolveRemainingGenerics() {
 
   // Clear tracking maps
   varDeclNodes.clear();
+}
+
+void TypeChecker::checkLiteralRange(const NExpression* expr,
+                                    const std::string& targetType) {
+  if (expr == nullptr) {
+    return;
+  }
+  const auto* intLiteral = dynamic_cast<const NInteger*>(expr);
+  if (intLiteral == nullptr) {
+    return;
+  }
+  if (!polang::isIntegerType(targetType)) {
+    return;
+  }
+  if (polang::isLiteralInRange(intLiteral->value, targetType)) {
+    return;
+  }
+  reportError("literal " + std::to_string(intLiteral->value) +
+                  " does not fit in type " + targetType + " (range " +
+                  polang::getIntegerRangeString(targetType) + ")",
+              intLiteral->loc);
 }

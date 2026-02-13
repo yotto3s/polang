@@ -231,6 +231,10 @@ private:
                              const std::string& targetType);
   void resolveRemainingGenerics();
 
+  // Check if an integer literal fits in its target type
+  void checkLiteralRange(const NExpression* expr,
+                         const std::string& targetType);
+
   // HM type inference infrastructure
   polang::Substitution subst;
   polang::Unifier unifier;
