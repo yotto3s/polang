@@ -714,6 +714,29 @@ void TypeChecker::visit(const NBinaryOperator& node) {
       return;
     }
 
+    // Verify operands are integer or index types (reject bool, etc.)
+    const bool lhsIsInteger = polang::isIntegerType(lhsType) ||
+                              polang::isIndexType(lhsType) ||
+                              polang::isGenericIntegerType(lhsType);
+    const bool rhsIsInteger = polang::isIntegerType(rhsType) ||
+                              polang::isIndexType(rhsType) ||
+                              polang::isGenericIntegerType(rhsType);
+
+    if (!lhsIsInteger) {
+      reportError("Modulo operator '%' requires integer operands, but got '" +
+                      lhsType + "'",
+                  node.loc);
+      inferredType = TypeNames::UNKNOWN;
+      return;
+    }
+    if (!rhsIsInteger) {
+      reportError("Modulo operator '%' requires integer operands, but got '" +
+                      rhsType + "'",
+                  node.loc);
+      inferredType = TypeNames::UNKNOWN;
+      return;
+    }
+
     // Apply the same type checking as other arithmetic operators
     checkArithmeticBinaryOp(node, lhsType, rhsType);
     return;
