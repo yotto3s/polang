@@ -106,9 +106,15 @@ public:
         continue;
       }
 
-      // Track operators and other tokens
-      lastToken = std::string(1, input[i]);
-      ++i;
+      // Track operators and other tokens (including multi-character operators)
+      if ((input[i] == '&' || input[i] == '|') && i + 1 < input.size() &&
+          input[i + 1] == input[i]) {
+        lastToken = std::string(2, input[i]);
+        i += 2;
+      } else {
+        lastToken = std::string(1, input[i]);
+        ++i;
+      }
     }
 
     // Input is incomplete if:
@@ -122,7 +128,8 @@ public:
     return parenDepth > 0 || ifWithoutElse > 0 || letWithoutIn > 0 ||
            moduleDepth > 0 || lastToken == "in" || lastToken == "then" ||
            lastToken == "+" || lastToken == "-" || lastToken == "*" ||
-           lastToken == "/" || lastToken == "=" || lastToken == "," ||
+           lastToken == "/" || lastToken == "%" || lastToken == "=" ||
+           lastToken == "," || lastToken == "&&" || lastToken == "||" ||
            lastToken == "and";
   }
 };

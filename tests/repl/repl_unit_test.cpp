@@ -80,6 +80,22 @@ TEST(IsInputIncomplete, TrailingDivide) {
   EXPECT_TRUE(InputChecker::isInputIncomplete("1 /"));
 }
 
+// F2: The modulo operator '%' was added but not included in the
+// continuation operator list. Input ending with '%' should be treated
+// as incomplete (the user is typing a multi-line expression like "10 %\n3"),
+// but isInputIncomplete returns false because '%' is not in the check list.
+TEST(IsInputIncomplete, TrailingModulo) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("10 %"));
+}
+
+TEST(IsInputIncomplete, TrailingLogicalAnd) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("true &&"));
+}
+
+TEST(IsInputIncomplete, TrailingLogicalOr) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("false ||"));
+}
+
 TEST(IsInputIncomplete, TrailingEquals) {
   EXPECT_TRUE(InputChecker::isInputIncomplete("x ="));
 }
