@@ -349,6 +349,7 @@ qualified_name : ident {
                | qualified_name TDOT ident {
                    $1->parts.push_back($3->name);
                    $$ = std::move($1);
+                   SET_LOC($$, @$);
                  }
                ;
 
@@ -363,6 +364,7 @@ qualified_name_multi : ident TDOT ident {
                      | qualified_name_multi TDOT ident {
                          $1->parts.push_back($3->name);
                          $$ = std::move($1);
+                         SET_LOC($$, @$);
                        }
                      ;
 
