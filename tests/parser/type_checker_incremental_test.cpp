@@ -243,7 +243,7 @@ TEST_F(IncrementalTypeCheckerTest, SnapshotPreservesFunctionSchemes) {
 TEST_F(IncrementalTypeCheckerTest,
        SnapshotRollbackRestoresPendingTypeSignatures) {
   // Input 1: Add a type signature via checkIncremental (not check(), which
-  // would call warnOrphanedTypeSignatures() and clear the pending map).
+  // would call reportOrphanedTypeSignatures() and clear the pending map).
   auto sig = parse("foo : i64 -> i64\n");
   ASSERT_NE(sig, nullptr);
   auto errors1 = tc.checkIncremental(*sig);

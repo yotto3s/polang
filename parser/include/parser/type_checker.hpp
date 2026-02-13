@@ -135,6 +135,8 @@ private:
     std::string returnType;
     std::vector<std::reference_wrapper<const NTypeSpec>> paramTypeSpecs;
     const NTypeSpec* returnTypeSpec = nullptr;
+    // References into the NTypeSpec tree — valid only while the source
+    // NTypeSpec (the signature passed to parseTypeSignature) is alive.
     std::vector<std::reference_wrapper<const TypeVarDecl>> typeVarDecls;
   };
 
@@ -147,13 +149,14 @@ private:
   void applyFunctionSignature(NFunctionDeclaration& node,
                               std::unique_ptr<const NTypeSpec> signature);
 
-  // Parse and register a type signature for forward references
-  // Returns true if the signature was successfully registered
-  [[nodiscard]] bool registerTypeSignature(const std::string& name,
-                                           const NTypeSpec& signature);
+  // Parse and register a type signature for forward references.
+  // Returns true if the signature was successfully registered.
+  // Errors are reported internally via reportError().
+  bool registerTypeSignature(const std::string& name,
+                             const NTypeSpec& signature);
 
   // Report errors for type signatures with no corresponding definition
-  void warnOrphanedTypeSignatures();
+  void reportOrphanedTypeSignatures();
 
   // Get mangled name for a symbol within current module context
   [[nodiscard]] std::string mangledName(const std::string& name) const;
