@@ -299,22 +299,9 @@ void TypeChecker::visit(const NQualifiedName& node) {
 
   // Check export visibility for qualified access (e.g., Math.PI)
   if (node.parts.size() >= 2) {
-    std::string moduleMangled;
-    for (size_t i = 0; i < node.parts.size() - 1; ++i) {
-      if (i > 0) {
-        moduleMangled += "$$";
-      }
-      moduleMangled += node.parts[i];
-    }
-    const std::string& memberName = node.parts.back();
-    std::string moduleDotName;
-    for (size_t i = 0; i < node.parts.size() - 1; ++i) {
-      if (i > 0) {
-        moduleDotName += ".";
-      }
-      moduleDotName += node.parts[i];
-    }
-    if (!checkExportAccess(moduleMangled, memberName, moduleDotName,
+    const auto [moduleMangled, moduleDotName] =
+        buildModuleNames(node.parts, node.parts.size() - 1);
+    if (!checkExportAccess(moduleMangled, node.parts.back(), moduleDotName,
                            node.loc)) {
       inferredType = TypeNames::UNKNOWN;
       return;
@@ -343,22 +330,9 @@ void TypeChecker::visit(const NMethodCall& node) {
   // Check export visibility for qualified function calls (e.g., Math.add(1, 2))
   if (node.qualifiedId != nullptr && node.qualifiedId->parts.size() >= 2) {
     const auto& parts = node.qualifiedId->parts;
-    std::string moduleMangled;
-    for (size_t i = 0; i < parts.size() - 1; ++i) {
-      if (i > 0) {
-        moduleMangled += "$$";
-      }
-      moduleMangled += parts[i];
-    }
-    const std::string& memberName = parts.back();
-    std::string moduleDotName;
-    for (size_t i = 0; i < parts.size() - 1; ++i) {
-      if (i > 0) {
-        moduleDotName += ".";
-      }
-      moduleDotName += parts[i];
-    }
-    if (!checkExportAccess(moduleMangled, memberName, moduleDotName,
+    const auto [moduleMangled, moduleDotName] =
+        buildModuleNames(parts, parts.size() - 1);
+    if (!checkExportAccess(moduleMangled, parts.back(), moduleDotName,
                            node.loc)) {
       inferredType = TypeNames::UNKNOWN;
       return;
@@ -1347,13 +1321,8 @@ void TypeChecker::inferFunction(
 void TypeChecker::visit(const NModuleDeclaration& node) {
   modulePath.push_back(node.name->name);
 
-  std::string moduleMangled;
-  for (size_t i = 0; i < modulePath.size(); ++i) {
-    if (i > 0) {
-      moduleMangled += "$$";
-    }
-    moduleMangled += modulePath[i];
-  }
+  const auto [moduleMangled, moduleDotName] =
+      buildModuleNames(modulePath, modulePath.size());
 
   moduleExports[moduleMangled] =
       std::set<std::string>(node.exports.begin(), node.exports.end());
@@ -1363,6 +1332,22 @@ void TypeChecker::visit(const NModuleDeclaration& node) {
   }
 
   modulePath.pop_back();
+}
+
+std::pair<std::string, std::string>
+TypeChecker::buildModuleNames(const std::vector<std::string>& parts,
+                              const size_t count) {
+  std::string mangled;
+  std::string dotName;
+  for (size_t i = 0; i < count; ++i) {
+    if (i > 0) {
+      mangled += "$$";
+      dotName += ".";
+    }
+    mangled += parts[i];
+    dotName += parts[i];
+  }
+  return {mangled, dotName};
 }
 
 bool TypeChecker::checkExportAccess(const std::string& moduleMangled,

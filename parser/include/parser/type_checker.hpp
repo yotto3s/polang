@@ -173,6 +173,10 @@ private:
   void handleItemsImport(const NImportStatement& node);
   void handleWildcardImport(const NImportStatement& node);
 
+  // Build mangled ($$-separated) and dot-separated module names from parts
+  static std::pair<std::string, std::string>
+  buildModuleNames(const std::vector<std::string>& parts, size_t count);
+
   // Check if a member is exported from a module; reports error if not
   bool checkExportAccess(const std::string& moduleMangled,
                          const std::string& memberName,
