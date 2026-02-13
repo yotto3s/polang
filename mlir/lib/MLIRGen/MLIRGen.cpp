@@ -615,11 +615,17 @@ public:
         return;
       }
 
-      // Emit GlobalOp at module level
+      // Emit GlobalOp at module level, before the entry function.
+      // Using setInsertionPoint (not setInsertionPointToStart) preserves
+      // declaration order so that initializers can reference earlier globals.
       GlobalOp globalOp;
       {
         OpBuilder::InsertionGuard guard(builder);
-        builder.setInsertionPointToStart(module.getBody());
+        if (entryFuncOp) {
+          builder.setInsertionPoint(entryFuncOp);
+        } else {
+          builder.setInsertionPointToStart(module.getBody());
+        }
         globalOp = builder.create<GlobalOp>(loc(node.loc),
                                             llvm::StringRef(varName), mlirType,
                                             /*is_external=*/false);
@@ -1006,8 +1012,9 @@ private:
   std::set<std::string> emittedExternFuncs;     // Track emitted func decls
   std::set<std::string> currentEvalGlobals; // Globals defined in current eval
   std::map<std::string, Type>
-      currentEvalGlobalTypes; // Types of current-eval globals (for init
-                              // regions)
+      currentEvalGlobalTypes;   // Types of current-eval globals (for init
+                                // regions)
+  FuncOp entryFuncOp = nullptr; // Entry function for insertion ordering
 
   /// Check if we are in incremental mode
   [[nodiscard]] bool isIncremental() const {
@@ -1410,6 +1417,7 @@ private:
     builder.setInsertionPointToEnd(module.getBody());
     auto entryFunc =
         builder.create<FuncOp>(loc(block.loc), entryFuncName, funcType);
+    entryFuncOp = entryFunc;
 
     // Create entry block
     Block* entryBlock = entryFunc.addEntryBlock();
