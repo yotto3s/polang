@@ -63,7 +63,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
   const auto snapshot = typeChecker->saveState();
 
   // Always use incremental type-checking in the REPL.
-  // check() calls warnOrphanedTypeSignatures() which would incorrectly
+  // check() calls reportOrphanedTypeSignatures() which would incorrectly
   // report type signatures whose definitions come in a later evaluation.
   const auto errors = typeChecker->checkIncremental(*newAst);
   if (!errors.empty()) {

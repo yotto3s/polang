@@ -188,7 +188,7 @@ std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   traitConstraints = polang::TraitConstraints();
   polang::resetUnificationVarCounter();
   ast.accept(*this);
-  warnOrphanedTypeSignatures();
+  reportOrphanedTypeSignatures();
   return errors;
 }
 
@@ -196,7 +196,7 @@ std::vector<TypeCheckError>
 TypeChecker::checkIncremental(const NBlock& newStatements) {
   // Clear transient state but preserve persistent environment
   // (localTypes, functionSignatures).
-  // Note: we intentionally do NOT call warnOrphanedTypeSignatures() here
+  // Note: we intentionally do NOT call reportOrphanedTypeSignatures() here
   // because the REPL is incremental — a type signature entered in one input
   // may have its corresponding definition provided in a subsequent input.
   errors.clear();
@@ -1398,7 +1398,7 @@ void TypeChecker::visit(const NTypeSignature& node) {
   pendingTypeSignatures[name] = node.typeExpr->clone();
 
   // Eagerly register the signature to enable forward references
-  static_cast<void>(registerTypeSignature(name, *node.typeExpr));
+  registerTypeSignature(name, *node.typeExpr);
 }
 
 std::optional<TypeChecker::ParsedSignature>
@@ -1612,7 +1612,7 @@ bool TypeChecker::validateTypeNames(
   return true;
 }
 
-void TypeChecker::warnOrphanedTypeSignatures() {
+void TypeChecker::reportOrphanedTypeSignatures() {
   for (const auto& [name, unused] : pendingTypeSignatures) {
     // Unmangle the name for display: strip module prefix (everything up to
     // and including the last "$$")
