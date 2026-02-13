@@ -575,6 +575,20 @@ void TypeChecker::checkLogicalBinaryOp(const NBinaryOperator& node,
                                        const std::string& rhsType) {
   const bool lhsIsTypevar = lhsType == TypeNames::TYPEVAR;
   const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
+  const bool lhsIsUniVar = polang::isUnificationVar(lhsType);
+  const bool rhsIsUniVar = polang::isUnificationVar(rhsType);
+
+  // If either is a unification variable, unify with bool
+  if (lhsIsUniVar || rhsIsUniVar) {
+    if (lhsIsUniVar) {
+      unifier.unify(lhsType, TypeNames::BOOL, subst);
+    }
+    if (rhsIsUniVar) {
+      unifier.unify(rhsType, TypeNames::BOOL, subst);
+    }
+    inferredType = TypeNames::BOOL;
+    return;
+  }
 
   // Both operands must be bool
   if (!lhsIsTypevar && lhsType != TypeNames::BOOL) {
