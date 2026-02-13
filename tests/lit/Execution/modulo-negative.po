@@ -1,0 +1,8 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test that modulo with negative dividend returns negative result *)
+(* Spec: "The result has the same sign as the dividend" *)
+(* CHECK: -2 : i64
+*)
+(0 - 17) % 5
