@@ -97,11 +97,10 @@ RUN BOTTOM_VERSION=$(curl -s "https://api.github.com/repos/ClementTsang/bottom/r
 # Chezmoi (for dotfiles management)
 RUN sh -c "$(curl -fsLS get.chezmoi.io)" -- -b /usr/local/bin
 
-# Node.js 22 + Claude Code
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g @anthropic-ai/claude-code \
-    && apt-get clean
+# Claude Code (native installer — no Node.js required)
+RUN curl -fsSL https://claude.ai/install.sh | bash \
+    && cp $(find /root/.claude -name claude -type f -executable 2>/dev/null | head -1) /usr/local/bin/claude \
+    && rm -rf /root/.claude/downloads
 
 # Entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
