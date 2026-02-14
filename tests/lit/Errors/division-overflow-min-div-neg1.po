@@ -8,7 +8,7 @@
    clean runtime error.
 *)
 
-(* CHECK: {{.*}}Runtime error:{{.*}}
+(* CHECK: Runtime error: integer overflow at line {{[0-9]+}}, column {{[0-9]+}}
 *)
 
 :{
