@@ -7,9 +7,9 @@ SCRIPT_DIR=$(dirname "$0")
 
 . "${SCRIPT_DIR}/docker_config.sh"
 
+docker pull "${BASE_IMAGE}"
 docker build \
-    --build-arg USERNAME="$(id -un)" \
-    --build-arg USER_UID="$(id -u)" \
-    --build-arg USER_GID="$(id -g)" \
-    -t "${IMAGE_NAME}" \
+    -f "${SCRIPT_DIR}/Dockerfile.dev" \
+    --build-arg BASE_IMAGE="${BASE_IMAGE}" \
+    -t "${DEV_IMAGE}" \
     "${SCRIPT_DIR}"

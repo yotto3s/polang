@@ -66,6 +66,9 @@ This establishes the PR early for visibility and tracking before implementation 
 All commands should be run inside the Docker container:
 
 ```bash
+# Build the dev image locally (pulls base from ghcr.io)
+docker/docker_build.sh
+
 # Start a container
 docker/docker_run.sh
 

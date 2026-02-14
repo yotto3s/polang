@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}-dev
+  IMAGE_NAME: ${{ github.repository_owner }}/polang-base
 
 jobs:
   check-changes:
@@ -28,7 +28,7 @@ jobs:
         with:
           filters: |
             docker:
-              - 'docker/**'
+              - 'docker/Dockerfile.base'
 
   build-image:
     needs: [check-changes]
@@ -63,6 +63,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./docker
+          file: ./docker/Dockerfile.base
           push: ${{ github.event_name != 'pull_request' }}
           load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -73,7 +74,7 @@ jobs:
   format-check:
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/${{ github.repository }}-dev:latest
+      image: ghcr.io/${{ github.repository_owner }}/polang-base:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -90,7 +91,7 @@ jobs:
   lint:
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/${{ github.repository }}-dev:latest
+      image: ghcr.io/${{ github.repository_owner }}/polang-base:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -119,7 +120,7 @@ jobs:
       (needs.build-image.result == 'success' || needs.build-image.result == 'skipped')
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/${{ github.repository }}-dev:latest
+      image: ghcr.io/${{ github.repository_owner }}/polang-base:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -155,7 +156,7 @@ jobs:
     if: ${{ !cancelled() && needs.build-and-test.result == 'success' }}
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/${{ github.repository }}-dev:latest
+      image: ghcr.io/${{ github.repository_owner }}/polang-base:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -194,7 +195,7 @@ jobs:
     if: ${{ !cancelled() && needs.build-and-test.result == 'success' }}
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/${{ github.repository }}-dev:latest
+      image: ghcr.io/${{ github.repository_owner }}/polang-base:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
