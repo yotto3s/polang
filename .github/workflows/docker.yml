@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'docker/**'
+      - 'docker/Dockerfile.base'
       - '.github/workflows/docker.yml'
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/polang-dev
+  IMAGE_NAME: ${{ github.repository_owner }}/polang-base
 
 jobs:
   build-and-push:
@@ -43,6 +43,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./docker
+          file: ./docker/Dockerfile.base
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
