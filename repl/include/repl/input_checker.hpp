@@ -107,14 +107,20 @@ public:
       }
 
       // Track operators and other tokens (including multi-character operators)
-      if ((input[i] == '&' || input[i] == '|') && i + 1 < input.size() &&
-          input[i + 1] == input[i]) {
-        lastToken = std::string(2, input[i]);
-        i += 2;
-      } else {
-        lastToken = std::string(1, input[i]);
-        ++i;
+      if (i + 1 < input.size()) {
+        const char c = input[i];
+        const char next = input[i + 1];
+        if ((c == '&' && next == '&') || (c == '|' && next == '|') ||
+            (c == '=' && next == '=') || (c == '!' && next == '=') ||
+            (c == '<' && next == '=') || (c == '>' && next == '=') ||
+            (c == '-' && next == '>')) {
+          lastToken = std::string{c, next};
+          i += 2;
+          continue;
+        }
       }
+      lastToken = std::string(1, input[i]);
+      ++i;
     }
 
     // Input is incomplete if:
@@ -130,7 +136,8 @@ public:
            lastToken == "+" || lastToken == "-" || lastToken == "*" ||
            lastToken == "/" || lastToken == "%" || lastToken == "=" ||
            lastToken == "," || lastToken == "&&" || lastToken == "||" ||
-           lastToken == "and";
+           lastToken == "<" || lastToken == ">" || lastToken == "->" ||
+           lastToken == "and" || lastToken == "as";
   }
 };
 
