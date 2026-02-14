@@ -1,10 +1,10 @@
 (* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
 *)
 
-(* F1: RemOpLowering is missing the division-by-zero guard.
+(* F1: Regression test for modulo-by-zero inside a function.
    When modulo is inside a function, the divisor is a parameter that
-   prevents constant folding. At runtime, zero divisor should produce
-   a "remainder by zero" error, but instead causes undefined behavior.
+   prevents constant folding. At runtime, a zero divisor should produce
+   the same "integer division by zero" runtime error as division.
    This mirrors the existing division-by-zero-function.po test.
 *)
 
