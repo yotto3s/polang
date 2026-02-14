@@ -701,40 +701,33 @@ void TypeChecker::visit(const NBinaryOperator& node) {
 
   // Special handling for modulo operator - only allows integers
   if (node.op == yy::parser::token::TMOD) {
-    // Check that both operands are integer types (not float)
-    const bool lhsIsFloat =
-        polang::isFloatType(lhsType) || lhsType == TypeNames::GENERIC_FLOAT;
-    const bool rhsIsFloat =
-        polang::isFloatType(rhsType) || rhsType == TypeNames::GENERIC_FLOAT;
-
-    if (lhsIsFloat || rhsIsFloat) {
-      reportError("Modulo operator '%' requires integer operands, not float",
-                  node.loc);
-      inferredType = TypeNames::UNKNOWN;
-      return;
+    // Verify operands are integer or index types (reject bool, float, etc.)
+    // Skip check for TYPEVAR and unification variables (polymorphic support)
+    if (lhsType != TypeNames::TYPEVAR &&
+        !polang::isUnificationVar(lhsType)) {
+      const bool lhsIsInteger = polang::isIntegerType(lhsType) ||
+                                polang::isIndexType(lhsType) ||
+                                polang::isGenericIntegerType(lhsType);
+      if (!lhsIsInteger) {
+        reportError("Modulo operator '%' requires integer operands, but got '" +
+                        lhsType + "'",
+                    node.loc);
+        inferredType = TypeNames::UNKNOWN;
+        return;
+      }
     }
-
-    // Verify operands are integer or index types (reject bool, etc.)
-    const bool lhsIsInteger = polang::isIntegerType(lhsType) ||
-                              polang::isIndexType(lhsType) ||
-                              polang::isGenericIntegerType(lhsType);
-    const bool rhsIsInteger = polang::isIntegerType(rhsType) ||
-                              polang::isIndexType(rhsType) ||
-                              polang::isGenericIntegerType(rhsType);
-
-    if (!lhsIsInteger) {
-      reportError("Modulo operator '%' requires integer operands, but got '" +
-                      lhsType + "'",
-                  node.loc);
-      inferredType = TypeNames::UNKNOWN;
-      return;
-    }
-    if (!rhsIsInteger) {
-      reportError("Modulo operator '%' requires integer operands, but got '" +
-                      rhsType + "'",
-                  node.loc);
-      inferredType = TypeNames::UNKNOWN;
-      return;
+    if (rhsType != TypeNames::TYPEVAR &&
+        !polang::isUnificationVar(rhsType)) {
+      const bool rhsIsInteger = polang::isIntegerType(rhsType) ||
+                                polang::isIndexType(rhsType) ||
+                                polang::isGenericIntegerType(rhsType);
+      if (!rhsIsInteger) {
+        reportError("Modulo operator '%' requires integer operands, but got '" +
+                        rhsType + "'",
+                    node.loc);
+        inferredType = TypeNames::UNKNOWN;
+        return;
+      }
     }
 
     // Apply the same type checking as other arithmetic operators
