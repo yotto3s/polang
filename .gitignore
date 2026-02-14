@@ -1,6 +1,9 @@
 # Build directory
 build*/
 
+# Git worktree
+.worktrees
+
 # Compiled objects
 *.o
 *.a
