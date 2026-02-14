@@ -583,7 +583,7 @@ void TypeChecker::checkLogicalBinaryOp(const NBinaryOperator& node,
     if (lhsIsUniVar) {
       if (!unifier.unify(lhsType, TypeNames::BOOL, subst)) {
         reportError("Type mismatch in logical operation: cannot unify left "
-                        "operand with 'bool' for operator '" +
+                    "operand with 'bool' for operator '" +
                         operatorToString(node.op) + "'",
                     node.loc);
       }
@@ -596,7 +596,7 @@ void TypeChecker::checkLogicalBinaryOp(const NBinaryOperator& node,
     if (rhsIsUniVar) {
       if (!unifier.unify(rhsType, TypeNames::BOOL, subst)) {
         reportError("Type mismatch in logical operation: cannot unify right "
-                        "operand with 'bool' for operator '" +
+                    "operand with 'bool' for operator '" +
                         operatorToString(node.op) + "'",
                     node.loc);
       }
