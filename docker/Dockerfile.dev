@@ -25,7 +25,7 @@ RUN ln -s /usr/bin/fdfind /usr/bin/fd
 # File viewers
 RUN apt-get update && apt-get install -y \
     bat \
-    exa \
+    eza \
     && apt-get clean
 RUN ln -s /usr/bin/batcat /usr/bin/bat 2>/dev/null || true
 

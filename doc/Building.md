@@ -15,8 +15,9 @@ This document describes how to build the Polang compiler and its components.
 
 ### Docker Environment (Recommended)
 
-The project includes a Docker environment with all dependencies pre-installed:
+The project uses a two-stage Docker setup:
 
+**Base image** (`ghcr.io/yotto3s/polang-base`) — used by CI:
 - Ubuntu 24.04 base
 - GCC and Clang 20 compilers
 - CMake, Bison, Flex
@@ -24,15 +25,23 @@ The project includes a Docker environment with all dependencies pre-installed:
 - clang-format, clang-tidy, clangd
 - lcov (for coverage), Python 3 (for lit tests)
 
+**Dev image** (`polang-dev`) — built locally for development:
+- Everything in base, plus:
+- neovim, ripgrep, fd, fzf, bat, lazygit, tmux, starship, etc.
+- valgrind, strace, perf (debugging/profiling)
+- Claude Code (via Node.js)
+- chezmoi (optional dotfiles management)
+- gosu-based UID/GID remapping
+
 ```bash
+# Build the dev image locally (pulls base from ghcr.io)
+docker/docker_build.sh
+
 # Start a container
 docker/docker_run.sh
 
 # Run any command inside the docker container
 docker exec polang <command> [options]
-
-# Build the Docker image locally
-docker/docker_build.sh
 ```
 
 ## Build Commands
