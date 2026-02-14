@@ -1,0 +1,60 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install essential development tools
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    wget \
+    flex \
+    bison \
+    gcc \
+    g++ \
+    gdb \
+    git \
+    sudo \
+    lsb-release \
+    software-properties-common \
+    gnupg \
+    libzstd-dev \
+    libz-dev \
+    lcov \
+    python3 \
+    && apt-get clean
+
+RUN wget https://apt.llvm.org/llvm.sh && \
+    chmod +x llvm.sh && \
+    sudo ./llvm.sh 20 all && \
+    rm llvm.sh
+
+# Install MLIR development packages
+RUN apt-get update && apt-get install -y \
+    libmlir-20-dev \
+    mlir-20-tools \
+    && apt-get clean
+
+# Configure LLVM library path for dynamic linker
+RUN echo "/usr/lib/llvm-20/lib" > /etc/ld.so.conf.d/llvm-20.conf && ldconfig
+
+# Register clang alternatives
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100 \
+    --slave /usr/bin/clang++ clang++ /usr/bin/clang++-20 \
+    --slave /usr/bin/clang-format clang-format /usr/bin/clang-format-20 \
+    --slave /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-20 \
+    --slave /usr/bin/clangd clangd /usr/bin/clangd-20
+
+# Remove default ubuntu user
+RUN touch /var/mail/ubuntu && chown ubuntu /var/mail/ubuntu && userdel -r ubuntu
+
+# Create default devuser (UID/GID 1000) with sudo privileges
+RUN groupadd --gid 1000 devuser \
+    && useradd --uid 1000 --gid 1000 -m devuser \
+    && echo "devuser ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/devuser \
+    && chmod 0440 /etc/sudoers.d/devuser
+
+# Set the working directory
+WORKDIR /workspace
+RUN chown 1000:1000 /workspace
+
+CMD ["/bin/bash"]
