@@ -703,8 +703,7 @@ void TypeChecker::visit(const NBinaryOperator& node) {
   if (node.op == yy::parser::token::TMOD) {
     // Verify operands are integer or index types (reject bool, float, etc.)
     // Skip check for TYPEVAR and unification variables (polymorphic support)
-    if (lhsType != TypeNames::TYPEVAR &&
-        !polang::isUnificationVar(lhsType)) {
+    if (lhsType != TypeNames::TYPEVAR && !polang::isUnificationVar(lhsType)) {
       const bool lhsIsInteger = polang::isIntegerType(lhsType) ||
                                 polang::isIndexType(lhsType) ||
                                 polang::isGenericIntegerType(lhsType);
@@ -716,8 +715,7 @@ void TypeChecker::visit(const NBinaryOperator& node) {
         return;
       }
     }
-    if (rhsType != TypeNames::TYPEVAR &&
-        !polang::isUnificationVar(rhsType)) {
+    if (rhsType != TypeNames::TYPEVAR && !polang::isUnificationVar(rhsType)) {
       const bool rhsIsInteger = polang::isIntegerType(rhsType) ||
                                 polang::isIndexType(rhsType) ||
                                 polang::isGenericIntegerType(rhsType);
