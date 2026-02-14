@@ -1,0 +1,14 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* F2: checkLogicalBinaryOp does not handle unification variables.
+   When a function has untyped parameters used with &&, the type checker
+   should infer the parameters as bool via unification, but instead it
+   reports a spurious type error because it does not check isUnificationVar.
+
+   This program should compile and produce true.
+*)
+(* CHECK: true : bool
+*)
+both(a, b) = a && b
+both(true, true)

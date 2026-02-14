@@ -578,13 +578,33 @@ void TypeChecker::checkLogicalBinaryOp(const NBinaryOperator& node,
   const bool lhsIsUniVar = polang::isUnificationVar(lhsType);
   const bool rhsIsUniVar = polang::isUnificationVar(rhsType);
 
-  // If either is a unification variable, unify with bool
+  // If either is a unification variable, unify with bool and validate the other
   if (lhsIsUniVar || rhsIsUniVar) {
     if (lhsIsUniVar) {
-      unifier.unify(lhsType, TypeNames::BOOL, subst);
+      if (!unifier.unify(lhsType, TypeNames::BOOL, subst)) {
+        reportError("Type mismatch in logical operation: cannot unify left "
+                        "operand with 'bool' for operator '" +
+                        operatorToString(node.op) + "'",
+                    node.loc);
+      }
+    } else if (!lhsIsTypevar && lhsType != TypeNames::BOOL) {
+      reportError("operator '" + operatorToString(node.op) +
+                      "' requires operands of type 'bool', but got '" +
+                      resolveGenericToDefault(lhsType) + "'",
+                  node.loc);
     }
     if (rhsIsUniVar) {
-      unifier.unify(rhsType, TypeNames::BOOL, subst);
+      if (!unifier.unify(rhsType, TypeNames::BOOL, subst)) {
+        reportError("Type mismatch in logical operation: cannot unify right "
+                        "operand with 'bool' for operator '" +
+                        operatorToString(node.op) + "'",
+                    node.loc);
+      }
+    } else if (!rhsIsTypevar && rhsType != TypeNames::BOOL) {
+      reportError("operator '" + operatorToString(node.op) +
+                      "' requires operands of type 'bool', but got '" +
+                      resolveGenericToDefault(rhsType) + "'",
+                  node.loc);
     }
     inferredType = TypeNames::BOOL;
     return;
