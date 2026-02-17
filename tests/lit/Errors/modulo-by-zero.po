@@ -1,0 +1,10 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+
+(* F1: Regression test: modulo by zero (a % 0) must produce the same runtime
+   error as division by zero (a / 0), triggering the same runtime error
+   message rather than undefined behavior or a crash.
+*)
+x = 10 % 0
+(* CHECK: Runtime error: integer division by zero at line 1, column 5
+*)
