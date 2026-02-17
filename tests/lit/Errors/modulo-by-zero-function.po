@@ -11,5 +11,5 @@
 modrem : i64 * i64 -> i64
 modrem(a, b) = a % b
 result = modrem(42, 0)
-(* CHECK: {{.*}}Runtime error: integer {{.*}}by zero{{.*}}
+(* CHECK: Runtime error: integer division by zero at line {{[0-9]+}}, column {{[0-9]+}}
 *)

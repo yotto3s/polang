@@ -19,3 +19,14 @@ rem_check(a, b) = a % b
 *)
 (* CHECK: {{.*}}srem i64 %{{.*}}, %{{.*}}
 *)
+
+rem_check_u : u64 * u64 -> u64
+rem_check_u(a, b) = a % b
+(* CHECK: define i64 @rem_check_u(i64 %{{[0-9]+}}, i64 %{{[0-9]+}}){{.*}}
+*)
+(* CHECK: {{.*}}icmp eq i64 %{{.*}}, 0
+*)
+(* CHECK: {{.*}}call void @__polang_runtime_error({{.*}})
+*)
+(* CHECK: {{.*}}urem i64 %{{.*}}, %{{.*}}
+*)
