@@ -789,7 +789,10 @@ void TypeChecker::visit(const NIfExpression& node) {
 
   // If condition is a unification var, unify it with bool
   if (polang::isUnificationVar(condType)) {
-    unifier.unify(condType, TypeNames::BOOL, subst);
+    if (!unifier.unify(condType, TypeNames::BOOL, subst)) {
+      reportError("Type mismatch: cannot unify if-condition with 'bool'",
+                  node.loc);
+    }
   }
 
   node.thenExpr->accept(*this);
