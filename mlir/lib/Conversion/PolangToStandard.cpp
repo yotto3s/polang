@@ -273,6 +273,34 @@ std::pair<int, int> extractLineColumn(Location loc) {
   return {0, 0};
 }
 
+/// Emit a runtime error call followed by a dummy yield.
+/// This pattern is shared by the zero-check guard and the overflow guard:
+/// it emits AddressOfOp for the message, two ConstantIntOps for line/col,
+/// a CallOp to __polang_runtime_error, a dummy value, and a YieldOp.
+/// The caller must have already set the insertion point to the target block.
+void emitRuntimeErrorAndDummyYield(Location loc,
+                                   ConversionPatternRewriter& rewriter,
+                                   StringRef msgSymbolName, int line, int col,
+                                   Type resultType) {
+  auto msgPtr = rewriter.create<LLVM::AddressOfOp>(
+      loc, LLVM::LLVMPointerType::get(rewriter.getContext()), msgSymbolName);
+  auto lineConst =
+      rewriter.create<arith::ConstantIntOp>(loc, line, rewriter.getI32Type());
+  auto colConst =
+      rewriter.create<arith::ConstantIntOp>(loc, col, rewriter.getI32Type());
+  rewriter.create<func::CallOp>(loc, "__polang_runtime_error", TypeRange{},
+                                ValueRange{msgPtr, lineConst, colConst});
+
+  // Yield dummy value (unreachable - error handler calls exit)
+  Value dummy;
+  if (isa<mlir::IndexType>(resultType)) {
+    dummy = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  } else {
+    dummy = rewriter.create<arith::ConstantIntOp>(loc, 0, resultType);
+  }
+  rewriter.create<scf::YieldOp>(loc, ValueRange{dummy});
+}
+
 /// Emit an scf.if guard that checks whether rhs is zero.
 /// The then-block calls __polang_runtime_error and yields a dummy value.
 /// The else-block is left empty for the caller to fill in the actual
@@ -309,24 +337,9 @@ emitIntegerZeroCheckGuard(Location loc, ConversionPatternRewriter& rewriter,
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
 
-    auto msgPtr = rewriter.create<LLVM::AddressOfOp>(
-        loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
-        "__polang_msg_integer_division_by_zero");
-    auto lineConst =
-        rewriter.create<arith::ConstantIntOp>(loc, line, rewriter.getI32Type());
-    auto colConst =
-        rewriter.create<arith::ConstantIntOp>(loc, col, rewriter.getI32Type());
-    rewriter.create<func::CallOp>(loc, "__polang_runtime_error", TypeRange{},
-                                  ValueRange{msgPtr, lineConst, colConst});
-
-    // Yield dummy value (unreachable - error handler calls exit)
-    Value dummy;
-    if (isa<mlir::IndexType>(resultType)) {
-      dummy = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    } else {
-      dummy = rewriter.create<arith::ConstantIntOp>(loc, 0, resultType);
-    }
-    rewriter.create<scf::YieldOp>(loc, ValueRange{dummy});
+    emitRuntimeErrorAndDummyYield(loc, rewriter,
+                                  "__polang_msg_integer_division_by_zero", line,
+                                  col, resultType);
   }
 
   return {ifOp, isUnsigned};
@@ -360,6 +373,8 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
 
     // Integer division: insert zero check
     auto moduleOp = op->getParentOfType<ModuleOp>();
+
+    // Zero-check guard (creates scf.if with error then-block)
     Type resultType = lhs.getType();
     auto [ifOp, isUnsigned] = emitIntegerZeroCheckGuard(
         loc, rewriter, moduleOp, rhs, resultType, origType);
@@ -369,13 +384,68 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
 
-      Value divResult;
       if (isUnsigned) {
-        divResult = rewriter.create<arith::DivUIOp>(loc, lhs, rhs);
+        // Unsigned division: no overflow possible
+        Value divResult = rewriter.create<arith::DivUIOp>(loc, lhs, rhs);
+        rewriter.create<scf::YieldOp>(loc, ValueRange{divResult});
+      } else if (auto intType = dyn_cast<mlir::IntegerType>(resultType)) {
+        // Signed integer division: check for MIN_INT / -1 overflow
+        unsigned bitWidth = intType.getWidth();
+
+        // Ensure the overflow error message global string exists
+        getOrCreateGlobalString(loc, rewriter, moduleOp,
+                                "__polang_msg_integer_overflow",
+                                "integer overflow");
+
+        // Extract source location for error reporting
+        auto [line, col] = extractLineColumn(loc);
+
+        // Create MIN_VALUE and -1 constants
+        auto minConst = rewriter.create<arith::ConstantIntOp>(
+            loc, APInt::getSignedMinValue(bitWidth).getSExtValue(), resultType);
+        auto negOneConst =
+            rewriter.create<arith::ConstantIntOp>(loc, -1, resultType);
+
+        // Check lhs == MIN_VALUE && rhs == -1
+        auto isMin = rewriter.create<arith::CmpIOp>(
+            loc, arith::CmpIPredicate::eq, lhs, minConst);
+        auto isNegOne = rewriter.create<arith::CmpIOp>(
+            loc, arith::CmpIPredicate::eq, rhs, negOneConst);
+        auto isOverflow = rewriter.create<arith::AndIOp>(loc, isMin, isNegOne);
+
+        // Nested if: overflow -> error, else -> normal division
+        auto overflowIf =
+            rewriter.create<scf::IfOp>(loc, TypeRange{resultType}, isOverflow,
+                                       /*withElseRegion=*/true);
+
+        // Overflow path: call runtime error
+        {
+          OpBuilder::InsertionGuard innerGuard(rewriter);
+          rewriter.setInsertionPointToStart(
+              &overflowIf.getThenRegion().front());
+
+          emitRuntimeErrorAndDummyYield(loc, rewriter,
+                                        "__polang_msg_integer_overflow", line,
+                                        col, resultType);
+        }
+
+        // Normal division path
+        {
+          OpBuilder::InsertionGuard innerGuard(rewriter);
+          rewriter.setInsertionPointToStart(
+              &overflowIf.getElseRegion().front());
+
+          Value divResult = rewriter.create<arith::DivSIOp>(loc, lhs, rhs);
+          rewriter.create<scf::YieldOp>(loc, ValueRange{divResult});
+        }
+
+        rewriter.create<scf::YieldOp>(loc, overflowIf.getResults());
       } else {
-        divResult = rewriter.create<arith::DivSIOp>(loc, lhs, rhs);
+        // Signed index type: perform division without overflow check
+        // (index width is target-dependent)
+        Value divResult = rewriter.create<arith::DivSIOp>(loc, lhs, rhs);
+        rewriter.create<scf::YieldOp>(loc, ValueRange{divResult});
       }
-      rewriter.create<scf::YieldOp>(loc, ValueRange{divResult});
     }
 
     rewriter.replaceOp(op, ifOp.getResults());
@@ -439,13 +509,70 @@ struct RemOpLowering : public OpConversionPattern<RemOp> {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
 
-      Value remResult;
       if (isUnsigned) {
-        remResult = rewriter.create<arith::RemUIOp>(loc, lhs, rhs);
+        // Unsigned remainder: no overflow possible
+        Value remResult = rewriter.create<arith::RemUIOp>(loc, lhs, rhs);
+        rewriter.create<scf::YieldOp>(loc, ValueRange{remResult});
+      } else if (auto intType = dyn_cast<mlir::IntegerType>(resultType)) {
+        // Signed integer remainder: check for MIN_INT % -1 overflow
+        // (LLVM srem has the same UB as sdiv for MIN_INT / -1 because
+        // x86 IDIV computes both quotient and remainder simultaneously)
+        unsigned bitWidth = intType.getWidth();
+
+        // Ensure the overflow error message global string exists
+        getOrCreateGlobalString(loc, rewriter, moduleOp,
+                                "__polang_msg_integer_overflow",
+                                "integer overflow");
+
+        // Extract source location for error reporting
+        auto [line, col] = extractLineColumn(loc);
+
+        // Create MIN_VALUE and -1 constants
+        auto minConst = rewriter.create<arith::ConstantIntOp>(
+            loc, APInt::getSignedMinValue(bitWidth).getSExtValue(), resultType);
+        auto negOneConst =
+            rewriter.create<arith::ConstantIntOp>(loc, -1, resultType);
+
+        // Check lhs == MIN_VALUE && rhs == -1
+        auto isMin = rewriter.create<arith::CmpIOp>(
+            loc, arith::CmpIPredicate::eq, lhs, minConst);
+        auto isNegOne = rewriter.create<arith::CmpIOp>(
+            loc, arith::CmpIPredicate::eq, rhs, negOneConst);
+        auto isOverflow = rewriter.create<arith::AndIOp>(loc, isMin, isNegOne);
+
+        // Nested if: overflow -> error, else -> normal remainder
+        auto overflowIf =
+            rewriter.create<scf::IfOp>(loc, TypeRange{resultType}, isOverflow,
+                                       /*withElseRegion=*/true);
+
+        // Overflow path: call runtime error
+        {
+          OpBuilder::InsertionGuard innerGuard(rewriter);
+          rewriter.setInsertionPointToStart(
+              &overflowIf.getThenRegion().front());
+
+          emitRuntimeErrorAndDummyYield(loc, rewriter,
+                                        "__polang_msg_integer_overflow", line,
+                                        col, resultType);
+        }
+
+        // Normal remainder path
+        {
+          OpBuilder::InsertionGuard innerGuard(rewriter);
+          rewriter.setInsertionPointToStart(
+              &overflowIf.getElseRegion().front());
+
+          Value remResult = rewriter.create<arith::RemSIOp>(loc, lhs, rhs);
+          rewriter.create<scf::YieldOp>(loc, ValueRange{remResult});
+        }
+
+        rewriter.create<scf::YieldOp>(loc, overflowIf.getResults());
       } else {
-        remResult = rewriter.create<arith::RemSIOp>(loc, lhs, rhs);
+        // Signed index type: perform remainder without overflow check
+        // (index width is target-dependent)
+        Value remResult = rewriter.create<arith::RemSIOp>(loc, lhs, rhs);
+        rewriter.create<scf::YieldOp>(loc, ValueRange{remResult});
       }
-      rewriter.create<scf::YieldOp>(loc, ValueRange{remResult});
     }
 
     rewriter.replaceOp(op, ifOp.getResults());

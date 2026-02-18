@@ -476,10 +476,10 @@ The `PolangToStandardPass` lowers Polang dialect operations to standard MLIR dia
 | `polang.sub` (float) | `arith.subf` |
 | `polang.mul` (integer) | `arith.muli` |
 | `polang.mul` (float) | `arith.mulf` |
-| `polang.div` (signed integer) | `arith.cmpi` eq + `scf.if` { error } else { `arith.divsi` } |
+| `polang.div` (signed integer) | `arith.cmpi` eq (zero) + `scf.if` { error } else { `arith.cmpi`/`arith.andi` (MIN/-1) + `scf.if` { error } else { `arith.divsi` } } |
 | `polang.div` (unsigned integer) | `arith.cmpi` eq + `scf.if` { error } else { `arith.divui` } |
 | `polang.div` (float) | `arith.divf` (no zero check) |
-| `polang.rem` (signed integer) | `arith.cmpi` eq + `scf.if` { error } else { `arith.remsi` } |
+| `polang.rem` (signed integer) | `arith.cmpi` eq (zero) + `scf.if` { error } else { `arith.cmpi`/`arith.andi` (MIN/-1) + `scf.if` { error } else { `arith.remsi` } } |
 | `polang.rem` (unsigned integer) | `arith.cmpi` eq + `scf.if` { error } else { `arith.remui` } |
 | `polang.cmp` (signed integer) | `arith.cmpi` (signed predicates) |
 | `polang.cmp` (unsigned integer) | `arith.cmpi` (unsigned predicates) |
@@ -496,7 +496,9 @@ The `PolangToStandardPass` lowers Polang dialect operations to standard MLIR dia
 
 **Runtime Checks:**
 
-Integer division and modulo by zero are detected at runtime via a guard inserted during lowering. Both `DivOpLowering` and `RemOpLowering` share a common `emitIntegerZeroCheckGuard` helper that emits an `arith.cmpi eq` to test if the divisor is zero, then wraps the operation in an `scf.if` block. The error path calls `__polang_runtime_error` (from the `PolangRuntime` library in `runtime/`) with the error message and source location. The runtime helper is linked into the host process and resolved by the JIT via `DynamicLibrarySearchGenerator`.
+Integer division and modulo by zero are detected at runtime via a guard inserted during lowering. Both `DivOpLowering` and `RemOpLowering` share a common `emitIntegerZeroCheckGuard` helper that emits an `arith.cmpi eq` to test if the divisor is zero, then wraps the operation in an `scf.if` block. Additionally, both signed integer division and signed integer modulo include a nested overflow guard that detects MIN_INT / -1 (or MIN_INT % -1) and emits an error, since LLVM's `sdiv` and `srem` instructions both have undefined behavior for this input on x86 (the hardware `IDIV` instruction computes quotient and remainder simultaneously). The error path calls `__polang_runtime_error` (from the `PolangRuntime` library in `runtime/`) with the error message and source location. The runtime helper is linked into the host process and resolved by the JIT via `DynamicLibrarySearchGenerator`.
+
+**Note:** `isize` (MLIR's `index` type) division and modulo do NOT include the MIN_INT / -1 overflow check because the index width is target-dependent (32-bit or 64-bit depending on the platform), making it impractical to determine the correct MIN value at compile time.
 
 **Type Conversions:**
 
