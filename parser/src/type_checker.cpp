@@ -639,8 +639,9 @@ void TypeChecker::visit(const NUnaryOperator& node) {
   switch (node.op) {
   case yy::parser::token::TMINUS:
     // Unary negation: operand must be numeric (or generic numeric)
-    if (operandType != TypeNames::TYPEVAR &&
-        !polang::isUnificationVar(operandType)) {
+    if (polang::isUnificationVar(operandType)) {
+      traitConstraints.addBound(operandType, polang::TraitBound::Numeric);
+    } else if (operandType != TypeNames::TYPEVAR) {
       if (!polang::isNumericType(operandType) &&
           !polang::isGenericType(operandType)) {
         reportError("cannot apply unary '-' to type '" +
@@ -659,8 +660,13 @@ void TypeChecker::visit(const NUnaryOperator& node) {
 
   case yy::parser::token::TNOT:
     // Logical not: operand must be bool
-    if (operandType != TypeNames::TYPEVAR &&
-        !polang::isUnificationVar(operandType)) {
+    if (polang::isUnificationVar(operandType)) {
+      if (!unifier.unify(operandType, TypeNames::BOOL, subst)) {
+        reportError(
+            "Type mismatch in logical not: cannot unify operand with 'bool'",
+            node.loc);
+      }
+    } else if (operandType != TypeNames::TYPEVAR) {
       if (operandType != TypeNames::BOOL) {
         reportError("cannot apply unary '!' to type '" +
                         resolveGenericToDefault(operandType) + "'",
