@@ -1,0 +1,18 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* F1: Bug reproduction - unary NOT does not unify univar operand with bool.
+   When myNot has an untyped parameter x used with !, the type checker should
+   infer x as bool via unification. Instead, x remains unconstrained and the
+   function is incorrectly inferred as polymorphic (forall 'a. 'a -> bool),
+   allowing myNot(42) to pass the type checker.
+
+   This test expects a TYPE ERROR from the type checker rejecting i64 for a
+   bool-only function. Currently, the type checker produces no error and the
+   program fails later at MLIR verification, so FileCheck will FAIL (the
+   expected type error pattern is absent), confirming the bug.
+*)
+(* CHECK: Type error:{{.*}}bool{{.*}}
+*)
+myNot(x) = !x
+myNot(42)
