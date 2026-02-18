@@ -1,0 +1,17 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* F1: Happy-path test: -10 % -1 = 0. Exercises the normal path through
+   any future overflow check -- the divisor is -1 but the dividend is
+   not MIN_INT, so no overflow occurs. The mathematical result of any
+   integer modulo by -1 is always 0.
+*)
+
+:{
+remIt : i64 * i64 -> i64
+remIt(a, b) = a % b
+:}
+
+(* CHECK: 0 : i64
+*)
+remIt(0 - 10, 0 - 1)
