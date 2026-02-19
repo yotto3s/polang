@@ -1,16 +1,9 @@
 (* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
 *)
 
-(* F2: Bug reproduction - unary negation does not add Numeric trait bound for univar.
-   When myNeg has an untyped parameter x used with unary -, the type checker
-   should constrain x with a Numeric trait bound. Instead, x remains
-   unconstrained and the function is incorrectly inferred as polymorphic
-   (forall 'a. 'a -> 'a), allowing myNeg(true) to pass the type checker.
-
-   This test expects a TYPE ERROR from the type checker rejecting bool for a
-   numeric-only function. Currently, the type checker produces no error and the
-   program fails later at MLIR verification, so FileCheck will FAIL (the
-   expected type error pattern is absent), confirming the bug.
+(* Regression test: unary - adds a Numeric trait bound to its univar operand.
+   myNeg(x) = -x constrains x with a Numeric bound, so myNeg(true) is
+   correctly rejected as a type error (bool is not numeric).
 *)
 (* CHECK: Type error:{{.*}}
 *)

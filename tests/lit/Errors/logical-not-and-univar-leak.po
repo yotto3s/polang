@@ -1,15 +1,10 @@
 (* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
 *)
 
-(* F1 variant: Bug reproduction - !a && b leaves a unconstrained.
-   In f(a, b) = !a && b, the && operator unifies the result of !a (bool) and
-   b with bool. But since ! does not unify a with bool, a remains unconstrained
-   and f is inferred as forall 'a. 'a -> bool -> bool.
-   This allows f(42, true) to pass the type checker.
-
-   This test expects a TYPE ERROR from the type checker rejecting i64.
-   Currently, the type checker produces no error and the program fails at MLIR
-   verification, so FileCheck will FAIL, confirming the bug.
+(* Regression test: !a && b correctly unifies a with bool via unary !.
+   f(a, b) = !a && b infers both a and b as bool, so f(42, true) is
+   correctly rejected as a type error (i64 cannot be used where bool
+   is expected).
 *)
 (* CHECK: Type error:{{.*}}bool{{.*}}
 *)

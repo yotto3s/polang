@@ -1,0 +1,11 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* Regression test: polymorphic function returning a non-bool type used as
+   an if-condition should be rejected. The call f(1) instantiates f with
+   i64 -> i64, so the if-condition gets a concrete i64, not bool.
+*)
+(* CHECK: Type error: If condition must be bool{{.*}}
+*)
+f(x) = x + 1
+if f(1) then 2 else 3

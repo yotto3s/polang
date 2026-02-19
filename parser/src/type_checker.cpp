@@ -9,6 +9,7 @@
 // clang-format on
 
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <set>
 
@@ -580,6 +581,8 @@ void TypeChecker::checkLogicalBinaryOp(const NBinaryOperator& node,
 
   // If either is a unification variable, unify with bool and validate the other
   if (lhsIsUniVar || rhsIsUniVar) {
+    assert(!lhsIsTypevar && !rhsIsTypevar &&
+           "typevar should not co-occur with uniVar in logical op");
     if (lhsIsUniVar) {
       if (!unifier.unify(lhsType, TypeNames::BOOL, subst)) {
         reportError("Type mismatch in logical operation: cannot unify left "
