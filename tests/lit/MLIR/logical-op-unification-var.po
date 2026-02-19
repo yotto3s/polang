@@ -1,0 +1,11 @@
+(* RUN: %polang_compiler --emit-mlir %s 2>/dev/null
+*)
+
+(* Regression test: logical operators handle unification variables.
+   checkLogicalBinaryOp unifies univar operands with bool, matching
+   the behavior of checkArithmeticBinaryOp and checkComparisonBinaryOp.
+   myAnd(a, b) = a && b correctly infers a and b as bool.
+*)
+
+myAnd(a, b) = a && b
+myAnd(true, false)

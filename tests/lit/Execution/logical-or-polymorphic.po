@@ -1,0 +1,11 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* F2: checkLogicalBinaryOp does not handle unification variables.
+   Same issue as logical-and-polymorphic but with || operator.
+   The type checker should infer parameters as bool, not report an error.
+*)
+(* CHECK: true : bool
+*)
+either(a, b) = a || b
+either(false, true)

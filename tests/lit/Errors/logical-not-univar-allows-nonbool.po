@@ -1,0 +1,12 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* Regression test: unary ! unifies its univar operand with bool.
+   myNot(x) = !x infers x as bool via unification, so myNot(42) is
+   correctly rejected as a type error (i64 cannot be used where bool
+   is expected).
+*)
+(* CHECK: Type error:{{.*}}bool{{.*}}
+*)
+myNot(x) = !x
+myNot(42)

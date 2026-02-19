@@ -9,6 +9,7 @@
 // clang-format on
 
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <set>
 
@@ -575,6 +576,42 @@ void TypeChecker::checkLogicalBinaryOp(const NBinaryOperator& node,
                                        const std::string& rhsType) {
   const bool lhsIsTypevar = lhsType == TypeNames::TYPEVAR;
   const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
+  const bool lhsIsUniVar = polang::isUnificationVar(lhsType);
+  const bool rhsIsUniVar = polang::isUnificationVar(rhsType);
+
+  // If either is a unification variable, unify with bool and validate the other
+  if (lhsIsUniVar || rhsIsUniVar) {
+    assert(!lhsIsTypevar && !rhsIsTypevar &&
+           "typevar should not co-occur with uniVar in logical op");
+    if (lhsIsUniVar) {
+      if (!unifier.unify(lhsType, TypeNames::BOOL, subst)) {
+        reportError("Type mismatch in logical operation: cannot unify left "
+                    "operand with 'bool' for operator '" +
+                        operatorToString(node.op) + "'",
+                    node.loc);
+      }
+    } else if (!lhsIsTypevar && lhsType != TypeNames::BOOL) {
+      reportError("operator '" + operatorToString(node.op) +
+                      "' requires operands of type 'bool', but got '" +
+                      resolveGenericToDefault(lhsType) + "'",
+                  node.loc);
+    }
+    if (rhsIsUniVar) {
+      if (!unifier.unify(rhsType, TypeNames::BOOL, subst)) {
+        reportError("Type mismatch in logical operation: cannot unify right "
+                    "operand with 'bool' for operator '" +
+                        operatorToString(node.op) + "'",
+                    node.loc);
+      }
+    } else if (!rhsIsTypevar && rhsType != TypeNames::BOOL) {
+      reportError("operator '" + operatorToString(node.op) +
+                      "' requires operands of type 'bool', but got '" +
+                      resolveGenericToDefault(rhsType) + "'",
+                  node.loc);
+    }
+    inferredType = TypeNames::BOOL;
+    return;
+  }
 
   // Both operands must be bool
   if (!lhsIsTypevar && lhsType != TypeNames::BOOL) {
@@ -605,8 +642,9 @@ void TypeChecker::visit(const NUnaryOperator& node) {
   switch (node.op) {
   case yy::parser::token::TMINUS:
     // Unary negation: operand must be numeric (or generic numeric)
-    if (operandType != TypeNames::TYPEVAR &&
-        !polang::isUnificationVar(operandType)) {
+    if (polang::isUnificationVar(operandType)) {
+      traitConstraints.addBound(operandType, polang::TraitBound::Numeric);
+    } else if (operandType != TypeNames::TYPEVAR) {
       if (!polang::isNumericType(operandType) &&
           !polang::isGenericType(operandType)) {
         reportError("cannot apply unary '-' to type '" +
@@ -625,8 +663,13 @@ void TypeChecker::visit(const NUnaryOperator& node) {
 
   case yy::parser::token::TNOT:
     // Logical not: operand must be bool
-    if (operandType != TypeNames::TYPEVAR &&
-        !polang::isUnificationVar(operandType)) {
+    if (polang::isUnificationVar(operandType)) {
+      if (!unifier.unify(operandType, TypeNames::BOOL, subst)) {
+        reportError(
+            "Type mismatch in logical not: cannot unify operand with 'bool'",
+            node.loc);
+      }
+    } else if (operandType != TypeNames::TYPEVAR) {
       if (operandType != TypeNames::BOOL) {
         reportError("cannot apply unary '!' to type '" +
                         resolveGenericToDefault(operandType) + "'",
@@ -749,7 +792,10 @@ void TypeChecker::visit(const NIfExpression& node) {
 
   // If condition is a unification var, unify it with bool
   if (polang::isUnificationVar(condType)) {
-    unifier.unify(condType, TypeNames::BOOL, subst);
+    if (!unifier.unify(condType, TypeNames::BOOL, subst)) {
+      reportError("Type mismatch: cannot unify if-condition with 'bool'",
+                  node.loc);
+    }
   }
 
   node.thenExpr->accept(*this);
