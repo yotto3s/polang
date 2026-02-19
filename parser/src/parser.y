@@ -1,5 +1,7 @@
 %{
+#include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <vector>
 #include "parser/node.hpp"
@@ -471,7 +473,16 @@ type_atom : ident {
             }
           ;
 
-numeric : TINTEGER { $$ = std::make_unique<NInteger>(atol($1.c_str())); SET_LOC($$, @$); }
+numeric : TINTEGER {
+              errno = 0;
+              char* end = nullptr;
+              long long val = std::strtoll($1.c_str(), &end, 10);
+              if (errno == ERANGE) {
+                error(@$, "integer literal " + $1 + " is out of range");
+              }
+              $$ = std::make_unique<NInteger>(val);
+              SET_LOC($$, @$);
+            }
         | TDOUBLE { $$ = std::make_unique<NDouble>(atof($1.c_str())); SET_LOC($$, @$); }
         ;
 
