@@ -344,6 +344,31 @@ public:
   }
 
   void visit(const NUnaryOperator& node) override {
+    // For TMINUS wrapping an integer literal, create the negated constant
+    // directly to avoid overflow when the positive value doesn't fit in the
+    // target type (e.g., -128 as i8: 128 overflows i8, but -128 fits).
+    if (node.op == yy::parser::token::TMINUS) {
+      if (const auto* intLit =
+              dynamic_cast<const NInteger*>(node.operand.get())) {
+        auto negatedValue = -static_cast<int64_t>(intLit->value);
+        if (expectedLiteralType != nullptr) {
+          const auto meta = getTypeMetadata(expectedLiteralType->getTypeName());
+          if (meta.isInteger() || meta.isIndex()) {
+            auto type = getPolangType(*expectedLiteralType);
+            result = builder.create<ConstantIntegerOp>(loc(node.loc), type,
+                                                       negatedValue);
+            resultType = expectedLiteralType->clone();
+            return;
+          }
+        }
+        auto type = getDefaultType();
+        result = builder.create<ConstantIntegerOp>(loc(node.loc), type,
+                                                   negatedValue);
+        resultType = makeTypeSpec(TypeNames::GENERIC_INT);
+        return;
+      }
+    }
+
     node.operand->accept(*this);
     if (!result) {
       return;
@@ -353,7 +378,7 @@ public:
 
     switch (node.op) {
     case yy::parser::token::TMINUS:
-      // Unary negation
+      // Unary negation (non-literal operand)
       result = builder.create<NegOp>(loc(node.loc), operandType, operand);
       // resultType remains the same as operand type
       break;

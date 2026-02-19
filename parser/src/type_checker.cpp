@@ -1884,27 +1884,30 @@ void TypeChecker::checkLiteralRange(const NExpression* expr,
     return;
   }
 
-  long long value = 0;
-  SourceLocation loc;
-
-  const auto* intLiteral = dynamic_cast<const NInteger*>(expr);
-  if (intLiteral != nullptr) {
-    value = intLiteral->value;
-    loc = intLiteral->loc;
-  } else {
-    // Handle negated integer literals: NUnaryOperator(TMINUS, NInteger(N))
-    const auto* unaryOp = dynamic_cast<const NUnaryOperator*>(expr);
+  // Extract integer literal value, handling both direct NInteger
+  // and negated NUnaryOperator(TMINUS, NInteger(N)) forms.
+  const auto extractLiteral = [](const NExpression* e)
+      -> std::optional<std::pair<long long, SourceLocation>> {
+    if (const auto* intLit = dynamic_cast<const NInteger*>(e)) {
+      return std::pair{intLit->value, intLit->loc};
+    }
+    const auto* unaryOp = dynamic_cast<const NUnaryOperator*>(e);
     if (unaryOp == nullptr || unaryOp->op != yy::parser::token::TMINUS) {
-      return;
+      return std::nullopt;
     }
     const auto* innerInt =
         dynamic_cast<const NInteger*>(unaryOp->operand.get());
     if (innerInt == nullptr) {
-      return;
+      return std::nullopt;
     }
-    value = -innerInt->value;
-    loc = unaryOp->loc;
+    return std::pair{-innerInt->value, unaryOp->loc};
+  };
+
+  const auto result = extractLiteral(expr);
+  if (!result) {
+    return;
   }
+  const auto [value, loc] = *result;
 
   if (!polang::isIntegerType(targetType)) {
     return;

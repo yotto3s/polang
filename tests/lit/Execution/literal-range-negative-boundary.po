@@ -1,0 +1,9 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Boundary test: -128 is the minimum value for i8 and should compile. *)
+(* CHECK: -128 : i8
+*)
+x : i8
+x = -128
+x
