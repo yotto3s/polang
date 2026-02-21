@@ -1,0 +1,7 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test not with equality: !(10 == 5) = true *)
+(* CHECK: true : bool
+*)
+!(10 == 5)

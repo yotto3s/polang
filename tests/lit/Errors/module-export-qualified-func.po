@@ -1,0 +1,13 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* CHECK: {{.*}}'helper' is not exported from module 'Math'{{.*}}
+*)
+
+module Math (add)
+  add : i64 * i64 -> i64
+  add(x, y) = x + y
+  helper : i64 -> i64
+  helper(x) = x * 2
+endmodule
+Math.helper(5)

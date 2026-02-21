@@ -24,6 +24,7 @@
 
 using polang::TypeNames;
 
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
@@ -342,6 +343,57 @@ public:
     }
   }
 
+  void visit(const NUnaryOperator& node) override {
+    // For TMINUS wrapping an integer literal, create the negated constant
+    // directly to avoid overflow when the positive value doesn't fit in the
+    // target type (e.g., -128 as i8: 128 overflows i8, but -128 fits).
+    if (node.op == yy::parser::token::TMINUS) {
+      if (const auto* intLit =
+              dynamic_cast<const NInteger*>(node.operand.get())) {
+        auto negatedValue = -static_cast<int64_t>(intLit->value);
+        if (expectedLiteralType != nullptr) {
+          const auto meta = getTypeMetadata(expectedLiteralType->getTypeName());
+          if (meta.isInteger() || meta.isIndex()) {
+            auto type = getPolangType(*expectedLiteralType);
+            result = builder.create<ConstantIntegerOp>(loc(node.loc), type,
+                                                       negatedValue);
+            resultType = expectedLiteralType->clone();
+            return;
+          }
+        }
+        auto type = getDefaultType();
+        result = builder.create<ConstantIntegerOp>(loc(node.loc), type,
+                                                   negatedValue);
+        resultType = makeTypeSpec(TypeNames::GENERIC_INT);
+        return;
+      }
+    }
+
+    node.operand->accept(*this);
+    if (!result) {
+      return;
+    }
+    Value operand = result;
+    Type operandType = operand.getType();
+
+    switch (node.op) {
+    case yy::parser::token::TMINUS:
+      // Unary negation (non-literal operand)
+      result = builder.create<NegOp>(loc(node.loc), operandType, operand);
+      // resultType remains the same as operand type
+      break;
+    case yy::parser::token::TNOT:
+      // Logical not
+      result = builder.create<NotOp>(loc(node.loc), operand);
+      resultType = makeTypeSpec(TypeNames::BOOL);
+      break;
+    default:
+      emitError(loc(node.loc)) << "Unknown unary operator: " << node.op;
+      result = nullptr;
+      break;
+    }
+  }
+
   void visit(const NBinaryOperator& node) override {
     node.lhs->accept(*this);
     if (!result) {
@@ -350,6 +402,59 @@ public:
     Value lhs = result;
     std::unique_ptr<const NTypeSpec> lhsType = std::move(resultType);
 
+    // Handle short-circuit operators BEFORE evaluating RHS
+    if (node.op == yy::parser::token::TLAND) {
+      // a && b: if a then b else false
+      Type boolType = builder.getType<BoolType>();
+      auto ifOp = builder.create<IfOp>(loc(node.loc), boolType, lhs);
+
+      // Then region: evaluate rhs and yield it
+      {
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+        node.rhs->accept(*this);
+        builder.create<YieldOp>(loc(node.loc), result);
+      }
+
+      // Else region: yield false
+      {
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+        Value falseVal = builder.create<ConstantBoolOp>(loc(node.loc), false);
+        builder.create<YieldOp>(loc(node.loc), falseVal);
+      }
+
+      result = ifOp.getResult();
+      resultType = makeTypeSpec(TypeNames::BOOL);
+      return;
+    }
+    if (node.op == yy::parser::token::TLOR) {
+      // a || b: if a then true else b
+      Type boolType = builder.getType<BoolType>();
+      auto ifOp = builder.create<IfOp>(loc(node.loc), boolType, lhs);
+
+      // Then region: yield true
+      {
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+        Value trueVal = builder.create<ConstantBoolOp>(loc(node.loc), true);
+        builder.create<YieldOp>(loc(node.loc), trueVal);
+      }
+
+      // Else region: evaluate rhs and yield it
+      {
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+        node.rhs->accept(*this);
+        builder.create<YieldOp>(loc(node.loc), result);
+      }
+
+      result = ifOp.getResult();
+      resultType = makeTypeSpec(TypeNames::BOOL);
+      return;
+    }
+
+    // For all other operators, evaluate RHS eagerly
     node.rhs->accept(*this);
     if (!result) {
       return;
@@ -374,6 +479,10 @@ public:
       break;
     case yy::parser::token::TDIV:
       result = builder.create<DivOp>(loc(node.loc), arithResultTy, lhs, rhs);
+      resultType = std::move(lhsType);
+      break;
+    case yy::parser::token::TMOD:
+      result = builder.create<RemOp>(loc(node.loc), arithResultTy, lhs, rhs);
       resultType = std::move(lhsType);
       break;
     // Comparison operations - result is always bool
@@ -531,11 +640,17 @@ public:
         return;
       }
 
-      // Emit GlobalOp at module level
+      // Emit GlobalOp at module level, before the entry function.
+      // Using setInsertionPoint (not setInsertionPointToStart) preserves
+      // declaration order so that initializers can reference earlier globals.
       GlobalOp globalOp;
       {
         OpBuilder::InsertionGuard guard(builder);
-        builder.setInsertionPointToStart(module.getBody());
+        if (entryFuncOp) {
+          builder.setInsertionPoint(entryFuncOp);
+        } else {
+          builder.setInsertionPointToStart(module.getBody());
+        }
         globalOp = builder.create<GlobalOp>(loc(node.loc),
                                             llvm::StringRef(varName), mlirType,
                                             /*is_external=*/false);
@@ -890,8 +1005,19 @@ public:
     result = nullptr; // Import statements don't produce a value
   }
 
-  void visit(const NTypeSignature& /*node*/) override {
-    // Type signatures are handled by the type checker, not MLIR generation
+  void visit(const NTypeSignature& node) override {
+    // Pre-register the function return type so forward-referenced calls
+    // produce the correct MLIR result type.
+    const NTypeSpec* innerType = node.typeExpr.get();
+    if (const auto* forall = dynamic_cast<const NForallType*>(innerType)) {
+      innerType = forall->innerType.get();
+    }
+    if (const auto* arrow = dynamic_cast<const NArrowType*>(innerType)) {
+      const std::string funcName = mangledName(node.id->name);
+      functionReturnTypes[funcName] = arrow->returnType->clone();
+      Type retTy = getType(*arrow->returnType);
+      functionReturnMLIRTypes[funcName] = retTy;
+    }
     result = nullptr;
   }
 
@@ -911,8 +1037,9 @@ private:
   std::set<std::string> emittedExternFuncs;     // Track emitted func decls
   std::set<std::string> currentEvalGlobals; // Globals defined in current eval
   std::map<std::string, Type>
-      currentEvalGlobalTypes; // Types of current-eval globals (for init
-                              // regions)
+      currentEvalGlobalTypes;   // Types of current-eval globals (for init
+                                // regions)
+  FuncOp entryFuncOp = nullptr; // Entry function for insertion ordering
 
   /// Check if we are in incremental mode
   [[nodiscard]] bool isIncremental() const {
@@ -1315,6 +1442,7 @@ private:
     builder.setInsertionPointToEnd(module.getBody());
     auto entryFunc =
         builder.create<FuncOp>(loc(block.loc), entryFuncName, funcType);
+    entryFuncOp = entryFunc;
 
     // Create entry block
     Block* entryBlock = entryFunc.addEntryBlock();

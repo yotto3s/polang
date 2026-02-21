@@ -1,0 +1,9 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test that boundary values compile and execute correctly *)
+(* CHECK: 127 : i8
+*)
+x : i8
+x = 127
+x

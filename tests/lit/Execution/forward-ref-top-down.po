@@ -1,0 +1,16 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test top-down code organization with forward type signatures *)
+(* CHECK: 30 : i64
+*)
+
+:{
+entry : i64 -> i64
+helper : i64 -> i64
+
+entry(x) = helper(x) + helper(x)
+helper(x) = x + 5
+:}
+
+entry(10)

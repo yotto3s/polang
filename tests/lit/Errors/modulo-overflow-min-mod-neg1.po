@@ -1,0 +1,19 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+
+(* F1: RemOpLowering does not guard against MIN_INT % -1 overflow.
+   LLVM's srem instruction has undefined behavior when computing
+   MIN_INT % -1 because the underlying IDIV instruction on x86
+   traps. DivOpLowering has a nested scf.if guard for this case,
+   but RemOpLowering only checks for zero divisor.
+   This test expects a runtime error instead of SIGFPE.
+*)
+
+(* CHECK: Runtime error: integer overflow at line {{[0-9]+}}, column {{[0-9]+}}
+*)
+
+:{
+remIt : i64 * i64 -> i64
+remIt(a, b) = a % b
+:}
+remIt(0 - 9223372036854775807 - 1, 0 - 1)

@@ -1,0 +1,12 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* Regression test: !a && b correctly unifies a with bool via unary !.
+   f(a, b) = !a && b infers both a and b as bool, so f(42, true) is
+   correctly rejected as a type error (i64 cannot be used where bool
+   is expected).
+*)
+(* CHECK: Type error:{{.*}}bool{{.*}}
+*)
+f(a, b) = !a && b
+f(42, true)

@@ -1,0 +1,10 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* Any negative literal assigned to u64 should be a range error. *)
+
+(* CHECK: {{.*}}does not fit in type u64{{.*}}
+*)
+
+x : u64
+x = -1

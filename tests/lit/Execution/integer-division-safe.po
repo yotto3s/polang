@@ -1,0 +1,6 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+(* CHECK: 10 : i64
+*)
+x = 100 / 10
+x

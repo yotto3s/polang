@@ -87,6 +87,9 @@ bool polang_lexer_has_error() {
 "<="                    { return yy::parser::make_TCLE(LOC); }
 ">"                     { return yy::parser::make_TCGT(LOC); }
 ">="                    { return yy::parser::make_TCGE(LOC); }
+"&&"                    { return yy::parser::make_TLAND(LOC); }
+"||"                    { return yy::parser::make_TLOR(LOC); }
+"!"                     { return yy::parser::make_TNOT(LOC); }
 "("                     { return yy::parser::make_TLPAREN(LOC); }
 ")"                     { return yy::parser::make_TRPAREN(LOC); }
 "{"                     { return yy::parser::make_TLBRACE(LOC); }
@@ -98,6 +101,7 @@ bool polang_lexer_has_error() {
 "-"                     { return yy::parser::make_TMINUS(LOC); }
 "*"                     { return yy::parser::make_TMUL(LOC); }
 "/"                     { return yy::parser::make_TDIV(LOC); }
+"%"                     { return yy::parser::make_TMOD(LOC); }
 <<EOF>>                 { return yy::parser::make_YYEOF(LOC); }
 .                       { lexerError = true; polang_report_error(yytext, yylineno, yylloc.begin.column); return yy::parser::make_YYEOF(LOC); }
 

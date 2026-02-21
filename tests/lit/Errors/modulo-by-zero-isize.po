@@ -1,0 +1,9 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+
+(* F1: Regression test for isize (IndexType) modulo-by-zero.
+   Verify that isize modulo by zero produces a runtime error.
+*)
+x = (10 as isize) % (0 as isize)
+(* CHECK: Runtime error: integer division by zero at line 1, column 5
+*)

@@ -1,0 +1,11 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* TC-4: One operand is a uniVar while the other is a concrete non-bool type.
+   The concrete i64 literal 42 should be rejected by the bool requirement
+   check for the && operator's right operand.
+*)
+(* CHECK: Type error: operator '&&' requires operands of type 'bool', but got 'i64'{{.*}}
+*)
+badAnd(a) = a && 42
+badAnd(true)

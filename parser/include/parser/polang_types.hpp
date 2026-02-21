@@ -1,6 +1,7 @@
 #ifndef POLANG_TYPES_HPP
 #define POLANG_TYPES_HPP
 
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -472,6 +473,69 @@ getIntegerWidth(const std::string& typeName) noexcept {
 getFloatWidth(const std::string& typeName) noexcept {
   const TypeMetadata meta = getTypeMetadata(typeName);
   return meta.isFloat() ? meta.width : 0;
+}
+
+/// Check if an integer literal value fits within the range of a target integer
+/// type. Returns true if the value is in range, or if the type is not a
+/// fixed-width integer.
+[[nodiscard]] inline bool
+isLiteralInRange(std::int64_t value, const std::string& typeName) noexcept {
+  if (typeName == TypeNames::I8) {
+    return value >= -128 && value <= 127;
+  }
+  if (typeName == TypeNames::I16) {
+    return value >= -32768 && value <= 32767;
+  }
+  if (typeName == TypeNames::I32) {
+    return value >= -2147483648LL && value <= 2147483647LL;
+  }
+  if (typeName == TypeNames::I64) {
+    return true; // int64_t value always fits in i64
+  }
+  if (typeName == TypeNames::U8) {
+    return value >= 0 && value <= 255;
+  }
+  if (typeName == TypeNames::U16) {
+    return value >= 0 && value <= 65535;
+  }
+  if (typeName == TypeNames::U32) {
+    return value >= 0 && value <= 4294967295LL;
+  }
+  if (typeName == TypeNames::U64) {
+    return value >= 0; // non-negative fits u64
+  }
+  return true; // isize, usize, non-integer types: no fixed range to check
+}
+
+/// Get the human-readable range string for an integer type.
+/// Returns empty string for non-fixed-width integer types.
+[[nodiscard]] inline std::string
+getIntegerRangeString(const std::string& typeName) {
+  if (typeName == TypeNames::I8) {
+    return "-128 to 127";
+  }
+  if (typeName == TypeNames::I16) {
+    return "-32768 to 32767";
+  }
+  if (typeName == TypeNames::I32) {
+    return "-2147483648 to 2147483647";
+  }
+  if (typeName == TypeNames::I64) {
+    return "-9223372036854775808 to 9223372036854775807";
+  }
+  if (typeName == TypeNames::U8) {
+    return "0 to 255";
+  }
+  if (typeName == TypeNames::U16) {
+    return "0 to 65535";
+  }
+  if (typeName == TypeNames::U32) {
+    return "0 to 4294967295";
+  }
+  if (typeName == TypeNames::U64) {
+    return "0 to 18446744073709551615";
+  }
+  return "";
 }
 
 } // namespace polang

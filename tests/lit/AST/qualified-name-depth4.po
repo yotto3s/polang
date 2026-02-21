@@ -1,0 +1,12 @@
+(* RUN: %polang_compiler --dump-ast %s | %FileCheck %s
+*)
+
+(* Test 4-level deep qualified name variable access *)
+(* CHECK:      NBlock
+*)
+(* CHECK-NEXT: `-NExpressionStatement
+*)
+(* CHECK-NEXT:   `-NQualifiedName 'A.B.C.D'
+*)
+
+A.B.C.D

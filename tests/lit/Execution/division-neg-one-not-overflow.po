@@ -1,0 +1,16 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Happy-path test: -10 / -1 = 10. Exercises the normal path through the
+   overflow check — the divisor is -1 but the dividend is not MIN_INT,
+   so no overflow occurs.
+*)
+
+:{
+divIt : i64 * i64 -> i64
+divIt(a, b) = a / b
+:}
+
+(* CHECK: 10 : i64
+*)
+divIt(0 - 10, 0 - 1)

@@ -1,0 +1,5 @@
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
+x = 10 / 2
+(* CHECK: {{.*}}polang.div{{.*}}
+*)

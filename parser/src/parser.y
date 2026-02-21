@@ -1,5 +1,7 @@
 %{
+#include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <vector>
 #include "parser/node.hpp"
@@ -137,6 +139,10 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
 %token TMINUS "-"
 %token TMUL "*"
 %token TDIV "/"
+%token TMOD "%"
+%token TLAND "&&"
+%token TLOR "||"
+%token TNOT "!"
 %token TLET "let"
 %token TFUN "fun"
 %token TIN "in"
@@ -168,6 +174,7 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
 %type <std::unique_ptr<NVariableDeclaration>> func_param
 %type <std::unique_ptr<NLetBinding>> let_binding
 %type <std::unique_ptr<NQualifiedName>> qualified_name
+%type <std::unique_ptr<NQualifiedName>> qualified_name_multi
 
 // Vector types (by value, not pointer)
 %type <VariableList> func_decl_args func_param_list
@@ -184,17 +191,20 @@ buildTypeSignature(std::unique_ptr<NExpression> lhs,
 %right TLET TIN TAND
 %right TIF TTHEN TELSE
 %right TEQUAL
+%left TLOR
+%left TLAND
 %nonassoc COMPARISON TCEQ TCNE TCLT TCLE TCGT TCGE
 %left TPLUS TMINUS
-%left TMUL TDIV
+%left TMUL TDIV TMOD
 %left TAS
+%right UNARY TNOT
 %left TDOT
 
-/* Expected shift/reduce conflicts (all on TLPAREN):
-   1. expr . "(" in call_args (function call vs grouped expr)
-   2. ident . "(" in module (export list vs module_body expr)
-   3. ident . "(" in stmts (function call vs grouped expr)
-   4. ident "." ident . "(" (qualified call vs qualified name + grouped expr)
+/* Expected shift/reduce conflicts:
+   1. ident . "(" in module (export list vs module_body expr)
+   2. ident . "(" in stmts (function call vs grouped expr)
+   3. ident "." ident . "(" (qualified call vs qualified name + grouped expr)
+   4. expr . "-" (binary minus vs start of unary negation after newline)
 */
 %expect 4
 
@@ -349,8 +359,24 @@ qualified_name : ident {
                | qualified_name TDOT ident {
                    $1->parts.push_back($3->name);
                    $$ = std::move($1);
+                   SET_LOC($$, @$);
                  }
                ;
+
+/* Qualified name with at least 2 parts (guaranteed to have a dot) */
+qualified_name_multi : ident TDOT ident {
+                         StringList parts;
+                         parts.push_back($1->name);
+                         parts.push_back($3->name);
+                         $$ = std::make_unique<NQualifiedName>(std::move(parts));
+                         SET_LOC($$, @$);
+                       }
+                     | qualified_name_multi TDOT ident {
+                         $1->parts.push_back($3->name);
+                         $$ = std::move($1);
+                         SET_LOC($$, @$);
+                       }
+                     ;
 
 import_items : ident {
                  $$ = ImportItemList();
@@ -447,7 +473,16 @@ type_atom : ident {
             }
           ;
 
-numeric : TINTEGER { $$ = std::make_unique<NInteger>(atol($1.c_str())); SET_LOC($$, @$); }
+numeric : TINTEGER {
+              errno = 0;
+              char* end = nullptr;
+              std::int64_t val = std::strtoll($1.c_str(), &end, 10);
+              if (errno == ERANGE) {
+                error(@$, "integer literal " + $1 + " is out of range");
+              }
+              $$ = std::make_unique<NInteger>(val);
+              SET_LOC($$, @$);
+            }
         | TDOUBLE { $$ = std::make_unique<NDouble>(atof($1.c_str())); SET_LOC($$, @$); }
         ;
 
@@ -460,46 +495,25 @@ expr : ident TLPAREN call_args TRPAREN {
          SET_LOC($$, @$);
        }
      | ident { $$ = std::move($1); }
-     | ident TDOT ident TLPAREN call_args TRPAREN {
-         /* Qualified function call: Math.add(1, 2) */
-         StringList parts;
-         parts.push_back($1->name);
-         parts.push_back($3->name);
-         auto qname = std::make_unique<NQualifiedName>(std::move(parts));
-         SET_LOC(qname, @1);
-         $$ = std::make_unique<NMethodCall>(std::move(qname), std::move($5));
+     | qualified_name_multi TLPAREN call_args TRPAREN {
+         /* Qualified function call with arbitrary depth: Math.add(1, 2), A.B.C.func() */
+         $$ = std::make_unique<NMethodCall>(std::move($1), std::move($3));
          SET_LOC($$, @$);
        }
-     | ident TDOT ident TDOT ident TLPAREN call_args TRPAREN {
-         /* Nested qualified function call: Math.Internal.helper(5) */
-         StringList parts;
-         parts.push_back($1->name);
-         parts.push_back($3->name);
-         parts.push_back($5->name);
-         auto qname = std::make_unique<NQualifiedName>(std::move(parts));
-         SET_LOC(qname, @1);
-         $$ = std::make_unique<NMethodCall>(std::move(qname), std::move($7));
-         SET_LOC($$, @$);
-       }
-     | ident TDOT ident {
-         /* Qualified variable access: Math.PI */
-         StringList parts;
-         parts.push_back($1->name);
-         parts.push_back($3->name);
-         $$ = std::make_unique<NQualifiedName>(std::move(parts));
-         SET_LOC($$, @$);
-       }
-     | ident TDOT ident TDOT ident {
-         /* Nested qualified variable access: Math.Internal.PI */
-         StringList parts;
-         parts.push_back($1->name);
-         parts.push_back($3->name);
-         parts.push_back($5->name);
-         $$ = std::make_unique<NQualifiedName>(std::move(parts));
-         SET_LOC($$, @$);
+     | qualified_name_multi {
+         /* Qualified variable access with arbitrary depth: Math.PI, A.B.C.value */
+         $$ = std::move($1);
        }
      | numeric { $$ = std::move($1); }
      | boolean { $$ = std::move($1); }
+     | TMINUS expr %prec UNARY {
+         $$ = std::make_unique<NUnaryOperator>(yy::parser::token::TMINUS, std::move($2));
+         SET_LOC($$, @$);
+       }
+     | TNOT expr %prec UNARY {
+         $$ = std::make_unique<NUnaryOperator>(yy::parser::token::TNOT, std::move($2));
+         SET_LOC($$, @$);
+       }
      | expr comparison expr %prec COMPARISON {
          $$ = std::make_unique<NBinaryOperator>(std::move($1), $2, std::move($3));
          SET_LOC($$, @$);
@@ -518,6 +532,18 @@ expr : ident TLPAREN call_args TRPAREN {
        }
      | expr TDIV expr {
          $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TDIV, std::move($3));
+         SET_LOC($$, @$);
+       }
+     | expr TMOD expr {
+         $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TMOD, std::move($3));
+         SET_LOC($$, @$);
+       }
+     | expr TLAND expr {
+         $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TLAND, std::move($3));
+         SET_LOC($$, @$);
+       }
+     | expr TLOR expr {
+         $$ = std::make_unique<NBinaryOperator>(std::move($1), yy::parser::token::TLOR, std::move($3));
          SET_LOC($$, @$);
        }
      | expr TAS type_spec {

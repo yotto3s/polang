@@ -1,0 +1,15 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+
+(* F1: Regression test for modulo-by-zero inside a function.
+   When modulo is inside a function, the divisor is a parameter that
+   prevents constant folding. At runtime, a zero divisor should produce
+   the same "integer division by zero" runtime error as division.
+   This mirrors the existing division-by-zero-function.po test.
+*)
+
+modrem : i64 * i64 -> i64
+modrem(a, b) = a % b
+result = modrem(42, 0)
+(* CHECK: Runtime error: integer division by zero at line {{[0-9]+}}, column {{[0-9]+}}
+*)

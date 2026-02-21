@@ -1,5 +1,6 @@
 add_mlir_library(PolangTransforms
   Monomorphization.cpp
+  InsertOverflowChecks.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/../../include/polang/Transforms
@@ -12,4 +13,7 @@ add_mlir_library(PolangTransforms
   MLIRIR
   MLIRPass
   MLIRFuncDialect
+  MLIRArithDialect
+  MLIRControlFlowDialect
+  MLIRLLVMDialect
 )

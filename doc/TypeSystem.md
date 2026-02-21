@@ -12,6 +12,7 @@ This document describes the Polang type system, including type inference and pol
   - [Conversion Semantics](#conversion-semantics)
   - [Literal Type Inference](#literal-type-inference)
   - [Boolean Conversions](#boolean-conversions)
+  - [Literal Range Checking](#literal-range-checking)
 - [Type Inference](#type-inference)
   - [Local Type Inference](#local-type-inference)
   - [If-Expression Type Inference](#if-expression-type-inference)
@@ -174,16 +175,17 @@ e = 3.14 as i32              (* convert float to integer (truncates toward zero)
 
 The `as` operator has higher precedence than arithmetic operators but lower precedence than unary operators:
 
-| Precedence | Operators |
-|------------|-----------|
-| Highest | Parentheses, function calls |
-| | Unary `-`, `!` |
-| | **`as` (type conversion)** |
-| | `*`, `/`, `%` |
-| | `+`, `-` |
-| | `<`, `>`, `<=`, `>=`, `==`, `!=` |
-| | `&&` |
-| Lowest | `\|\|` |
+| Precedence | Operators                           | Associativity   |
+|------------|-------------------------------------|-----------------|
+| 9          | `.` (member access)                 | Left            |
+| 8          | Unary `-`, `!`                      | Right (prefix)  |
+| 7          | `as` (type conversion)              | Left            |
+| 6          | `*`, `/`                            | Left            |
+| 5          | `+`, `-`                            | Left            |
+| 4          | `==`, `!=`, `<`, `<=`, `>`, `>=`    | Non-associative |
+| 3          | `&&`                                | Left            |
+| 2          | `||`                                | Left            |
+| 1          | `if`/`then`/`else`, `let`/`in`      | Right           |
 
 **Precedence examples:**
 
@@ -404,7 +406,7 @@ d : u8
 d = 200                      (* OK: 200 fits in u8 *)
 ```
 
-**Compile-time error** if the literal value doesn't fit in the target type:
+**Compile-time error** if the literal value doesn't fit in the target type (see [Literal Range Checking](#literal-range-checking)):
 
 ```polang
 x : i8
@@ -446,6 +448,43 @@ int_value = if b then 1 else 0
 ```
 
 This design ensures that boolean semantics are always explicit in the code.
+
+### Literal Range Checking
+
+When an integer literal is assigned to a typed context (variable with type annotation, function argument, or let binding), the compiler verifies at compile time that the literal value fits within the target type's range. This is specified in §5.1 and §12.4.
+
+**Error format:**
+```
+Type error: literal <value> does not fit in type <type> (range <min> to <max>) at line L, column C
+```
+
+**Contexts that trigger range checking:**
+- Variable declarations with type annotations: `x : i8 = 1000`
+- Let bindings with type annotations: `let x : i8 = 1000 in x`
+- Function call arguments: `f(1000)` where `f : i8 -> i8`
+- Polymorphic function arguments (after type resolution)
+- Negated integer literals: `x : u8 = -1` or `x : i8 = -200`
+
+**Contexts that do NOT trigger range checking:**
+- `as` casts: `300 as i8` is an explicit narrowing conversion that truncates
+- Default type resolution: bare `42` defaults to `i64` and always fits
+- Generic/unresolved types: `{int}` hasn't been resolved yet
+- `isize`/`usize`: platform-dependent width, no fixed range at compile time
+
+**Integer type ranges:**
+
+| Type | Min | Max |
+|------|-----|-----|
+| `i8` | -128 | 127 |
+| `i16` | -32768 | 32767 |
+| `i32` | -2147483648 | 2147483647 |
+| `i64` | -9223372036854775808 | 9223372036854775807 |
+| `u8` | 0 | 255 |
+| `u16` | 0 | 65535 |
+| `u32` | 0 | 4294967295 |
+| `u64` | 0 | 18446744073709551615 |
+
+**Implementation:** `isLiteralInRange()` and `getIntegerRangeString()` in `polang_types.hpp`, `checkLiteralRange()` in `type_checker.cpp`.
 
 ## Type Inference
 

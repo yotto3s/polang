@@ -1,0 +1,7 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test complex precedence: !false && 5 > 3 || false = true *)
+(* CHECK: true : bool
+*)
+!false && 5 > 3 || false

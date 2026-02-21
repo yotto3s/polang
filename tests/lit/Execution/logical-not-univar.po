@@ -1,0 +1,11 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* TC-3: Unary NOT with a unification variable parameter.
+   When a function has an untyped parameter used with !, the type checker
+   should infer the parameter as bool and produce the correct result.
+*)
+(* CHECK: false : bool
+*)
+myNot(x) = !x
+myNot(true)

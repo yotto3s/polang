@@ -106,7 +106,19 @@ public:
         continue;
       }
 
-      // Track operators and other tokens
+      // Track operators and other tokens (including multi-character operators)
+      if (i + 1 < input.size()) {
+        const char c = input[i];
+        const char next = input[i + 1];
+        if ((c == '&' && next == '&') || (c == '|' && next == '|') ||
+            (c == '=' && next == '=') || (c == '!' && next == '=') ||
+            (c == '<' && next == '=') || (c == '>' && next == '=') ||
+            (c == '-' && next == '>')) {
+          lastToken = std::string{c, next};
+          i += 2;
+          continue;
+        }
+      }
       lastToken = std::string(1, input[i]);
       ++i;
     }
@@ -122,8 +134,10 @@ public:
     return parenDepth > 0 || ifWithoutElse > 0 || letWithoutIn > 0 ||
            moduleDepth > 0 || lastToken == "in" || lastToken == "then" ||
            lastToken == "+" || lastToken == "-" || lastToken == "*" ||
-           lastToken == "/" || lastToken == "=" || lastToken == "," ||
-           lastToken == "and";
+           lastToken == "/" || lastToken == "%" || lastToken == "=" ||
+           lastToken == "," || lastToken == "&&" || lastToken == "||" ||
+           lastToken == "<" || lastToken == ">" || lastToken == "->" ||
+           lastToken == "and" || lastToken == "as";
   }
 };
 

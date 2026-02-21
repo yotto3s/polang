@@ -45,4 +45,4 @@ target_include_directories(PolangCompiler PRIVATE
 
 target_compile_definitions(PolangCompiler PRIVATE ${LLVM_DEFINITIONS_LIST})
 target_link_directories(PolangCompiler PRIVATE ${LLVM_LIBRARY_DIRS})
-target_link_libraries(PolangCompiler PRIVATE PolangMLIRCodegen)
+target_link_libraries(PolangCompiler PRIVATE PolangMLIRCodegen PolangRuntime)

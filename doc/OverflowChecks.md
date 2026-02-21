@@ -1,0 +1,71 @@
+# Integer Overflow Checks
+
+## Overview
+
+Polang implements Swift-style overflow checking for all integer arithmetic operations. Unlike many languages that either silently wrap (C/C++) or only check in debug mode, Polang checks for overflow in all build modes and immediately terminates with an error message.
+
+## Checked Operations
+
+The following operations are checked for overflow:
+- Addition (`+`)
+- Subtraction (`-`)
+- Multiplication (`*`)
+- Unary negation (`-x`)
+- Division (`MIN_INT / -1` for signed types)
+
+## Implementation
+
+### Architecture
+
+Overflow checking uses two complementary MLIR passes:
+
+1. **PolangToStandard lowering**: Generates `arith.addi/subi/muli` operations
+2. **CheckConstantOverflow pass**: Detects overflow in constant expressions at compile time (runs *before* canonicalization to catch cases that would otherwise be silently folded)
+3. **Canonicalization/CSE**: Standard MLIR optimizations
+4. **InsertOverflowChecks pass**: Replaces non-constant arithmetic operations with LLVM overflow intrinsics for runtime checks
+5. **LLVM lowering**: Final conversion to LLVM IR
+
+### Signedness Tracking
+
+Since MLIR's `arith` dialect doesn't distinguish between signed and unsigned for addition/subtraction/multiplication, we attach a `polang.is_unsigned` attribute during the PolangToStandard lowering pass. This attribute is read by the InsertOverflowChecks pass to choose the correct intrinsic:
+
+- Signed: `llvm.sadd.with.overflow.iN`, `llvm.ssub.with.overflow.iN`, `llvm.smul.with.overflow.iN`
+- Unsigned: `llvm.uadd.with.overflow.iN`, `llvm.usub.with.overflow.iN`, `llvm.umul.with.overflow.iN`
+
+### Runtime Behavior
+
+When overflow is detected:
+1. The overflow intrinsic's flag is set
+2. Control branches to an error block
+3. The error block calls `__polang_runtime_error(message, line, column)`
+4. The runtime function prints an error message and exits with status 1
+
+Example error output:
+```
+Runtime error: integer overflow at line 5, column 10
+```
+
+## Performance
+
+While overflow checking adds runtime overhead, the two-pass approach ensures:
+- Constant-expression overflows are caught at compile time with a clear diagnostic
+- MLIR optimizations can eliminate redundant runtime checks
+- LLVM can optimize the control flow
+- The intrinsics are well-optimized by LLVM
+
+For performance-critical code that intentionally uses wrapping behavior, future versions will support explicit wrapping operators (`&+`, `&-`, `&*`).
+
+## Testing
+
+Tests are located in `tests/lit/Execution/overflow-*.po` and verify:
+- Signed overflow detection
+- Unsigned overflow detection  
+- All arithmetic operations
+- Non-overflowing operations still work correctly
+
+## References
+
+- Spec: `spec/polang-spec.md` §6.1 (Integer Types)
+- Issue: yotto3s/polang#76 (Add runtime check for integer overflow)
+- Pass implementation: `mlir/lib/Transforms/InsertOverflowChecks.cpp`
+- Runtime handler: `runtime/src/runtime.c`

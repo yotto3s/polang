@@ -1,0 +1,15 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* F2: Negative literal assigned to unsigned type should be a range error.
+   The parser represents -1 as NUnaryOperator(TMINUS, NInteger(1)).
+   checkLiteralRange only checks NInteger directly via dynamic_cast,
+   so negated literals like -1 are not caught by the range checker.
+   Per spec: z : u8 / z = -1 should be Error: -1 doesn't fit in u8.
+*)
+
+(* CHECK: {{.*}}does not fit in type u8{{.*}}
+*)
+
+z : u8
+z = -1

@@ -1,0 +1,12 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* Boundary test: -129 does not fit in i8 (range -128 to 127).
+   Off-by-one from the lower bound.
+*)
+
+(* CHECK: {{.*}}does not fit in type i8{{.*}}
+*)
+
+x : i8
+x = -129

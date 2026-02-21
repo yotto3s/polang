@@ -1,0 +1,10 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+
+(* Test signed integer overflow on multiplication *)
+
+(* CHECK: {{.*}}Runtime error: integer overflow{{.*}}
+*)
+
+mul(x, y) = x * y
+mul(9223372036854775807, 2)

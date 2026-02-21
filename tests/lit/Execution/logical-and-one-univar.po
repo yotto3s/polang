@@ -1,0 +1,12 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* TC-1: Asymmetric case where only one operand is a unification variable.
+   When a function has one untyped parameter used with && alongside a concrete
+   bool literal, the type checker should infer the parameter as bool via
+   unification and produce the correct result.
+*)
+(* CHECK: false : bool
+*)
+andWithLiteral(a) = a && true
+andWithLiteral(false)

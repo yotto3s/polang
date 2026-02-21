@@ -22,6 +22,7 @@ class NProductType;
 class NFunctionDeclaration;
 struct NLetBinding;
 struct SourceLocation;
+struct TypeVarDecl;
 
 struct TypeCheckError {
   std::string message;
@@ -60,6 +61,7 @@ public:
   void visit(const NIdentifier& node) override;
   void visit(const NQualifiedName& node) override;
   void visit(const NMethodCall& node) override;
+  void visit(const NUnaryOperator& node) override;
   void visit(const NBinaryOperator& node) override;
   void visit(const NCastExpression& node) override;
   void visit(const NBlock& node) override;
@@ -122,12 +124,40 @@ private:
   // Pending type signatures: name -> type expression
   std::map<std::string, std::unique_ptr<const NTypeSpec>> pendingTypeSignatures;
 
+  // Parsed representation of a type signature (shared by register and apply)
+  struct ParsedSignature {
+    bool isPolymorphic = false;
+    bool isArrowType = false;
+    bool isUnitParam = false;
+    std::vector<std::string> typeParams;
+    std::map<std::string, std::set<polang::TraitBound>> paramBounds;
+    std::set<std::string> usedTypeVars;
+    std::vector<std::string> paramTypes;
+    std::string returnType;
+    std::vector<std::reference_wrapper<const NTypeSpec>> paramTypeSpecs;
+    const NTypeSpec* returnTypeSpec = nullptr;
+    // References into the NTypeSpec tree — valid only while the source
+    // NTypeSpec (the signature passed to parseTypeSignature) is alive.
+    std::vector<std::reference_wrapper<const TypeVarDecl>> typeVarDecls;
+  };
+
+  // Parse a type signature into a ParsedSignature, validating type names.
+  // Returns std::nullopt if validation fails.
+  [[nodiscard]] std::optional<ParsedSignature>
+  parseTypeSignature(const NTypeSpec& signature);
+
   // Apply a type signature to a function declaration
   void applyFunctionSignature(NFunctionDeclaration& node,
                               std::unique_ptr<const NTypeSpec> signature);
 
-  // Warn about type signatures with no corresponding definition
-  void warnOrphanedTypeSignatures();
+  // Parse and register a type signature for forward references.
+  // Returns true if the signature was successfully registered.
+  // Errors are reported internally via reportError().
+  bool registerTypeSignature(const std::string& name,
+                             const NTypeSpec& signature);
+
+  // Report errors for type signatures with no corresponding definition
+  void reportOrphanedTypeSignatures();
 
   // Get mangled name for a symbol within current module context
   [[nodiscard]] std::string mangledName(const std::string& name) const;
@@ -173,6 +203,16 @@ private:
   void handleItemsImport(const NImportStatement& node);
   void handleWildcardImport(const NImportStatement& node);
 
+  // Build mangled ($$-separated) and dot-separated module names from parts
+  static std::pair<std::string, std::string>
+  buildModuleNames(const std::vector<std::string>& parts, size_t count);
+
+  // Check if a member is exported from a module; reports error if not
+  bool checkExportAccess(const std::string& moduleMangled,
+                         const std::string& memberName,
+                         const std::string& moduleDotName,
+                         const SourceLocation& loc);
+
   // Helper methods for NBinaryOperator type checking
   void checkArithmeticBinaryOp(const NBinaryOperator& node,
                                const std::string& lhsType,
@@ -180,6 +220,9 @@ private:
   void checkComparisonBinaryOp(const NBinaryOperator& node,
                                const std::string& lhsType,
                                const std::string& rhsType);
+  void checkLogicalBinaryOp(const NBinaryOperator& node,
+                            const std::string& lhsType,
+                            const std::string& rhsType);
 
   // Track AST nodes for variables with generic types needing deferred
   // resolution
@@ -191,6 +234,10 @@ private:
   void propagateTypeToSource(const NExpression* expr,
                              const std::string& targetType);
   void resolveRemainingGenerics();
+
+  // Check if an integer literal fits in its target type
+  void checkLiteralRange(const NExpression* expr,
+                         const std::string& targetType);
 
   // HM type inference infrastructure
   polang::Substitution subst;

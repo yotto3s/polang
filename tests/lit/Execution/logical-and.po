@@ -1,0 +1,7 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test range check with logical and: 0 < 50 < 100 = true *)
+(* CHECK: true : bool
+*)
+let x = 50 in x > 0 && x < 100

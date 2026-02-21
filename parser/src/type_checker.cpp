@@ -9,6 +9,7 @@
 // clang-format on
 
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <set>
 
@@ -25,7 +26,9 @@ using polang::formatVarDeclTypeError;
 using polang::isArithmeticOperator;
 using polang::isComparisonOperator;
 using polang::isFloatType;
+using polang::isGenericIntegerType;
 using polang::isGenericType;
+using polang::isIndexType;
 using polang::isIntegerType;
 using polang::operatorToString;
 using polang::resolveAllGenericsToDefault;
@@ -65,6 +68,10 @@ public:
     for (const auto& arg : node.arguments) {
       arg->accept(*this);
     }
+  }
+
+  void visit(const NUnaryOperator& node) override {
+    node.operand->accept(*this);
   }
 
   void visit(const NBinaryOperator& node) override {
@@ -188,7 +195,7 @@ std::vector<TypeCheckError> TypeChecker::check(const NBlock& ast) {
   traitConstraints = polang::TraitConstraints();
   polang::resetUnificationVarCounter();
   ast.accept(*this);
-  warnOrphanedTypeSignatures();
+  reportOrphanedTypeSignatures();
   return errors;
 }
 
@@ -196,7 +203,7 @@ std::vector<TypeCheckError>
 TypeChecker::checkIncremental(const NBlock& newStatements) {
   // Clear transient state but preserve persistent environment
   // (localTypes, functionSignatures).
-  // Note: we intentionally do NOT call warnOrphanedTypeSignatures() here
+  // Note: we intentionally do NOT call reportOrphanedTypeSignatures() here
   // because the REPL is incremental — a type signature entered in one input
   // may have its corresponding definition provided in a subsequent input.
   errors.clear();
@@ -291,12 +298,24 @@ void TypeChecker::visit(const NIdentifier& node) {
 void TypeChecker::visit(const NQualifiedName& node) {
   const std::string mangled = node.getMangledName();
   auto it = localTypes.find(mangled);
-  if (it != localTypes.end()) {
-    inferredType = it->second;
+  if (it == localTypes.end()) {
+    reportError("Undefined qualified name: " + node.getFullName(), node.loc);
+    inferredType = TypeNames::UNKNOWN;
     return;
   }
-  reportError("Undefined qualified name: " + node.getFullName(), node.loc);
-  inferredType = TypeNames::UNKNOWN;
+
+  // Check export visibility for qualified access (e.g., Math.PI)
+  if (node.parts.size() >= 2) {
+    const auto [moduleMangled, moduleDotName] =
+        buildModuleNames(node.parts, node.parts.size() - 1);
+    if (!checkExportAccess(moduleMangled, node.parts.back(), moduleDotName,
+                           node.loc)) {
+      inferredType = TypeNames::UNKNOWN;
+      return;
+    }
+  }
+
+  inferredType = it->second;
 }
 
 void TypeChecker::visit(const NMethodCall& node) {
@@ -313,6 +332,18 @@ void TypeChecker::visit(const NMethodCall& node) {
     reportError(formatUndefinedFunc(funcName), node.loc);
     inferredType = TypeNames::UNKNOWN;
     return;
+  }
+
+  // Check export visibility for qualified function calls (e.g., Math.add(1, 2))
+  if (node.qualifiedId != nullptr && node.qualifiedId->parts.size() >= 2) {
+    const auto& parts = node.qualifiedId->parts;
+    const auto [moduleMangled, moduleDotName] =
+        buildModuleNames(parts, parts.size() - 1);
+    if (!checkExportAccess(moduleMangled, parts.back(), moduleDotName,
+                           node.loc)) {
+      inferredType = TypeNames::UNKNOWN;
+      return;
+    }
   }
 
   if (std::holds_alternative<polang::PolymorphicSignature>(sigIt->second)) {
@@ -351,6 +382,8 @@ void TypeChecker::visit(const NMethodCall& node) {
         unifier.unify(argTypes[i], paramTypes[i], subst);
         continue;
       }
+      // Check integer literal range for function arguments
+      checkLiteralRange(node.arguments[i].get(), paramTypes[i]);
       if (argTypes[i] != TypeNames::UNKNOWN &&
           paramTypes[i] != TypeNames::UNKNOWN &&
           argTypes[i] != TypeNames::TYPEVAR &&
@@ -416,6 +449,13 @@ void TypeChecker::instantiateCall(NMethodCall& node,
       propagateTypeToSource(node.arguments[i].get(), resolvedParam);
       node.arguments[i]->accept(*this);
     }
+  }
+
+  // Check integer literal ranges with resolved parameter types
+  for (size_t i = 0; i < argTypes.size(); ++i) {
+    std::string resolvedParam = callSubst.apply(scheme.paramTypes[i]);
+    resolvedParam = polang::resolveGenericToDefault(resolvedParam);
+    checkLiteralRange(node.arguments[i].get(), resolvedParam);
   }
 
   // Resolve all type param bindings to concrete types
@@ -533,6 +573,122 @@ void TypeChecker::checkComparisonBinaryOp(const NBinaryOperator& node,
   inferredType = TypeNames::BOOL;
 }
 
+void TypeChecker::checkLogicalBinaryOp(const NBinaryOperator& node,
+                                       const std::string& lhsType,
+                                       const std::string& rhsType) {
+  const bool lhsIsTypevar = lhsType == TypeNames::TYPEVAR;
+  const bool rhsIsTypevar = rhsType == TypeNames::TYPEVAR;
+  const bool lhsIsUniVar = polang::isUnificationVar(lhsType);
+  const bool rhsIsUniVar = polang::isUnificationVar(rhsType);
+
+  // If either is a unification variable, unify with bool and validate the other
+  if (lhsIsUniVar || rhsIsUniVar) {
+    assert(!lhsIsTypevar && !rhsIsTypevar &&
+           "typevar should not co-occur with uniVar in logical op");
+    if (lhsIsUniVar) {
+      if (!unifier.unify(lhsType, TypeNames::BOOL, subst)) {
+        reportError("Type mismatch in logical operation: cannot unify left "
+                    "operand with 'bool' for operator '" +
+                        operatorToString(node.op) + "'",
+                    node.loc);
+      }
+    } else if (!lhsIsTypevar && lhsType != TypeNames::BOOL) {
+      reportError("operator '" + operatorToString(node.op) +
+                      "' requires operands of type 'bool', but got '" +
+                      resolveGenericToDefault(lhsType) + "'",
+                  node.loc);
+    }
+    if (rhsIsUniVar) {
+      if (!unifier.unify(rhsType, TypeNames::BOOL, subst)) {
+        reportError("Type mismatch in logical operation: cannot unify right "
+                    "operand with 'bool' for operator '" +
+                        operatorToString(node.op) + "'",
+                    node.loc);
+      }
+    } else if (!rhsIsTypevar && rhsType != TypeNames::BOOL) {
+      reportError("operator '" + operatorToString(node.op) +
+                      "' requires operands of type 'bool', but got '" +
+                      resolveGenericToDefault(rhsType) + "'",
+                  node.loc);
+    }
+    inferredType = TypeNames::BOOL;
+    return;
+  }
+
+  // Both operands must be bool
+  if (!lhsIsTypevar && lhsType != TypeNames::BOOL) {
+    reportError("operator '" + operatorToString(node.op) +
+                    "' requires operands of type 'bool', but got '" +
+                    resolveGenericToDefault(lhsType) + "'",
+                node.loc);
+  }
+  if (!rhsIsTypevar && rhsType != TypeNames::BOOL) {
+    reportError("operator '" + operatorToString(node.op) +
+                    "' requires operands of type 'bool', but got '" +
+                    resolveGenericToDefault(rhsType) + "'",
+                node.loc);
+  }
+
+  inferredType = TypeNames::BOOL;
+}
+
+void TypeChecker::visit(const NUnaryOperator& node) {
+  node.operand->accept(*this);
+  const std::string operandType = inferredType;
+
+  if (operandType == TypeNames::UNKNOWN) {
+    inferredType = TypeNames::UNKNOWN;
+    return;
+  }
+
+  switch (node.op) {
+  case yy::parser::token::TMINUS:
+    // Unary negation: operand must be numeric (or generic numeric)
+    if (polang::isUnificationVar(operandType)) {
+      traitConstraints.addBound(operandType, polang::TraitBound::Numeric);
+    } else if (operandType != TypeNames::TYPEVAR) {
+      if (!polang::isNumericType(operandType) &&
+          !polang::isGenericType(operandType)) {
+        reportError("cannot apply unary '-' to type '" +
+                        resolveGenericToDefault(operandType) + "'",
+                    node.loc);
+      } else if (polang::isUnsignedIntegerType(operandType) ||
+                 operandType == TypeNames::USIZE) {
+        reportError("unary negation cannot be applied to unsigned type '" +
+                        operandType + "'",
+                    node.loc);
+      }
+    }
+    // Result type is same as operand
+    inferredType = operandType;
+    break;
+
+  case yy::parser::token::TNOT:
+    // Logical not: operand must be bool
+    if (polang::isUnificationVar(operandType)) {
+      if (!unifier.unify(operandType, TypeNames::BOOL, subst)) {
+        reportError(
+            "Type mismatch in logical not: cannot unify operand with 'bool'",
+            node.loc);
+      }
+    } else if (operandType != TypeNames::TYPEVAR) {
+      if (operandType != TypeNames::BOOL) {
+        reportError("cannot apply unary '!' to type '" +
+                        resolveGenericToDefault(operandType) + "'",
+                    node.loc);
+      }
+    }
+    // Result type is bool
+    inferredType = TypeNames::BOOL;
+    break;
+
+  default:
+    reportError("Unknown unary operator", node.loc);
+    inferredType = TypeNames::UNKNOWN;
+    break;
+  }
+}
+
 void TypeChecker::visit(const NBinaryOperator& node) {
   node.lhs->accept(*this);
   const std::string lhsType = inferredType;
@@ -545,12 +701,49 @@ void TypeChecker::visit(const NBinaryOperator& node) {
     return;
   }
 
+  // Special handling for modulo operator - only allows integers
+  if (node.op == yy::parser::token::TMOD) {
+    // Validate that a modulo operand is an integer/index type.
+    // Returns true if the operand is valid (or is a type variable that
+    // should be checked later via trait bounds). Returns false and reports
+    // an error if the operand is a concrete non-integer type.
+    const auto checkModuloOperand = [&](const std::string& operandType) {
+      if (operandType == TypeNames::TYPEVAR) {
+        return true;
+      }
+      if (polang::isUnificationVar(operandType)) {
+        traitConstraints.addBound(operandType, polang::TraitBound::Integer);
+        return true;
+      }
+      if (isIntegerType(operandType) || isIndexType(operandType) ||
+          isGenericIntegerType(operandType)) {
+        return true;
+      }
+      reportError("operator '%' requires integer operands, but got '" +
+                      operandType + "'",
+                  node.loc);
+      inferredType = TypeNames::UNKNOWN;
+      return false;
+    };
+
+    if (!checkModuloOperand(lhsType) || !checkModuloOperand(rhsType)) {
+      return;
+    }
+
+    // Apply the same type checking as other arithmetic operators
+    checkArithmeticBinaryOp(node, lhsType, rhsType);
+    return;
+  }
+
   switch (polang::getOperatorCategory(node.op)) {
   case polang::OperatorCategory::Arithmetic:
     checkArithmeticBinaryOp(node, lhsType, rhsType);
     break;
   case polang::OperatorCategory::Comparison:
     checkComparisonBinaryOp(node, lhsType, rhsType);
+    break;
+  case polang::OperatorCategory::Logical:
+    checkLogicalBinaryOp(node, lhsType, rhsType);
     break;
   case polang::OperatorCategory::Unknown:
     // Unknown operator - leave type as is
@@ -615,7 +808,10 @@ void TypeChecker::visit(const NIfExpression& node) {
 
   // If condition is a unification var, unify it with bool
   if (polang::isUnificationVar(condType)) {
-    unifier.unify(condType, TypeNames::BOOL, subst);
+    if (!unifier.unify(condType, TypeNames::BOOL, subst)) {
+      reportError("Type mismatch: cannot unify if-condition with 'bool'",
+                  node.loc);
+    }
   }
 
   node.thenExpr->accept(*this);
@@ -750,6 +946,7 @@ void TypeChecker::typeCheckLetBindings(
         bindingTypes.push_back(exprType);
       } else {
         std::string declaredType = var->type->getTypeName();
+        checkLiteralRange(var->assignmentExpr.get(), declaredType);
         if (!areTypesCompatible(exprType, declaredType)) {
           reportError("Variable '" + var->id->name + "' declared as " +
                           var->type->getTypeName() + " but initialized with " +
@@ -848,6 +1045,9 @@ void TypeChecker::typeCheckVarDeclWithAnnotation(NVariableDeclaration& node,
                                                  const std::string& varName,
                                                  const std::string& exprType) {
   const std::string declType = node.type->getTypeName();
+
+  // Check integer literal range before type compatibility check
+  checkLiteralRange(node.assignmentExpr.get(), declType);
 
   const std::string& expectedType = declType;
 
@@ -1017,8 +1217,12 @@ void TypeChecker::inferFunction(
   }
 
   // Pre-register signature with TYPEVAR return for recursive call support
-  functionSignatures[funcName] =
-      polang::MonoSignature{paramTypes, TypeNames::TYPEVAR};
+  // Only register if not already present (from type signature forward
+  // reference)
+  if (functionSignatures.find(funcName) == functionSignatures.end()) {
+    functionSignatures[funcName] =
+        polang::MonoSignature{paramTypes, TypeNames::TYPEVAR};
+  }
 
   // For explicit forall: pre-unify params that share the same type variable,
   // and build the type param -> uni var mapping
@@ -1297,13 +1501,8 @@ void TypeChecker::inferFunction(
 void TypeChecker::visit(const NModuleDeclaration& node) {
   modulePath.push_back(node.name->name);
 
-  std::string moduleMangled;
-  for (size_t i = 0; i < modulePath.size(); ++i) {
-    if (i > 0) {
-      moduleMangled += "$$";
-    }
-    moduleMangled += modulePath[i];
-  }
+  const auto [moduleMangled, moduleDotName] =
+      buildModuleNames(modulePath, modulePath.size());
 
   moduleExports[moduleMangled] =
       std::set<std::string>(node.exports.begin(), node.exports.end());
@@ -1313,6 +1512,39 @@ void TypeChecker::visit(const NModuleDeclaration& node) {
   }
 
   modulePath.pop_back();
+}
+
+std::pair<std::string, std::string>
+TypeChecker::buildModuleNames(const std::vector<std::string>& parts,
+                              const size_t count) {
+  std::string mangled;
+  std::string dotName;
+  for (size_t i = 0; i < count; ++i) {
+    if (i > 0) {
+      mangled += "$$";
+      dotName += ".";
+    }
+    mangled += parts[i];
+    dotName += parts[i];
+  }
+  return {mangled, dotName};
+}
+
+bool TypeChecker::checkExportAccess(const std::string& moduleMangled,
+                                    const std::string& memberName,
+                                    const std::string& moduleDotName,
+                                    const SourceLocation& loc) {
+  auto exportsIt = moduleExports.find(moduleMangled);
+  if (exportsIt == moduleExports.end()) {
+    return true; // Module not found in exports map — allow (defensive)
+  }
+  if (exportsIt->second.find(memberName) != exportsIt->second.end()) {
+    return true; // Member is exported
+  }
+  reportError("'" + memberName + "' is not exported from module '" +
+                  moduleDotName + "'",
+              loc);
+  return false;
 }
 
 void TypeChecker::handleModuleImport(const NImportStatement& node) {
@@ -1327,8 +1559,14 @@ void TypeChecker::handleModuleAliasImport(const NImportStatement& node) {
 
 void TypeChecker::handleItemsImport(const NImportStatement& node) {
   const std::string moduleName = node.modulePath->getMangledName();
+  const std::string moduleDotName = node.modulePath->getFullName();
 
   for (const auto& item : node.items) {
+    // Check export visibility for explicit imports
+    if (!checkExportAccess(moduleName, item.name, moduleDotName, node.loc)) {
+      continue;
+    }
+
     const std::string mangledItemName = moduleName + "$$" + item.name;
     const std::string localName = item.getEffectiveName();
 
@@ -1392,67 +1630,137 @@ void TypeChecker::visit(const NImportStatement& node) {
 void TypeChecker::visit(const NTypeSignature& node) {
   const std::string name = mangledName(node.id->name);
   pendingTypeSignatures[name] = node.typeExpr->clone();
+
+  // Eagerly register the signature to enable forward references
+  registerTypeSignature(name, *node.typeExpr);
 }
 
-void TypeChecker::applyFunctionSignature(
-    NFunctionDeclaration& node, std::unique_ptr<const NTypeSpec> signature) {
-  // Check if this is a forall type signature
-  const auto* forallType = dynamic_cast<const NForallType*>(signature.get());
+std::optional<TypeChecker::ParsedSignature>
+TypeChecker::parseTypeSignature(const NTypeSpec& signature) {
+  ParsedSignature result;
+
+  const auto* forallType = dynamic_cast<const NForallType*>(&signature);
   std::set<std::string> declaredTypeVars;
-  std::reference_wrapper<const NTypeSpec> innerSig = *signature;
+  std::reference_wrapper<const NTypeSpec> innerSig = signature;
 
   if (forallType != nullptr) {
-    node.hasExplicitForall = true;
-    node.typeParams.clear();
-    node.typeParamBounds.clear();
-
-    auto& registry = polang::getTraitRegistry();
-
+    result.isPolymorphic = true;
     for (const auto& tv : forallType->typeVars) {
       declaredTypeVars.insert(tv.name);
-      node.typeParams.push_back(tv.name);
-
+      result.typeParams.push_back(tv.name);
+      result.typeVarDecls.emplace_back(std::cref(tv));
       if (!tv.bound.empty()) {
-        if (!registry.isKnownTrait(tv.bound)) {
-          reportError("unknown type class '" + tv.bound + "'");
-          return;
-        }
         auto traitBound = polang::stringToTraitBound(tv.bound);
         if (traitBound) {
-          node.typeParamBounds[tv.name].insert(*traitBound);
+          result.paramBounds[tv.name].insert(*traitBound);
         }
       }
     }
-
     innerSig = *forallType->innerType;
   }
 
   // Validate type names in the signature
-  std::set<std::string> usedTypeVars;
   const size_t errorsBefore = errors.size();
-  validateTypeNames(innerSig.get(), declaredTypeVars, usedTypeVars);
+  validateTypeNames(innerSig.get(), declaredTypeVars, result.usedTypeVars);
   if (errors.size() > errorsBefore) {
+    return std::nullopt;
+  }
+
+  // Check if this is an arrow type (function signature)
+  const auto* arrowType = dynamic_cast<const NArrowType*>(&innerSig.get());
+  if (arrowType != nullptr) {
+    result.isArrowType = true;
+    result.returnType = arrowType->returnType->getTypeName();
+    result.returnTypeSpec = arrowType->returnType.get();
+
+    const auto* unitParam =
+        dynamic_cast<const NUnitType*>(arrowType->paramType.get());
+    if (unitParam != nullptr) {
+      result.isUnitParam = true;
+    } else {
+      const auto* productType =
+          dynamic_cast<const NProductType*>(arrowType->paramType.get());
+      if (productType != nullptr) {
+        for (const auto& t : productType->types) {
+          result.paramTypes.push_back(t->getTypeName());
+          result.paramTypeSpecs.emplace_back(std::cref(*t));
+        }
+      } else {
+        result.paramTypes.push_back(arrowType->paramType->getTypeName());
+        result.paramTypeSpecs.emplace_back(std::cref(*arrowType->paramType));
+      }
+    }
+  }
+
+  return result;
+}
+
+bool TypeChecker::registerTypeSignature(const std::string& name,
+                                        const NTypeSpec& signature) {
+  auto parsed = parseTypeSignature(signature);
+  if (!parsed) {
+    return false;
+  }
+  if (!parsed->isArrowType) {
+    return true; // Variable signature — don't register
+  }
+
+  if (parsed->isPolymorphic) {
+    polang::PolymorphicSignature sig;
+    sig.typeParams = parsed->typeParams;
+    sig.paramBounds = parsed->paramBounds;
+    sig.paramTypes = std::move(parsed->paramTypes);
+    sig.returnType = std::move(parsed->returnType);
+    functionSignatures[name] = sig;
+  } else {
+    functionSignatures[name] = polang::MonoSignature{
+        std::move(parsed->paramTypes), std::move(parsed->returnType)};
+  }
+  return true;
+}
+
+void TypeChecker::applyFunctionSignature(
+    NFunctionDeclaration& node, std::unique_ptr<const NTypeSpec> signature) {
+  auto parsed = parseTypeSignature(*signature);
+  if (!parsed) {
     return;
   }
 
-  // Warn about unused type variables (only for forall signatures)
-  if (forallType != nullptr) {
-    for (const auto& tv : forallType->typeVars) {
-      if (usedTypeVars.find(tv.name) == usedTypeVars.end()) {
+  // Set forall flags on AST node
+  if (parsed->isPolymorphic) {
+    node.hasExplicitForall = true;
+    node.typeParams = parsed->typeParams;
+    node.typeParamBounds.clear();
+    for (const auto& [tp, bounds] : parsed->paramBounds) {
+      node.typeParamBounds[tp] = bounds;
+    }
+
+    // Warn about unused type variables
+    for (const auto& tvRef : parsed->typeVarDecls) {
+      const auto& tv = tvRef.get();
+      if (parsed->usedTypeVars.find(tv.name) == parsed->usedTypeVars.end()) {
         std::cerr << "Warning: unused type variable " << tv.name << "\n";
       }
     }
   }
 
-  // Process the (inner) type as arrow type
-  const auto* arrowType = dynamic_cast<const NArrowType*>(&innerSig.get());
-  if (arrowType == nullptr) {
+  // Validate trait bounds via registry (not in parseTypeSignature)
+  if (parsed->isPolymorphic) {
+    auto& registry = polang::getTraitRegistry();
+    for (const auto& tvRef : parsed->typeVarDecls) {
+      const auto& tv = tvRef.get();
+      if (!tv.bound.empty() && !registry.isKnownTrait(tv.bound)) {
+        reportError("unknown type class '" + tv.bound + "'");
+        return;
+      }
+    }
+  }
+
+  // Validate it's an arrow type
+  if (!parsed->isArrowType) {
     if (node.arguments.empty()) {
-      // Non-arrow type for zero-param function is no longer valid.
-      // Must use () -> T syntax.
       reportError("type signature for '" + node.id->name + "' must use () -> " +
-                  innerSig.get().getTypeName() +
-                  " for zero-parameter functions");
+                  signature->getTypeName() + " for zero-parameter functions");
       return;
     }
     reportError("type signature for '" + node.id->name +
@@ -1460,49 +1768,34 @@ void TypeChecker::applyFunctionSignature(
     return;
   }
 
-  // Check for unit type parameter: () -> T means zero-param function
-  const auto* unitParam =
-      dynamic_cast<const NUnitType*>(arrowType->paramType.get());
-  if (unitParam != nullptr) {
-    // () -> T: zero-param function
+  // Handle unit parameter: () -> T means zero-param function
+  if (parsed->isUnitParam) {
     if (!node.arguments.empty()) {
       reportError("type signature for '" + node.id->name +
                   "' has () parameter but definition has " +
                   std::to_string(node.arguments.size()) + " parameters");
       return;
     }
-    node.type = arrowType->returnType->clone();
+    node.type = parsed->returnTypeSpec->clone();
     return;
   }
 
-  // Extract parameter type references
-  std::vector<std::reference_wrapper<const NTypeSpec>> paramTypeRefs;
-  const auto* productType =
-      dynamic_cast<const NProductType*>(arrowType->paramType.get());
-  if (productType != nullptr) {
-    for (const auto& t : productType->types) {
-      paramTypeRefs.push_back(std::cref(*t));
-    }
-  } else {
-    paramTypeRefs.push_back(std::cref(*arrowType->paramType));
-  }
-
   // Check arity matches
-  if (paramTypeRefs.size() != node.arguments.size()) {
+  if (parsed->paramTypeSpecs.size() != node.arguments.size()) {
     reportError("type signature for '" + node.id->name + "' has " +
-                std::to_string(paramTypeRefs.size()) +
+                std::to_string(parsed->paramTypeSpecs.size()) +
                 " parameters but definition has " +
                 std::to_string(node.arguments.size()));
     return;
   }
 
   // Apply parameter types (clone from references)
-  for (size_t i = 0; i < paramTypeRefs.size(); ++i) {
-    node.arguments[i]->type = paramTypeRefs[i].get().clone();
+  for (size_t i = 0; i < parsed->paramTypeSpecs.size(); ++i) {
+    node.arguments[i]->type = parsed->paramTypeSpecs[i].get().clone();
   }
 
   // Apply return type (clone)
-  node.type = arrowType->returnType->clone();
+  node.type = parsed->returnTypeSpec->clone();
 }
 
 bool TypeChecker::validateTypeNames(
@@ -1553,7 +1846,7 @@ bool TypeChecker::validateTypeNames(
   return true;
 }
 
-void TypeChecker::warnOrphanedTypeSignatures() {
+void TypeChecker::reportOrphanedTypeSignatures() {
   for (const auto& [name, unused] : pendingTypeSignatures) {
     // Unmangle the name for display: strip module prefix (everything up to
     // and including the last "$$")
@@ -1562,8 +1855,8 @@ void TypeChecker::warnOrphanedTypeSignatures() {
     if (pos != std::string::npos) {
       displayName = name.substr(pos + 2);
     }
-    std::cerr << "Warning: type signature for '" << displayName
-              << "' has no corresponding definition\n";
+    reportError("type signature for '" + displayName +
+                "' has no corresponding definition");
   }
   pendingTypeSignatures.clear();
 }
@@ -1645,4 +1938,47 @@ void TypeChecker::resolveRemainingGenerics() {
 
   // Clear tracking maps
   varDeclNodes.clear();
+}
+
+void TypeChecker::checkLiteralRange(const NExpression* expr,
+                                    const std::string& targetType) {
+  if (expr == nullptr) {
+    return;
+  }
+
+  // Extract integer literal value, handling both direct NInteger
+  // and negated NUnaryOperator(TMINUS, NInteger(N)) forms.
+  const auto extractLiteral = [](const NExpression* e)
+      -> std::optional<std::pair<std::int64_t, SourceLocation>> {
+    if (const auto* intLit = dynamic_cast<const NInteger*>(e)) {
+      return std::pair{intLit->value, intLit->loc};
+    }
+    const auto* unaryOp = dynamic_cast<const NUnaryOperator*>(e);
+    if (unaryOp == nullptr || unaryOp->op != yy::parser::token::TMINUS) {
+      return std::nullopt;
+    }
+    const auto* innerInt =
+        dynamic_cast<const NInteger*>(unaryOp->operand.get());
+    if (innerInt == nullptr) {
+      return std::nullopt;
+    }
+    return std::pair{-innerInt->value, unaryOp->loc};
+  };
+
+  const auto result = extractLiteral(expr);
+  if (!result) {
+    return;
+  }
+  const auto [value, loc] = *result;
+
+  if (!polang::isIntegerType(targetType)) {
+    return;
+  }
+  if (polang::isLiteralInRange(value, targetType)) {
+    return;
+  }
+  reportError("literal " + std::to_string(value) + " does not fit in type " +
+                  targetType + " (range " +
+                  polang::getIntegerRangeString(targetType) + ")",
+              loc);
 }

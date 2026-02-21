@@ -1,0 +1,11 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+
+(* F1: Regression test for runtime modulo-by-zero handling.
+   When the divisor is a variable that happens to be zero at runtime,
+   modulo should produce a runtime error, not undefined behavior.
+*)
+y = 0
+x = 10 % y
+(* CHECK: Runtime error: integer division by zero at line 1, column 5
+*)

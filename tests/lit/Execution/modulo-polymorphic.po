@@ -1,0 +1,11 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Modulo operator should work with polymorphic functions.
+   When a function has untyped parameters used with %, the type checker
+   should infer the parameters as integers via unification.
+*)
+(* CHECK: 1 : i64
+*)
+mod(a, b) = a % b
+mod(10, 3)

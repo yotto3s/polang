@@ -1,0 +1,16 @@
+(* RUN: %not %polang_repl %s 2>&1 | %FileCheck %s
+*)
+
+(* Regression test for i32 MIN_INT / -1 overflow.
+   The spec says: "Division overflow (the sole case being MIN_INT / -1 for
+   signed types) is also a runtime error." This test verifies the i32 case.
+*)
+
+(* CHECK: Runtime error: integer overflow at line {{[0-9]+}}, column {{[0-9]+}}
+*)
+
+:{
+divIt : i32 * i32 -> i32
+divIt(a, b) = a / b
+:}
+divIt((0 as i32) - (2147483647 as i32) - (1 as i32), (0 as i32) - (1 as i32))

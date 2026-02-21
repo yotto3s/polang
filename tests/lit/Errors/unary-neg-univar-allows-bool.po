@@ -1,0 +1,11 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* Regression test: unary - adds a Numeric trait bound to its univar operand.
+   myNeg(x) = -x constrains x with a Numeric bound, so myNeg(true) is
+   correctly rejected as a type error (bool is not numeric).
+*)
+(* CHECK: Type error:{{.*}}
+*)
+myNeg(x) = -x
+myNeg(true)

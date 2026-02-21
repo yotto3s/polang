@@ -1,0 +1,7 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test unary negation: -(10) + 5 = -5 *)
+(* CHECK: -5 : i64
+*)
+-10 + 5

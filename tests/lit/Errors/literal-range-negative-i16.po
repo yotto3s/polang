@@ -1,0 +1,10 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* -40000 does not fit in i16 (range -32768 to 32767). *)
+
+(* CHECK: {{.*}}does not fit in type i16{{.*}}
+*)
+
+x : i16
+x = -40000

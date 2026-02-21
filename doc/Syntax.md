@@ -373,6 +373,19 @@ Expressions can be:
 
 ## Operators
 
+### Unary Operators
+
+Polang supports the following unary operators:
+
+| Operator | Description   | Example |
+|----------|---------------|---------|
+| `-`      | Negation      | `-x`    |
+| `!`      | Logical not   | `!flag` |
+
+**Unary negation (`-`)** computes the arithmetic negation of its operand. The operand must be a numeric type (integer or float). The result has the same type as the operand.
+
+**Logical not (`!`)** performs logical negation. The operand must be of type `bool`. The result is `false` if the operand is `true`, and `true` if the operand is `false`.
+
 ### Arithmetic Operators
 
 | Operator | Description    | Example   |
@@ -381,6 +394,22 @@ Expressions can be:
 | `-`      | Subtraction    | `a - b`   |
 | `*`      | Multiplication | `a * b`   |
 | `/`      | Division       | `a / b`   |
+| `%`      | Modulo (remainder) | `a % b`   |
+
+The modulo operator `%` computes the remainder of integer division (truncated division). The result has the same sign as the dividend. Only integer and index type operands are permitted with `%`; other types (float, bool, etc.) are rejected and the program is ill-formed. Integer division and remainder by zero is undefined behavior.
+
+Examples:
+```
+17 % 5     (* 2 *)
+20 % 10    (* 0 *)
+10 % 3     (* 1 *)
+```
+
+**Division by zero**: Integer division by zero produces a runtime error with source location:
+```
+Runtime error: integer division by zero at line <L>, column <C>
+```
+Float division by zero follows IEEE 754 and produces `inf` or `NaN`.
 
 ### Comparison Operators
 
@@ -416,18 +445,34 @@ See [Type Conversions](TypeSystem.md#type-conversions) for detailed conversion s
 
 ### Operator Precedence
 
-From highest to lowest:
+Operators are listed from highest to lowest precedence:
 
-1. Unary `-`, `!` (negation, logical not)
-2. `as` (type conversion)
-3. `*`, `/` (multiplication, division)
-4. `+`, `-` (addition, subtraction)
-5. `==`, `!=`, `<`, `<=`, `>`, `>=` (comparisons)
+| Precedence | Operators                           | Associativity   |
+|------------|-------------------------------------|-----------------|
+| 9          | `.` (member access)                 | Left            |
+| 8          | Unary `-`, `!`                      | Right (prefix)  |
+| 7          | `as` (type conversion)              | Left            |
+| 6          | `*`, `/`, `%`                       | Left            |
+| 5          | `+`, `-`                            | Left            |
+| 4          | `==`, `!=`, `<`, `<=`, `>`, `>=`    | Non-associative |
+| 3          | `&&`                                | Left            |
+| 2          | `\|\|`                              | Left            |
+| 1          | `if`/`then`/`else`, `let`/`in`      | Right           |
 
-Parentheses can be used to override precedence:
+Examples:
 
 ```
-(1 + 2) * 3    (* 9, not 7 *)
+-10 + 5             (* evaluated as: (-10) + 5 = -5 *)
+!false && true      (* evaluated as: (!false) && true = true *)
+a > 0 && a < 10 || b == 0    (* evaluated as: ((a > 0) && (a < 10)) || (b == 0) *)
+10 % 3 + 1          (* evaluated as: (10 % 3) + 1 = 2 *)
+```
+
+Comparison operators are non-associative, meaning expressions like `a < b < c` are syntax errors and must use explicit parentheses:
+
+```
+a < b && b < c      (* correct *)
+(a < b) < c         (* syntax error: can't compare bool and integer *)
 ```
 
 ## Comments

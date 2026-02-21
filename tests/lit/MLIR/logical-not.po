@@ -1,0 +1,42 @@
+(* RUN: %polang_compiler --emit-mlir %s | %FileCheck %s
+*)
+
+(* Test logical not operator *)
+(* CHECK:      polang.func @logical_not(%arg0: !polang.bool) -> !polang.bool {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.not %arg0 : !polang.bool
+*)
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+*)
+(* CHECK-NEXT: }
+*)
+logical_not : bool -> bool
+logical_not(x) = !x
+
+(* Test negation of boolean literal *)
+(* CHECK:      polang.func @not_true() -> !polang.bool {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.bool true : !polang.bool
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.not %{{[0-9]+}} : !polang.bool
+*)
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+*)
+(* CHECK-NEXT: }
+*)
+not_true : () -> bool
+not_true() = !true
+
+(* Test negation of comparison *)
+(* CHECK:      polang.func @not_comparison(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.bool {
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp gt, %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed>
+*)
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.not %{{[0-9]+}} : !polang.bool
+*)
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+*)
+(* CHECK-NEXT: }
+*)
+not_comparison : i64 * i64 -> bool
+not_comparison(a, b) = !(a > b)

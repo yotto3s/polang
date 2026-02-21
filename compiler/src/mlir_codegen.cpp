@@ -141,6 +141,11 @@ bool MLIRCodeGenContext::lowerToStandard() {
   // Add the Polang to Standard lowering pass
   pm.addPass(createPolangToStandardPass());
 
+  // Check for overflow in constant expressions BEFORE canonicalization.
+  // Canonicalization would fold overflowing constants (e.g., MAX_INT + 1)
+  // into wrapped results, silently swallowing the overflow.
+  pm.addPass(polang::createCheckConstantOverflowPass());
+
   // Run canonicalization
   pm.addPass(createCanonicalizerPass());
 
@@ -163,8 +168,13 @@ bool MLIRCodeGenContext::lowerToLLVM() {
   // Lower SCF to CF
   pm.addPass(createConvertSCFToCFPass());
 
-  // Lower to LLVM
+  // Lower func dialect to LLVM first, so that any __polang_runtime_error
+  // created by DivOpLowering (as func::FuncOp) is converted to LLVMFuncOp
+  // before InsertOverflowChecks runs (which also needs that symbol).
   pm.addPass(createConvertFuncToLLVMPass());
+
+  // Insert overflow checks (must run after FuncToLLVM but before ArithToLLVM)
+  pm.addPass(polang::createInsertOverflowChecksPass());
   pm.addPass(createArithToLLVMConversionPass());
   pm.addPass(createConvertControlFlowToLLVMPass());
   pm.addPass(createFinalizeMemRefToLLVMConversionPass());

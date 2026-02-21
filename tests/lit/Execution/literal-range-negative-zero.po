@@ -1,0 +1,9 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Edge case: -0 is valid for all types including unsigned. *)
+(* CHECK: 0 : u8
+*)
+x : u8
+x = -0
+x

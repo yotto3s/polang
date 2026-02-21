@@ -1,0 +1,7 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test modulo execution *)
+(* CHECK: 1 : i64
+*)
+10 % 3

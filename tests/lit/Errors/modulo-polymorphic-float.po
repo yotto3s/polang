@@ -1,0 +1,21 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* F1: Bug reproduction - polymorphic modulo function accepts float arguments.
+   When a function like mod(a, b) = a % b is defined with untyped parameters,
+   the type checker assigns Numeric trait bounds (via checkArithmeticBinaryOp)
+   instead of Integer trait bounds. Since Numeric includes float types,
+   calling mod(3.14, 2.0) passes the trait check at instantiation time.
+   The float-typed polang.rem operation then fails at MLIR lowering because
+   RemOpLowering only handles integer and index types.
+
+   This test expects a type error when calling the polymorphic modulo function
+   with float arguments. The test will FAIL (no error produced) if the bug
+   exists.
+*)
+
+(* CHECK: {{.*}}does not satisfy{{.*}}
+*)
+
+mod(a, b) = a % b
+mod(3.14, 2.0)

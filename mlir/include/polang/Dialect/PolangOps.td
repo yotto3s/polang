@@ -223,6 +223,59 @@ def Polang_DivOp : Polang_ArithOp<"div"> {
   }];
 }
 
+def Polang_RemOp : Polang_ArithOp<"rem"> {
+  let summary = "Remainder (modulo) operation";
+  let description = [{
+    Computes the remainder of integer division (truncated division).
+    The result has the same sign as the dividend.
+    Only valid for integer and index types; other types (float, bool, etc.) are not permitted.
+
+    Example:
+    ```mlir
+    %0 = polang.rem %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+    ```
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Unary operations
+//===----------------------------------------------------------------------===//
+
+def Polang_NegOp : Polang_Op<"neg", [Pure]> {
+  let summary = "Unary negation operation";
+  let description = [{
+    Negates a numeric value (unary minus).
+
+    Example:
+    ```mlir
+    %0 = polang.neg %a : !polang.integer<64, signed> -> !polang.integer<64, signed>
+    %1 = polang.neg %f : !polang.float<64> -> !polang.float<64>
+    ```
+  }];
+
+  let arguments = (ins Polang_AnyNumericOrParam:$operand);
+  let results = (outs Polang_AnyNumericOrParam:$result);
+  let assemblyFormat = "$operand attr-dict `:` type($operand) `->` type($result)";
+
+  let hasVerifier = 1;
+}
+
+def Polang_NotOp : Polang_Op<"not", [Pure]> {
+  let summary = "Logical not operation";
+  let description = [{
+    Performs logical not on a boolean value.
+
+    Example:
+    ```mlir
+    %0 = polang.not %a : !polang.bool
+    ```
+  }];
+
+  let arguments = (ins Polang_BoolType:$operand);
+  let results = (outs Polang_BoolType:$result);
+  let assemblyFormat = "$operand attr-dict `:` type($operand)";
+}
+
 //===----------------------------------------------------------------------===//
 // Type conversion operations
 //===----------------------------------------------------------------------===//

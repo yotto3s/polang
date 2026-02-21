@@ -7,8 +7,9 @@ namespace polang {
 
 /// Categories of binary operators.
 enum class OperatorCategory {
-  Arithmetic, ///< +, -, *, /
+  Arithmetic, ///< +, -, *, /, %
   Comparison, ///< ==, !=, <, <=, >, >=
+  Logical,    ///< &&, ||
   Unknown     ///< Unrecognized operator
 };
 
@@ -23,7 +24,7 @@ enum class OperatorCategory {
 [[nodiscard]] std::string operatorToString(int op) noexcept;
 
 /// Check if the given token represents an arithmetic operator.
-/// Arithmetic operators: +, -, *, /
+/// Arithmetic operators: +, -, *, /, %
 /// @param op The operator token
 /// @return true if the operator is arithmetic
 [[nodiscard]] bool isArithmeticOperator(int op) noexcept;
@@ -33,6 +34,12 @@ enum class OperatorCategory {
 /// @param op The operator token
 /// @return true if the operator is a comparison
 [[nodiscard]] bool isComparisonOperator(int op) noexcept;
+
+/// Check if the given token represents a logical operator.
+/// Logical operators: &&, ||
+/// @param op The operator token
+/// @return true if the operator is logical
+[[nodiscard]] bool isLogicalOperator(int op) noexcept;
 
 } // namespace polang
 

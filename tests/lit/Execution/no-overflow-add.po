@@ -1,0 +1,9 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test that non-overflowing operations work correctly *)
+
+(* CHECK: 42 : i64
+*)
+
+40 + 2
