@@ -27,7 +27,8 @@ The project uses a two-stage Docker setup:
 
 **Dev image** (`polang-dev`) — built locally for development:
 - Everything in base, plus:
-- curl, ripgrep, valgrind, strace (utilities/debugging)
+- curl, jq, ripgrep, valgrind, strace (utilities/debugging)
+- libnotify-bin (notify-send for DBus notification forwarding to host)
 - Claude Code (AI-assisted development, standalone binary via official installer)
 - gh CLI (GitHub integration)
 - gosu-based UID/GID remapping
