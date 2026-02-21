@@ -80,8 +80,32 @@ TEST(IsInputIncomplete, TrailingDivide) {
   EXPECT_TRUE(InputChecker::isInputIncomplete("1 /"));
 }
 
+// Regression test: the modulo operator '%' must be treated as a continuation
+// operator. Input ending with '%' should be treated as incomplete (the user is
+// typing a multi-line expression like "10 %\n3"), and isInputIncomplete should
+// return true.
+TEST(IsInputIncomplete, TrailingModulo) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("10 %"));
+}
+
+TEST(IsInputIncomplete, TrailingLogicalAnd) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("true &&"));
+}
+
+TEST(IsInputIncomplete, TrailingLogicalOr) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("false ||"));
+}
+
 TEST(IsInputIncomplete, TrailingEquals) {
   EXPECT_TRUE(InputChecker::isInputIncomplete("x ="));
+}
+
+TEST(IsInputIncomplete, TrailingLessThan) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("1 <"));
+}
+
+TEST(IsInputIncomplete, TrailingGreaterThan) {
+  EXPECT_TRUE(InputChecker::isInputIncomplete("1 >"));
 }
 
 // Complete expression tests
