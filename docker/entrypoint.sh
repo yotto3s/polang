@@ -16,6 +16,7 @@ if [ "$(id -u "$USERNAME")" != "$TARGET_UID" ]; then
 fi
 
 # Fix home directory ownership (skip read-only mounts like .ssh and .gitconfig)
+# NOTE: exclusion list must match :ro mounts in docker_run.sh
 find "/home/$USERNAME" -maxdepth 1 -mindepth 1 ! -name .ssh ! -name .gitconfig -exec chown -R "$TARGET_UID:$TARGET_GID" {} +
 chown "$TARGET_UID:$TARGET_GID" "/home/$USERNAME"
 
