@@ -3,99 +3,30 @@ FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Entrypoint dependency
+# Entrypoint dependency + essential tools
 RUN apt-get update && apt-get install -y \
     gosu \
-    && apt-get clean
-
-# Editors
-RUN apt-get update && apt-get install -y \
-    neovim \
-    python3-pynvim \
-    && apt-get clean
-
-# Search and navigation
-RUN apt-get update && apt-get install -y \
+    curl \
     ripgrep \
-    fd-find \
-    fzf \
-    && apt-get clean
-RUN ln -s /usr/bin/fdfind /usr/bin/fd
-
-# File viewers
-RUN apt-get update && apt-get install -y \
-    bat \
-    eza \
-    && apt-get clean
-RUN ln -s /usr/bin/batcat /usr/bin/bat 2>/dev/null || true
-
-# VCS tools
-RUN apt-get update && apt-get install -y \
-    tig \
-    && apt-get clean
-
-# System monitoring
-RUN apt-get update && apt-get install -y \
-    htop \
-    && apt-get clean
-
-# Debugging and profiling
-RUN apt-get update && apt-get install -y \
     valgrind \
     strace \
-    linux-tools-generic \
-    && apt-get clean
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Utilities
-RUN apt-get update && apt-get install -y \
-    tmux \
-    parallel \
-    curl \
-    tree \
-    unzip \
-    && apt-get clean
+# Node.js 22 LTS (Claude Code runtime)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Tools installed from binary releases (not in Ubuntu repos)
-# lazygit
-RUN LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') \
-    && curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" \
-    && tar xf lazygit.tar.gz lazygit \
-    && install lazygit /usr/local/bin \
-    && rm lazygit lazygit.tar.gz
+# Claude Code
+RUN npm install -g @anthropic-ai/claude-code
 
-# zoxide
-RUN curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
-
-# starship
-RUN curl -sS https://starship.rs/install.sh | sh -s -- -y
-
-# dust
-RUN DUST_VERSION=$(curl -s "https://api.github.com/repos/bootandy/dust/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') \
-    && curl -Lo dust.tar.gz "https://github.com/bootandy/dust/releases/latest/download/dust-v${DUST_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
-    && tar xf dust.tar.gz --strip-components=1 -C /usr/local/bin \
-    && rm dust.tar.gz
-
-# duf
-RUN DUF_VERSION=$(curl -s "https://api.github.com/repos/muesli/duf/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') \
-    && curl -Lo duf.deb "https://github.com/muesli/duf/releases/latest/download/duf_${DUF_VERSION}_linux_amd64.deb" \
-    && dpkg -i duf.deb \
-    && rm duf.deb
-
-# procs
-RUN PROCS_VERSION=$(curl -s "https://api.github.com/repos/dalance/procs/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') \
-    && curl -Lo procs.zip "https://github.com/dalance/procs/releases/latest/download/procs-v${PROCS_VERSION}-x86_64-linux.zip" \
-    && unzip procs.zip \
-    && install procs /usr/local/bin \
-    && rm procs procs.zip
-
-# bottom
-RUN BOTTOM_VERSION=$(curl -s "https://api.github.com/repos/ClementTsang/bottom/releases/latest" | grep -Po '"tag_name": "\K[^"]*') \
-    && curl -Lo bottom.deb "https://github.com/ClementTsang/bottom/releases/latest/download/bottom_${BOTTOM_VERSION}-1_amd64.deb" \
-    && dpkg -i bottom.deb \
-    && rm bottom.deb
-
-# Chezmoi (for dotfiles management)
-RUN sh -c "$(curl -fsLS get.chezmoi.io)" -- -b /usr/local/bin
+# gh CLI
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+        > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update && apt-get install -y gh \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
