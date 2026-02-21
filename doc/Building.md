@@ -27,10 +27,9 @@ The project uses a two-stage Docker setup:
 
 **Dev image** (`polang-dev`) — built locally for development:
 - Everything in base, plus:
-- neovim, ripgrep, fd, fzf, bat, lazygit, tmux, starship, etc.
-- valgrind, strace, perf (debugging/profiling)
-- Claude Code (via Node.js)
-- chezmoi (optional dotfiles management)
+- ripgrep, valgrind, strace (debugging/profiling)
+- Node.js 22 LTS, Claude Code (AI-assisted development)
+- gh CLI (GitHub integration)
 - gosu-based UID/GID remapping
 
 ```bash
