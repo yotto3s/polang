@@ -12,13 +12,10 @@ RUN apt-get update && apt-get install -y \
     strace \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Node.js 22 LTS (Claude Code runtime)
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Claude Code
-RUN npm install -g @anthropic-ai/claude-code
+# Claude Code (official standalone installer — no Node.js required)
+RUN curl -fsSL https://claude.ai/install.sh | bash -s latest \
+    && mv /root/.local/bin/claude /usr/local/bin/claude \
+    && rm -rf /root/.claude/downloads
 
 # gh CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \

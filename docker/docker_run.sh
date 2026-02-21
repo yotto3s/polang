@@ -20,7 +20,7 @@ docker run -d \
     -v "${PROJECT_DIR}:/workspace/polang" \
     -v "${HOME}/.claude:/home/devuser/.claude" \
     -v "${HOME}/.ssh:/home/devuser/.ssh:ro" \
-    "${GITCONFIG_MOUNT[@]+"${GITCONFIG_MOUNT[@]}"}" \
+    ${GITCONFIG_MOUNT[@]+"${GITCONFIG_MOUNT[@]}"} \
     -e TARGET_UID="$(id -u)" \
     -e TARGET_GID="$(id -g)" \
     ${ANTHROPIC_API_KEY:+-e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"} \
