@@ -28,12 +28,15 @@ docker run -d \
     --name "${CONTAINER_NAME}" \
     -v "${PROJECT_DIR}:/workspace/polang" \
     -v "${HOME}/.claude:/home/devuser/.claude" \
+    -v "${HOME}/.claude.json:/home/devuser/.claude.json" \
+    -v "${HOME}/.credentials.json:/home/devuser/.credentials.json" \
     -v "${HOME}/.ssh:/home/devuser/.ssh:ro" \
     ${GITCONFIG_MOUNT[@]+"${GITCONFIG_MOUNT[@]}"} \
     ${DBUS_MOUNT[@]+"${DBUS_MOUNT[@]}"} \
     ${DBUS_ENV[@]+"${DBUS_ENV[@]}"} \
     -e TARGET_UID="$(id -u)" \
     -e TARGET_GID="$(id -g)" \
+    -e "TERM=xterm-256color" \
     ${ANTHROPIC_API_KEY:+-e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"} \
     ${CLAUDE_CODE_OAUTH_TOKEN:+-e CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN"} \
     -w /workspace/polang \
