@@ -12,7 +12,3 @@ if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [
     CLAUDE_CODE_OAUTH_TOKEN=$(python3 -c "import json; print(json.load(open('$CREDS_FILE'))['claudeAiOauth']['accessToken'])" 2>/dev/null) || true
     export CLAUDE_CODE_OAUTH_TOKEN
 fi
-
-# Dotfiles: set to a chezmoi-compatible repo URL to apply on container start
-# export CHEZMOI_REPO=https://github.com/username/dotfiles.git
-# export CHEZMOI_EMAIL=you@example.com
