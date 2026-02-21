@@ -476,7 +476,7 @@ type_atom : ident {
 numeric : TINTEGER {
               errno = 0;
               char* end = nullptr;
-              long long val = std::strtoll($1.c_str(), &end, 10);
+              std::int64_t val = std::strtoll($1.c_str(), &end, 10);
               if (errno == ERANGE) {
                 error(@$, "integer literal " + $1 + " is out of range");
               }

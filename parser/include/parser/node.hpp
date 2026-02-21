@@ -1,6 +1,7 @@
 #ifndef POLANG_NODE_HPP
 #define POLANG_NODE_HPP
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <set>
@@ -64,8 +65,8 @@ class NStatement : public Node {};
 
 class NInteger : public NExpression {
 public:
-  long long value;
-  explicit NInteger(long long value) : value(value) {}
+  std::int64_t value;
+  explicit NInteger(std::int64_t value) : value(value) {}
   void accept(Visitor &visitor) const override;
 };
 

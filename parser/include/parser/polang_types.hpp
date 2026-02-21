@@ -1,6 +1,7 @@
 #ifndef POLANG_TYPES_HPP
 #define POLANG_TYPES_HPP
 
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -478,7 +479,7 @@ getFloatWidth(const std::string& typeName) noexcept {
 /// type. Returns true if the value is in range, or if the type is not a
 /// fixed-width integer.
 [[nodiscard]] inline bool
-isLiteralInRange(long long value, const std::string& typeName) noexcept {
+isLiteralInRange(std::int64_t value, const std::string& typeName) noexcept {
   if (typeName == TypeNames::I8) {
     return value >= -128 && value <= 127;
   }
@@ -489,7 +490,7 @@ isLiteralInRange(long long value, const std::string& typeName) noexcept {
     return value >= -2147483648LL && value <= 2147483647LL;
   }
   if (typeName == TypeNames::I64) {
-    return true; // long long is at least 64-bit
+    return true; // int64_t value always fits in i64
   }
   if (typeName == TypeNames::U8) {
     return value >= 0 && value <= 255;

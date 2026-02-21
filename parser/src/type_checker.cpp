@@ -1949,7 +1949,7 @@ void TypeChecker::checkLiteralRange(const NExpression* expr,
   // Extract integer literal value, handling both direct NInteger
   // and negated NUnaryOperator(TMINUS, NInteger(N)) forms.
   const auto extractLiteral = [](const NExpression* e)
-      -> std::optional<std::pair<long long, SourceLocation>> {
+      -> std::optional<std::pair<std::int64_t, SourceLocation>> {
     if (const auto* intLit = dynamic_cast<const NInteger*>(e)) {
       return std::pair{intLit->value, intLit->loc};
     }
