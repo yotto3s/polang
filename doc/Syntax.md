@@ -396,7 +396,7 @@ Polang supports the following unary operators:
 | `/`      | Division       | `a / b`   |
 | `%`      | Modulo (remainder) | `a % b`   |
 
-The modulo operator `%` computes the remainder of integer division (truncated division). The result has the same sign as the dividend. Float operands are not permitted with `%`; the program is ill-formed. Integer division and remainder by zero is undefined behavior.
+The modulo operator `%` computes the remainder of integer division (truncated division). The result has the same sign as the dividend. Only integer and index type operands are permitted with `%`; other types (float, bool, etc.) are rejected and the program is ill-formed. Integer division and remainder by zero is undefined behavior.
 
 Examples:
 ```

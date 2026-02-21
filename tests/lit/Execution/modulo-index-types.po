@@ -1,0 +1,7 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test modulo with isize and usize index types *)
+(* CHECK: 2 : isize
+*)
+(17 as isize) % (5 as isize)

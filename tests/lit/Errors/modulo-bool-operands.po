@@ -1,0 +1,20 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* F1: Bug reproduction - modulo on bool operands passes the type checker.
+   The modulo type check only blocks float operands but does not verify
+   that operands are integer or index types. bool % bool passes type
+   checking because areTypesCompatible(bool, bool) returns true.
+
+   This test expects a type error about modulo requiring integer operands.
+   The test will FAIL if the bug exists (no such error is produced).
+*)
+
+(* CHECK: Type error: operator '%' requires integer operands, but got 'bool' at line {{[0-9]+}}, column {{[0-9]+}}
+*)
+
+a : bool
+a = true
+b : bool
+b = true
+a % b

@@ -26,7 +26,9 @@ using polang::formatVarDeclTypeError;
 using polang::isArithmeticOperator;
 using polang::isComparisonOperator;
 using polang::isFloatType;
+using polang::isGenericIntegerType;
 using polang::isGenericType;
+using polang::isIndexType;
 using polang::isIntegerType;
 using polang::operatorToString;
 using polang::resolveAllGenericsToDefault;
@@ -701,16 +703,30 @@ void TypeChecker::visit(const NBinaryOperator& node) {
 
   // Special handling for modulo operator - only allows integers
   if (node.op == yy::parser::token::TMOD) {
-    // Check that both operands are integer types (not float)
-    const bool lhsIsFloat =
-        polang::isFloatType(lhsType) || lhsType == TypeNames::GENERIC_FLOAT;
-    const bool rhsIsFloat =
-        polang::isFloatType(rhsType) || rhsType == TypeNames::GENERIC_FLOAT;
-
-    if (lhsIsFloat || rhsIsFloat) {
-      reportError("Modulo operator '%' requires integer operands, not float",
+    // Validate that a modulo operand is an integer/index type.
+    // Returns true if the operand is valid (or is a type variable that
+    // should be checked later via trait bounds). Returns false and reports
+    // an error if the operand is a concrete non-integer type.
+    const auto checkModuloOperand = [&](const std::string& operandType) {
+      if (operandType == TypeNames::TYPEVAR) {
+        return true;
+      }
+      if (polang::isUnificationVar(operandType)) {
+        traitConstraints.addBound(operandType, polang::TraitBound::Integer);
+        return true;
+      }
+      if (isIntegerType(operandType) || isIndexType(operandType) ||
+          isGenericIntegerType(operandType)) {
+        return true;
+      }
+      reportError("operator '%' requires integer operands, but got '" +
+                      operandType + "'",
                   node.loc);
       inferredType = TypeNames::UNKNOWN;
+      return false;
+    };
+
+    if (!checkModuloOperand(lhsType) || !checkModuloOperand(rhsType)) {
       return;
     }
 
