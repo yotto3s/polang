@@ -1,0 +1,14 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* F2c: Negative literal passed as function argument to unsigned type.
+   checkLiteralRange on function arguments also only checks NInteger
+   directly. Passing -1 to a function expecting u8 should be rejected.
+*)
+
+(* CHECK: {{.*}}does not fit in type u8{{.*}}
+*)
+
+f : u8 -> u8
+f(x) = x
+f(-1)

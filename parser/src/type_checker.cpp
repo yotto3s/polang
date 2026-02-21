@@ -1929,18 +1929,40 @@ void TypeChecker::checkLiteralRange(const NExpression* expr,
   if (expr == nullptr) {
     return;
   }
-  const auto* intLiteral = dynamic_cast<const NInteger*>(expr);
-  if (intLiteral == nullptr) {
+
+  // Extract integer literal value, handling both direct NInteger
+  // and negated NUnaryOperator(TMINUS, NInteger(N)) forms.
+  const auto extractLiteral = [](const NExpression* e)
+      -> std::optional<std::pair<long long, SourceLocation>> {
+    if (const auto* intLit = dynamic_cast<const NInteger*>(e)) {
+      return std::pair{intLit->value, intLit->loc};
+    }
+    const auto* unaryOp = dynamic_cast<const NUnaryOperator*>(e);
+    if (unaryOp == nullptr || unaryOp->op != yy::parser::token::TMINUS) {
+      return std::nullopt;
+    }
+    const auto* innerInt =
+        dynamic_cast<const NInteger*>(unaryOp->operand.get());
+    if (innerInt == nullptr) {
+      return std::nullopt;
+    }
+    return std::pair{-innerInt->value, unaryOp->loc};
+  };
+
+  const auto result = extractLiteral(expr);
+  if (!result) {
     return;
   }
+  const auto [value, loc] = *result;
+
   if (!polang::isIntegerType(targetType)) {
     return;
   }
-  if (polang::isLiteralInRange(intLiteral->value, targetType)) {
+  if (polang::isLiteralInRange(value, targetType)) {
     return;
   }
-  reportError("literal " + std::to_string(intLiteral->value) +
-                  " does not fit in type " + targetType + " (range " +
+  reportError("literal " + std::to_string(value) + " does not fit in type " +
+                  targetType + " (range " +
                   polang::getIntegerRangeString(targetType) + ")",
-              intLiteral->loc);
+              loc);
 }

@@ -463,6 +463,7 @@ Type error: literal <value> does not fit in type <type> (range <min> to <max>) a
 - Let bindings with type annotations: `let x : i8 = 1000 in x`
 - Function call arguments: `f(1000)` where `f : i8 -> i8`
 - Polymorphic function arguments (after type resolution)
+- Negated integer literals: `x : u8 = -1` or `x : i8 = -200`
 
 **Contexts that do NOT trigger range checking:**
 - `as` casts: `300 as i8` is an explicit narrowing conversion that truncates

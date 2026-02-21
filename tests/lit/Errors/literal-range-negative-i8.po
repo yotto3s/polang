@@ -1,0 +1,15 @@
+(* RUN: %not %polang_compiler %s 2>&1 | %FileCheck %s
+*)
+
+(* F2b: Negative literal exceeding signed range should be a range error.
+   -200 does not fit in i8 (range -128 to 127).
+   The parser represents -200 as NUnaryOperator(TMINUS, NInteger(200)).
+   checkLiteralRange receives the NUnaryOperator, unwraps the negation,
+   and checks that -200 is outside the i8 range.
+*)
+
+(* CHECK: {{.*}}does not fit in type i8{{.*}}
+*)
+
+x : i8
+x = -200
