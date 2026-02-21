@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y \
 
 # Claude Code (official standalone installer — no Node.js required)
 RUN curl -fsSL https://claude.ai/install.sh | bash -s latest \
-    && mv /root/.local/bin/claude /usr/local/bin/claude \
-    && rm -rf /root/.claude/downloads
+    && cp -L /root/.local/bin/claude /usr/local/bin/claude \
+    && rm -rf /root/.local/bin/claude /root/.claude
 
 # gh CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
