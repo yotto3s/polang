@@ -228,7 +228,7 @@ def Polang_RemOp : Polang_ArithOp<"rem"> {
   let description = [{
     Computes the remainder of integer division (truncated division).
     The result has the same sign as the dividend.
-    Only valid for integer types; float operands are not permitted.
+    Only valid for integer and index types; other types (float, bool, etc.) are not permitted.
 
     Example:
     ```mlir

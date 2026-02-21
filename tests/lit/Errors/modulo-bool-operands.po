@@ -10,7 +10,7 @@
    The test will FAIL if the bug exists (no such error is produced).
 *)
 
-(* CHECK: {{.*}}Modulo operator '%' requires integer operands{{.*}}
+(* CHECK: Type error: operator '%' requires integer operands, but got 'bool' at line {{[0-9]+}}, column {{[0-9]+}}
 *)
 
 a : bool
