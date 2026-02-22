@@ -27,10 +27,10 @@ The project uses a two-stage Docker setup:
 
 **Dev image** (`polang-dev`) — built locally for development:
 - Everything in base, plus:
-- neovim, ripgrep, fd, fzf, bat, lazygit, tmux, starship, etc.
-- valgrind, strace, perf (debugging/profiling)
-- Claude Code (via Node.js)
-- chezmoi (optional dotfiles management)
+- curl, jq, ripgrep, valgrind, strace (utilities/debugging)
+- libnotify-bin (notify-send for DBus notification forwarding to host)
+- Claude Code (AI-assisted development, standalone binary via official installer)
+- gh CLI (GitHub integration)
 - gosu-based UID/GID remapping
 
 ```bash
