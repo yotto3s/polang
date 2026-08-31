@@ -123,7 +123,7 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     return EvalResult::error("Monomorphization failed");
   }
 
-  // Get resolved type from MLIR (after type inference, before lowering).
+  // Get resolved type from MLIR (after monomorphization, before lowering).
   // Always resolve, even for non-expression statements, so that execute()
   // uses the correct ABI (e.g. f64 returns via xmm0, not rax).
   resultType = codegenCtx.getResolvedReturnType(entryFuncName);
