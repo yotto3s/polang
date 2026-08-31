@@ -198,7 +198,7 @@ When adding new features:
 
 Some functions are intentionally not covered by tests because they are infrastructure code required by MLIR/LLVM but not used in our execution path.
 
-### MLIR Pass Infrastructure (7 functions)
+### MLIR Pass Infrastructure (5 functions)
 
 These methods are required by MLIR's pass infrastructure for CLI tools like `mlir-opt`, but Polang runs passes programmatically.
 
@@ -207,8 +207,6 @@ These methods are required by MLIR's pass infrastructure for CLI tools like `mli
 | `mlir/lib/Conversion/PolangToStandard.cpp` | `PolangToStandardPass::getArgument()` | Returns pass name for CLI |
 | `mlir/lib/Conversion/PolangToStandard.cpp` | `PolangToStandardPass::getDescription()` | Returns pass description |
 | `mlir/lib/Conversion/PolangToStandard.cpp` | `registerPolangConversionPasses()` | Registers passes with MLIR CLI |
-| `mlir/lib/Dialect/PolangTypeInference.cpp` | `TypeInferencePass::getArgument()` | Returns pass name for CLI |
-| `mlir/lib/Dialect/PolangTypeInference.cpp` | `TypeInferencePass::getDescription()` | Returns pass description |
 | `mlir/lib/Transforms/Monomorphization.cpp` | `MonomorphizationPass::getArgument()` | Returns pass name for CLI |
 | `mlir/lib/Transforms/Monomorphization.cpp` | `MonomorphizationPass::getDescription()` | Returns pass description |
 

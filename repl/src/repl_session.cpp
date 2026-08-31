@@ -115,11 +115,12 @@ EvalResult ReplSession::evaluate(const std::string& input) {
     return EvalResult::error("Code generation failed");
   }
 
-  // Run type inference to resolve type variables
-  if (!codegenCtx.runTypeInference()) {
-    std::cerr << "Type inference failed: " << codegenCtx.getError() << "\n";
+  // Run monomorphization to resolve type variables and specialize polymorphic
+  // functions
+  if (!codegenCtx.runMonomorphization()) {
+    std::cerr << "Monomorphization failed: " << codegenCtx.getError() << "\n";
     typeChecker->restoreState(snapshot);
-    return EvalResult::error("Type inference failed");
+    return EvalResult::error("Monomorphization failed");
   }
 
   // Get resolved type from MLIR (after type inference, before lowering).

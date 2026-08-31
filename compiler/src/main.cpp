@@ -89,9 +89,10 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  // Always run type inference to resolve type variables
-  if (!context.runTypeInference()) {
-    std::cerr << "Type inference failed: " << context.getError() << "\n";
+  // Always run monomorphization to resolve type variables and specialize
+  // polymorphic functions
+  if (!context.runMonomorphization()) {
+    std::cerr << "Monomorphization failed: " << context.getError() << "\n";
     return 1;
   }
 

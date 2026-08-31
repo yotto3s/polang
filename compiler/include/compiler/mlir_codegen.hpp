@@ -54,9 +54,9 @@ public:
                const std::string& entryFuncName = "",
                OptCompiledSymbols compiledSymbols = std::nullopt);
 
-  /// Run type inference pass to resolve type variables.
+  /// Run monomorphization pass to specialize polymorphic functions.
   /// Must be called after generateCode() when emitTypeVars was true.
-  [[nodiscard]] bool runTypeInference();
+  [[nodiscard]] bool runMonomorphization();
 
   /// Lower the Polang dialect to standard dialects.
   /// Must be called after generateCode().
@@ -79,7 +79,7 @@ public:
   [[nodiscard]] bool runCode(int64_t& result);
 
   /// Get the resolved return type name of an entry function.
-  /// Must be called after runTypeInference().
+  /// Must be called after runMonomorphization().
   /// Returns "int", "double", "bool", or "unknown".
   [[nodiscard]] std::string
   getResolvedReturnType(const std::string& funcName = "__polang_entry") const;

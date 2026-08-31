@@ -433,11 +433,9 @@ module {
 
 Type inference is fully handled at the AST level by the TypeChecker's Hindley-Milner unification algorithm (`parser/src/type_checker.cpp`). The Monomorphization pass (`mlir/lib/Transforms/Monomorphization.cpp`) specializes generic functions by creating concrete copies for each unique type instantiation.
 
-> **Note:** A `TypeInferencePass` (`mlir/lib/Dialect/PolangTypeInference.cpp`) is registered for `polang-opt` round-trip testing but is not used in the main compilation pipeline.
-
 **Example:**
 
-Before type inference and monomorphization:
+Before monomorphization:
 ```mlir
 polang.generic_func @identity<a>(%arg0: !polang.type_param<"a">) -> !polang.type_param<"a"> {
   polang.return %arg0 : !polang.type_param<"a">
@@ -666,8 +664,7 @@ mlir/
 │   │   ├── PolangOps.td        # Operation definitions
 │   │   ├── PolangTypes.td      # Type definitions (including TypeParamType)
 │   │   ├── PolangEnums.td      # Enum definitions
-│   │   ├── PolangLocations.h   # Custom location types
-│   │   └── Passes.h            # Dialect pass declarations
+│   │   └── PolangLocations.h   # Custom location types
 │   ├── Conversion/
 │   │   └── Passes.h            # Lowering pass declarations
 │   ├── Transforms/
@@ -679,8 +676,7 @@ mlir/
 │   ├── Dialect/
 │   │   ├── PolangDialect.cpp       # Dialect implementation
 │   │   ├── PolangOps.cpp           # Operation implementations (includes verifiers)
-│   │   ├── PolangTypes.cpp         # Type implementations
-│   │   └── PolangTypeInference.cpp # Type inference pass
+│   │   └── PolangTypes.cpp         # Type implementations
 │   ├── Conversion/
 │   │   └── PolangToStandard.cpp    # Lowering pass
 │   ├── Transforms/
