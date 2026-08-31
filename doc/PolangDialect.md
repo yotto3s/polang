@@ -337,12 +337,6 @@ The Polang dialect uses custom verifiers to catch type errors during compilation
 
 ## Transformation Passes
 
-### Type Inference Pass (`polang-type-inference`)
-
-Resolves type parameters in `polang.generic_func` operations by analyzing `polang.instantiate` call sites. The pass infers concrete types for each type parameter based on the argument types at the call site.
-
-Type inference occurs primarily at the AST level via the TypeChecker's Hindley-Milner unification. The MLIR-level pass handles residual type parameter resolution for generic functions.
-
 ### Monomorphization Pass (`polang-monomorphize`)
 
 Specializes polymorphic functions for each unique set of concrete type arguments.
@@ -421,8 +415,7 @@ mlir/
 │   │   ├── PolangOps.td        # Operation definitions
 │   │   ├── PolangTypes.td      # Type definitions
 │   │   ├── PolangEnums.td      # Enum definitions
-│   │   ├── PolangLocations.h   # Custom location types
-│   │   └── Passes.h            # Dialect pass declarations
+│   │   └── PolangLocations.h   # Custom location types
 │   ├── Conversion/
 │   │   └── Passes.h            # Lowering pass declarations
 │   ├── Transforms/
@@ -434,8 +427,7 @@ mlir/
 │   ├── Dialect/
 │   │   ├── PolangDialect.cpp       # Dialect implementation
 │   │   ├── PolangOps.cpp           # Operation implementations (verifiers)
-│   │   ├── PolangTypes.cpp         # Type implementations
-│   │   └── PolangTypeInference.cpp # Type inference pass
+│   │   └── PolangTypes.cpp         # Type implementations
 │   ├── Conversion/
 │   │   └── PolangToStandard.cpp    # Lowering pass
 │   ├── Transforms/

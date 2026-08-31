@@ -662,8 +662,7 @@ mlir/
 │       └── Passes.h         # Monomorphization pass declarations
 └── lib/
     ├── Dialect/
-    │   ├── PolangTypes.cpp          # Type implementations
-    │   └── PolangTypeInference.cpp  # MLIR-level type inference pass
+    │   └── PolangTypes.cpp          # Type implementations
     └── Transforms/
         └── Monomorphization.cpp     # Function specialization for call sites
 ```
@@ -697,14 +696,11 @@ This variant design makes the monomorphic/polymorphic distinction explicit at th
    ├── Generates polang.generic_func with !polang.type_param<"name"> for polymorphic functions
    └── Generates polang.instantiate at call sites with concrete type bindings
 
-4. Type inference pass runs (PolangTypeInference.cpp)
-   └── Resolves residual type parameters in generic functions
-
-5. Monomorphization pass runs (Monomorphization.cpp)
+4. Monomorphization pass runs (Monomorphization.cpp)
    ├── Creates specialized function copies for each unique type combination
    └── Replaces polang.instantiate with polang.call to specialized functions
 
-6. Lowering proceeds with fully-typed MLIR
+5. Lowering proceeds with fully-typed MLIR
 ```
 
 ### Verifier Compatibility

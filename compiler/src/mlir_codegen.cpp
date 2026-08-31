@@ -110,9 +110,9 @@ bool MLIRCodeGenContext::generateCode(const NBlock& ast, bool emitTypeVars,
   return true;
 }
 
-bool MLIRCodeGenContext::runTypeInference() {
+bool MLIRCodeGenContext::runMonomorphization() {
   if (!module || !*module) {
-    error = "No module for type inference";
+    error = "No module for monomorphization";
     return false;
   }
 
@@ -123,7 +123,7 @@ bool MLIRCodeGenContext::runTypeInference() {
   pm.addPass(polang::createMonomorphizationPass());
 
   if (failed(pm.run(**module))) {
-    error = "Type inference failed";
+    error = "Monomorphization failed";
     return false;
   }
 
