@@ -28,8 +28,8 @@ cmake --build build -j$(nproc)
 Or from outside the container:
 
 ```bash
-docker exec polang cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
-docker exec polang cmake --build build -j$(nproc)
+docker exec polang-dev cmake -S. -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_PREFIX_PATH="/usr/lib/llvm-20"
+docker exec polang-dev cmake --build build -j$(nproc)
 ```
 
 ### Running
