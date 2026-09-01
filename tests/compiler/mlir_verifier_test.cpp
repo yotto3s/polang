@@ -37,8 +37,8 @@ protected:
     context.getOrLoadDialect<PolangDialect>();
     context.getOrLoadDialect<DLTIDialect>();
     // Capture diagnostics as strings
-    diagHandler = context.getDiagEngine().registerHandler(
-        [this](Diagnostic& diag) {
+    diagHandler =
+        context.getDiagEngine().registerHandler([this](Diagnostic& diag) {
           lastDiag = diag.str();
           return success();
         });
@@ -82,8 +82,8 @@ TEST_F(VerifierTest, ReturnOpTypeMismatch) {
   builder.setInsertionPointToEnd(entry);
 
   // Return f64 from a function that expects i64
-  auto val = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type, 1.0);
+  auto val =
+      builder.create<ConstantFloatOp>(builder.getUnknownLoc(), f64Type, 1.0);
   builder.create<ReturnOp>(builder.getUnknownLoc(), val.getResult());
 
   EXPECT_TRUE(failed(verify(*module)));
@@ -101,8 +101,8 @@ TEST_F(VerifierTest, ReturnOpValueWhenVoid) {
   builder.setInsertionPointToEnd(entry);
 
   // Return a value from void function
-  auto val = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type, 42);
+  auto val =
+      builder.create<ConstantIntegerOp>(builder.getUnknownLoc(), i64Type, 42);
   builder.create<ReturnOp>(builder.getUnknownLoc(), val.getResult());
 
   EXPECT_TRUE(failed(verify(*module)));
@@ -122,9 +122,8 @@ TEST_F(VerifierTest, CallOpUndefinedFunction) {
   builder.setInsertionPointToEnd(entry);
 
   // Call undefined function
-  auto callOp = builder.create<CallOp>(
-      builder.getUnknownLoc(), "nonexistent",
-      TypeRange{i64Type}, ValueRange{});
+  auto callOp = builder.create<CallOp>(builder.getUnknownLoc(), "nonexistent",
+                                       TypeRange{i64Type}, ValueRange{});
   builder.create<ReturnOp>(builder.getUnknownLoc(), callOp.getResult());
 
   EXPECT_TRUE(failed(verify(*module)));
@@ -140,8 +139,8 @@ TEST_F(VerifierTest, CallOpArgCountMismatch) {
 
   // Define target function with 1 parameter
   auto targetType = builder.getFunctionType({i64Type}, {i64Type});
-  builder.create<polang::FuncOp>(
-      builder.getUnknownLoc(), "target", targetType, ArrayRef<StringRef>{});
+  builder.create<polang::FuncOp>(builder.getUnknownLoc(), "target", targetType,
+                                 ArrayRef<StringRef>{});
 
   // Define caller function
   auto callerType = builder.getFunctionType({}, {i64Type});
@@ -151,9 +150,8 @@ TEST_F(VerifierTest, CallOpArgCountMismatch) {
   builder.setInsertionPointToEnd(entry);
 
   // Call with wrong number of arguments (0 instead of 1)
-  auto callOp = builder.create<CallOp>(
-      builder.getUnknownLoc(), "target",
-      TypeRange{i64Type}, ValueRange{});
+  auto callOp = builder.create<CallOp>(builder.getUnknownLoc(), "target",
+                                       TypeRange{i64Type}, ValueRange{});
   builder.create<ReturnOp>(builder.getUnknownLoc(), callOp.getResult());
 
   EXPECT_TRUE(failed(verify(module)));
@@ -171,8 +169,8 @@ TEST_F(VerifierTest, CallOpArgTypeMismatch) {
 
   // Define target function expecting i64 parameter
   auto targetType = builder.getFunctionType({i64Type}, {i64Type});
-  builder.create<polang::FuncOp>(
-      builder.getUnknownLoc(), "target", targetType, ArrayRef<StringRef>{});
+  builder.create<polang::FuncOp>(builder.getUnknownLoc(), "target", targetType,
+                                 ArrayRef<StringRef>{});
 
   // Define caller function
   auto callerType = builder.getFunctionType({}, {i64Type});
@@ -182,11 +180,11 @@ TEST_F(VerifierTest, CallOpArgTypeMismatch) {
   builder.setInsertionPointToEnd(entry);
 
   // Pass f64 argument to function expecting i64
-  auto val = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type, 1.0);
-  auto callOp = builder.create<CallOp>(
-      builder.getUnknownLoc(), "target",
-      TypeRange{i64Type}, ValueRange{val.getResult()});
+  auto val =
+      builder.create<ConstantFloatOp>(builder.getUnknownLoc(), f64Type, 1.0);
+  auto callOp =
+      builder.create<CallOp>(builder.getUnknownLoc(), "target",
+                             TypeRange{i64Type}, ValueRange{val.getResult()});
   builder.create<ReturnOp>(builder.getUnknownLoc(), callOp.getResult());
 
   EXPECT_TRUE(failed(verify(module)));
@@ -205,17 +203,18 @@ TEST_F(VerifierTest, AddOpTypeMismatch) {
   Block* entry = func.addEntryBlock();
   builder.setInsertionPointToEnd(entry);
 
-  auto lhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type, 1);
-  auto rhs = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type, 2.0);
+  auto lhs =
+      builder.create<ConstantIntegerOp>(builder.getUnknownLoc(), i64Type, 1);
+  auto rhs =
+      builder.create<ConstantFloatOp>(builder.getUnknownLoc(), f64Type, 2.0);
 
   // AddOp with mismatched types
-  builder.create<AddOp>(
-      builder.getUnknownLoc(), i64Type, lhs.getResult(), rhs.getResult());
+  builder.create<AddOp>(builder.getUnknownLoc(), i64Type, lhs.getResult(),
+                        rhs.getResult());
 
   EXPECT_TRUE(failed(verify(*module)));
-  EXPECT_NE(lastDiag.find("operand types must be compatible"), std::string::npos);
+  EXPECT_NE(lastDiag.find("operand types must be compatible"),
+            std::string::npos);
 }
 
 TEST_F(VerifierTest, SubOpTypeMismatch) {
@@ -228,16 +227,17 @@ TEST_F(VerifierTest, SubOpTypeMismatch) {
   Block* entry = func.addEntryBlock();
   builder.setInsertionPointToEnd(entry);
 
-  auto lhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type, 1);
-  auto rhs = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type, 2.0);
+  auto lhs =
+      builder.create<ConstantIntegerOp>(builder.getUnknownLoc(), i64Type, 1);
+  auto rhs =
+      builder.create<ConstantFloatOp>(builder.getUnknownLoc(), f64Type, 2.0);
 
-  builder.create<SubOp>(
-      builder.getUnknownLoc(), i64Type, lhs.getResult(), rhs.getResult());
+  builder.create<SubOp>(builder.getUnknownLoc(), i64Type, lhs.getResult(),
+                        rhs.getResult());
 
   EXPECT_TRUE(failed(verify(*module)));
-  EXPECT_NE(lastDiag.find("operand types must be compatible"), std::string::npos);
+  EXPECT_NE(lastDiag.find("operand types must be compatible"),
+            std::string::npos);
 }
 
 TEST_F(VerifierTest, MulOpTypeMismatch) {
@@ -250,16 +250,17 @@ TEST_F(VerifierTest, MulOpTypeMismatch) {
   Block* entry = func.addEntryBlock();
   builder.setInsertionPointToEnd(entry);
 
-  auto lhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type, 1);
-  auto rhs = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type, 2.0);
+  auto lhs =
+      builder.create<ConstantIntegerOp>(builder.getUnknownLoc(), i64Type, 1);
+  auto rhs =
+      builder.create<ConstantFloatOp>(builder.getUnknownLoc(), f64Type, 2.0);
 
-  builder.create<MulOp>(
-      builder.getUnknownLoc(), i64Type, lhs.getResult(), rhs.getResult());
+  builder.create<MulOp>(builder.getUnknownLoc(), i64Type, lhs.getResult(),
+                        rhs.getResult());
 
   EXPECT_TRUE(failed(verify(*module)));
-  EXPECT_NE(lastDiag.find("operand types must be compatible"), std::string::npos);
+  EXPECT_NE(lastDiag.find("operand types must be compatible"),
+            std::string::npos);
 }
 
 TEST_F(VerifierTest, DivOpTypeMismatch) {
@@ -272,16 +273,17 @@ TEST_F(VerifierTest, DivOpTypeMismatch) {
   Block* entry = func.addEntryBlock();
   builder.setInsertionPointToEnd(entry);
 
-  auto lhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type, 1);
-  auto rhs = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type, 2.0);
+  auto lhs =
+      builder.create<ConstantIntegerOp>(builder.getUnknownLoc(), i64Type, 1);
+  auto rhs =
+      builder.create<ConstantFloatOp>(builder.getUnknownLoc(), f64Type, 2.0);
 
-  builder.create<DivOp>(
-      builder.getUnknownLoc(), i64Type, lhs.getResult(), rhs.getResult());
+  builder.create<DivOp>(builder.getUnknownLoc(), i64Type, lhs.getResult(),
+                        rhs.getResult());
 
   EXPECT_TRUE(failed(verify(*module)));
-  EXPECT_NE(lastDiag.find("operand types must be compatible"), std::string::npos);
+  EXPECT_NE(lastDiag.find("operand types must be compatible"),
+            std::string::npos);
 }
 
 TEST_F(VerifierTest, AddOpResultTypeMismatch) {
@@ -294,14 +296,14 @@ TEST_F(VerifierTest, AddOpResultTypeMismatch) {
   Block* entry = func.addEntryBlock();
   builder.setInsertionPointToEnd(entry);
 
-  auto lhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type, 1);
-  auto rhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type, 2);
+  auto lhs =
+      builder.create<ConstantIntegerOp>(builder.getUnknownLoc(), i64Type, 1);
+  auto rhs =
+      builder.create<ConstantIntegerOp>(builder.getUnknownLoc(), i64Type, 2);
 
   // AddOp with i64 operands but f64 result type
-  builder.create<AddOp>(
-      builder.getUnknownLoc(), f64Type, lhs.getResult(), rhs.getResult());
+  builder.create<AddOp>(builder.getUnknownLoc(), f64Type, lhs.getResult(),
+                        rhs.getResult());
 
   EXPECT_TRUE(failed(verify(*module)));
   EXPECT_NE(lastDiag.find("result type must be compatible"), std::string::npos);
@@ -320,18 +322,54 @@ TEST_F(VerifierTest, CmpOpTypeMismatch) {
   Block* entry = func.addEntryBlock();
   builder.setInsertionPointToEnd(entry);
 
-  auto lhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type, 1);
-  auto rhs = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type, 2.0);
+  auto lhs =
+      builder.create<ConstantIntegerOp>(builder.getUnknownLoc(), i64Type, 1);
+  auto rhs =
+      builder.create<ConstantFloatOp>(builder.getUnknownLoc(), f64Type, 2.0);
 
-  builder.create<CmpOp>(
-      builder.getUnknownLoc(), boolType,
-      CmpPredicate::eq, lhs.getResult(), rhs.getResult());
+  builder.create<CmpOp>(builder.getUnknownLoc(), boolType, CmpPredicate::eq,
+                        lhs.getResult(), rhs.getResult());
 
   EXPECT_TRUE(failed(verify(*module)));
   EXPECT_NE(lastDiag.find("comparison operand types must be compatible"),
             std::string::npos);
+}
+
+// ============== CastOp Verifier Tests ==============
+
+TEST_F(VerifierTest, CastOpRejectsI1Input) {
+  OpBuilder builder(&context);
+  auto i64Type = builder.getI64Type();
+  auto boolType = builder.getI1Type();
+  auto funcType = builder.getFunctionType({boolType}, {i64Type});
+
+  auto [module, func] = createModule("test", funcType);
+  Block* entry = func.addEntryBlock();
+  builder.setInsertionPointToEnd(entry);
+
+  builder.create<CastOp>(builder.getUnknownLoc(), i64Type,
+                         entry->getArgument(0));
+
+  EXPECT_TRUE(failed(verify(*module)));
+  EXPECT_NE(lastDiag.find("must be numeric"), std::string::npos);
+}
+
+TEST_F(VerifierTest, CastOpRejectsI1Result) {
+  OpBuilder builder(&context);
+  auto i64Type = builder.getI64Type();
+  auto boolType = builder.getI1Type();
+  auto funcType = builder.getFunctionType({}, {boolType});
+
+  auto [module, func] = createModule("test", funcType);
+  Block* entry = func.addEntryBlock();
+  builder.setInsertionPointToEnd(entry);
+
+  auto lhs =
+      builder.create<ConstantIntegerOp>(builder.getUnknownLoc(), i64Type, 1);
+  builder.create<CastOp>(builder.getUnknownLoc(), boolType, lhs.getResult());
+
+  EXPECT_TRUE(failed(verify(*module)));
+  EXPECT_NE(lastDiag.find("must be numeric"), std::string::npos);
 }
 
 TEST_F(VerifierTest, TupleTypeCreation) {
@@ -384,14 +422,16 @@ TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
   EXPECT_EQ(polang::getTupleElementOffset(flatTuple, 1), 8u);
   EXPECT_EQ(polang::getTupleElementSlotOffset(flatTuple, 0), 0u);
   EXPECT_EQ(polang::getTupleElementSlotOffset(flatTuple, 1), 1u);
-  EXPECT_EQ(polang::getTupleElementOffsets(flatTuple), (SmallVector<uint64_t>{0, 8}));
-  EXPECT_EQ(polang::getTupleElementSlotOffsets(flatTuple), (SmallVector<uint64_t>{0, 1}));
+  EXPECT_EQ(polang::getTupleElementOffsets(flatTuple),
+            (SmallVector<uint64_t>{0, 8}));
+  EXPECT_EQ(polang::getTupleElementSlotOffsets(flatTuple),
+            (SmallVector<uint64_t>{0, 1}));
 
   // 4. Flat tuple with sub-64-bit types (i8, i1, f32)
-  auto sub64Tuple =
-      mlir::TupleType::get(&context, {i8Type, i1Type, f32Type});
+  auto sub64Tuple = mlir::TupleType::get(&context, {i8Type, i1Type, f32Type});
   EXPECT_EQ(polang::getTupleTypeSize(sub64Tuple), 24u);
-  EXPECT_EQ(polang::getTupleElementOffsets(sub64Tuple), (SmallVector<uint64_t>{0, 8, 16}));
+  EXPECT_EQ(polang::getTupleElementOffsets(sub64Tuple),
+            (SmallVector<uint64_t>{0, 8, 16}));
   EXPECT_EQ(polang::getTupleElementSlotOffsets(sub64Tuple),
             (SmallVector<uint64_t>{0, 1, 2}));
 
@@ -407,7 +447,8 @@ TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
   EXPECT_EQ(polang::getTupleElementSlotOffset(nestedTuple, 0), 0u);
   EXPECT_EQ(polang::getTupleElementSlotOffset(nestedTuple, 1), 1u);
   EXPECT_EQ(polang::getTupleElementSlotOffset(nestedTuple, 2), 3u);
-  EXPECT_EQ(polang::getTupleElementOffsets(nestedTuple), (SmallVector<uint64_t>{0, 8, 24}));
+  EXPECT_EQ(polang::getTupleElementOffsets(nestedTuple),
+            (SmallVector<uint64_t>{0, 8, 24}));
   EXPECT_EQ(polang::getTupleElementSlotOffsets(nestedTuple),
             (SmallVector<uint64_t>{0, 1, 3}));
 
@@ -420,8 +461,10 @@ TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
   EXPECT_EQ(polang::getTupleTypeSize(group), 24u);
   auto deepTuple = mlir::TupleType::get(&context, {pair1, group});
   EXPECT_EQ(polang::getTupleTypeSize(deepTuple), 40u);
-  EXPECT_EQ(polang::getTupleElementOffsets(deepTuple), (SmallVector<uint64_t>{0, 16}));
-  EXPECT_EQ(polang::getTupleElementSlotOffsets(deepTuple), (SmallVector<uint64_t>{0, 2}));
+  EXPECT_EQ(polang::getTupleElementOffsets(deepTuple),
+            (SmallVector<uint64_t>{0, 16}));
+  EXPECT_EQ(polang::getTupleElementSlotOffsets(deepTuple),
+            (SmallVector<uint64_t>{0, 2}));
 
   // 7. Unspecialized generic tuple (type_param<"a">, i64)
   auto typeParamA = polang::TypeParamType::get(&context, "a");
@@ -459,8 +502,8 @@ TEST_F(VerifierTest, TargetDataLayoutInteraction) {
   // 2. Custom 32-bit index DataLayout via module with DLTI spec
   auto loc = UnknownLoc::get(&context);
   OwningOpRef<ModuleOp> module32 = ModuleOp::create(loc);
-  auto entry = DataLayoutEntryAttr::get(
-      mlir::IndexType::get(&context), builder.getI64IntegerAttr(32));
+  auto entry = DataLayoutEntryAttr::get(mlir::IndexType::get(&context),
+                                        builder.getI64IntegerAttr(32));
   auto spec = DataLayoutSpecAttr::get(
       &context, ArrayRef<DataLayoutEntryInterface>{entry});
   (*module32)->setAttr(DLTIDialect::kDataLayoutAttrName, spec);

@@ -15,7 +15,7 @@ The dialect is defined using TableGen in `mlir/include/polang/Dialect/`.
 
 ## Types
 
-The Polang compiler leverages standard built-in MLIR types for primitives and defines dialect-specific types for domain-specific constructs (`TypeParamType` and `TupleType`).
+The Polang compiler leverages standard built-in MLIR types for primitives and tuples (`mlir::TupleType`), and defines a dialect-specific type for type parameters (`TypeParamType`).
 
 ### Standard Primitive Types
 
@@ -44,8 +44,6 @@ Type parameters represent named type variables in generic function templates. Th
 | `!polang.type_param<"b">` | Named type parameter "b" |
 
 Type parameters appear in `polang.generic_func` signatures and are bound to concrete types by `polang.instantiate` operations at call sites.
-
-### Tuple Types
 
 ### Tuple Types
 

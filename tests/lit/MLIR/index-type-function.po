@@ -8,7 +8,7 @@
 *)
 (* CHECK:  polang.func @to_usize(%{{.*}}: si64) -> index {
 *)
-(* CHECK-NEXT:    %{{[0-9]+}} = polang.cast %{{.*}} : si64 -> index
+(* CHECK-NEXT:    %{{[0-9]+}} = polang.cast %{{.*}} : si64 -> index {is_unsigned}
 *)
 to_i64 : isize -> i64
 to_i64(x) = x as i64

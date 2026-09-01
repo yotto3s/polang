@@ -469,6 +469,9 @@ public:
 
     // Use switch for cleaner operator dispatch
     Type arithResultTy = lhs.getType();
+    const bool isUnsigned =
+        lhsType ? getTypeMetadata(lhsType->getTypeName()).isUnsigned() : false;
+
     switch (node.op) {
     // Arithmetic operations - use LHS type as result type
     case yy::parser::token::TPLUS:
@@ -483,14 +486,26 @@ public:
       result = builder.create<MulOp>(loc(node.loc), arithResultTy, lhs, rhs);
       resultType = std::move(lhsType);
       break;
-    case yy::parser::token::TDIV:
-      result = builder.create<DivOp>(loc(node.loc), arithResultTy, lhs, rhs);
+    case yy::parser::token::TDIV: {
+      auto divOp =
+          builder.create<DivOp>(loc(node.loc), arithResultTy, lhs, rhs);
+      if (isUnsigned) {
+        divOp->setAttr("is_unsigned", builder.getUnitAttr());
+      }
+      result = divOp;
       resultType = std::move(lhsType);
       break;
-    case yy::parser::token::TMOD:
-      result = builder.create<RemOp>(loc(node.loc), arithResultTy, lhs, rhs);
+    }
+    case yy::parser::token::TMOD: {
+      auto remOp =
+          builder.create<RemOp>(loc(node.loc), arithResultTy, lhs, rhs);
+      if (isUnsigned) {
+        remOp->setAttr("is_unsigned", builder.getUnitAttr());
+      }
+      result = remOp;
       resultType = std::move(lhsType);
       break;
+    }
     // Comparison operations - result is always bool
     case yy::parser::token::TCEQ:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::eq, lhs, rhs);
@@ -500,22 +515,46 @@ public:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::ne, lhs, rhs);
       resultType = makeTypeSpec(TypeNames::BOOL);
       break;
-    case yy::parser::token::TCLT:
-      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::lt, lhs, rhs);
+    case yy::parser::token::TCLT: {
+      auto cmpOp =
+          builder.create<CmpOp>(loc(node.loc), CmpPredicate::lt, lhs, rhs);
+      if (isUnsigned) {
+        cmpOp->setAttr("is_unsigned", builder.getUnitAttr());
+      }
+      result = cmpOp;
       resultType = makeTypeSpec(TypeNames::BOOL);
       break;
-    case yy::parser::token::TCLE:
-      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::le, lhs, rhs);
+    }
+    case yy::parser::token::TCLE: {
+      auto cmpOp =
+          builder.create<CmpOp>(loc(node.loc), CmpPredicate::le, lhs, rhs);
+      if (isUnsigned) {
+        cmpOp->setAttr("is_unsigned", builder.getUnitAttr());
+      }
+      result = cmpOp;
       resultType = makeTypeSpec(TypeNames::BOOL);
       break;
-    case yy::parser::token::TCGT:
-      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::gt, lhs, rhs);
+    }
+    case yy::parser::token::TCGT: {
+      auto cmpOp =
+          builder.create<CmpOp>(loc(node.loc), CmpPredicate::gt, lhs, rhs);
+      if (isUnsigned) {
+        cmpOp->setAttr("is_unsigned", builder.getUnitAttr());
+      }
+      result = cmpOp;
       resultType = makeTypeSpec(TypeNames::BOOL);
       break;
-    case yy::parser::token::TCGE:
-      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::ge, lhs, rhs);
+    }
+    case yy::parser::token::TCGE: {
+      auto cmpOp =
+          builder.create<CmpOp>(loc(node.loc), CmpPredicate::ge, lhs, rhs);
+      if (isUnsigned) {
+        cmpOp->setAttr("is_unsigned", builder.getUnitAttr());
+      }
+      result = cmpOp;
       resultType = makeTypeSpec(TypeNames::BOOL);
       break;
+    }
     default:
       emitError(loc(node.loc)) << "Unknown binary operator: " << node.op;
       result = nullptr;
@@ -530,6 +569,9 @@ public:
       return;
     }
     const Value inputValue = result;
+    const bool inputIsUnsigned =
+        resultType ? getTypeMetadata(resultType->getTypeName()).isUnsigned()
+                   : false;
 
     // Get the target type
     Type targetType = getPolangType(*node.targetType);
@@ -539,7 +581,14 @@ public:
     }
 
     // Create the cast operation
-    result = builder.create<CastOp>(loc(node.loc), targetType, inputValue);
+    auto castOp = builder.create<CastOp>(loc(node.loc), targetType, inputValue);
+    if (inputIsUnsigned) {
+      castOp->setAttr("input_is_unsigned", builder.getUnitAttr());
+    }
+    if (getTypeMetadata(node.targetType->getTypeName()).isUnsigned()) {
+      castOp->setAttr("is_unsigned", builder.getUnitAttr());
+    }
+    result = castOp;
     resultType = node.targetType->clone();
   }
 

@@ -40,8 +40,12 @@ def Polang_TypeParamType : Polang_Type<"TypeParam", "type_param"> {
 // Type constraints
 //===----------------------------------------------------------------------===//
 
+def Polang_NonBoolInteger : Type<
+    CPred<"::llvm::isa<::mlir::IntegerType>($_self) && ::llvm::cast<::mlir::IntegerType>($_self).getWidth() > 1">,
+    "integer type with width > 1", "::mlir::IntegerType">;
+
 def Polang_AnyNumericOrParam : AnyTypeOf<[
-    AnyInteger, AnyFloat, Index, Polang_TypeParamType
+    Polang_NonBoolInteger, AnyFloat, Index, Polang_TypeParamType
 ], "numeric type or type parameter">;
 
 def Polang_AnyTypeOrParam : AnyTypeOf<[

@@ -6,7 +6,7 @@
 *)
 (* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 42 : si64
 *)
-(* CHECK-NEXT:     %{{[0-9]+}} = polang.cast %{{[0-9]+}} : si64 -> index
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.cast %{{[0-9]+}} : si64 -> index {is_unsigned}
 *)
 (* CHECK-NEXT:     polang.return %{{[0-9]+}} : index
 *)

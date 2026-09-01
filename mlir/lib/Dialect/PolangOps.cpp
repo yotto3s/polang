@@ -728,18 +728,17 @@ LogicalResult CastOp::verify() {
     return success();
   }
 
-  // Both types must be numeric
-  const bool inputIsNumeric = isa<mlir::IntegerType>(inputType) ||
-                              isa<mlir::FloatType>(inputType) ||
-                              isa<mlir::IndexType>(inputType);
-  const bool resultIsNumeric = isa<mlir::IntegerType>(resultType) ||
-                               isa<mlir::FloatType>(resultType) ||
-                               isa<mlir::IndexType>(resultType);
+  auto isNumericType = [](Type t) {
+    if (auto intType = dyn_cast<mlir::IntegerType>(t)) {
+      return intType.getWidth() > 1;
+    }
+    return isa<mlir::FloatType, mlir::IndexType>(t);
+  };
 
-  if (!inputIsNumeric) {
+  if (!isNumericType(inputType)) {
     return emitOpError("input type must be numeric, got ") << inputType;
   }
-  if (!resultIsNumeric) {
+  if (!isNumericType(resultType)) {
     return emitOpError("result type must be numeric, got ") << resultType;
   }
 

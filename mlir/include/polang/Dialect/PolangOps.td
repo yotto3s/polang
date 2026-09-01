@@ -57,7 +57,7 @@ def Polang_ConstantIntegerOp : Polang_Op<"constant.integer", [Pure]> {
   }];
 
   let arguments = (ins Polang_AnyIntegerAttr:$value);
-  let results = (outs AnyTypeOf<[AnyInteger, Index, Polang_TypeParamType]>:$result);
+  let results = (outs AnyTypeOf<[Polang_NonBoolInteger, Index, Polang_TypeParamType]>:$result);
 
   let hasCustomAssemblyFormat = 1;
 

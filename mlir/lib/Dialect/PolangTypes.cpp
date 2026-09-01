@@ -33,7 +33,9 @@ struct BuiltinTupleDataLayoutModel
     auto tupleType = llvm::cast<mlir::TupleType>(type);
     auto sz = polang::getTupleTypeSize(tupleType, &dataLayout);
     if (!sz) {
-      return llvm::TypeSize::getFixed(0);
+      llvm::report_fatal_error(
+          "cannot compute DataLayout size of unspecialized tuple containing "
+          "type parameters");
     }
     return llvm::TypeSize::getFixed(*sz);
   }
