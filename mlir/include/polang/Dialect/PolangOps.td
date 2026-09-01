@@ -785,4 +785,70 @@ def Polang_PrintOp : Polang_Op<"print"> {
   let assemblyFormat = "$value `:` type($value) attr-dict";
 }
 
+//===----------------------------------------------------------------------===//
+// Tuple operations
+//===----------------------------------------------------------------------===//
+
+def Polang_TupleOp : Polang_Op<"tuple", [Pure]> {
+  let summary = "Construct a tuple from values";
+  let description = [{
+    Constructs a tuple value from zero or more element values.
+
+    Example:
+    ```mlir
+    %t = polang.tuple %a, %b : (!polang.integer<64, signed>, !polang.float<64>) -> !polang.tuple<!polang.integer<64, signed>, !polang.float<64>>
+    ```
+  }];
+
+  let arguments = (ins Variadic<Polang_PrimitiveOrParamType>:$elements);
+  let results = (outs Polang_TupleType:$result);
+
+  let assemblyFormat = "($elements^)? attr-dict `:` functional-type($elements, results)";
+
+  let hasVerifier = 1;
+
+  let builders = [
+    OpBuilder<(ins "mlir::ValueRange":$elements), [{
+      ::llvm::SmallVector<::mlir::Type> types;
+      for (auto val : elements)
+        types.push_back(val.getType());
+      build($_builder, $_state,
+            $_builder.getType<TupleType>(types), elements);
+    }]>
+  ];
+}
+
+def Polang_TupleGetOp : Polang_Op<"tuple.get", [Pure]> {
+  let summary = "Extract an element from a tuple by constant index";
+  let description = [{
+    Extracts the element at the specified zero-based index from a tuple.
+
+    Example:
+    ```mlir
+    %0 = polang.tuple.get %t [0] : !polang.tuple<!polang.integer<64, signed>, !polang.float<64>> -> !polang.integer<64, signed>
+    ```
+  }];
+
+  let arguments = (ins Polang_TupleType:$tuple, IndexAttr:$index);
+  let results = (outs Polang_AnyTypeOrParam:$result);
+
+  let assemblyFormat = "$tuple `[` $index `]` attr-dict `:` type($tuple) `->` type($result)";
+
+  let hasVerifier = 1;
+
+  let builders = [
+    OpBuilder<(ins "mlir::Value":$tuple, "int64_t":$index), [{
+      auto tupleType = ::llvm::dyn_cast<TupleType>(tuple.getType());
+      ::mlir::Type resType;
+      if (tupleType && index >= 0 && static_cast<size_t>(index) < tupleType.getTypes().size()) {
+        resType = tupleType.getTypes()[index];
+      } else {
+        resType = $_builder.getNoneType();
+      }
+      build($_builder, $_state, resType, tuple,
+            $_builder.getIndexAttr(index));
+    }]>
+  ];
+}
+
 #endif // POLANG_OPS_TD

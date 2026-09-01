@@ -481,6 +481,175 @@ TEST_F(VerifierTest, CmpOpTypeMismatch) {
             std::string::npos);
 }
 
+// ============== TupleOp and TupleGetOp Verifier Tests ==============
+
+TEST_F(VerifierTest, TupleOpValid) {
+  OpBuilder builder(&context);
+  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto f64Type = polang::FloatType::get(&context, 64);
+  auto tupleType = polang::TupleType::get(&context, {i64Type, f64Type});
+  auto emptyTupleType = polang::TupleType::get(&context, {});
+  auto funcType = builder.getFunctionType({}, {i64Type});
+
+  auto [module, func] = createModule("test", funcType);
+  Block* entry = func.addEntryBlock();
+  builder.setInsertionPointToEnd(entry);
+
+  auto c1 = builder.create<ConstantIntegerOp>(
+      builder.getUnknownLoc(), i64Type,
+      IntegerAttr::get(builder.getIntegerType(64), 42));
+  auto c2 = builder.create<ConstantFloatOp>(
+      builder.getUnknownLoc(), f64Type,
+      FloatAttr::get(builder.getF64Type(), 3.14));
+
+  auto tupleOp = builder.create<TupleOp>(
+      builder.getUnknownLoc(), ValueRange{c1.getResult(), c2.getResult()});
+  EXPECT_EQ(tupleOp.getResult().getType(), tupleType);
+
+  auto emptyTupleOp =
+      builder.create<TupleOp>(builder.getUnknownLoc(), ValueRange{});
+  EXPECT_EQ(emptyTupleOp.getResult().getType(), emptyTupleType);
+
+  auto getOp = builder.create<TupleGetOp>(builder.getUnknownLoc(),
+                                          tupleOp.getResult(), 0);
+  builder.create<ReturnOp>(builder.getUnknownLoc(), getOp.getResult());
+
+  EXPECT_TRUE(succeeded(verify(*module)));
+}
+
+TEST_F(VerifierTest, TupleOpOperandCountMismatch) {
+  OpBuilder builder(&context);
+  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto f64Type = polang::FloatType::get(&context, 64);
+  auto tupleType = polang::TupleType::get(&context, {i64Type, f64Type});
+  auto funcType = builder.getFunctionType({}, {i64Type});
+
+  auto [module, func] = createModule("test", funcType);
+  Block* entry = func.addEntryBlock();
+  builder.setInsertionPointToEnd(entry);
+
+  auto c1 = builder.create<ConstantIntegerOp>(
+      builder.getUnknownLoc(), i64Type,
+      IntegerAttr::get(builder.getIntegerType(64), 42));
+
+  // Create TupleOp with 1 operand but 2-element tuple result type
+  builder.create<TupleOp>(builder.getUnknownLoc(), tupleType,
+                          ValueRange{c1.getResult()});
+
+  EXPECT_TRUE(failed(verify(*module)));
+  EXPECT_NE(lastDiag.find("operand count"), std::string::npos);
+}
+
+TEST_F(VerifierTest, TupleOpOperandTypeMismatch) {
+  OpBuilder builder(&context);
+  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto f64Type = polang::FloatType::get(&context, 64);
+  auto tupleType = polang::TupleType::get(&context, {i64Type, f64Type});
+  auto funcType = builder.getFunctionType({}, {i64Type});
+
+  auto [module, func] = createModule("test", funcType);
+  Block* entry = func.addEntryBlock();
+  builder.setInsertionPointToEnd(entry);
+
+  auto c1 = builder.create<ConstantFloatOp>(
+      builder.getUnknownLoc(), f64Type,
+      FloatAttr::get(builder.getF64Type(), 1.0));
+  auto c2 = builder.create<ConstantFloatOp>(
+      builder.getUnknownLoc(), f64Type,
+      FloatAttr::get(builder.getF64Type(), 2.0));
+
+  // c1 is f64 but element 0 expected i64
+  builder.create<TupleOp>(builder.getUnknownLoc(), tupleType,
+                          ValueRange{c1.getResult(), c2.getResult()});
+
+  EXPECT_TRUE(failed(verify(*module)));
+  EXPECT_NE(lastDiag.find("incompatible with tuple element type"),
+            std::string::npos);
+}
+
+TEST_F(VerifierTest, TupleGetOpIndexOutOfBounds) {
+  OpBuilder builder(&context);
+  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto f64Type = polang::FloatType::get(&context, 64);
+  auto funcType = builder.getFunctionType({}, {i64Type});
+
+  auto [module, func] = createModule("test", funcType);
+  Block* entry = func.addEntryBlock();
+  builder.setInsertionPointToEnd(entry);
+
+  auto c1 = builder.create<ConstantIntegerOp>(
+      builder.getUnknownLoc(), i64Type,
+      IntegerAttr::get(builder.getIntegerType(64), 42));
+  auto c2 = builder.create<ConstantFloatOp>(
+      builder.getUnknownLoc(), f64Type,
+      FloatAttr::get(builder.getF64Type(), 3.14));
+
+  auto tupleOp = builder.create<TupleOp>(
+      builder.getUnknownLoc(), ValueRange{c1.getResult(), c2.getResult()});
+
+  // Out-of-bounds index 2 on 2-element tuple
+  builder.create<TupleGetOp>(builder.getUnknownLoc(), i64Type,
+                             tupleOp.getResult(), builder.getIndexAttr(2));
+
+  EXPECT_TRUE(failed(verify(*module)));
+  EXPECT_NE(lastDiag.find("out of bounds"), std::string::npos);
+}
+
+TEST_F(VerifierTest, TupleGetOpResultTypeMismatch) {
+  OpBuilder builder(&context);
+  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto f64Type = polang::FloatType::get(&context, 64);
+  auto funcType = builder.getFunctionType({}, {f64Type});
+
+  auto [module, func] = createModule("test", funcType);
+  Block* entry = func.addEntryBlock();
+  builder.setInsertionPointToEnd(entry);
+
+  auto c1 = builder.create<ConstantIntegerOp>(
+      builder.getUnknownLoc(), i64Type,
+      IntegerAttr::get(builder.getIntegerType(64), 42));
+  auto c2 = builder.create<ConstantFloatOp>(
+      builder.getUnknownLoc(), f64Type,
+      FloatAttr::get(builder.getF64Type(), 3.14));
+
+  auto tupleOp = builder.create<TupleOp>(
+      builder.getUnknownLoc(), ValueRange{c1.getResult(), c2.getResult()});
+
+  // Element 0 is i64, but extract specifying f64 result type
+  builder.create<TupleGetOp>(builder.getUnknownLoc(), f64Type,
+                             tupleOp.getResult(), builder.getIndexAttr(0));
+
+  EXPECT_TRUE(failed(verify(*module)));
+  EXPECT_NE(lastDiag.find("does not match tuple element type"),
+            std::string::npos);
+}
+
+TEST_F(VerifierTest, TupleGetOpBuilderOutOfBoundsSafe) {
+  OpBuilder builder(&context);
+  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto funcType = builder.getFunctionType({}, {i64Type});
+
+  auto [module, func] = createModule("test", funcType);
+  Block* entry = func.addEntryBlock();
+  builder.setInsertionPointToEnd(entry);
+
+  auto c1 = builder.create<ConstantIntegerOp>(
+      builder.getUnknownLoc(), i64Type,
+      IntegerAttr::get(builder.getIntegerType(64), 42));
+
+  auto tupleOp =
+      builder.create<TupleOp>(builder.getUnknownLoc(), ValueRange{c1.getResult()});
+
+  // Builder with out-of-bounds index should not crash; it builds with NoneType fallback
+  auto getOp = builder.create<TupleGetOp>(builder.getUnknownLoc(),
+                                          tupleOp.getResult(), 5);
+  EXPECT_TRUE(isa<NoneType>(getOp.getResult().getType()));
+
+  EXPECT_TRUE(failed(verify(*module)));
+  EXPECT_NE(lastDiag.find("must be any Polang type or type parameter"),
+            std::string::npos);
+}
+
 TEST_F(VerifierTest, TupleTypeVerification) {
   auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
   auto i128Type = polang::IntegerType::get(&context, 128, Signedness::Signed);

@@ -1153,3 +1153,68 @@ GlobalLoadOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
   }
   return success();
 }
+
+//===----------------------------------------------------------------------===//
+// TupleOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult TupleOp::verify() {
+  auto tupleType = llvm::dyn_cast<polang::TupleType>(getResult().getType());
+  if (!tupleType) {
+    return emitOpError("result must be a TupleType");
+  }
+
+  if (getElements().size() != tupleType.getTypes().size()) {
+    return emitOpError("operand count (")
+           << getElements().size()
+           << ") does not match tuple type element count ("
+           << tupleType.getTypes().size() << ")";
+  }
+
+  for (size_t i = 0; i < getElements().size(); ++i) {
+    Type operandType = getElements()[i].getType();
+    Type expectedType = tupleType.getTypes()[i];
+    if (!llvm::isa<polang::IntegerType, polang::FloatType, BoolType,
+                   polang::IndexType, TypeParamType>(expectedType)) {
+      return emitOpError("tuple element ")
+             << i << " type (" << expectedType
+             << ") must be a primitive type or type parameter";
+    }
+    if (!typesAreCompatible(operandType, expectedType)) {
+      return emitOpError("operand ")
+             << i << " type (" << operandType
+             << ") is incompatible with tuple element type (" << expectedType
+             << ")";
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// TupleGetOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult TupleGetOp::verify() {
+  auto tupleType = llvm::dyn_cast<polang::TupleType>(getTuple().getType());
+  if (!tupleType) {
+    return emitOpError("operand must be a TupleType");
+  }
+
+  uint64_t idx = getIndex().getZExtValue();
+  if (idx >= tupleType.getTypes().size()) {
+    return emitOpError("index ")
+           << idx << " is out of bounds for tuple of size "
+           << tupleType.getTypes().size();
+  }
+
+  Type expectedType = tupleType.getTypes()[idx];
+  Type resultType = getResult().getType();
+  if (!typesAreCompatible(resultType, expectedType)) {
+    return emitOpError("result type (")
+           << resultType << ") does not match tuple element type at index "
+           << idx << " (" << expectedType << ")";
+  }
+
+  return success();
+}

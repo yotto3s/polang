@@ -327,6 +327,25 @@ Loads the current value from a previously declared global variable.
 %0 = polang.global.load @x : !polang.integer<64, signed>
 ```
 
+### Tuple Operations
+
+#### `polang.tuple`
+
+Constructs a tuple value from zero or more element values.
+
+```mlir
+%0 = polang.tuple %a, %b : (!polang.integer<64, signed>, !polang.float<64>) -> !polang.tuple<!polang.integer<64, signed>, !polang.float<64>>
+%unit = polang.tuple : () -> !polang.tuple<>
+```
+
+#### `polang.tuple.get`
+
+Extracts an element from a tuple by constant zero-based index.
+
+```mlir
+%first = polang.tuple.get %0 [0] : !polang.tuple<!polang.integer<64, signed>, !polang.float<64>> -> !polang.integer<64, signed>
+```
+
 ### Debug Operations
 
 #### `polang.print`
