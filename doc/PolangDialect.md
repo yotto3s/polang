@@ -66,6 +66,8 @@ Represents a fixed-size heterogeneous product of types with arbitrary arity ($N 
 | `(i64, f64)` | `!polang.tuple<!polang.integer<64, signed>, !polang.float<64>>` | 2-tuple of i64 and f64 |
 | `('a, 'b)` | `!polang.tuple<!polang.type_param<"a">, !polang.type_param<"b">>` | Generic tuple |
 
+Tuples of arity $N \ge 1$ lower to fixed-size stack allocations (`memref.alloca() : memref<N x i64>`) with 64-bit element alignment and strict in-order layout. Functions returning a non-unit tuple lower via an `sret` (structure return) convention where the caller allocates `memref.alloca() : memref<N x i64>` on its stack frame and passes it as argument 0, and the callee writes to it and returns void (`func.return`). Unit tuples (`!polang.tuple<>`) are discarded during lowering: functions taking/returning unit tuples lower to 0 arguments / 0 return values, and unit tuple constructions produce no SSA registers.
+
 ### Type Constraints
 
 - **`PrimitiveType`**: Types that fit in a 64-bit slot (`IntegerType` and `FloatType` with width $\le 64$, `BoolType`, `IndexType`).

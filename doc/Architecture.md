@@ -487,10 +487,18 @@ The `PolangToStandardPass` lowers Polang dialect operations to standard MLIR dia
 | `polang.return` | `func.return` |
 | `polang.if` | `scf.if` |
 | `polang.yield` | `scf.yield` |
+| `polang.tuple` ($N \ge 1$) | `memref.alloca` + `memref.store` |
+| `polang.tuple.get` | `memref.load` |
 | `polang.ref.create` (mutable) | `memref.alloca` + `memref.store` |
 | `polang.ref.create` (immutable) | passthrough |
 | `polang.ref.deref` | `memref.load` |
 | `polang.ref.store` | `memref.store` |
+
+**Structure Return (SRET) Convention:**
+
+Functions returning a non-unit tuple `!polang.tuple<T1, ... TN>` ($N \ge 1$) use an `sret` convention during lowering to standard dialects:
+- **Callee**: Prepends `sret: memref<N x i64>` as argument 0, stores returned tuple elements into it, and returns void (`func.return`).
+- **Caller**: Allocates `%sret_buf = memref.alloca() : memref<N x i64>` in the caller's stack frame, passes `%sret_buf` as argument 0 in `func.call`, and uses `%sret_buf` as the call result value for downstream access.
 
 **Runtime Checks:**
 
@@ -513,6 +521,10 @@ Integer division and modulo by zero are detected at runtime via a guard inserted
 | `!polang.float<32>` | `f32` |
 | `!polang.float<64>` | `f64` |
 | `!polang.bool` | `i1` |
+| `!polang.index<signed>` | `index` |
+| `!polang.index<unsigned>` | `index` |
+| `!polang.tuple<T1, ... TN>` ($N \ge 1$) | `memref<N x i64>` |
+| `!polang.tuple<>` ($N = 0$) | Discarded (0 types / 0 SSA values) |
 
 ### Stage 4: Standard to LLVM Dialect
 

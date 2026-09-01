@@ -53,6 +53,17 @@ public:
     addConversion([](polang::IndexType type) {
       return mlir::IndexType::get(type.getContext());
     });
+    addConversion([](polang::TupleType type,
+                     SmallVectorImpl<Type>& results) -> LogicalResult {
+      if (type.getTypes().empty()) {
+        // Unit tuple is discarded (produces 0 standard types)
+        return success();
+      }
+      results.push_back(
+          mlir::MemRefType::get({static_cast<int64_t>(type.getTypes().size())},
+                                mlir::IntegerType::get(type.getContext(), 64)));
+      return success();
+    });
     // Handle type parameters that weren't resolved by monomorphization.
     // Default to i64 as fallback (should not be reached in normal flow).
     addConversion([](TypeParamType type) -> Type {
@@ -950,19 +961,44 @@ struct FuncOpLowering : public OpConversionPattern<FuncOp> {
                   ConversionPatternRewriter& rewriter) const override {
     (void)adaptor; // Unused, but required by MLIR interface
     auto funcType = op.getFunctionType();
+
+    // Check if function returns a non-unit tuple (requires sret convention)
+    bool isSret = false;
+    MemRefType sretType;
+    if (funcType.getNumResults() == 1) {
+      if (auto tupleType = dyn_cast<polang::TupleType>(funcType.getResult(0))) {
+        if (!tupleType.getTypes().empty()) {
+          isSret = true;
+          sretType = mlir::MemRefType::get(
+              {static_cast<int64_t>(tupleType.getTypes().size())},
+              mlir::IntegerType::get(tupleType.getContext(), 64));
+        }
+      }
+    }
+
     TypeConverter::SignatureConversion signatureConversion(
-        funcType.getNumInputs());
+        funcType.getNumInputs() + (isSret ? 1 : 0));
+
+    if (isSret) {
+      signatureConversion.addInputs(sretType);
+    }
 
     const auto* typeConverter = getTypeConverter();
     for (size_t i = 0; i < funcType.getNumInputs(); ++i) {
-      signatureConversion.addInputs(
-          i, typeConverter->convertType(funcType.getInput(i)));
+      SmallVector<Type> convertedInputs;
+      if (failed(typeConverter->convertType(funcType.getInput(i),
+                                            convertedInputs))) {
+        return failure();
+      }
+      signatureConversion.addInputs(i, convertedInputs);
     }
 
     SmallVector<Type> resultTypes;
-    if (failed(
-            typeConverter->convertTypes(funcType.getResults(), resultTypes))) {
-      return failure();
+    if (!isSret) {
+      if (failed(typeConverter->convertTypes(funcType.getResults(),
+                                             resultTypes))) {
+        return failure();
+      }
     }
 
     auto newFuncType = rewriter.getFunctionType(
@@ -995,16 +1031,52 @@ struct CallOpLowering : public OpConversionPattern<CallOp> {
   using OpConversionPattern<CallOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(CallOp op, OpAdaptor adaptor,
+  matchAndRewrite(CallOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
+    // Check if callee returns a non-unit tuple (sret convention)
+    bool isSret = false;
+    MemRefType sretType;
+    if (op.getResultTypes().size() == 1) {
+      if (auto tupleType =
+              dyn_cast<polang::TupleType>(op.getResultTypes()[0])) {
+        if (!tupleType.getTypes().empty()) {
+          isSret = true;
+          sretType = mlir::MemRefType::get(
+              {static_cast<int64_t>(tupleType.getTypes().size())},
+              mlir::IntegerType::get(tupleType.getContext(), 64));
+        }
+      }
+    }
+
+    Location loc = op.getLoc();
+    if (isSret) {
+      // Allocate sret buffer in caller's stack frame
+      auto sretBuf = rewriter.create<memref::AllocaOp>(loc, sretType);
+
+      SmallVector<Value> callArgs;
+      callArgs.push_back(sretBuf.getResult());
+      for (ValueRange range : adaptor.getOperands()) {
+        callArgs.append(range.begin(), range.end());
+      }
+
+      rewriter.create<func::CallOp>(loc, op.getCallee(), TypeRange{}, callArgs);
+      rewriter.replaceOp(op, sretBuf.getResult());
+      return success();
+    }
+
     SmallVector<Type> resultTypes;
     if (failed(getTypeConverter()->convertTypes(op.getResultTypes(),
                                                 resultTypes))) {
       return failure();
     }
 
+    SmallVector<Value> flatOperands;
+    for (ValueRange range : adaptor.getOperands()) {
+      flatOperands.append(range.begin(), range.end());
+    }
+
     rewriter.replaceOpWithNewOp<func::CallOp>(op, op.getCallee(), resultTypes,
-                                              adaptor.getOperands());
+                                              flatOperands);
     return success();
   }
 };
@@ -1013,9 +1085,44 @@ struct ReturnOpLowering : public OpConversionPattern<ReturnOp> {
   using OpConversionPattern<ReturnOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ReturnOp op, OpAdaptor adaptor,
+  matchAndRewrite(ReturnOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
-    rewriter.replaceOpWithNewOp<func::ReturnOp>(op, adaptor.getOperands());
+    // Check if returning a non-unit tuple (sret convention)
+    if (op.getNumOperands() == 1) {
+      if (auto tupleType =
+              dyn_cast<polang::TupleType>(op.getOperand(0).getType())) {
+        if (!tupleType.getTypes().empty()) {
+          auto enclosingFunc = op->getParentOfType<func::FuncOp>();
+          if (!enclosingFunc || enclosingFunc.getArguments().empty()) {
+            return failure();
+          }
+          Value sretArg = enclosingFunc.getArgument(0);
+          if (adaptor.getOperands().empty() ||
+              adaptor.getOperands()[0].empty()) {
+            return failure();
+          }
+          Value srcMemRef = adaptor.getOperands()[0].front();
+          Location loc = op.getLoc();
+          int64_t n = static_cast<int64_t>(tupleType.getTypes().size());
+          for (int64_t i = 0; i < n; ++i) {
+            auto idxConst = rewriter.create<arith::ConstantIndexOp>(loc, i);
+            auto val = rewriter.create<memref::LoadOp>(loc, srcMemRef,
+                                                       ValueRange{idxConst});
+            rewriter.create<memref::StoreOp>(loc, val, sretArg,
+                                             ValueRange{idxConst});
+          }
+          rewriter.replaceOpWithNewOp<func::ReturnOp>(op, ValueRange{});
+          return success();
+        }
+      }
+    }
+
+    SmallVector<Value> flatOperands;
+    for (ValueRange range : adaptor.getOperands()) {
+      flatOperands.append(range.begin(), range.end());
+    }
+
+    rewriter.replaceOpWithNewOp<func::ReturnOp>(op, flatOperands);
     return success();
   }
 };
@@ -1030,14 +1137,15 @@ struct IfOpLowering : public OpConversionPattern<IfOp> {
   LogicalResult
   matchAndRewrite(IfOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
-    auto resultType = getTypeConverter()->convertType(op.getResult().getType());
-    if (!resultType) {
+    SmallVector<Type> resultTypes;
+    if (failed(getTypeConverter()->convertTypes(op->getResultTypes(),
+                                                resultTypes))) {
       return failure();
     }
 
     // Create scf::IfOp with empty regions (no withElseRegion to avoid
     // auto-created blocks)
-    auto scfIf = rewriter.create<scf::IfOp>(op.getLoc(), TypeRange{resultType},
+    auto scfIf = rewriter.create<scf::IfOp>(op.getLoc(), resultTypes,
                                             adaptor.getCondition());
 
     // Erase the auto-generated empty blocks if any
@@ -1064,9 +1172,14 @@ struct YieldOpLowering : public OpConversionPattern<YieldOp> {
   using OpConversionPattern<YieldOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(YieldOp op, OpAdaptor adaptor,
+  matchAndRewrite(YieldOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter& rewriter) const override {
-    rewriter.replaceOpWithNewOp<scf::YieldOp>(op, adaptor.getOperands());
+    SmallVector<Value> flatOperands;
+    for (ValueRange range : adaptor.getOperands()) {
+      flatOperands.append(range.begin(), range.end());
+    }
+
+    rewriter.replaceOpWithNewOp<scf::YieldOp>(op, flatOperands);
     return success();
   }
 };
@@ -1160,6 +1273,143 @@ struct PrintOpLowering : public OpConversionPattern<PrintOp> {
     // For now, just erase the print operation
     // In a full implementation, this would lower to a runtime call
     rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Tuple Operations Lowering
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+Value castValueToI64(Location loc, Value val,
+                     ConversionPatternRewriter& rewriter) {
+  Type type = val.getType();
+  if (auto intType = dyn_cast<mlir::IntegerType>(type)) {
+    if (intType.getWidth() > 64) {
+      return {};
+    }
+    if (intType.getWidth() == 64) {
+      return val;
+    }
+    return rewriter.create<arith::ExtUIOp>(loc, rewriter.getI64Type(), val);
+  }
+  if (auto floatType = dyn_cast<mlir::FloatType>(type)) {
+    if (floatType.getWidth() > 64) {
+      return {};
+    }
+    if (floatType.isF64()) {
+      return rewriter.create<arith::BitcastOp>(loc, rewriter.getI64Type(), val);
+    }
+    if (floatType.isF32()) {
+      auto f64Val =
+          rewriter.create<arith::ExtFOp>(loc, rewriter.getF64Type(), val);
+      return rewriter.create<arith::BitcastOp>(loc, rewriter.getI64Type(),
+                                               f64Val);
+    }
+  }
+  if (isa<mlir::IndexType>(type)) {
+    return rewriter.create<arith::IndexCastOp>(loc, rewriter.getI64Type(), val);
+  }
+  return {};
+}
+
+Value castValueFromI64(Location loc, Value i64Val, Type targetType,
+                       ConversionPatternRewriter& rewriter) {
+  if (auto intType = dyn_cast<mlir::IntegerType>(targetType)) {
+    if (intType.getWidth() > 64) {
+      return {};
+    }
+    if (intType.getWidth() == 64) {
+      return i64Val;
+    }
+    return rewriter.create<arith::TruncIOp>(loc, targetType, i64Val);
+  }
+  if (auto floatType = dyn_cast<mlir::FloatType>(targetType)) {
+    if (floatType.getWidth() > 64) {
+      return {};
+    }
+    if (floatType.isF64()) {
+      return rewriter.create<arith::BitcastOp>(loc, targetType, i64Val);
+    }
+    if (floatType.isF32()) {
+      auto f64Val =
+          rewriter.create<arith::BitcastOp>(loc, rewriter.getF64Type(), i64Val);
+      return rewriter.create<arith::TruncFOp>(loc, targetType, f64Val);
+    }
+  }
+  if (isa<mlir::IndexType>(targetType)) {
+    return rewriter.create<arith::IndexCastOp>(loc, targetType, i64Val);
+  }
+  return {};
+}
+
+} // namespace
+
+struct TupleOpLowering : public OpConversionPattern<TupleOp> {
+  using OpConversionPattern<TupleOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(TupleOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    // If unit tuple, discard completely (no SSA register/value created)
+    if (op.getType().getTypes().empty()) {
+      rewriter.replaceOp(op, ValueRange{});
+      return success();
+    }
+
+    Location loc = op.getLoc();
+    auto memRefType = dyn_cast_or_null<MemRefType>(
+        getTypeConverter()->convertType(op.getType()));
+    if (!memRefType) {
+      return failure();
+    }
+
+    // Allocate fixed-size 64-bit aligned stack storage: memref<N x i64>
+    auto alloca = rewriter.create<memref::AllocaOp>(loc, memRefType);
+
+    // Store each element sequentially at 64-bit word offset
+    for (size_t i = 0; i < adaptor.getElements().size(); ++i) {
+      Value elem = adaptor.getElements()[i];
+      Value i64Val = castValueToI64(loc, elem, rewriter);
+      if (!i64Val) {
+        return rewriter.notifyMatchFailure(
+            op, "unsupported element type for 64-bit slot tuple lowering");
+      }
+      auto idxConst = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      rewriter.create<memref::StoreOp>(loc, i64Val, alloca,
+                                       ValueRange{idxConst});
+    }
+
+    rewriter.replaceOp(op, alloca.getResult());
+    return success();
+  }
+};
+
+struct TupleGetOpLowering : public OpConversionPattern<TupleGetOp> {
+  using OpConversionPattern<TupleGetOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(TupleGetOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    Location loc = op.getLoc();
+    Type targetType = getTypeConverter()->convertType(op.getType());
+    if (!targetType) {
+      return failure();
+    }
+
+    auto idxConst = rewriter.create<arith::ConstantIndexOp>(
+        loc, op.getIndex().getZExtValue());
+    auto loadedI64 = rewriter.create<memref::LoadOp>(loc, adaptor.getTuple(),
+                                                     ValueRange{idxConst});
+
+    Value result = castValueFromI64(loc, loadedI64, targetType, rewriter);
+    if (!result) {
+      return rewriter.notifyMatchFailure(
+          op, "unsupported result type for tuple element extraction");
+    }
+    rewriter.replaceOp(op, result);
     return success();
   }
 };
@@ -1316,15 +1566,15 @@ struct PolangToStandardPass
     PolangTypeConverter typeConverter;
     RewritePatternSet patterns(&getContext());
 
-    patterns
-        .add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
-             ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
-             MulOpLowering, DivOpLowering, RemOpLowering, NegOpLowering,
-             NotOpLowering, CastOpLowering, CmpOpLowering,
-             GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
-             CallOpLowering, ReturnOpLowering, IfOpLowering, YieldOpLowering,
-             GlobalOpLowering, GlobalLoadOpLowering, PrintOpLowering>(
-            typeConverter, &getContext());
+    patterns.add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
+                 ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
+                 MulOpLowering, DivOpLowering, RemOpLowering, NegOpLowering,
+                 NotOpLowering, CastOpLowering, CmpOpLowering,
+                 GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
+                 CallOpLowering, ReturnOpLowering, IfOpLowering,
+                 YieldOpLowering, GlobalOpLowering, GlobalLoadOpLowering,
+                 PrintOpLowering, TupleOpLowering, TupleGetOpLowering>(
+        typeConverter, &getContext());
 
     if (failed(applyPartialConversion(moduleOp, target, std::move(patterns)))) {
       signalPassFailure();

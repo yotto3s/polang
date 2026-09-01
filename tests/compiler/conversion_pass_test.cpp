@@ -147,4 +147,147 @@ TEST_F(ConversionPassTest, ConstantFloatOpF32) {
   module->erase();
 }
 
+// ============== Tuple Lowering Tests ==============
+
+TEST_F(ConversionPassTest, UnitTupleFunctionLowering) {
+  OpBuilder builder(&context);
+  auto unitType = polang::TupleType::get(&context, {});
+
+  // Function taking and returning unit tuple
+  auto funcType = builder.getFunctionType({unitType}, {unitType});
+  auto module = ModuleOp::create(builder.getUnknownLoc());
+  builder.setInsertionPointToEnd(module.getBody());
+
+  auto func = builder.create<polang::FuncOp>(
+      builder.getUnknownLoc(), "__polang_entry", funcType,
+      ArrayRef<StringRef>{"arg"});
+  Block* entry = func.addEntryBlock();
+  builder.setInsertionPointToEnd(entry);
+
+  // Construct a unit tuple and return it
+  auto unitVal =
+      builder.create<polang::TupleOp>(builder.getUnknownLoc(), ValueRange{});
+  builder.create<ReturnOp>(builder.getUnknownLoc(), unitVal.getResult());
+
+  EXPECT_TRUE(runPass(module));
+
+  // Verify polang ops are all lowered
+  EXPECT_FALSE(hasOp<polang::FuncOp>(module));
+  EXPECT_FALSE(hasOp<polang::TupleOp>(module));
+  EXPECT_FALSE(hasOp<polang::ReturnOp>(module));
+
+  // Verify func::FuncOp was created with 0 inputs and 0 outputs
+  auto loweredFunc = module.lookupSymbol<func::FuncOp>("__polang_entry");
+  ASSERT_TRUE(loweredFunc != nullptr);
+  EXPECT_EQ(loweredFunc.getFunctionType().getNumInputs(), 0u);
+  EXPECT_EQ(loweredFunc.getFunctionType().getNumResults(), 0u);
+
+  // Verify no memref.alloca was created for unit tuple
+  EXPECT_FALSE(hasOp<memref::AllocaOp>(module));
+
+  // Verify func.return has 0 operands
+  auto returnOp = cast<func::ReturnOp>(loweredFunc.getBody().front().getTerminator());
+  EXPECT_EQ(returnOp.getNumOperands(), 0u);
+
+  module->erase();
+}
+
+TEST_F(ConversionPassTest, TupleOpAndGetOpLowering) {
+  OpBuilder builder(&context);
+  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto f64Type = polang::FloatType::get(&context, 64);
+
+  auto funcType = builder.getFunctionType({}, {i64Type});
+  auto module = ModuleOp::create(builder.getUnknownLoc());
+  builder.setInsertionPointToEnd(module.getBody());
+
+  auto func = builder.create<polang::FuncOp>(
+      builder.getUnknownLoc(), "__polang_entry", funcType,
+      ArrayRef<StringRef>{});
+  Block* entry = func.addEntryBlock();
+  builder.setInsertionPointToEnd(entry);
+
+  auto c1 = builder.create<ConstantIntegerOp>(
+      builder.getUnknownLoc(), i64Type,
+      IntegerAttr::get(builder.getIntegerType(64), 42));
+  auto c2 = builder.create<ConstantFloatOp>(
+      builder.getUnknownLoc(), f64Type,
+      FloatAttr::get(builder.getF64Type(), 3.14));
+
+  auto tuple = builder.create<TupleOp>(
+      builder.getUnknownLoc(), ValueRange{c1.getResult(), c2.getResult()});
+  auto get = builder.create<TupleGetOp>(builder.getUnknownLoc(),
+                                        tuple.getResult(), 0);
+  builder.create<ReturnOp>(builder.getUnknownLoc(), get.getResult());
+
+  EXPECT_TRUE(runPass(module));
+
+  EXPECT_FALSE(hasOp<polang::TupleOp>(module));
+  EXPECT_FALSE(hasOp<polang::TupleGetOp>(module));
+  EXPECT_TRUE(hasOp<memref::AllocaOp>(module));
+  EXPECT_TRUE(hasOp<memref::StoreOp>(module));
+  EXPECT_TRUE(hasOp<memref::LoadOp>(module));
+
+  module->erase();
+}
+
+TEST_F(ConversionPassTest, TupleFunctionSretRoundTrip) {
+  OpBuilder builder(&context);
+  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto f64Type = polang::FloatType::get(&context, 64);
+  auto tupleType = polang::TupleType::get(&context, {i64Type, f64Type});
+
+  auto module = ModuleOp::create(builder.getUnknownLoc());
+  builder.setInsertionPointToEnd(module.getBody());
+
+  // 1. Callee: make_pair(a: i64, b: f64) -> (i64, f64)
+  auto calleeType = builder.getFunctionType({i64Type, f64Type}, {tupleType});
+  auto callee = builder.create<polang::FuncOp>(
+      builder.getUnknownLoc(), "make_pair", calleeType,
+      ArrayRef<StringRef>{"a", "b"});
+  Block* calleeEntry = callee.addEntryBlock();
+  builder.setInsertionPointToEnd(calleeEntry);
+  auto t = builder.create<TupleOp>(
+      builder.getUnknownLoc(),
+      ValueRange{calleeEntry->getArgument(0), calleeEntry->getArgument(1)});
+  builder.create<ReturnOp>(builder.getUnknownLoc(), t.getResult());
+
+  // 2. Caller: caller() -> i64
+  builder.setInsertionPointToEnd(module.getBody());
+  auto callerType = builder.getFunctionType({}, {i64Type});
+  auto caller = builder.create<polang::FuncOp>(
+      builder.getUnknownLoc(), "caller", callerType, ArrayRef<StringRef>{});
+  Block* callerEntry = caller.addEntryBlock();
+  builder.setInsertionPointToEnd(callerEntry);
+  auto c1 = builder.create<ConstantIntegerOp>(
+      builder.getUnknownLoc(), i64Type,
+      IntegerAttr::get(builder.getIntegerType(64), 10));
+  auto c2 = builder.create<ConstantFloatOp>(
+      builder.getUnknownLoc(), f64Type,
+      FloatAttr::get(builder.getF64Type(), 20.0));
+  auto call = builder.create<CallOp>(
+      builder.getUnknownLoc(), "make_pair", TypeRange{tupleType},
+      ValueRange{c1.getResult(), c2.getResult()});
+  auto get = builder.create<TupleGetOp>(builder.getUnknownLoc(),
+                                        call.getResult(), 0);
+  builder.create<ReturnOp>(builder.getUnknownLoc(), get.getResult());
+
+  EXPECT_TRUE(runPass(module));
+
+  // Check lowered make_pair: (memref<2xi64>, i64, f64) -> ()
+  auto loweredCallee = module.lookupSymbol<func::FuncOp>("make_pair");
+  ASSERT_TRUE(loweredCallee != nullptr);
+  EXPECT_EQ(loweredCallee.getFunctionType().getNumInputs(), 3u);
+  EXPECT_TRUE(isa<MemRefType>(loweredCallee.getFunctionType().getInput(0)));
+  EXPECT_EQ(loweredCallee.getFunctionType().getNumResults(), 0u);
+
+  // Check lowered caller: () -> i64
+  auto loweredCaller = module.lookupSymbol<func::FuncOp>("caller");
+  ASSERT_TRUE(loweredCaller != nullptr);
+  EXPECT_EQ(loweredCaller.getFunctionType().getNumInputs(), 0u);
+  EXPECT_EQ(loweredCaller.getFunctionType().getNumResults(), 1u);
+
+  module->erase();
+}
+
 } // namespace
