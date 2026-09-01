@@ -2,13 +2,13 @@
 *)
 
 (* Test MLIR generation for functions with isize/usize parameter and return types *)
-(* CHECK:  polang.func @to_i64(%{{.*}}: !polang.index<signed>) -> !polang.integer<64, signed> {
+(* CHECK:  polang.func @to_i64(%{{.*}}: index) -> si64 {
 *)
-(* CHECK-NEXT:    %{{[0-9]+}} = polang.cast %{{.*}} : !polang.index<signed> -> !polang.integer<64, signed>
+(* CHECK-NEXT:    %{{[0-9]+}} = polang.cast %{{.*}} : index -> si64
 *)
-(* CHECK:  polang.func @to_usize(%{{.*}}: !polang.integer<64, signed>) -> !polang.index<unsigned> {
+(* CHECK:  polang.func @to_usize(%{{.*}}: si64) -> index {
 *)
-(* CHECK-NEXT:    %{{[0-9]+}} = polang.cast %{{.*}} : !polang.integer<64, signed> -> !polang.index<unsigned>
+(* CHECK-NEXT:    %{{[0-9]+}} = polang.cast %{{.*}} : si64 -> index
 *)
 to_i64 : isize -> i64
 to_i64(x) = x as i64

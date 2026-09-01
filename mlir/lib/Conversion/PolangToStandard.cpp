@@ -19,6 +19,8 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/Patterns.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -36,22 +38,11 @@ namespace {
 class PolangTypeConverter : public TypeConverter {
 public:
   PolangTypeConverter() {
-    addConversion([](Type type) { return type; });
-    addConversion([](polang::IntegerType type) {
-      // All integer types map to LLVM integer types (signedness is in ops)
-      return mlir::IntegerType::get(type.getContext(), type.getWidth());
-    });
-    addConversion([](polang::FloatType type) {
-      if (type.getWidth() == 32) {
-        return (Type)Float32Type::get(type.getContext());
+    addConversion([](Type type) -> Type {
+      if (auto intType = dyn_cast<mlir::IntegerType>(type)) {
+        return mlir::IntegerType::get(intType.getContext(), intType.getWidth());
       }
-      return (Type)Float64Type::get(type.getContext());
-    });
-    addConversion([](BoolType type) {
-      return mlir::IntegerType::get(type.getContext(), 1);
-    });
-    addConversion([](polang::IndexType type) {
-      return mlir::IndexType::get(type.getContext());
+      return type;
     });
     // Handle type parameters that weren't resolved by monomorphization.
     // Default to i64 as fallback (should not be reached in normal flow).
@@ -77,7 +68,7 @@ struct ConstantIntegerOpLowering
     (void)adaptor; // Unused, but required by MLIR interface
     Type resultType = op.getResult().getType();
 
-    if (isa<polang::IndexType>(resultType)) {
+    if (isa<mlir::IndexType>(resultType)) {
       auto value = rewriter.create<arith::ConstantIndexOp>(
           op.getLoc(), op.getValue().getSExtValue());
       rewriter.replaceOp(op, value);
@@ -85,8 +76,8 @@ struct ConstantIntegerOpLowering
     }
 
     unsigned width = 64; // Default width
-    if (auto polangType = dyn_cast<polang::IntegerType>(resultType)) {
-      width = polangType.getWidth();
+    if (auto intType = dyn_cast<mlir::IntegerType>(resultType)) {
+      width = intType.getWidth();
     }
 
     auto intType = rewriter.getIntegerType(width);
@@ -107,32 +98,13 @@ struct ConstantFloatOpLowering : public OpConversionPattern<ConstantFloatOp> {
     Type resultType = op.getResult().getType();
     mlir::FloatType floatType = rewriter.getF64Type(); // Default to f64
 
-    if (auto polangType = dyn_cast<polang::FloatType>(resultType)) {
-      if (polangType.getWidth() == 32) {
-        floatType = rewriter.getF32Type();
-      } else {
-        floatType = rewriter.getF64Type();
-      }
+    if (auto ft = dyn_cast<mlir::FloatType>(resultType)) {
+      floatType = ft;
     }
 
     // getValue() returns APFloat from the attribute
     auto value = rewriter.create<arith::ConstantFloatOp>(
         op.getLoc(), op.getValue(), floatType);
-    rewriter.replaceOp(op, value);
-    return success();
-  }
-};
-
-struct ConstantBoolOpLowering : public OpConversionPattern<ConstantBoolOp> {
-  using OpConversionPattern<ConstantBoolOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(ConstantBoolOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter& rewriter) const override {
-    (void)adaptor; // Unused, but required by MLIR interface
-    auto i1Type = rewriter.getI1Type();
-    auto value = rewriter.create<arith::ConstantIntOp>(
-        op.getLoc(), op.getValue() ? 1 : 0, i1Type);
     rewriter.replaceOp(op, value);
     return success();
   }
@@ -144,11 +116,8 @@ struct ConstantBoolOpLowering : public OpConversionPattern<ConstantBoolOp> {
 
 /// Check if the original Polang type is unsigned.
 [[nodiscard]] bool isOrigTypeUnsigned(Type origType) noexcept {
-  if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
+  if (auto intType = dyn_cast<mlir::IntegerType>(origType)) {
     return intType.isUnsigned();
-  }
-  if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
-    return indexType.isUnsigned();
   }
   return false;
 }
@@ -359,14 +328,7 @@ struct DivOpLowering : public OpConversionPattern<DivOp> {
     auto origType = op.getLhs().getType();
 
     // Float division: no zero check (IEEE 754 produces inf/NaN)
-    if (isa<polang::FloatType>(origType)) {
-      rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
-      return success();
-    }
-
-    // For already-converted float types (fallback path)
-    if (!isa<polang::IntegerType, polang::IndexType>(origType) &&
-        !isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
+    if (isa<mlir::FloatType>(origType)) {
       rewriter.replaceOpWithNewOp<arith::DivFOp>(op, lhs, rhs);
       return success();
     }
@@ -462,7 +424,7 @@ struct NegOpLowering : public OpConversionPattern<NegOp> {
     auto operand = adaptor.getOperand();
     auto origType = op.getOperand().getType();
 
-    if (isa<polang::FloatType>(origType)) {
+    if (isa<mlir::FloatType>(origType)) {
       rewriter.replaceOpWithNewOp<arith::NegFOp>(op, operand);
     } else {
       // Integer negation: 0 - x
@@ -498,7 +460,7 @@ struct RemOpLowering : public OpConversionPattern<RemOp> {
     // Remainder is only valid for integer types.
     // (Unlike DivOpLowering, no float path is needed because the type
     // checker rejects float operands for the modulo operator.)
-    if (!isa<polang::IntegerType, polang::IndexType>(origType) &&
+    if (!isa<mlir::IntegerType, mlir::IndexType>(origType) &&
         !isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
       return failure();
     }
@@ -615,9 +577,9 @@ void lowerIntToIntCast(CastOp op, Value input, Type inputType, Type resultType,
 
   if (inputWidth < resultWidth) {
     // Widening - check signedness of original input type
-    bool isSigned = true; // Default to signed
-    if (auto polangInt = dyn_cast<polang::IntegerType>(origInputType)) {
-      isSigned = !polangInt.isUnsigned();
+    bool isSigned = true;
+    if (auto intType = dyn_cast<mlir::IntegerType>(origInputType)) {
+      isSigned = !intType.isUnsigned();
     }
     if (isSigned) {
       rewriter.replaceOpWithNewOp<arith::ExtSIOp>(op, resultType, input);
@@ -654,9 +616,9 @@ void lowerFloatToFloatCast(CastOp op, Value input, Type inputType,
 void lowerIntToFloatCast(CastOp op, Value input, Type resultType,
                          Type origInputType,
                          ConversionPatternRewriter& rewriter) {
-  bool isSigned = true; // Default to signed
-  if (auto polangInt = dyn_cast<polang::IntegerType>(origInputType)) {
-    isSigned = !polangInt.isUnsigned();
+  bool isSigned = true;
+  if (auto intType = dyn_cast<mlir::IntegerType>(origInputType)) {
+    isSigned = !intType.isUnsigned();
   }
   if (isSigned) {
     rewriter.replaceOpWithNewOp<arith::SIToFPOp>(op, resultType, input);
@@ -669,14 +631,10 @@ void lowerIntToFloatCast(CastOp op, Value input, Type resultType,
 void lowerFloatToIntCast(CastOp op, Value input, Type inputType,
                          Type resultType, Type origResultType, Location loc,
                          ConversionPatternRewriter& rewriter) {
-  // llvm.fptosi.sat / llvm.fptoui.sat clamp values to representable range
-  bool isSigned = true; // Default to signed
-  if (auto polangInt = dyn_cast<polang::IntegerType>(origResultType)) {
-    isSigned = !polangInt.isUnsigned();
+  bool isSigned = true;
+  if (auto intType = dyn_cast<mlir::IntegerType>(origResultType)) {
+    isSigned = !intType.isUnsigned();
   }
-
-  // Build intrinsic name: llvm.fptosi.sat.i<N>.f<M> or
-  // llvm.fptoui.sat.i<N>.f<M>
   auto intType = cast<mlir::IntegerType>(resultType);
   unsigned intWidth = intType.getWidth();
   unsigned floatWidth = inputType.getIntOrFloatBitWidth();
@@ -691,86 +649,43 @@ void lowerFloatToIntCast(CastOp op, Value input, Type inputType,
   rewriter.replaceOp(op, callOp.getResults());
 }
 
-/// Lower index to integer cast (arith.index_cast or arith.index_castui).
+/// Lower index to integer cast (arith.index_cast).
 void lowerIndexToIntCast(CastOp op, Value input, Type resultType,
-                         Type origInputType,
+                         Type /*origInputType*/,
                          ConversionPatternRewriter& rewriter) {
-  bool isSigned = true;
-  if (auto indexType = dyn_cast<polang::IndexType>(origInputType)) {
-    isSigned = !indexType.isUnsigned();
-  }
-  if (isSigned) {
-    rewriter.replaceOpWithNewOp<arith::IndexCastOp>(op, resultType, input);
-  } else {
-    rewriter.replaceOpWithNewOp<arith::IndexCastUIOp>(op, resultType, input);
-  }
+  rewriter.replaceOpWithNewOp<arith::IndexCastOp>(op, resultType, input);
 }
 
-/// Lower integer to index cast (arith.index_cast or arith.index_castui).
+/// Lower integer to index cast (arith.index_cast).
 void lowerIntToIndexCast(CastOp op, Value input, Type resultType,
-                         Type origResultType,
+                         Type /*origResultType*/,
                          ConversionPatternRewriter& rewriter) {
-  bool isSigned = true;
-  if (auto indexType = dyn_cast<polang::IndexType>(origResultType)) {
-    isSigned = !indexType.isUnsigned();
-  }
-  if (isSigned) {
-    rewriter.replaceOpWithNewOp<arith::IndexCastOp>(op, resultType, input);
-  } else {
-    rewriter.replaceOpWithNewOp<arith::IndexCastUIOp>(op, resultType, input);
-  }
+  rewriter.replaceOpWithNewOp<arith::IndexCastOp>(op, resultType, input);
 }
 
 /// Lower index to float cast (index → i64 → float).
 void lowerIndexToFloatCast(CastOp op, Value input, Type resultType,
-                           Type origInputType, Location loc,
+                           Type /*origInputType*/, Location loc,
                            ConversionPatternRewriter& rewriter) {
-  bool isSigned = true;
-  if (auto indexType = dyn_cast<polang::IndexType>(origInputType)) {
-    isSigned = !indexType.isUnsigned();
-  }
-  // First convert index to i64
   auto i64Type = rewriter.getI64Type();
-  Value intVal;
-  if (isSigned) {
-    intVal = rewriter.create<arith::IndexCastOp>(loc, i64Type, input);
-  } else {
-    intVal = rewriter.create<arith::IndexCastUIOp>(loc, i64Type, input);
-  }
-  // Then convert i64 to float
-  if (isSigned) {
-    rewriter.replaceOpWithNewOp<arith::SIToFPOp>(op, resultType, intVal);
-  } else {
-    rewriter.replaceOpWithNewOp<arith::UIToFPOp>(op, resultType, intVal);
-  }
+  Value intVal = rewriter.create<arith::IndexCastOp>(loc, i64Type, input);
+  rewriter.replaceOpWithNewOp<arith::SIToFPOp>(op, resultType, intVal);
 }
 
 /// Lower float to index cast (float → i64 → index).
 void lowerFloatToIndexCast(CastOp op, Value input, Type inputType,
-                           Type resultType, Type origResultType, Location loc,
-                           ConversionPatternRewriter& rewriter) {
-  bool isSigned = true;
-  if (auto indexType = dyn_cast<polang::IndexType>(origResultType)) {
-    isSigned = !indexType.isUnsigned();
-  }
-  // First convert float to i64 using saturating intrinsic
+                           Type resultType, Type /*origResultType*/,
+                           Location loc, ConversionPatternRewriter& rewriter) {
   auto i64Type = rewriter.getI64Type();
   unsigned floatWidth = inputType.getIntOrFloatBitWidth();
   std::string intrinsicName =
-      isSigned ? "llvm.fptosi.sat.i64.f" : "llvm.fptoui.sat.i64.f";
-  intrinsicName += std::to_string(floatWidth);
+      "llvm.fptosi.sat.i64.f" + std::to_string(floatWidth);
 
   auto intrinsicAttr = rewriter.getStringAttr(intrinsicName);
   auto callOp = rewriter.create<LLVM::CallIntrinsicOp>(
       loc, i64Type, intrinsicAttr, ValueRange{input});
-  // Then convert i64 to index
-  if (isSigned) {
-    rewriter.replaceOpWithNewOp<arith::IndexCastOp>(op, resultType,
-                                                    callOp.getResult(0));
-  } else {
-    rewriter.replaceOpWithNewOp<arith::IndexCastUIOp>(op, resultType,
-                                                      callOp.getResult(0));
-  }
+  rewriter.replaceOpWithNewOp<arith::IndexCastOp>(op, resultType,
+                                                  callOp.getResult(0));
 }
 
 struct CastOpLowering : public OpConversionPattern<CastOp> {
@@ -881,29 +796,18 @@ struct CmpOpLowering : public OpConversionPattern<CmpOp> {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
 
-    // Check the original type to determine signedness
     auto origType = op.getLhs().getType();
 
-    if (isa<polang::FloatType>(origType)) {
+    if (isa<mlir::FloatType>(origType)) {
       auto pred = convertToFloatPredicate(op.getPredicate());
       rewriter.replaceOpWithNewOp<arith::CmpFOp>(op, pred, lhs, rhs);
-    } else if (auto intType = dyn_cast<polang::IntegerType>(origType)) {
-      auto pred =
-          convertToIntPredicate(op.getPredicate(), intType.isUnsigned());
-      rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, pred, lhs, rhs);
-    } else if (auto indexType = dyn_cast<polang::IndexType>(origType)) {
-      auto pred =
-          convertToIntPredicate(op.getPredicate(), indexType.isUnsigned());
-      rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, pred, lhs, rhs);
-    } else if (isa<mlir::IntegerType, mlir::IndexType>(lhs.getType())) {
-      // Fallback for already converted types - assume signed
-      auto pred =
-          convertToIntPredicate(op.getPredicate(), /*isUnsigned=*/false);
-      rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, pred, lhs, rhs);
     } else {
-      // Fallback to float comparison
-      auto pred = convertToFloatPredicate(op.getPredicate());
-      rewriter.replaceOpWithNewOp<arith::CmpFOp>(op, pred, lhs, rhs);
+      bool isUnsigned = false;
+      if (auto intType = dyn_cast<mlir::IntegerType>(origType)) {
+        isUnsigned = intType.isUnsigned();
+      }
+      auto pred = convertToIntPredicate(op.getPredicate(), isUnsigned);
+      rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, pred, lhs, rhs);
     }
     return success();
   }
@@ -1023,42 +927,6 @@ struct ReturnOpLowering : public OpConversionPattern<ReturnOp> {
 //===----------------------------------------------------------------------===//
 // Control Flow Lowering
 //===----------------------------------------------------------------------===//
-
-struct IfOpLowering : public OpConversionPattern<IfOp> {
-  using OpConversionPattern<IfOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(IfOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter& rewriter) const override {
-    auto resultType = getTypeConverter()->convertType(op.getResult().getType());
-    if (!resultType) {
-      return failure();
-    }
-
-    // Create scf::IfOp with empty regions (no withElseRegion to avoid
-    // auto-created blocks)
-    auto scfIf = rewriter.create<scf::IfOp>(op.getLoc(), TypeRange{resultType},
-                                            adaptor.getCondition());
-
-    // Erase the auto-generated empty blocks if any
-    if (!scfIf.getThenRegion().empty()) {
-      rewriter.eraseBlock(&scfIf.getThenRegion().front());
-    }
-    if (!scfIf.getElseRegion().empty()) {
-      rewriter.eraseBlock(&scfIf.getElseRegion().front());
-    }
-
-    // Move then region
-    rewriter.inlineRegionBefore(op.getThenRegion(), scfIf.getThenRegion(),
-                                scfIf.getThenRegion().end());
-    // Move else region
-    rewriter.inlineRegionBefore(op.getElseRegion(), scfIf.getElseRegion(),
-                                scfIf.getElseRegion().end());
-
-    rewriter.replaceOp(op, scfIf.getResults());
-    return success();
-  }
-};
 
 struct YieldOpLowering : public OpConversionPattern<YieldOp> {
   using OpConversionPattern<YieldOp>::OpConversionPattern;
@@ -1309,20 +1177,21 @@ struct PolangToStandardPass
     ConversionTarget target(getContext());
 
     target.addLegalDialect<arith::ArithDialect, func::FuncDialect,
-                           scf::SCFDialect, memref::MemRefDialect,
-                           LLVM::LLVMDialect>();
+                           memref::MemRefDialect, LLVM::LLVMDialect>();
     target.addIllegalDialect<PolangDialect>();
 
     PolangTypeConverter typeConverter;
     RewritePatternSet patterns(&getContext());
 
+    scf::populateSCFStructuralTypeConversionsAndLegality(typeConverter,
+                                                         patterns, target);
+
     patterns
-        .add<ConstantIntegerOpLowering, ConstantFloatOpLowering,
-             ConstantBoolOpLowering, AddOpLowering, SubOpLowering,
-             MulOpLowering, DivOpLowering, RemOpLowering, NegOpLowering,
-             NotOpLowering, CastOpLowering, CmpOpLowering,
+        .add<ConstantIntegerOpLowering, ConstantFloatOpLowering, AddOpLowering,
+             SubOpLowering, MulOpLowering, DivOpLowering, RemOpLowering,
+             NegOpLowering, NotOpLowering, CastOpLowering, CmpOpLowering,
              GenericFuncOpLowering, InstantiateOpLowering, FuncOpLowering,
-             CallOpLowering, ReturnOpLowering, IfOpLowering, YieldOpLowering,
+             CallOpLowering, ReturnOpLowering, YieldOpLowering,
              GlobalOpLowering, GlobalLoadOpLowering, PrintOpLowering>(
             typeConverter, &getContext());
 

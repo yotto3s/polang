@@ -5,9 +5,9 @@
 (* multiple specialized versions through monomorphization. *)
 
 (* Specialized versions (order may vary) *)
-(* CHECK-DAG: {{.*}}polang.func @identity$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+(* CHECK-DAG: {{.*}}polang.func @identity$i64(%{{.*}}: si64) -> si64{{.*}}
 *)
-(* CHECK-DAG: {{.*}}polang.func @identity$bool(%{{.*}}: !polang.bool) -> !polang.bool{{.*}}
+(* CHECK-DAG: {{.*}}polang.func @identity$bool(%{{.*}}: i1) -> i1{{.*}}
 *)
 
 (* Original generic function is erased *)

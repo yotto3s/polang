@@ -2,21 +2,21 @@
 *)
 
 (* Test logical or operator with short-circuit evaluation *)
-(* CHECK:      polang.func @logical_or(%arg0: !polang.bool, %arg1: !polang.bool) -> !polang.bool {
+(* CHECK:      polang.func @logical_or(%arg0: i1, %arg1: i1) -> i1 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.if %arg0 : !polang.bool -> !polang.bool {
+(* CHECK-NEXT:   %0 = scf.if %arg0 -> (i1) {
 *)
-(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.bool true : !polang.bool
+(* CHECK-NEXT:     %true = arith.constant true
 *)
-(* CHECK-NEXT:     polang.yield %{{[0-9]+}} : !polang.bool
+(* CHECK-NEXT:     scf.yield %true : i1
 *)
 (* CHECK-NEXT:   } else {
 *)
-(* CHECK-NEXT:     polang.yield %arg1 : !polang.bool
+(* CHECK-NEXT:     scf.yield %arg1 : i1
 *)
 (* CHECK-NEXT:   }
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+(* CHECK-NEXT:   polang.return %0 : i1
 *)
 (* CHECK-NEXT: }
 *)
@@ -24,25 +24,25 @@ logical_or : bool * bool -> bool
 logical_or(a, b) = a || b
 
 (* Test compound logical or *)
-(* CHECK:      polang.func @compound_or(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.bool {
+(* CHECK:      polang.func @compound_or(%arg0: si64, %arg1: si64) -> i1 {
 *)
-(* CHECK:        %{{[0-9]+}} = polang.cmp eq, %arg0, %{{[0-9]+}} : !polang.integer<64, signed>, !polang.integer<64, signed>
+(* CHECK:        %[[CMP1:.*]] = polang.cmp eq, %arg0, %{{.*}} : si64, si64
 *)
-(* CHECK:        %{{[0-9]+}} = polang.if %{{[0-9]+}} : !polang.bool -> !polang.bool {
+(* CHECK:        %{{.*}} = scf.if %[[CMP1]] -> (i1) {
 *)
-(* CHECK:          %{{[0-9]+}} = polang.constant.bool true : !polang.bool
+(* CHECK:          %true{{.*}} = arith.constant true
 *)
-(* CHECK:          polang.yield %{{[0-9]+}} : !polang.bool
+(* CHECK:          scf.yield %true{{.*}} : i1
 *)
 (* CHECK:        } else {
 *)
-(* CHECK:          %{{[0-9]+}} = polang.cmp eq, %arg1, %{{[0-9]+}} : !polang.integer<64, signed>, !polang.integer<64, signed>
+(* CHECK:          %[[CMP2:.*]] = polang.cmp eq, %arg1, %{{.*}} : si64, si64
 *)
-(* CHECK:          polang.yield %{{[0-9]+}} : !polang.bool
+(* CHECK:          scf.yield %[[CMP2]] : i1
 *)
 (* CHECK:        }
 *)
-(* CHECK:        polang.return %{{[0-9]+}} : !polang.bool
+(* CHECK:        polang.return %{{.*}} : i1
 *)
 (* CHECK:      }
 *)

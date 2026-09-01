@@ -5,6 +5,6 @@
 
 add(x, y) = x + y
 
-(* CHECK: 4 : isize
+(* CHECK: 4 : index
 *)
 add(1 as isize, 3)

@@ -4,20 +4,20 @@
 (* Test type inference from literal values *)
 
 (* Integer literal infers int type *)
-(* CHECK: {{.*}}polang.constant.integer 42 : !polang.integer<64, signed>{{.*}}
+(* CHECK: {{.*}}polang.constant.integer 42 : si64{{.*}}
 *)
 a = 42
 
 (* Double literal infers double type *)
-(* CHECK: {{.*}}polang.constant.float 3.140000e+00 : !polang.float<64>{{.*}}
+(* CHECK: {{.*}}polang.constant.float 3.140000e+00 : f64{{.*}}
 *)
 b = 3.14
 
 (* Boolean literal infers bool type *)
-(* CHECK: {{.*}}polang.constant.bool true : !polang.bool{{.*}}
+(* CHECK: {{.*}}arith.constant true{{.*}}
 *)
 c = true
 
-(* CHECK: {{.*}}polang.constant.bool false : !polang.bool{{.*}}
+(* CHECK: {{.*}}arith.constant false{{.*}}
 *)
 d = false

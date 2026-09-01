@@ -5,11 +5,11 @@
 
 (* CHECK:      module {
 *)
-(* CHECK-NEXT:   polang.func @__polang_entry() -> !polang.float<32> {
+(* CHECK-NEXT:   polang.func @__polang_entry() -> f32 {
 *)
-(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 5 : !polang.integer<32, signed>
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 5 : si32
 *)
-(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.float {{.*}} : !polang.float<32>
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.float {{.*}} : f32
 *)
 x : i32
 x = 5

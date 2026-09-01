@@ -6,11 +6,11 @@
 (* constrains x to integer), so the function is emitted as monomorphic. *)
 
 (* Monomorphic function with concrete types (resolved by AST TypeChecker) *)
-(* CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.integer<64, signed>) -> !polang.bool{{.*}}
+(* CHECK: {{.*}}polang.func @is_zero(%{{.*}}: si64) -> i1{{.*}}
 *)
 
 (* Verify comparison operation with concrete types *)
-(* CHECK: {{.*}}polang.cmp eq{{.*}}!polang.integer<64, signed>{{.*}}
+(* CHECK: {{.*}}polang.cmp eq{{.*}}si64{{.*}}
 *)
 
 is_zero(x) = x == 0

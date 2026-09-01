@@ -67,33 +67,33 @@ Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
   switch (meta.kind) {
   case TypeKind::Integer:
     if (meta.isGeneric) {
-      // Generic integer defaults to i64
-      return polang::IntegerType::get(context, DEFAULT_INT_WIDTH,
-                                      Signedness::Signed);
+      // Generic integer defaults to si64
+      return mlir::IntegerType::get(context, DEFAULT_INT_WIDTH,
+                                    mlir::IntegerType::Signed);
     }
-    return polang::IntegerType::get(context, meta.width,
-                                    meta.isSigned() ? Signedness::Signed
-                                                    : Signedness::Unsigned);
+    return mlir::IntegerType::get(context, meta.width,
+                                  meta.isSigned()
+                                      ? mlir::IntegerType::Signed
+                                      : mlir::IntegerType::Unsigned);
 
   case TypeKind::Float:
-    if (meta.isGeneric) {
+    if (meta.isGeneric || meta.width == 64) {
       // Generic float defaults to f64
-      return polang::FloatType::get(context, DEFAULT_FLOAT_WIDTH);
+      return Float64Type::get(context);
     }
-    return polang::FloatType::get(context, meta.width);
+    return Float32Type::get(context);
 
   case TypeKind::Bool:
-    return BoolType::get(context);
+    return mlir::IntegerType::get(context, 1);
 
   case TypeKind::Index:
-    return polang::IndexType::get(
-        context, meta.isSigned() ? Signedness::Signed : Signedness::Unsigned);
+    return mlir::IndexType::get(context);
 
   case TypeKind::Unit:
   case TypeKind::TypeVar:
   case TypeKind::Function:
   case TypeKind::Unknown:
-    // Default to i64 for unresolved/unknown types
+    // Default to si64 for unresolved/unknown types
     return getDefaultType();
   }
 
@@ -102,25 +102,10 @@ Type PolangTypeConverter::getPolangType(const NTypeSpec& typeSpec) {
 }
 
 Type PolangTypeConverter::getDefaultType() {
-  return polang::IntegerType::get(context, DEFAULT_INT_WIDTH,
-                                  Signedness::Signed);
+  return mlir::IntegerType::get(context, DEFAULT_INT_WIDTH,
+                                mlir::IntegerType::Signed);
 }
 
 Type PolangTypeConverter::convertPolangType(Type polangType) {
-  if (auto intType = dyn_cast<polang::IntegerType>(polangType)) {
-    return mlir::IntegerType::get(context, intType.getWidth());
-  }
-  if (auto floatType = dyn_cast<polang::FloatType>(polangType)) {
-    if (floatType.getWidth() == 32) {
-      return Float32Type::get(context);
-    }
-    return Float64Type::get(context);
-  }
-  if (isa<BoolType>(polangType)) {
-    return mlir::IntegerType::get(context, 1);
-  }
-  if (isa<polang::IndexType>(polangType)) {
-    return mlir::IndexType::get(context);
-  }
-  return mlir::IntegerType::get(context, DEFAULT_INT_WIDTH);
+  return polangType;
 }

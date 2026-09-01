@@ -69,143 +69,12 @@ private:
   DiagnosticEngine::HandlerID diagHandler;
 };
 
-// ============== IfOp Verifier Tests ==============
-
-TEST_F(VerifierTest, IfOpEmptyThenRegion) {
-  OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto boolType = BoolType::get(&context);
-  auto funcType = builder.getFunctionType({}, {i64Type});
-
-  auto [module, func] = createModule("test", funcType);
-  Block* entry = func.addEntryBlock();
-  builder.setInsertionPointToEnd(entry);
-
-  // Create a bool constant for condition
-  auto cond = builder.create<ConstantBoolOp>(
-      builder.getUnknownLoc(), boolType, true);
-
-  // Create IfOp - then region will be empty (no yield)
-  auto ifOp = builder.create<polang::IfOp>(
-      builder.getUnknownLoc(), i64Type, cond);
-
-  // Leave then region empty (just the auto-created block)
-  // But add yield to else region
-  builder.setInsertionPointToEnd(&ifOp.getElseRegion().front());
-  auto elseVal = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 0));
-  builder.create<YieldOp>(builder.getUnknownLoc(), elseVal.getResult());
-
-  EXPECT_TRUE(failed(verify(*module)));
-  EXPECT_NE(lastDiag.find("then region"), std::string::npos);
-}
-
-TEST_F(VerifierTest, IfOpEmptyElseRegion) {
-  OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto boolType = BoolType::get(&context);
-  auto funcType = builder.getFunctionType({}, {i64Type});
-
-  auto [module, func] = createModule("test", funcType);
-  Block* entry = func.addEntryBlock();
-  builder.setInsertionPointToEnd(entry);
-
-  auto cond = builder.create<ConstantBoolOp>(
-      builder.getUnknownLoc(), boolType, true);
-
-  auto ifOp = builder.create<polang::IfOp>(
-      builder.getUnknownLoc(), i64Type, cond);
-
-  // Add yield to then region
-  builder.setInsertionPointToEnd(&ifOp.getThenRegion().front());
-  auto thenVal = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 1));
-  builder.create<YieldOp>(builder.getUnknownLoc(), thenVal.getResult());
-
-  // Leave else region empty
-  EXPECT_TRUE(failed(verify(*module)));
-  EXPECT_NE(lastDiag.find("else region"), std::string::npos);
-}
-
-TEST_F(VerifierTest, IfOpYieldTypeMismatchThen) {
-  OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto f64Type = polang::FloatType::get(&context, 64);
-  auto boolType = BoolType::get(&context);
-  auto funcType = builder.getFunctionType({}, {i64Type});
-
-  auto [module, func] = createModule("test", funcType);
-  Block* entry = func.addEntryBlock();
-  builder.setInsertionPointToEnd(entry);
-
-  auto cond = builder.create<ConstantBoolOp>(
-      builder.getUnknownLoc(), boolType, true);
-
-  // IfOp expects i64 result
-  auto ifOp = builder.create<polang::IfOp>(
-      builder.getUnknownLoc(), i64Type, cond);
-
-  // Then yields f64 (mismatch!)
-  builder.setInsertionPointToEnd(&ifOp.getThenRegion().front());
-  auto thenVal = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type,
-      FloatAttr::get(builder.getF64Type(), 1.0));
-  builder.create<YieldOp>(builder.getUnknownLoc(), thenVal.getResult());
-
-  // Else yields i64 (correct)
-  builder.setInsertionPointToEnd(&ifOp.getElseRegion().front());
-  auto elseVal = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 0));
-  builder.create<YieldOp>(builder.getUnknownLoc(), elseVal.getResult());
-
-  EXPECT_TRUE(failed(verify(*module)));
-  EXPECT_NE(lastDiag.find("then branch yields"), std::string::npos);
-}
-
-TEST_F(VerifierTest, IfOpYieldTypeMismatchElse) {
-  OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto f64Type = polang::FloatType::get(&context, 64);
-  auto boolType = BoolType::get(&context);
-  auto funcType = builder.getFunctionType({}, {i64Type});
-
-  auto [module, func] = createModule("test", funcType);
-  Block* entry = func.addEntryBlock();
-  builder.setInsertionPointToEnd(entry);
-
-  auto cond = builder.create<ConstantBoolOp>(
-      builder.getUnknownLoc(), boolType, true);
-
-  auto ifOp = builder.create<polang::IfOp>(
-      builder.getUnknownLoc(), i64Type, cond);
-
-  // Then yields i64 (correct)
-  builder.setInsertionPointToEnd(&ifOp.getThenRegion().front());
-  auto thenVal = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 1));
-  builder.create<YieldOp>(builder.getUnknownLoc(), thenVal.getResult());
-
-  // Else yields f64 (mismatch!)
-  builder.setInsertionPointToEnd(&ifOp.getElseRegion().front());
-  auto elseVal = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type,
-      FloatAttr::get(builder.getF64Type(), 0.0));
-  builder.create<YieldOp>(builder.getUnknownLoc(), elseVal.getResult());
-
-  EXPECT_TRUE(failed(verify(*module)));
-  EXPECT_NE(lastDiag.find("else branch yields"), std::string::npos);
-}
-
 // ============== ReturnOp Verifier Tests ==============
 
 TEST_F(VerifierTest, ReturnOpTypeMismatch) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto f64Type = polang::FloatType::get(&context, 64);
+  auto i64Type = builder.getI64Type();
+  auto f64Type = builder.getF64Type();
   auto funcType = builder.getFunctionType({}, {i64Type});
 
   auto [module, func] = createModule("test", funcType);
@@ -214,8 +83,7 @@ TEST_F(VerifierTest, ReturnOpTypeMismatch) {
 
   // Return f64 from a function that expects i64
   auto val = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type,
-      FloatAttr::get(builder.getF64Type(), 1.0));
+      builder.getUnknownLoc(), f64Type, 1.0);
   builder.create<ReturnOp>(builder.getUnknownLoc(), val.getResult());
 
   EXPECT_TRUE(failed(verify(*module)));
@@ -224,7 +92,7 @@ TEST_F(VerifierTest, ReturnOpTypeMismatch) {
 
 TEST_F(VerifierTest, ReturnOpValueWhenVoid) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto i64Type = builder.getI64Type();
   // Function with no return type (void)
   auto funcType = builder.getFunctionType({}, {});
 
@@ -234,8 +102,7 @@ TEST_F(VerifierTest, ReturnOpValueWhenVoid) {
 
   // Return a value from void function
   auto val = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 42));
+      builder.getUnknownLoc(), i64Type, 42);
   builder.create<ReturnOp>(builder.getUnknownLoc(), val.getResult());
 
   EXPECT_TRUE(failed(verify(*module)));
@@ -247,7 +114,7 @@ TEST_F(VerifierTest, ReturnOpValueWhenVoid) {
 
 TEST_F(VerifierTest, CallOpUndefinedFunction) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto i64Type = builder.getI64Type();
   auto funcType = builder.getFunctionType({}, {i64Type});
 
   auto [module, func] = createModule("test", funcType);
@@ -266,7 +133,7 @@ TEST_F(VerifierTest, CallOpUndefinedFunction) {
 
 TEST_F(VerifierTest, CallOpArgCountMismatch) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto i64Type = builder.getI64Type();
 
   auto module = ModuleOp::create(builder.getUnknownLoc());
   builder.setInsertionPointToEnd(module.getBody());
@@ -296,8 +163,8 @@ TEST_F(VerifierTest, CallOpArgCountMismatch) {
 
 TEST_F(VerifierTest, CallOpArgTypeMismatch) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto f64Type = polang::FloatType::get(&context, 64);
+  auto i64Type = builder.getI64Type();
+  auto f64Type = builder.getF64Type();
 
   auto module = ModuleOp::create(builder.getUnknownLoc());
   builder.setInsertionPointToEnd(module.getBody());
@@ -316,8 +183,7 @@ TEST_F(VerifierTest, CallOpArgTypeMismatch) {
 
   // Pass f64 argument to function expecting i64
   auto val = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type,
-      FloatAttr::get(builder.getF64Type(), 1.0));
+      builder.getUnknownLoc(), f64Type, 1.0);
   auto callOp = builder.create<CallOp>(
       builder.getUnknownLoc(), "target",
       TypeRange{i64Type}, ValueRange{val.getResult()});
@@ -331,8 +197,8 @@ TEST_F(VerifierTest, CallOpArgTypeMismatch) {
 
 TEST_F(VerifierTest, AddOpTypeMismatch) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto f64Type = polang::FloatType::get(&context, 64);
+  auto i64Type = builder.getI64Type();
+  auto f64Type = builder.getF64Type();
   auto funcType = builder.getFunctionType({}, {i64Type});
 
   auto [module, func] = createModule("test", funcType);
@@ -340,11 +206,9 @@ TEST_F(VerifierTest, AddOpTypeMismatch) {
   builder.setInsertionPointToEnd(entry);
 
   auto lhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 1));
+      builder.getUnknownLoc(), i64Type, 1);
   auto rhs = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type,
-      FloatAttr::get(builder.getF64Type(), 2.0));
+      builder.getUnknownLoc(), f64Type, 2.0);
 
   // AddOp with mismatched types
   builder.create<AddOp>(
@@ -356,8 +220,8 @@ TEST_F(VerifierTest, AddOpTypeMismatch) {
 
 TEST_F(VerifierTest, SubOpTypeMismatch) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto f64Type = polang::FloatType::get(&context, 64);
+  auto i64Type = builder.getI64Type();
+  auto f64Type = builder.getF64Type();
   auto funcType = builder.getFunctionType({}, {i64Type});
 
   auto [module, func] = createModule("test", funcType);
@@ -365,11 +229,9 @@ TEST_F(VerifierTest, SubOpTypeMismatch) {
   builder.setInsertionPointToEnd(entry);
 
   auto lhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 1));
+      builder.getUnknownLoc(), i64Type, 1);
   auto rhs = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type,
-      FloatAttr::get(builder.getF64Type(), 2.0));
+      builder.getUnknownLoc(), f64Type, 2.0);
 
   builder.create<SubOp>(
       builder.getUnknownLoc(), i64Type, lhs.getResult(), rhs.getResult());
@@ -380,8 +242,8 @@ TEST_F(VerifierTest, SubOpTypeMismatch) {
 
 TEST_F(VerifierTest, MulOpTypeMismatch) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto f64Type = polang::FloatType::get(&context, 64);
+  auto i64Type = builder.getI64Type();
+  auto f64Type = builder.getF64Type();
   auto funcType = builder.getFunctionType({}, {i64Type});
 
   auto [module, func] = createModule("test", funcType);
@@ -389,11 +251,9 @@ TEST_F(VerifierTest, MulOpTypeMismatch) {
   builder.setInsertionPointToEnd(entry);
 
   auto lhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 1));
+      builder.getUnknownLoc(), i64Type, 1);
   auto rhs = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type,
-      FloatAttr::get(builder.getF64Type(), 2.0));
+      builder.getUnknownLoc(), f64Type, 2.0);
 
   builder.create<MulOp>(
       builder.getUnknownLoc(), i64Type, lhs.getResult(), rhs.getResult());
@@ -404,8 +264,8 @@ TEST_F(VerifierTest, MulOpTypeMismatch) {
 
 TEST_F(VerifierTest, DivOpTypeMismatch) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto f64Type = polang::FloatType::get(&context, 64);
+  auto i64Type = builder.getI64Type();
+  auto f64Type = builder.getF64Type();
   auto funcType = builder.getFunctionType({}, {i64Type});
 
   auto [module, func] = createModule("test", funcType);
@@ -413,11 +273,9 @@ TEST_F(VerifierTest, DivOpTypeMismatch) {
   builder.setInsertionPointToEnd(entry);
 
   auto lhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 1));
+      builder.getUnknownLoc(), i64Type, 1);
   auto rhs = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type,
-      FloatAttr::get(builder.getF64Type(), 2.0));
+      builder.getUnknownLoc(), f64Type, 2.0);
 
   builder.create<DivOp>(
       builder.getUnknownLoc(), i64Type, lhs.getResult(), rhs.getResult());
@@ -428,8 +286,8 @@ TEST_F(VerifierTest, DivOpTypeMismatch) {
 
 TEST_F(VerifierTest, AddOpResultTypeMismatch) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto f64Type = polang::FloatType::get(&context, 64);
+  auto i64Type = builder.getI64Type();
+  auto f64Type = builder.getF64Type();
   auto funcType = builder.getFunctionType({}, {f64Type});
 
   auto [module, func] = createModule("test", funcType);
@@ -437,11 +295,9 @@ TEST_F(VerifierTest, AddOpResultTypeMismatch) {
   builder.setInsertionPointToEnd(entry);
 
   auto lhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 1));
+      builder.getUnknownLoc(), i64Type, 1);
   auto rhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 2));
+      builder.getUnknownLoc(), i64Type, 2);
 
   // AddOp with i64 operands but f64 result type
   builder.create<AddOp>(
@@ -451,17 +307,13 @@ TEST_F(VerifierTest, AddOpResultTypeMismatch) {
   EXPECT_NE(lastDiag.find("result type must be compatible"), std::string::npos);
 }
 
-// CastOp non-numeric type tests removed: ODS constraint (Polang_AnyNumericOrVar)
-// prevents creating CastOp with BoolType, making the custom verifier's numeric
-// checks unreachable.
-
 // ============== CmpOp Verifier Tests ==============
 
 TEST_F(VerifierTest, CmpOpTypeMismatch) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto f64Type = polang::FloatType::get(&context, 64);
-  auto boolType = BoolType::get(&context);
+  auto i64Type = builder.getI64Type();
+  auto f64Type = builder.getF64Type();
+  auto boolType = builder.getI1Type();
   auto funcType = builder.getFunctionType({}, {boolType});
 
   auto [module, func] = createModule("test", funcType);
@@ -469,11 +321,9 @@ TEST_F(VerifierTest, CmpOpTypeMismatch) {
   builder.setInsertionPointToEnd(entry);
 
   auto lhs = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 1));
+      builder.getUnknownLoc(), i64Type, 1);
   auto rhs = builder.create<ConstantFloatOp>(
-      builder.getUnknownLoc(), f64Type,
-      FloatAttr::get(builder.getF64Type(), 2.0));
+      builder.getUnknownLoc(), f64Type, 2.0);
 
   builder.create<CmpOp>(
       builder.getUnknownLoc(), boolType,
@@ -484,53 +334,9 @@ TEST_F(VerifierTest, CmpOpTypeMismatch) {
             std::string::npos);
 }
 
-TEST_F(VerifierTest, IntegerTypeVerification) {
-  // Valid power-of-two widths >= 8
-  EXPECT_TRUE(polang::IntegerType::getChecked(
-                  [&] { return emitError(UnknownLoc::get(&context)); },
-                  &context, 8u, Signedness::Signed) != nullptr);
-  EXPECT_TRUE(polang::IntegerType::getChecked(
-                  [&] { return emitError(UnknownLoc::get(&context)); },
-                  &context, 16u, Signedness::Signed) != nullptr);
-  EXPECT_TRUE(polang::IntegerType::getChecked(
-                  [&] { return emitError(UnknownLoc::get(&context)); },
-                  &context, 32u, Signedness::Signed) != nullptr);
-  EXPECT_TRUE(polang::IntegerType::getChecked(
-                  [&] { return emitError(UnknownLoc::get(&context)); },
-                  &context, 64u, Signedness::Signed) != nullptr);
-
-  // Non power-of-two widths rejected
-  EXPECT_TRUE(polang::IntegerType::getChecked(
-                  [&] { return emitError(UnknownLoc::get(&context)); },
-                  &context, 24u, Signedness::Signed) == nullptr);
-  EXPECT_NE(lastDiag.find("integer width must be a power of 2 >= 8"),
-            std::string::npos);
-
-  // Width < 8 rejected
-  EXPECT_TRUE(polang::IntegerType::getChecked(
-                  [&] { return emitError(UnknownLoc::get(&context)); },
-                  &context, 4u, Signedness::Signed) == nullptr);
-}
-
-TEST_F(VerifierTest, FloatTypeVerification) {
-  // Valid widths (32, 64)
-  EXPECT_TRUE(polang::FloatType::getChecked(
-                  [&] { return emitError(UnknownLoc::get(&context)); },
-                  &context, 32u) != nullptr);
-  EXPECT_TRUE(polang::FloatType::getChecked(
-                  [&] { return emitError(UnknownLoc::get(&context)); },
-                  &context, 64u) != nullptr);
-
-  // Invalid widths rejected
-  EXPECT_TRUE(polang::FloatType::getChecked(
-                  [&] { return emitError(UnknownLoc::get(&context)); },
-                  &context, 16u) == nullptr);
-  EXPECT_NE(lastDiag.find("float width must be 32 or 64"), std::string::npos);
-}
-
 TEST_F(VerifierTest, TupleTypeVerification) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto i64Type = builder.getI64Type();
   auto validTuple = polang::TupleType::getChecked(
       [&] { return emitError(UnknownLoc::get(&context)); }, &context,
       ArrayRef<Type>{i64Type});
@@ -542,7 +348,7 @@ TEST_F(VerifierTest, TupleTypeVerification) {
       ArrayRef<Type>{validTuple, i64Type});
   EXPECT_TRUE(nestedTuple != nullptr);
 
-  // Non-Polang type (e.g. NoneType) is rejected
+  // Non-Polang/non-MLIR standard type (e.g. NoneType) is rejected
   auto invalidTuple = polang::TupleType::getChecked(
       [&] { return emitError(UnknownLoc::get(&context)); }, &context,
       ArrayRef<Type>{builder.getNoneType()});
@@ -552,29 +358,25 @@ TEST_F(VerifierTest, TupleTypeVerification) {
 }
 
 TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
-  auto i8Type = polang::IntegerType::get(&context, 8, Signedness::Signed);
-  auto i16Type = polang::IntegerType::get(&context, 16, Signedness::Signed);
-  auto i32Type = polang::IntegerType::get(&context, 32, Signedness::Signed);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto f32Type = polang::FloatType::get(&context, 32);
-  auto f64Type = polang::FloatType::get(&context, 64);
-  auto boolType = BoolType::get(&context);
-  auto isizeType = polang::IndexType::get(&context, Signedness::Signed);
-  auto usizeType = polang::IndexType::get(&context, Signedness::Unsigned);
+  OpBuilder builder(&context);
+  auto i1Type = builder.getI1Type();
+  auto i8Type = builder.getI8Type();
+  auto i16Type = builder.getI16Type();
+  auto i32Type = builder.getI32Type();
+  auto i64Type = builder.getI64Type();
+  auto f32Type = builder.getF32Type();
+  auto f64Type = builder.getF64Type();
+  auto indexType = builder.getIndexType();
 
   // 1. Primitive type sizes
-  EXPECT_EQ(i8Type.typeSize(), 1u);
-  EXPECT_EQ(i16Type.typeSize(), 2u);
-  EXPECT_EQ(i32Type.typeSize(), 4u);
-  EXPECT_EQ(i64Type.typeSize(), 8u);
-  EXPECT_EQ(f32Type.typeSize(), 4u);
-  EXPECT_EQ(f64Type.typeSize(), 8u);
-  EXPECT_EQ(boolType.typeSize(), 1u);
-  EXPECT_EQ(isizeType.typeSize(), 8u);
-  EXPECT_EQ(usizeType.typeSize(), 8u);
-
+  EXPECT_EQ(polang::getTypeSize(i1Type), 1u);
+  EXPECT_EQ(polang::getTypeSize(i8Type), 1u);
+  EXPECT_EQ(polang::getTypeSize(i16Type), 2u);
   EXPECT_EQ(polang::getTypeSize(i32Type), 4u);
+  EXPECT_EQ(polang::getTypeSize(i64Type), 8u);
+  EXPECT_EQ(polang::getTypeSize(f32Type), 4u);
   EXPECT_EQ(polang::getTypeSize(f64Type), 8u);
+  EXPECT_EQ(polang::getTypeSize(indexType), 8u);
 
   // 2. Empty tuple ()
   auto emptyTuple = polang::TupleType::get(&context, {});
@@ -596,17 +398,17 @@ TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
   EXPECT_EQ(flatTuple.getElementOffsets(), (SmallVector<uint64_t>{0, 8}));
   EXPECT_EQ(flatTuple.getElementSlotOffsets(), (SmallVector<uint64_t>{0, 1}));
 
-  // 4. Flat tuple with sub-64-bit types (i8, bool, f32)
+  // 4. Flat tuple with sub-64-bit types (i8, i1, f32)
   auto sub64Tuple =
-      polang::TupleType::get(&context, {i8Type, boolType, f32Type});
+      polang::TupleType::get(&context, {i8Type, i1Type, f32Type});
   EXPECT_EQ(sub64Tuple.typeSize(), 24u);
   EXPECT_EQ(sub64Tuple.getNumSlots(), 3u);
   EXPECT_EQ(sub64Tuple.getElementOffsets(), (SmallVector<uint64_t>{0, 8, 16}));
   EXPECT_EQ(sub64Tuple.getElementSlotOffsets(),
             (SmallVector<uint64_t>{0, 1, 2}));
 
-  // 5. Nested tuple (i64, (f64, bool), i32)
-  auto innerTuple = polang::TupleType::get(&context, {f64Type, boolType});
+  // 5. Nested tuple (i64, (f64, i1), i32)
+  auto innerTuple = polang::TupleType::get(&context, {f64Type, i1Type});
   EXPECT_EQ(innerTuple.typeSize(), 16u);
   auto nestedTuple =
       polang::TupleType::get(&context, {i64Type, innerTuple, i32Type});
@@ -622,15 +424,15 @@ TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
   EXPECT_EQ(nestedTuple.getElementSlotOffsets(),
             (SmallVector<uint64_t>{0, 1, 3}));
 
-  // 6. Deeply nested tuple ((i64, f64), (bool, (i32, f32)))
+  // 6. Deeply nested tuple ((i64, f64), (i1, (i32, f32)))
   auto pair1 = polang::TupleType::get(&context, {i64Type, f64Type});
   auto pair2 = polang::TupleType::get(&context, {i32Type, f32Type});
-  auto group = polang::TupleType::get(&context, {boolType, pair2});
+  auto group = polang::TupleType::get(&context, {i1Type, pair2});
   EXPECT_EQ(pair1.typeSize(), 16u);
   EXPECT_EQ(pair2.typeSize(), 16u);
-  EXPECT_EQ(group.typeSize(), 24u); // bool at 0 (size 1), pair2 at 8 (size 16) -> total 24
+  EXPECT_EQ(group.typeSize(), 24u);
   auto deepTuple = polang::TupleType::get(&context, {pair1, group});
-  EXPECT_EQ(deepTuple.typeSize(), 40u); // pair1 at 0 (size 16), group at 16 (size 24) -> total 40
+  EXPECT_EQ(deepTuple.typeSize(), 40u);
   EXPECT_EQ(deepTuple.getNumSlots(), 5u);
   EXPECT_EQ(deepTuple.getElementOffsets(), (SmallVector<uint64_t>{0, 16}));
   EXPECT_EQ(deepTuple.getElementSlotOffsets(), (SmallVector<uint64_t>{0, 2}));
@@ -647,10 +449,10 @@ TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
   EXPECT_EQ(genericTuple.getElementOffsets(), std::nullopt);
   EXPECT_EQ(genericTuple.getElementSlotOffsets(), std::nullopt);
 
-  // 8. Nested unspecialized generic tuple (i64, (type_param<"a">, f64), bool)
+  // 8. Nested unspecialized generic tuple (i64, (type_param<"a">, f64), i1)
   auto genericInner = polang::TupleType::get(&context, {typeParamA, f64Type});
   auto genericNested =
-      polang::TupleType::get(&context, {i64Type, genericInner, boolType});
+      polang::TupleType::get(&context, {i64Type, genericInner, i1Type});
   EXPECT_EQ(genericNested.typeSize(), std::nullopt);
   EXPECT_EQ(genericNested.getNumSlots(), std::nullopt);
   EXPECT_EQ(genericNested.getElementOffset(0), 0u);
@@ -661,16 +463,14 @@ TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
 
 TEST_F(VerifierTest, TargetDataLayoutInteraction) {
   OpBuilder builder(&context);
-  auto isizeType = polang::IndexType::get(&context, Signedness::Signed);
-  auto usizeType = polang::IndexType::get(&context, Signedness::Unsigned);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto indexType = builder.getIndexType();
+  auto i64Type = builder.getI64Type();
 
   // 1. Default DataLayout (64-bit index)
   mlir::DataLayout defaultDL;
-  EXPECT_EQ(defaultDL.getTypeSize(isizeType), 8u);
-  EXPECT_EQ(defaultDL.getTypeSizeInBits(isizeType), 64u);
-  EXPECT_EQ(isizeType.typeSize(&defaultDL), 8u);
-  EXPECT_EQ(usizeType.typeSize(&defaultDL), 8u);
+  EXPECT_EQ(defaultDL.getTypeSize(indexType), 8u);
+  EXPECT_EQ(defaultDL.getTypeSizeInBits(indexType), 64u);
+  EXPECT_EQ(polang::getTypeSize(indexType, &defaultDL), 8u);
 
   // 2. Custom 32-bit index DataLayout via module with DLTI spec
   auto loc = UnknownLoc::get(&context);
@@ -682,19 +482,13 @@ TEST_F(VerifierTest, TargetDataLayoutInteraction) {
   (*module32)->setAttr(DLTIDialect::kDataLayoutAttrName, spec);
 
   mlir::DataLayout dl32(*module32);
-  EXPECT_EQ(dl32.getTypeSize(isizeType), 4u);
-  EXPECT_EQ(dl32.getTypeSizeInBits(isizeType), 32u);
-  EXPECT_EQ(isizeType.typeSize(&dl32), 4u);
-  EXPECT_EQ(usizeType.typeSize(&dl32), 4u);
-  EXPECT_EQ(polang::getTypeSize(isizeType, &dl32), 4u);
+  EXPECT_EQ(dl32.getTypeSize(indexType), 4u);
+  EXPECT_EQ(dl32.getTypeSizeInBits(indexType), 32u);
+  EXPECT_EQ(polang::getTypeSize(indexType, &dl32), 4u);
 
   // 3. TupleType layout with 32-bit index and 64-bit alignment rule
   auto tupleWithIndices =
-      polang::TupleType::get(&context, {isizeType, usizeType, i64Type});
-  // Element 0: isize (4 bytes) at offset 0
-  // Element 1: usize (4 bytes) at offset 8 (64-bit aligned)
-  // Element 2: i64 (8 bytes) at offset 16 (64-bit aligned)
-  // Total size: 24 bytes (3 slots)
+      polang::TupleType::get(&context, {indexType, indexType, i64Type});
   EXPECT_EQ(tupleWithIndices.typeSize(&dl32), 24u);
   EXPECT_EQ(tupleWithIndices.getNumSlots(&dl32), 3u);
   EXPECT_EQ(tupleWithIndices.getElementOffsets(&dl32),

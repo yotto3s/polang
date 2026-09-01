@@ -2,11 +2,11 @@
 *)
 
 (* Test unary negation operator *)
-(* CHECK:      polang.func @negate_int(%arg0: !polang.integer<64, signed>) -> !polang.integer<64, signed> {
+(* CHECK:      polang.func @negate_int(%arg0: si64) -> si64 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.neg %arg0 : !polang.integer<64, signed> -> !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.neg %arg0 : si64 -> si64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed>
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : si64
 *)
 (* CHECK-NEXT: }
 *)
@@ -14,13 +14,13 @@ negate_int : i64 -> i64
 negate_int(x) = -x
 
 (* Test negation of arithmetic expression *)
-(* CHECK:      polang.func @negate_expr(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.integer<64, signed> {
+(* CHECK:      polang.func @negate_expr(%arg0: si64, %arg1: si64) -> si64 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : si64, si64 -> si64
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.neg %{{[0-9]+}} : !polang.integer<64, signed> -> !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.neg %{{[0-9]+}} : si64 -> si64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed>
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : si64
 *)
 (* CHECK-NEXT: }
 *)
@@ -28,11 +28,11 @@ negate_expr : i64 * i64 -> i64
 negate_expr(a, b) = -(a + b)
 
 (* Test unary negation of float *)
-(* CHECK:      polang.func @negate_float(%arg0: !polang.float<64>) -> !polang.float<64> {
+(* CHECK:      polang.func @negate_float(%arg0: f64) -> f64 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.neg %arg0 : !polang.float<64> -> !polang.float<64>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.neg %arg0 : f64 -> f64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : f64
 *)
 (* CHECK-NEXT: }
 *)

@@ -83,7 +83,7 @@ private:
 
 TEST_F(ConversionPassTest, PrintOpLowering) {
   OpBuilder builder(&context);
-  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto i64Type = builder.getI64Type();
 
   auto funcType = builder.getFunctionType({}, {i64Type});
   auto module = ModuleOp::create(builder.getUnknownLoc());
@@ -97,8 +97,7 @@ TEST_F(ConversionPassTest, PrintOpLowering) {
 
   // Create a value and print it
   auto val = builder.create<ConstantIntegerOp>(
-      builder.getUnknownLoc(), i64Type,
-      IntegerAttr::get(builder.getIntegerType(64), 42));
+      builder.getUnknownLoc(), i64Type, 42);
   builder.create<PrintOp>(builder.getUnknownLoc(), val.getResult());
 
   // Return a constant
@@ -116,7 +115,7 @@ TEST_F(ConversionPassTest, PrintOpLowering) {
 
 TEST_F(ConversionPassTest, ConstantFloatOpF32) {
   OpBuilder builder(&context);
-  auto f32Type = polang::FloatType::get(&context, 32);
+  auto f32Type = builder.getF32Type();
 
   // Function returning f32
   auto funcType = builder.getFunctionType({}, {f32Type});

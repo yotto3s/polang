@@ -2,6 +2,6 @@
 *)
 
 (* Test float to usize cast (truncates to integer) *)
-(* CHECK: 3 : usize
+(* CHECK: 3 : index
 *)
 3.14 as usize

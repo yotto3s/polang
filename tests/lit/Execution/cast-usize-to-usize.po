@@ -2,7 +2,7 @@
 *)
 
 (* Test usize to usize identity cast (noop) *)
-(* CHECK: 42 : usize
+(* CHECK: 42 : index
 *)
 identity : usize -> usize
 identity(x) = x as usize

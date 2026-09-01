@@ -6,11 +6,11 @@
 (* The AST-level TypeChecker resolves x from x + base where base is i64. *)
 
 (* Monomorphic function with concrete types and captures attribute *)
-(* CHECK: {{.*}}polang.func @add_base(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}captures{{.*}}
+(* CHECK: {{.*}}polang.func @add_base(%{{.*}}: si64, %{{.*}}: si64) -> si64{{.*}}captures{{.*}}
 *)
 
 (* Verify add operation with concrete types *)
-(* CHECK: {{.*}}polang.add{{.*}}!polang.integer<64, signed>, !polang.integer<64, signed>{{.*}}
+(* CHECK: {{.*}}polang.add{{.*}}si64, si64{{.*}}
 *)
 
 base = 10

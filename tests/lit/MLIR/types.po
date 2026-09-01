@@ -2,11 +2,11 @@
 *)
 
 (* Test double constant *)
-(* CHECK:      polang.func @double_val() -> !polang.float<64> {
+(* CHECK:      polang.func @double_val() -> f64 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.float 3.140000e+00 : !polang.float<64>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.float 3.140000e+00 : f64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : f64
 *)
 (* CHECK-NEXT: }
 *)
@@ -14,11 +14,11 @@ double_val : () -> f64
 double_val() = 3.14
 
 (* Test bool constant *)
-(* CHECK:      polang.func @bool_val() -> !polang.bool {
+(* CHECK:      polang.func @bool_val() -> i1 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.bool true : !polang.bool
+(* CHECK-NEXT:   %true = arith.constant true
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+(* CHECK-NEXT:   polang.return %true : i1
 *)
 (* CHECK-NEXT: }
 *)

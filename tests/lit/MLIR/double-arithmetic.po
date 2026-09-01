@@ -2,11 +2,11 @@
 *)
 
 (* Test double addition *)
-(* CHECK:      polang.func @dadd(%arg0: !polang.float<64>, %arg1: !polang.float<64>) -> !polang.float<64> {
+(* CHECK:      polang.func @dadd(%arg0: f64, %arg1: f64) -> f64 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.float<64>, !polang.float<64> -> !polang.float<64>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : f64, f64 -> f64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : f64
 *)
 (* CHECK-NEXT: }
 *)
@@ -14,11 +14,11 @@ dadd : f64 * f64 -> f64
 dadd(a, b) = a + b
 
 (* Test double subtraction *)
-(* CHECK:      polang.func @dsub(%arg0: !polang.float<64>, %arg1: !polang.float<64>) -> !polang.float<64> {
+(* CHECK:      polang.func @dsub(%arg0: f64, %arg1: f64) -> f64 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.sub %arg0, %arg1 : !polang.float<64>, !polang.float<64> -> !polang.float<64>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.sub %arg0, %arg1 : f64, f64 -> f64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : f64
 *)
 (* CHECK-NEXT: }
 *)
@@ -26,11 +26,11 @@ dsub : f64 * f64 -> f64
 dsub(a, b) = a - b
 
 (* Test double multiplication *)
-(* CHECK:      polang.func @dmul(%arg0: !polang.float<64>, %arg1: !polang.float<64>) -> !polang.float<64> {
+(* CHECK:      polang.func @dmul(%arg0: f64, %arg1: f64) -> f64 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.mul %arg0, %arg1 : !polang.float<64>, !polang.float<64> -> !polang.float<64>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.mul %arg0, %arg1 : f64, f64 -> f64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : f64
 *)
 (* CHECK-NEXT: }
 *)
@@ -38,11 +38,11 @@ dmul : f64 * f64 -> f64
 dmul(a, b) = a * b
 
 (* Test double division *)
-(* CHECK:      polang.func @ddiv(%arg0: !polang.float<64>, %arg1: !polang.float<64>) -> !polang.float<64> {
+(* CHECK:      polang.func @ddiv(%arg0: f64, %arg1: f64) -> f64 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.div %arg0, %arg1 : !polang.float<64>, !polang.float<64> -> !polang.float<64>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.div %arg0, %arg1 : f64, f64 -> f64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.float<64>
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : f64
 *)
 (* CHECK-NEXT: }
 *)

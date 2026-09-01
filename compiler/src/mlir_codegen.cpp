@@ -264,18 +264,18 @@ namespace {
 
 /// Convert a Polang type to its string representation
 std::string typeToString(Type type) {
-  if (auto intType = dyn_cast<polang::IntegerType>(type)) {
-    std::string prefix = intType.isSigned() ? "i" : "u";
-    return prefix + std::to_string(intType.getWidth());
+  if (auto intType = dyn_cast<mlir::IntegerType>(type)) {
+    if (intType.getWidth() == 1) {
+      return "bool";
+    }
+    return (intType.isUnsigned() ? "u" : "i") +
+           std::to_string(intType.getWidth());
   }
-  if (auto floatType = dyn_cast<polang::FloatType>(type)) {
+  if (auto floatType = dyn_cast<mlir::FloatType>(type)) {
     return "f" + std::to_string(floatType.getWidth());
   }
-  if (isa<polang::BoolType>(type)) {
-    return "bool";
-  }
-  if (auto indexType = dyn_cast<polang::IndexType>(type)) {
-    return indexType.isSigned() ? "isize" : "usize";
+  if (isa<mlir::IndexType>(type)) {
+    return "index";
   }
   if (auto tupleType = dyn_cast<polang::TupleType>(type)) {
     std::string result = "(";

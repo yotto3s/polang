@@ -23,31 +23,12 @@ using namespace polang;
 #pragma GCC diagnostic pop
 
 LogicalResult
-polang::IntegerType::verify(function_ref<InFlightDiagnostic()> emitError,
-                            unsigned width, Signedness /*signedness*/) {
-  if (width < 8 || !llvm::isPowerOf2_32(width)) {
-    return emitError() << "integer width must be a power of 2 >= 8, but got "
-                       << width;
-  }
-  return success();
-}
-
-LogicalResult
-polang::FloatType::verify(function_ref<InFlightDiagnostic()> emitError,
-                          unsigned width) {
-  if (width != 32 && width != 64) {
-    return emitError() << "float width must be 32 or 64, but got " << width;
-  }
-  return success();
-}
-
-LogicalResult
 polang::TupleType::verify(function_ref<InFlightDiagnostic()> emitError,
                           ArrayRef<Type> types) {
   for (size_t i = 0; i < types.size(); ++i) {
     Type elem = types[i];
-    if (!llvm::isa<IntegerType, FloatType, BoolType, IndexType, TypeParamType,
-                   TupleType>(elem)) {
+    if (!llvm::isa<mlir::IntegerType, mlir::FloatType, mlir::IndexType,
+                   TypeParamType, TupleType>(elem)) {
       return emitError() << "tuple element " << i << " type (" << elem
                          << ") is not a valid Polang type or type parameter";
     }
@@ -58,88 +39,6 @@ polang::TupleType::verify(function_ref<InFlightDiagnostic()> emitError,
 //===----------------------------------------------------------------------===//
 // DataLayoutTypeInterface implementations
 //===----------------------------------------------------------------------===//
-
-::llvm::TypeSize polang::IntegerType::getTypeSizeInBits(
-    const ::mlir::DataLayout& /*dataLayout*/,
-    ::mlir::DataLayoutEntryListRef /*params*/) const {
-  return ::llvm::TypeSize::getFixed(getWidth());
-}
-
-uint64_t polang::IntegerType::getABIAlignment(
-    const ::mlir::DataLayout& /*dataLayout*/,
-    ::mlir::DataLayoutEntryListRef /*params*/) const {
-  return llvm::divideCeil(getWidth(), 8);
-}
-
-uint64_t polang::IntegerType::getPreferredAlignment(
-    const ::mlir::DataLayout& dataLayout,
-    ::mlir::DataLayoutEntryListRef params) const {
-  return getABIAlignment(dataLayout, params);
-}
-
-::llvm::TypeSize polang::FloatType::getTypeSizeInBits(
-    const ::mlir::DataLayout& /*dataLayout*/,
-    ::mlir::DataLayoutEntryListRef /*params*/) const {
-  return ::llvm::TypeSize::getFixed(getWidth());
-}
-
-uint64_t polang::FloatType::getABIAlignment(
-    const ::mlir::DataLayout& /*dataLayout*/,
-    ::mlir::DataLayoutEntryListRef /*params*/) const {
-  return getWidth() / 8;
-}
-
-uint64_t polang::FloatType::getPreferredAlignment(
-    const ::mlir::DataLayout& dataLayout,
-    ::mlir::DataLayoutEntryListRef params) const {
-  return getABIAlignment(dataLayout, params);
-}
-
-::llvm::TypeSize polang::BoolType::getTypeSizeInBits(
-    const ::mlir::DataLayout& /*dataLayout*/,
-    ::mlir::DataLayoutEntryListRef /*params*/) const {
-  return ::llvm::TypeSize::getFixed(8);
-}
-
-uint64_t polang::BoolType::getABIAlignment(
-    const ::mlir::DataLayout& /*dataLayout*/,
-    ::mlir::DataLayoutEntryListRef /*params*/) const {
-  return 1;
-}
-
-uint64_t polang::BoolType::getPreferredAlignment(
-    const ::mlir::DataLayout& /*dataLayout*/,
-    ::mlir::DataLayoutEntryListRef /*params*/) const {
-  return 1;
-}
-
-::llvm::TypeSize polang::IndexType::getTypeSizeInBits(
-    const ::mlir::DataLayout& dataLayout,
-    ::mlir::DataLayoutEntryListRef /*params*/) const {
-  return ::llvm::TypeSize::getFixed(
-      dataLayout.getTypeSizeInBits(mlir::IndexType::get(getContext())));
-}
-
-uint64_t polang::IndexType::getABIAlignment(
-    const ::mlir::DataLayout& dataLayout,
-    ::mlir::DataLayoutEntryListRef /*params*/) const {
-  return dataLayout.getTypeABIAlignment(mlir::IndexType::get(getContext()));
-}
-
-uint64_t polang::IndexType::getPreferredAlignment(
-    const ::mlir::DataLayout& dataLayout,
-    ::mlir::DataLayoutEntryListRef /*params*/) const {
-  return dataLayout.getTypePreferredAlignment(
-      mlir::IndexType::get(getContext()));
-}
-
-uint64_t
-polang::IndexType::typeSize(const ::mlir::DataLayout* dataLayout) const {
-  if (dataLayout != nullptr) {
-    return dataLayout->getTypeSize(mlir::IndexType::get(getContext()));
-  }
-  return 8;
-}
 
 ::llvm::TypeSize polang::TupleType::getTypeSizeInBits(
     const ::mlir::DataLayout& dataLayout,
@@ -165,22 +64,17 @@ uint64_t polang::TupleType::getPreferredAlignment(
 
 std::optional<uint64_t>
 polang::getTypeSize(Type type, const ::mlir::DataLayout* dataLayout) {
-  if (auto intType = llvm::dyn_cast<IntegerType>(type)) {
-    return intType.typeSize();
-  }
-  if (auto floatType = llvm::dyn_cast<FloatType>(type)) {
-    return floatType.typeSize();
-  }
-  if (auto boolType = llvm::dyn_cast<BoolType>(type)) {
-    return boolType.typeSize();
-  }
-  if (auto indexType = llvm::dyn_cast<IndexType>(type)) {
-    return indexType.typeSize(dataLayout);
+  if (llvm::isa<TypeParamType>(type)) {
+    return std::nullopt;
   }
   if (auto tupleType = llvm::dyn_cast<TupleType>(type)) {
     return tupleType.typeSize(dataLayout);
   }
-  return std::nullopt;
+  if (dataLayout != nullptr) {
+    return dataLayout->getTypeSize(type);
+  }
+  mlir::DataLayout defaultDL;
+  return defaultDL.getTypeSize(type);
 }
 
 std::optional<uint64_t>

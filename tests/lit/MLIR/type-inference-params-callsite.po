@@ -4,7 +4,7 @@
 (* Polymorphic function, type inferred via monomorphization at call site *)
 
 (* Monomorphized version for int *)
-(* CHECK: {{.*}}polang.func @identity$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+(* CHECK: {{.*}}polang.func @identity$i64(%{{.*}}: si64) -> si64{{.*}}
 *)
 
 (* Original generic function is erased *)

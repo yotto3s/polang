@@ -5,11 +5,11 @@
 (* After monomorphization, constants have concrete types. *)
 
 (* Specialized function with concrete types *)
-(* CHECK: {{.*}}polang.func @get_zero$i64(%{{.*}}: !polang.integer<64, signed>){{.*}}
+(* CHECK: {{.*}}polang.func @get_zero$i64(%{{.*}}: si64){{.*}}
 *)
 
 (* Constants in the specialized function have concrete types *)
-(* CHECK: {{.*}}polang.constant.integer 0 : !polang.integer<64, signed>{{.*}}
+(* CHECK: {{.*}}polang.constant.integer 0 : si64{{.*}}
 *)
 
 (* Original generic function is erased *)

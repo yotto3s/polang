@@ -2,7 +2,7 @@
 *)
 
 (* Test arithmetic operations on usize values *)
-(* CHECK: 42 : usize
+(* CHECK: 42 : index
 *)
 add_usize : usize * usize -> usize
 add_usize(a, b) = a + b

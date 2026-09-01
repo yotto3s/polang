@@ -3,13 +3,13 @@
 
 (* Captured variable with inferred parameter *)
 base = 10
-(* CHECK: {{.*}}polang.func @add_base(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+(* CHECK: {{.*}}polang.func @add_base(%{{.*}}: si64) -> si64{{.*}}
 *)
 add_base(x) = x + base
 
 (* Double captured variable with inferred parameter *)
 factor = 2.5
-(* CHECK: {{.*}}polang.func @scale(%{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}}
+(* CHECK: {{.*}}polang.func @scale(%{{.*}}: f64) -> f64{{.*}}
 *)
 scale(x) = x * factor
 

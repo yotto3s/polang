@@ -8,6 +8,6 @@ add(x, y) = x + y
 result : usize
 result = add(10 as usize, 20 as usize)
 
-(* CHECK: 30 : usize
+(* CHECK: 30 : index
 *)
 result

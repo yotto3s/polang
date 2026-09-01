@@ -5,7 +5,7 @@
 (* as inference-based polymorphism. *)
 
 (* The specialized identity function with concrete types *)
-(* CHECK-DAG: {{.*}}polang.func @identity$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+(* CHECK-DAG: {{.*}}polang.func @identity$i64(%{{.*}}: si64) -> si64{{.*}}
 *)
 
 (* The original generic function is erased after monomorphization *)

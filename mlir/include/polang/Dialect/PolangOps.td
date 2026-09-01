@@ -47,36 +47,25 @@ def Polang_AnyFloatAttr : Attr<CPred<"::llvm::isa<::mlir::FloatAttr>($_self)">,
 def Polang_ConstantIntegerOp : Polang_Op<"constant.integer", [Pure]> {
   let summary = "Integer constant";
   let description = [{
-    Produces a constant integer value of any supported width and signedness.
+    Produces a constant integer or index value.
 
     Example:
     ```mlir
-    %0 = polang.constant.integer 42 : !polang.integer<64, signed>
-    %1 = polang.constant.integer 255 : !polang.integer<8, unsigned>
+    %0 = polang.constant.integer 42 : i64
+    %1 = polang.constant.integer 255 : i8
     ```
   }];
 
   let arguments = (ins Polang_AnyIntegerAttr:$value);
-  let results = (outs AnyTypeOf<[Polang_IntegerType, Polang_IndexType, Polang_TypeParamType]>:$result);
+  let results = (outs AnyTypeOf<[AnyInteger, Index, Polang_TypeParamType]>:$result);
 
   let hasCustomAssemblyFormat = 1;
 
   let builders = [
-    OpBuilder<(ins "IntegerType":$type, "int64_t":$value), [{
-      unsigned width = type.getWidth();
-      bool isSigned = type.isSigned();
-      build($_builder, $_state, type,
-            $_builder.getIntegerAttr(
-                $_builder.getIntegerType(width, isSigned), value));
-    }]>,
-    // Builder for type parameters (generic functions)
     OpBuilder<(ins "mlir::Type":$type, "int64_t":$value), [{
-      if (auto intType = ::llvm::dyn_cast<IntegerType>(type)) {
-        unsigned width = intType.getWidth();
-        bool isSigned = intType.isSigned();
+      if (auto intType = ::llvm::dyn_cast<::mlir::IntegerType>(type)) {
         build($_builder, $_state, type,
-              $_builder.getIntegerAttr(
-                  $_builder.getIntegerType(width, isSigned), value));
+              $_builder.getIntegerAttr(intType, value));
       } else {
         // For index types and type parameters, use i64 attribute
         build($_builder, $_state, type,
@@ -93,66 +82,25 @@ def Polang_ConstantFloatOp : Polang_Op<"constant.float", [Pure]> {
 
     Example:
     ```mlir
-    %0 = polang.constant.float 3.14 : !polang.float<64>
-    %1 = polang.constant.float 1.5 : !polang.float<32>
+    %0 = polang.constant.float 3.14 : f64
+    %1 = polang.constant.float 1.5 : f32
     ```
   }];
 
   let arguments = (ins Polang_AnyFloatAttr:$value);
-  let results = (outs AnyTypeOf<[Polang_FloatType, Polang_TypeParamType]>:$result);
+  let results = (outs AnyTypeOf<[AnyFloat, Polang_TypeParamType]>:$result);
 
   let hasCustomAssemblyFormat = 1;
 
   let builders = [
-    OpBuilder<(ins "FloatType":$type, "double":$value), [{
-      unsigned width = type.getWidth();
-      if (width == 32) {
-        build($_builder, $_state, type,
-              $_builder.getF32FloatAttr(static_cast<float>(value)));
-      } else {
-        build($_builder, $_state, type,
-              $_builder.getF64FloatAttr(value));
-      }
-    }]>,
-    // Builder for type parameters (generic functions)
     OpBuilder<(ins "mlir::Type":$type, "double":$value), [{
-      if (auto floatType = ::llvm::dyn_cast<FloatType>(type)) {
-        unsigned width = floatType.getWidth();
-        if (width == 32) {
-          build($_builder, $_state, type,
-                $_builder.getF32FloatAttr(static_cast<float>(value)));
-        } else {
-          build($_builder, $_state, type,
-                $_builder.getF64FloatAttr(value));
-        }
+      if (auto floatType = ::llvm::dyn_cast<::mlir::FloatType>(type)) {
+        build($_builder, $_state, type,
+              $_builder.getFloatAttr(floatType, value));
       } else {
         // For type parameters, use f64 attribute (actual type resolved later)
         build($_builder, $_state, type, $_builder.getF64FloatAttr(value));
       }
-    }]>
-  ];
-}
-
-def Polang_ConstantBoolOp : Polang_Op<"constant.bool", [Pure]> {
-  let summary = "Boolean constant";
-  let description = [{
-    Produces a constant boolean value.
-
-    Example:
-    ```mlir
-    %0 = polang.constant.bool true : !polang.bool
-    ```
-  }];
-
-  let arguments = (ins BoolAttr:$value);
-  let results = (outs Polang_BoolType:$result);
-
-  let assemblyFormat = "$value attr-dict `:` type($result)";
-
-  let builders = [
-    OpBuilder<(ins "bool":$value), [{
-      build($_builder, $_state, $_builder.getType<BoolType>(),
-            $_builder.getBoolAttr(value));
     }]>
   ];
 }
@@ -260,19 +208,22 @@ def Polang_NegOp : Polang_Op<"neg", [Pure]> {
   let hasVerifier = 1;
 }
 
-def Polang_NotOp : Polang_Op<"not", [Pure]> {
+def Polang_NotOp : Polang_Op<"not", [
+    Pure,
+    SameOperandsAndResultType
+]> {
   let summary = "Logical not operation";
   let description = [{
-    Performs logical not on a boolean value.
+    Performs logical not on an i1 (boolean) value.
 
     Example:
     ```mlir
-    %0 = polang.not %a : !polang.bool
+    %0 = polang.not %a : i1
     ```
   }];
 
-  let arguments = (ins Polang_BoolType:$operand);
-  let results = (outs Polang_BoolType:$result);
+  let arguments = (ins I1:$operand);
+  let results = (outs I1:$result);
   let assemblyFormat = "$operand attr-dict `:` type($operand)";
 }
 
@@ -293,8 +244,8 @@ def Polang_CastOp : Polang_Op<"cast", [Pure]> {
 
     Example:
     ```mlir
-    %0 = polang.cast %x : !polang.integer<32, signed> -> !polang.integer<64, signed>
-    %1 = polang.cast %f : !polang.float<64> -> !polang.integer<32, signed>
+    %0 = polang.cast %x : i32 -> i64
+    %1 = polang.cast %f : f64 -> i32
     ```
   }];
 
@@ -319,11 +270,11 @@ def Polang_CmpOp : Polang_Op<"cmp", [
   ]> {
   let summary = "Comparison operation";
   let description = [{
-    Compares two numeric values and returns a boolean result.
+    Compares two numeric values and returns an i1 boolean result.
 
     Example:
     ```mlir
-    %0 = polang.cmp eq, %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed>
+    %0 = polang.cmp eq, %a, %b : i64, i64
     ```
   }];
 
@@ -332,7 +283,7 @@ def Polang_CmpOp : Polang_Op<"cmp", [
     Polang_AnyNumericOrParam:$lhs,
     Polang_AnyNumericOrParam:$rhs
   );
-  let results = (outs Polang_BoolType:$result);
+  let results = (outs I1:$result);
 
   // Print both operand types since they may differ during type inference
   let assemblyFormat = "$predicate `,` $lhs `,` $rhs attr-dict `:` type($lhs) `,` type($rhs)";
@@ -565,55 +516,18 @@ def Polang_ReturnOp : Polang_Op<"return", [
 // Control flow operations
 //===----------------------------------------------------------------------===//
 
-def Polang_IfOp : Polang_Op<"if", [
-    RecursiveMemoryEffects
-  ]> {
-  let summary = "If-then-else expression";
-  let description = [{
-    Evaluates a condition and executes one of two regions.
-    Both regions must yield a value of the same type.
-
-    Example:
-    ```mlir
-    %0 = polang.if %cond : !polang.bool -> !polang.integer<64, signed> {
-      polang.yield %a : !polang.integer<64, signed>
-    } else {
-      polang.yield %b : !polang.integer<64, signed>
-    }
-    ```
-  }];
-
-  let arguments = (ins Polang_BoolType:$condition);
-  let results = (outs Polang_AnyTypeOrParam:$result);
-  let regions = (region
-    SizedRegion<1>:$thenRegion,
-    SizedRegion<1>:$elseRegion
-  );
-
-  let assemblyFormat = [{
-    $condition `:` type($condition) `->` type($result) $thenRegion `else` $elseRegion attr-dict
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "mlir::Type":$resultType, "mlir::Value":$condition)>
-  ];
-
-  let hasVerifier = 1;
-}
-
 def Polang_YieldOp : Polang_Op<"yield", [
     Pure,
     Terminator,
-    ParentOneOf<["IfOp", "LetExprOp"]>
+    HasParent<"LetExprOp">
   ]> {
   let summary = "Yield value from region";
   let description = [{
-    Yields a value from a region (if-then-else branches, let expressions).
+    Yields a value from a let expression body region.
 
     Example:
     ```mlir
-    polang.yield %0 : !polang.integer<64, signed>
+    polang.yield %0 : i64
     ```
   }];
 

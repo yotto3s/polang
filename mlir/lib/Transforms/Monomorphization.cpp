@@ -35,18 +35,18 @@ namespace {
 
 /// Get a type string for mangling
 std::string getTypeString(Type type) {
-  if (auto intType = dyn_cast<polang::IntegerType>(type)) {
-    return (intType.isSigned() ? "i" : "u") +
+  if (auto intType = dyn_cast<mlir::IntegerType>(type)) {
+    if (intType.getWidth() == 1) {
+      return "bool";
+    }
+    return (intType.isUnsigned() ? "u" : "i") +
            std::to_string(intType.getWidth());
   }
-  if (auto floatType = dyn_cast<polang::FloatType>(type)) {
+  if (auto floatType = dyn_cast<mlir::FloatType>(type)) {
     return "f" + std::to_string(floatType.getWidth());
   }
-  if (isa<BoolType>(type)) {
-    return "bool";
-  }
-  if (auto indexType = dyn_cast<polang::IndexType>(type)) {
-    return indexType.isSigned() ? "isize" : "usize";
+  if (isa<mlir::IndexType>(type)) {
+    return "index";
   }
   if (auto tupleType = dyn_cast<polang::TupleType>(type)) {
     size_t n = tupleType.getTypes().size();

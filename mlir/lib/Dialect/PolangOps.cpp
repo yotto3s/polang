@@ -556,65 +556,6 @@ FunctionType CallOp::getCalleeType() {
 }
 
 //===----------------------------------------------------------------------===//
-// IfOp
-//===----------------------------------------------------------------------===//
-
-void IfOp::build(OpBuilder& builder, OperationState& state, Type resultType,
-                 Value condition) {
-  (void)builder; // Unused, but required by MLIR interface
-  state.addOperands(condition);
-  state.addTypes(resultType);
-
-  // Create then region
-  Region* thenRegion = state.addRegion();
-  thenRegion->push_back(new Block());
-
-  // Create else region
-  Region* elseRegion = state.addRegion();
-  elseRegion->push_back(new Block());
-}
-
-LogicalResult IfOp::verify() {
-  // Check that both regions have terminators
-  if (getThenRegion().empty() || getThenRegion().front().empty()) {
-    return emitOpError("then region must not be empty");
-  }
-  if (getElseRegion().empty() || getElseRegion().front().empty()) {
-    return emitOpError("else region must not be empty");
-  }
-
-  auto* thenTerminator = getThenRegion().front().getTerminator();
-  auto* elseTerminator = getElseRegion().front().getTerminator();
-
-  auto thenYield = dyn_cast<YieldOp>(thenTerminator);
-  auto elseYield = dyn_cast<YieldOp>(elseTerminator);
-
-  if (!thenYield) {
-    return emitOpError("then region must end with polang.yield");
-  }
-  if (!elseYield) {
-    return emitOpError("else region must end with polang.yield");
-  }
-
-  // Check that yield types match result type (allow type variables)
-  if (!typesAreCompatible(thenYield.getValue().getType(),
-                          getResult().getType())) {
-    return emitOpError("then branch yields ")
-           << thenYield.getValue().getType() << " but if expects "
-           << getResult().getType();
-  }
-
-  if (!typesAreCompatible(elseYield.getValue().getType(),
-                          getResult().getType())) {
-    return emitOpError("else branch yields ")
-           << elseYield.getValue().getType() << " but if expects "
-           << getResult().getType();
-  }
-
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // ReturnOp verifier
 //===----------------------------------------------------------------------===//
 
@@ -787,13 +728,13 @@ LogicalResult CastOp::verify() {
     return success();
   }
 
-  // Both types must be numeric (not bool)
-  const bool inputIsNumeric = isa<polang::IntegerType>(inputType) ||
-                              isa<polang::FloatType>(inputType) ||
-                              isa<polang::IndexType>(inputType);
-  const bool resultIsNumeric = isa<polang::IntegerType>(resultType) ||
-                               isa<polang::FloatType>(resultType) ||
-                               isa<polang::IndexType>(resultType);
+  // Both types must be numeric
+  const bool inputIsNumeric = isa<mlir::IntegerType>(inputType) ||
+                              isa<mlir::FloatType>(inputType) ||
+                              isa<mlir::IndexType>(inputType);
+  const bool resultIsNumeric = isa<mlir::IntegerType>(resultType) ||
+                               isa<mlir::FloatType>(resultType) ||
+                               isa<mlir::IndexType>(resultType);
 
   if (!inputIsNumeric) {
     return emitOpError("input type must be numeric, got ") << inputType;
@@ -815,18 +756,6 @@ LogicalResult CmpOp::verify() {
   }
   return success();
 }
-
-//===----------------------------------------------------------------------===//
-// InferTypeOpInterface implementations
-//===----------------------------------------------------------------------===//
-
-// Note: Arithmetic ops need explicit result type specification in MLIRGen
-// since we removed SameOperandsAndResultType to allow type variables.
-// CmpOp always returns bool, so it infers the result type automatically.
-
-// Note: LoadOp does not implement InferTypeOpInterface because the memref
-// element type is the LLVM type (i64), not the Polang type (!polang.int).
-// MLIRGen already specifies the type explicitly.
 
 //===----------------------------------------------------------------------===//
 // ConstantIntegerOp custom print/parse
@@ -854,13 +783,12 @@ ParseResult ConstantIntegerOp::parse(OpAsmParser& parser,
 
   // Create the IntegerAttr with the appropriate bit width
   unsigned width = 64; // Default width for type parameters and index types
-  if (auto intType = dyn_cast<polang::IntegerType>(resultType)) {
+  if (auto intType = dyn_cast<mlir::IntegerType>(resultType)) {
     width = intType.getWidth();
-  } else if (!isa<polang::IndexType>(resultType) &&
+  } else if (!isa<mlir::IndexType>(resultType) &&
              !isa<TypeParamType>(resultType)) {
-    return parser.emitError(
-        parser.getNameLoc(),
-        "expected polang.integer, polang.index, or type_param type");
+    return parser.emitError(parser.getNameLoc(),
+                            "expected integer, index, or type_param type");
   }
   auto attr = IntegerAttr::get(
       mlir::IntegerType::get(parser.getContext(), width), value);
@@ -897,15 +825,11 @@ ParseResult ConstantFloatOp::parse(OpAsmParser& parser,
   // Create the FloatAttr with the appropriate type
   mlir::Type attrType =
       Float64Type::get(parser.getContext()); // Default for type vars
-  if (auto floatType = dyn_cast<polang::FloatType>(resultType)) {
-    if (floatType.getWidth() == 32) {
-      attrType = Float32Type::get(parser.getContext());
-    } else {
-      attrType = Float64Type::get(parser.getContext());
-    }
+  if (auto floatType = dyn_cast<mlir::FloatType>(resultType)) {
+    attrType = floatType;
   } else if (!isa<TypeParamType>(resultType)) {
     return parser.emitError(parser.getNameLoc(),
-                            "expected polang.float or type_param type");
+                            "expected float or type_param type");
   }
   auto attr = FloatAttr::get(attrType, value);
   result.addAttribute("value", attr);

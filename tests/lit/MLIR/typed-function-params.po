@@ -5,25 +5,25 @@
 (* This verifies the type infrastructure works for non-default types *)
 
 (* Function with i32 parameters shows correct MLIR types *)
-(* CHECK: {{.*}}polang.func @add_i32(%{{.*}}: !polang.integer<32, signed>, %{{.*}}: !polang.integer<32, signed>) -> !polang.integer<32, signed>{{.*}}
+(* CHECK: {{.*}}polang.func @add_i32(%{{.*}}: si32, %{{.*}}: si32) -> si32{{.*}}
 *)
 add_i32 : i32 * i32 -> i32
 add_i32(a, b) = a + b
 
 (* Function with i16 parameters *)
-(* CHECK: {{.*}}polang.func @mul_i16(%{{.*}}: !polang.integer<16, signed>, %{{.*}}: !polang.integer<16, signed>) -> !polang.integer<16, signed>{{.*}}
+(* CHECK: {{.*}}polang.func @mul_i16(%{{.*}}: si16, %{{.*}}: si16) -> si16{{.*}}
 *)
 mul_i16 : i16 * i16 -> i16
 mul_i16(a, b) = a * b
 
 (* Function with u64 parameters *)
-(* CHECK: {{.*}}polang.func @add_u64(%{{.*}}: !polang.integer<64, unsigned>, %{{.*}}: !polang.integer<64, unsigned>) -> !polang.integer<64, unsigned>{{.*}}
+(* CHECK: {{.*}}polang.func @add_u64(%{{.*}}: ui64, %{{.*}}: ui64) -> ui64{{.*}}
 *)
 add_u64 : u64 * u64 -> u64
 add_u64(a, b) = a + b
 
 (* Function with f32 parameters *)
-(* CHECK: {{.*}}polang.func @mul_f32(%{{.*}}: !polang.float<32>, %{{.*}}: !polang.float<32>) -> !polang.float<32>{{.*}}
+(* CHECK: {{.*}}polang.func @mul_f32(%{{.*}}: f32, %{{.*}}: f32) -> f32{{.*}}
 *)
 mul_f32 : f32 * f32 -> f32
 mul_f32(a, b) = a * b

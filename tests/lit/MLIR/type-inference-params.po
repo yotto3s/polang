@@ -5,17 +5,17 @@
 (* when the body constrains the types. They are emitted as monomorphic functions. *)
 
 (* Function resolved to integer (x * 2 constrains x to integer) *)
-(* CHECK: {{.*}}polang.func @double_it(%{{.*}}: !polang.integer<64, signed>){{.*}}
+(* CHECK: {{.*}}polang.func @double_it(%{{.*}}: si64){{.*}}
 *)
 double_it(x) = x * 2
 
 (* Function resolved to float (x / 2.0 constrains x to float) *)
-(* CHECK: {{.*}}polang.func @half(%{{.*}}: !polang.float<64>){{.*}}
+(* CHECK: {{.*}}polang.func @half(%{{.*}}: f64){{.*}}
 *)
 half(x) = x / 2.0
 
 (* Function resolved to integer (x == 0 constrains x to integer) *)
-(* CHECK: {{.*}}polang.func @is_zero(%{{.*}}: !polang.integer<64, signed>){{.*}}
+(* CHECK: {{.*}}polang.func @is_zero(%{{.*}}: si64){{.*}}
 *)
 is_zero(x) = x == 0
 

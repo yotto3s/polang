@@ -64,6 +64,7 @@ target_link_libraries(conversion_pass_test PRIVATE
     MLIRArithDialect
     MLIRFuncDialect
     MLIRSCFDialect
+    MLIRSCFTransforms
     MLIRMemRefDialect
     MLIRLLVMDialect
     MLIRTransforms

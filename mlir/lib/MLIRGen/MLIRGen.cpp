@@ -24,6 +24,7 @@
 
 using polang::TypeNames;
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -135,21 +136,22 @@ public:
     if (expectedLiteralType != nullptr) {
       const auto meta = getTypeMetadata(expectedLiteralType->getTypeName());
       if (meta.isFloat()) {
-        auto type = polang::FloatType::get(builder.getContext(), meta.width);
+        auto type = meta.width == 32 ? (Type)builder.getF32Type()
+                                     : (Type)builder.getF64Type();
         result =
             builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
         resultType = expectedLiteralType->clone();
         return;
       }
     }
-    auto type =
-        polang::FloatType::get(builder.getContext(), DEFAULT_FLOAT_WIDTH);
+    auto type = builder.getF64Type();
     result = builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
     resultType = makeTypeSpec(TypeNames::GENERIC_FLOAT);
   }
 
   void visit(const NBoolean& node) override {
-    result = builder.create<ConstantBoolOp>(loc(node.loc), node.value);
+    result = builder.create<arith::ConstantIntOp>(loc(node.loc),
+                                                  node.value ? 1 : 0, 1);
     resultType = makeTypeSpec(TypeNames::BOOL);
   }
 
@@ -405,40 +407,44 @@ public:
     // Handle short-circuit operators BEFORE evaluating RHS
     if (node.op == yy::parser::token::TLAND) {
       // a && b: if a then b else false
-      Type boolType = builder.getType<BoolType>();
-      auto ifOp = builder.create<IfOp>(loc(node.loc), boolType, lhs);
+      Type boolType = builder.getI1Type();
+      auto ifOp = builder.create<scf::IfOp>(loc(node.loc), TypeRange{boolType},
+                                            lhs, /*withElseRegion=*/true);
 
       // Then region: evaluate rhs and yield it
       {
         OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
         node.rhs->accept(*this);
-        builder.create<YieldOp>(loc(node.loc), result);
+        builder.create<scf::YieldOp>(loc(node.loc), result);
       }
 
       // Else region: yield false
       {
         OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
-        Value falseVal = builder.create<ConstantBoolOp>(loc(node.loc), false);
-        builder.create<YieldOp>(loc(node.loc), falseVal);
+        Value falseVal =
+            builder.create<arith::ConstantIntOp>(loc(node.loc), 0, 1);
+        builder.create<scf::YieldOp>(loc(node.loc), falseVal);
       }
 
-      result = ifOp.getResult();
+      result = ifOp.getResult(0);
       resultType = makeTypeSpec(TypeNames::BOOL);
       return;
     }
     if (node.op == yy::parser::token::TLOR) {
       // a || b: if a then true else b
-      Type boolType = builder.getType<BoolType>();
-      auto ifOp = builder.create<IfOp>(loc(node.loc), boolType, lhs);
+      Type boolType = builder.getI1Type();
+      auto ifOp = builder.create<scf::IfOp>(loc(node.loc), TypeRange{boolType},
+                                            lhs, /*withElseRegion=*/true);
 
       // Then region: yield true
       {
         OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
-        Value trueVal = builder.create<ConstantBoolOp>(loc(node.loc), true);
-        builder.create<YieldOp>(loc(node.loc), trueVal);
+        Value trueVal =
+            builder.create<arith::ConstantIntOp>(loc(node.loc), 1, 1);
+        builder.create<scf::YieldOp>(loc(node.loc), trueVal);
       }
 
       // Else region: evaluate rhs and yield it
@@ -446,10 +452,10 @@ public:
         OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
         node.rhs->accept(*this);
-        builder.create<YieldOp>(loc(node.loc), result);
+        builder.create<scf::YieldOp>(loc(node.loc), result);
       }
 
-      result = ifOp.getResult();
+      result = ifOp.getResult(0);
       resultType = makeTypeSpec(TypeNames::BOOL);
       return;
     }
@@ -565,7 +571,8 @@ public:
     // Create if operation
     Type resultTy =
         ifResultType ? getPolangType(*ifResultType) : getDefaultType();
-    auto ifOp = builder.create<IfOp>(loc(node.loc), resultTy, condition);
+    auto ifOp = builder.create<scf::IfOp>(loc(node.loc), TypeRange{resultTy},
+                                          condition, /*withElseRegion=*/true);
 
     // Generate then region
     {
@@ -573,7 +580,7 @@ public:
       builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
       node.thenExpr->accept(*this);
       if (result) {
-        builder.create<YieldOp>(loc(node.thenExpr->loc), result);
+        builder.create<scf::YieldOp>(loc(node.thenExpr->loc), result);
       }
     }
 
@@ -583,11 +590,11 @@ public:
       builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
       node.elseExpr->accept(*this);
       if (result) {
-        builder.create<YieldOp>(loc(node.elseExpr->loc), result);
+        builder.create<scf::YieldOp>(loc(node.elseExpr->loc), result);
       }
     }
 
-    result = ifOp.getResult();
+    result = ifOp.getResult(0);
     resultType = std::move(ifResultType);
   }
 
@@ -1461,13 +1468,13 @@ private:
       // Create default value matching the return type
       Value defaultVal;
       if (isFloatType(inferredType)) {
-        auto floatTy = polang::FloatType::get(builder.getContext(),
-                                              getFloatWidth(inferredType));
+        auto floatTy = getFloatWidth(inferredType) == 32
+                           ? (Type)builder.getF32Type()
+                           : (Type)builder.getF64Type();
         defaultVal =
             builder.create<ConstantFloatOp>(loc(block.loc), floatTy, 0.0);
       } else if (inferredType == TypeNames::BOOL) {
-        // NOLINTNEXTLINE(bugprone-branch-clone) - creates different op types
-        defaultVal = builder.create<ConstantBoolOp>(loc(block.loc), false);
+        defaultVal = builder.create<arith::ConstantIntOp>(loc(block.loc), 0, 1);
       } else {
         // Use the return type (already resolved or type variable)
         defaultVal =

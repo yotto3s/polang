@@ -4,13 +4,13 @@
 (* Test MLIR representation of f32 float type *)
 
 (* Function with f32 parameters *)
-(* CHECK: {{.*}}polang.func @add_f32(%{{.*}}: !polang.float<32>, %{{.*}}: !polang.float<32>) -> !polang.float<32>{{.*}}
+(* CHECK: {{.*}}polang.func @add_f32(%{{.*}}: f32, %{{.*}}: f32) -> f32{{.*}}
 *)
 add_f32 : f32 * f32 -> f32
 add_f32(a, b) = a + b
 
 (* Function with f32 return type, mixing with arithmetic *)
-(* CHECK: {{.*}}polang.func @mul_f32(%{{.*}}: !polang.float<32>, %{{.*}}: !polang.float<32>) -> !polang.float<32>{{.*}}
+(* CHECK: {{.*}}polang.func @mul_f32(%{{.*}}: f32, %{{.*}}: f32) -> f32{{.*}}
 *)
 mul_f32 : f32 * f32 -> f32
 mul_f32(a, b) = a * b
