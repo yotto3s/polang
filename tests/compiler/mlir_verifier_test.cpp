@@ -482,27 +482,109 @@ TEST_F(VerifierTest, CmpOpTypeMismatch) {
 }
 
 TEST_F(VerifierTest, TupleTypeVerification) {
+  OpBuilder builder(&context);
   auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
-  auto i128Type = polang::IntegerType::get(&context, 128, Signedness::Signed);
   auto validTuple = polang::TupleType::getChecked(
       [&] { return emitError(UnknownLoc::get(&context)); }, &context,
       ArrayRef<Type>{i64Type});
   EXPECT_TRUE(validTuple != nullptr);
 
-  // Large integer (>64 bit) rejected
-  auto invalidIntTuple = polang::TupleType::getChecked(
-      [&] { return emitError(UnknownLoc::get(&context)); }, &context,
-      ArrayRef<Type>{i128Type});
-  EXPECT_TRUE(invalidIntTuple == nullptr);
-  EXPECT_NE(lastDiag.find("integer width must be <= 64"), std::string::npos);
-
-  // Nested tuple rejected
+  // Nested tuple is accepted
   auto nestedTuple = polang::TupleType::getChecked(
       [&] { return emitError(UnknownLoc::get(&context)); }, &context,
-      ArrayRef<Type>{validTuple});
-  EXPECT_TRUE(nestedTuple == nullptr);
-  EXPECT_NE(lastDiag.find("must be a primitive type or type parameter"),
+      ArrayRef<Type>{validTuple, i64Type});
+  EXPECT_TRUE(nestedTuple != nullptr);
+
+  // Non-Polang type (e.g. NoneType) is rejected
+  auto invalidTuple = polang::TupleType::getChecked(
+      [&] { return emitError(UnknownLoc::get(&context)); }, &context,
+      ArrayRef<Type>{builder.getNoneType()});
+  EXPECT_TRUE(invalidTuple == nullptr);
+  EXPECT_NE(lastDiag.find("not a valid Polang type or type parameter"),
             std::string::npos);
+}
+
+TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
+  auto i8Type = polang::IntegerType::get(&context, 8, Signedness::Signed);
+  auto i16Type = polang::IntegerType::get(&context, 16, Signedness::Signed);
+  auto i32Type = polang::IntegerType::get(&context, 32, Signedness::Signed);
+  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto f32Type = polang::FloatType::get(&context, 32);
+  auto f64Type = polang::FloatType::get(&context, 64);
+  auto boolType = BoolType::get(&context);
+  auto isizeType = polang::IndexType::get(&context, Signedness::Signed);
+  auto usizeType = polang::IndexType::get(&context, Signedness::Unsigned);
+
+  // 1. Primitive type sizes
+  EXPECT_EQ(i8Type.typeSize(), 1u);
+  EXPECT_EQ(i16Type.typeSize(), 2u);
+  EXPECT_EQ(i32Type.typeSize(), 4u);
+  EXPECT_EQ(i64Type.typeSize(), 8u);
+  EXPECT_EQ(f32Type.typeSize(), 4u);
+  EXPECT_EQ(f64Type.typeSize(), 8u);
+  EXPECT_EQ(boolType.typeSize(), 1u);
+  EXPECT_EQ(isizeType.typeSize(), 8u);
+  EXPECT_EQ(usizeType.typeSize(), 8u);
+
+  EXPECT_EQ(polang::getTypeSize(i32Type), 4u);
+  EXPECT_EQ(polang::getTypeSize(f64Type), 8u);
+
+  // 2. Empty tuple ()
+  auto emptyTuple = polang::TupleType::get(&context, {});
+  EXPECT_EQ(emptyTuple.typeSize(), 0u);
+  EXPECT_EQ(emptyTuple.getNumSlots(), 0u);
+  EXPECT_TRUE(emptyTuple.getElementOffsets().empty());
+  EXPECT_TRUE(emptyTuple.getElementSlotOffsets().empty());
+
+  // 3. Flat tuple (i64, f64)
+  auto flatTuple = polang::TupleType::get(&context, {i64Type, f64Type});
+  EXPECT_EQ(flatTuple.typeSize(), 16u);
+  EXPECT_EQ(flatTuple.getNumSlots(), 2u);
+  EXPECT_EQ(flatTuple.getElementOffset(0), 0u);
+  EXPECT_EQ(flatTuple.getElementOffset(1), 8u);
+  EXPECT_EQ(flatTuple.getElementSlotOffset(0), 0u);
+  EXPECT_EQ(flatTuple.getElementSlotOffset(1), 1u);
+  EXPECT_EQ(flatTuple.getElementOffsets(), (SmallVector<uint64_t>{0, 8}));
+  EXPECT_EQ(flatTuple.getElementSlotOffsets(), (SmallVector<uint64_t>{0, 1}));
+
+  // 4. Flat tuple with sub-64-bit types (i8, bool, f32)
+  auto sub64Tuple =
+      polang::TupleType::get(&context, {i8Type, boolType, f32Type});
+  EXPECT_EQ(sub64Tuple.typeSize(), 24u);
+  EXPECT_EQ(sub64Tuple.getNumSlots(), 3u);
+  EXPECT_EQ(sub64Tuple.getElementOffsets(), (SmallVector<uint64_t>{0, 8, 16}));
+  EXPECT_EQ(sub64Tuple.getElementSlotOffsets(),
+            (SmallVector<uint64_t>{0, 1, 2}));
+
+  // 5. Nested tuple (i64, (f64, bool), i32)
+  auto innerTuple = polang::TupleType::get(&context, {f64Type, boolType});
+  EXPECT_EQ(innerTuple.typeSize(), 16u);
+  auto nestedTuple =
+      polang::TupleType::get(&context, {i64Type, innerTuple, i32Type});
+  EXPECT_EQ(nestedTuple.typeSize(), 32u);
+  EXPECT_EQ(nestedTuple.getNumSlots(), 4u);
+  EXPECT_EQ(nestedTuple.getElementOffset(0), 0u);
+  EXPECT_EQ(nestedTuple.getElementOffset(1), 8u);
+  EXPECT_EQ(nestedTuple.getElementOffset(2), 24u);
+  EXPECT_EQ(nestedTuple.getElementSlotOffset(0), 0u);
+  EXPECT_EQ(nestedTuple.getElementSlotOffset(1), 1u);
+  EXPECT_EQ(nestedTuple.getElementSlotOffset(2), 3u);
+  EXPECT_EQ(nestedTuple.getElementOffsets(), (SmallVector<uint64_t>{0, 8, 24}));
+  EXPECT_EQ(nestedTuple.getElementSlotOffsets(),
+            (SmallVector<uint64_t>{0, 1, 3}));
+
+  // 6. Deeply nested tuple ((i64, f64), (bool, (i32, f32)))
+  auto pair1 = polang::TupleType::get(&context, {i64Type, f64Type});
+  auto pair2 = polang::TupleType::get(&context, {i32Type, f32Type});
+  auto group = polang::TupleType::get(&context, {boolType, pair2});
+  EXPECT_EQ(pair1.typeSize(), 16u);
+  EXPECT_EQ(pair2.typeSize(), 16u);
+  EXPECT_EQ(group.typeSize(), 24u); // bool at 0 (size 1), pair2 at 8 (size 16) -> total 24
+  auto deepTuple = polang::TupleType::get(&context, {pair1, group});
+  EXPECT_EQ(deepTuple.typeSize(), 40u); // pair1 at 0 (size 16), group at 16 (size 24) -> total 40
+  EXPECT_EQ(deepTuple.getNumSlots(), 5u);
+  EXPECT_EQ(deepTuple.getElementOffsets(), (SmallVector<uint64_t>{0, 16}));
+  EXPECT_EQ(deepTuple.getElementSlotOffsets(), (SmallVector<uint64_t>{0, 2}));
 }
 
 } // namespace

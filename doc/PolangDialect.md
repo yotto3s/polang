@@ -58,19 +58,22 @@ Type parameters appear in `polang.generic_func` signatures and are bound to conc
 
 ### Tuple Types
 
-Represents a fixed-size heterogeneous product of types with arbitrary arity ($N \ge 0$). Elements must be primitive types (`PrimitiveType`) or type parameters (`TypeParamType`).
+Represents a fixed-size heterogeneous product of types with arbitrary arity ($N \ge 0$). Elements can be any Polang types (including nested `TupleType`) or type parameters (`TypeParamType`).
+
+Each member in a tuple is 64-bit (8-byte) aligned in order without re-ordering.
 
 | Polang Type | MLIR Type | Description |
 |-------------|-----------|-------------|
 | `()` | `!polang.tuple<>` | 0-tuple (unit) |
 | `(i64, f64)` | `!polang.tuple<!polang.integer<64, signed>, !polang.float<64>>` | 2-tuple of i64 and f64 |
+| `(i64, (f64, bool))` | `!polang.tuple<!polang.integer<64, signed>, !polang.tuple<!polang.float<64>, !polang.bool>>` | Nested tuple |
 | `('a, 'b)` | `!polang.tuple<!polang.type_param<"a">, !polang.type_param<"b">>` | Generic tuple |
 
 ### Type Constraints
 
 - **`PrimitiveType`**: Types that fit in a 64-bit slot (`IntegerType` and `FloatType` with width $\le 64$, `BoolType`, `IndexType`).
 - **`PrimitiveOrParamType`**: `PrimitiveType` or `TypeParamType`.
-- **`AnyType`**: All concrete Polang types (`PrimitiveType` + `TupleType`).
+- **`AnyType`**: All concrete Polang types (`IntegerType`, `FloatType`, `BoolType`, `IndexType`, `TupleType`).
 - **`AnyTypeOrParam`**: `AnyType` or `TypeParamType`.
 
 ## Operations

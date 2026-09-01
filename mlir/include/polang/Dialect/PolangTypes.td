@@ -60,6 +60,7 @@ def Polang_IntegerType : Polang_Type<"Integer", "integer"> {
   let extraClassDeclaration = [{
     bool isSigned() const { return getSignedness() == Signedness::Signed; }
     bool isUnsigned() const { return getSignedness() == Signedness::Unsigned; }
+    uint64_t typeSize() const { return (getWidth() + 7) / 8; }
   }];
 }
 
@@ -77,6 +78,10 @@ def Polang_FloatType : Polang_Type<"Float", "float"> {
 
   let parameters = (ins "unsigned":$width);
   let assemblyFormat = "`<` $width `>`";
+
+  let extraClassDeclaration = [{
+    uint64_t typeSize() const { return getWidth() / 8; }
+  }];
 }
 
 def Polang_BoolType : Polang_Type<"Bool", "bool"> {
@@ -84,6 +89,10 @@ def Polang_BoolType : Polang_Type<"Bool", "bool"> {
   let description = [{
     The Polang boolean type represents a true/false value.
     It maps to `bool` in Polang source code.
+  }];
+
+  let extraClassDeclaration = [{
+    uint64_t typeSize() const { return 1; }
   }];
 }
 
@@ -107,6 +116,7 @@ def Polang_IndexType : Polang_Type<"Index", "index"> {
   let extraClassDeclaration = [{
     bool isSigned() const { return getSignedness() == Signedness::Signed; }
     bool isUnsigned() const { return getSignedness() == Signedness::Unsigned; }
+    uint64_t typeSize() const { return 8; }
   }];
 }
 
@@ -125,13 +135,14 @@ def Polang_TupleType : Polang_Type<"Tuple", "tuple"> {
   let summary = "Tuple type containing zero or more types";
   let description = [{
     Represents a fixed-size heterogeneous product of types.
-    Can contain any Polang primitive types or type parameters.
+    Can contain any Polang types or type parameters.
 
     Examples:
     ```mlir
     !polang.tuple<>                                   ; 0-tuple (unit)
     !polang.tuple<!polang.index<unsigned>>            ; 1-tuple
     !polang.tuple<!polang.index<unsigned>, !polang.index<unsigned>> ; 2-tuple
+    !polang.tuple<!polang.integer<64, signed>, !polang.tuple<!polang.float<64>, !polang.bool>> ; nested tuple
     !polang.tuple<!polang.integer<64, signed>, !polang.type_param<"a">>
     ```
   }];
@@ -139,6 +150,28 @@ def Polang_TupleType : Polang_Type<"Tuple", "tuple"> {
   let parameters = (ins ArrayRefParameter<"::mlir::Type">:$types);
   let hasCustomAssemblyFormat = 1;
   let genVerifyDecl = 1;
+
+  let extraClassDeclaration = [{
+    /// Size in bytes (computed with 64-bit member alignment).
+    uint64_t typeSize() const;
+
+    /// Number of 64-bit words (slots) occupied by this tuple.
+    uint64_t getNumSlots() const { return (typeSize() + 7) / 8; }
+
+    /// Offset in bytes of the element at the specified index.
+    uint64_t getElementOffset(size_t index) const;
+
+    /// Offset in 64-bit slots of the element at the specified index.
+    uint64_t getElementSlotOffset(size_t index) const {
+      return getElementOffset(index) / 8;
+    }
+
+    /// Offsets in bytes of all elements.
+    ::llvm::SmallVector<uint64_t> getElementOffsets() const;
+
+    /// Offsets in 64-bit slots of all elements.
+    ::llvm::SmallVector<uint64_t> getElementSlotOffsets() const;
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -166,7 +199,7 @@ def Polang_PrimitiveOrParamType : Type<
     "Polang primitive type or type parameter">;
 
 def Polang_AnyType : AnyTypeOf<[
-    Polang_PrimitiveType, Polang_TupleType
+    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_IndexType, Polang_TupleType
 ], "any Polang type">;
 
 // Type constraints that include type parameters (for generic functions)
@@ -175,7 +208,7 @@ def Polang_AnyNumericOrParam : AnyTypeOf<[
 ], "Polang numeric type or type parameter">;
 
 def Polang_AnyTypeOrParam : AnyTypeOf<[
-    Polang_PrimitiveOrParamType, Polang_TupleType
+    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_IndexType, Polang_TypeParamType, Polang_TupleType
 ], "any Polang type or type parameter">;
 
 #endif // POLANG_TYPES_TD

@@ -27,29 +27,81 @@ polang::TupleType::verify(function_ref<InFlightDiagnostic()> emitError,
                           ArrayRef<Type> types) {
   for (size_t i = 0; i < types.size(); ++i) {
     Type elem = types[i];
-    if (auto intType = llvm::dyn_cast<polang::IntegerType>(elem)) {
-      if (intType.getWidth() > 64) {
-        return emitError() << "tuple element " << i
-                           << " integer width must be <= 64, but got "
-                           << intType.getWidth();
-      }
-      continue;
+    if (!llvm::isa<IntegerType, FloatType, BoolType, IndexType, TypeParamType,
+                   TupleType>(elem)) {
+      return emitError() << "tuple element " << i << " type (" << elem
+                         << ") is not a valid Polang type or type parameter";
     }
-    if (auto floatType = llvm::dyn_cast<polang::FloatType>(elem)) {
-      if (floatType.getWidth() > 64) {
-        return emitError() << "tuple element " << i
-                           << " float width must be <= 64, but got "
-                           << floatType.getWidth();
-      }
-      continue;
-    }
-    if (llvm::isa<BoolType, polang::IndexType, TypeParamType>(elem)) {
-      continue;
-    }
-    return emitError() << "tuple element " << i << " type (" << elem
-                       << ") must be a primitive type or type parameter";
   }
   return success();
+}
+
+std::optional<uint64_t> polang::getTypeSize(Type type) {
+  if (auto intType = llvm::dyn_cast<IntegerType>(type)) {
+    return intType.typeSize();
+  }
+  if (auto floatType = llvm::dyn_cast<FloatType>(type)) {
+    return floatType.typeSize();
+  }
+  if (auto boolType = llvm::dyn_cast<BoolType>(type)) {
+    return boolType.typeSize();
+  }
+  if (auto indexType = llvm::dyn_cast<IndexType>(type)) {
+    return indexType.typeSize();
+  }
+  if (auto tupleType = llvm::dyn_cast<TupleType>(type)) {
+    return tupleType.typeSize();
+  }
+  return std::nullopt;
+}
+
+uint64_t polang::TupleType::typeSize() const {
+  uint64_t currentOffset = 0;
+  for (Type elem : getTypes()) {
+    currentOffset = llvm::alignTo(currentOffset, 8);
+    auto sz = polang::getTypeSize(elem);
+    if (sz) {
+      currentOffset += *sz;
+    }
+  }
+  return llvm::alignTo(currentOffset, 8);
+}
+
+uint64_t polang::TupleType::getElementOffset(size_t index) const {
+  assert(index < getTypes().size() && "element index out of bounds");
+  uint64_t currentOffset = 0;
+  for (size_t i = 0; i < index; ++i) {
+    currentOffset = llvm::alignTo(currentOffset, 8);
+    auto sz = polang::getTypeSize(getTypes()[i]);
+    if (sz) {
+      currentOffset += *sz;
+    }
+  }
+  return llvm::alignTo(currentOffset, 8);
+}
+
+SmallVector<uint64_t> polang::TupleType::getElementOffsets() const {
+  SmallVector<uint64_t> offsets;
+  offsets.reserve(getTypes().size());
+  uint64_t currentOffset = 0;
+  for (Type elem : getTypes()) {
+    currentOffset = llvm::alignTo(currentOffset, 8);
+    offsets.push_back(currentOffset);
+    auto sz = polang::getTypeSize(elem);
+    if (sz) {
+      currentOffset += *sz;
+    }
+  }
+  return offsets;
+}
+
+SmallVector<uint64_t> polang::TupleType::getElementSlotOffsets() const {
+  SmallVector<uint64_t> slotOffsets;
+  slotOffsets.reserve(getTypes().size());
+  for (uint64_t byteOffset : getElementOffsets()) {
+    slotOffsets.push_back(byteOffset / 8);
+  }
+  return slotOffsets;
 }
 
 Type polang::TupleType::parse(AsmParser& parser) {
