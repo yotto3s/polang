@@ -205,22 +205,6 @@ def Polang_AnyNumericType : AnyTypeOf<[
     Polang_IntegerType, Polang_FloatType, Polang_IndexType
 ], "Polang numeric type">;
 
-def Polang_PrimitiveType : Type<
-    CPred<"([](::mlir::Type t) {"
-          "  if (auto it = ::llvm::dyn_cast<::polang::IntegerType>(t)) return it.getWidth() <= 64;"
-          "  if (auto ft = ::llvm::dyn_cast<::polang::FloatType>(t)) return ft.getWidth() <= 64;"
-          "  return ::llvm::isa<::polang::BoolType, ::polang::IndexType>(t);"
-          "})($_self)">,
-    "Polang primitive type (fits in 64-bit slot)">;
-
-def Polang_PrimitiveOrParamType : Type<
-    CPred<"([](::mlir::Type t) {"
-          "  if (auto it = ::llvm::dyn_cast<::polang::IntegerType>(t)) return it.getWidth() <= 64;"
-          "  if (auto ft = ::llvm::dyn_cast<::polang::FloatType>(t)) return ft.getWidth() <= 64;"
-          "  return ::llvm::isa<::polang::BoolType, ::polang::IndexType, ::polang::TypeParamType>(t);"
-          "})($_self)">,
-    "Polang primitive type or type parameter">;
-
 def Polang_AnyType : AnyTypeOf<[
     Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_IndexType, Polang_TupleType
 ], "any Polang type">;

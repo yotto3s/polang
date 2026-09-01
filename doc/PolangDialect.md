@@ -71,10 +71,10 @@ Each member in a tuple is 64-bit (8-byte) aligned in order without re-ordering.
 
 ### Type Constraints
 
-- **`PrimitiveType`**: Types that fit in a 64-bit slot (`IntegerType` and `FloatType` with width $\le 64$, `BoolType`, `IndexType`).
-- **`PrimitiveOrParamType`**: `PrimitiveType` or `TypeParamType`.
 - **`AnyType`**: All concrete Polang types (`IntegerType`, `FloatType`, `BoolType`, `IndexType`, `TupleType`).
 - **`AnyTypeOrParam`**: `AnyType` or `TypeParamType`.
+- **`AnyNumericType`**: `IntegerType`, `FloatType`, `IndexType`.
+- **`AnyNumericOrParam`**: `AnyNumericType` or `TypeParamType`.
 
 ## Operations
 
