@@ -277,6 +277,17 @@ std::string typeToString(Type type) {
   if (auto indexType = dyn_cast<polang::IndexType>(type)) {
     return indexType.isSigned() ? "isize" : "usize";
   }
+  if (auto tupleType = dyn_cast<polang::TupleType>(type)) {
+    std::string result = "(";
+    for (size_t i = 0; i < tupleType.getTypes().size(); ++i) {
+      if (i > 0) {
+        result += ", ";
+      }
+      result += typeToString(tupleType.getTypes()[i]);
+    }
+    result += ")";
+    return result;
+  }
   return "unknown";
 }
 

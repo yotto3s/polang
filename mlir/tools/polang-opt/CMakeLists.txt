@@ -8,7 +8,14 @@ add_llvm_executable(polang-opt
 
 target_link_libraries(polang-opt
   PRIVATE
-  PolangDialect
+  PolangMLIR
+  MLIRArithDialect
+  MLIRFuncDialect
+  MLIRMemRefDialect
+  MLIRSCFDialect
+  MLIRLLVMDialect
+  MLIRControlFlowDialect
+  MLIRTransforms
   MLIRIR
   MLIRParser
   MLIRPass

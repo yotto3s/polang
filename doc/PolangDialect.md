@@ -56,6 +56,23 @@ Type parameters represent named type variables in generic function templates. Th
 
 Type parameters appear in `polang.generic_func` signatures and are bound to concrete types by `polang.instantiate` operations at call sites.
 
+### Tuple Types
+
+Represents a fixed-size heterogeneous product of types with arbitrary arity ($N \ge 0$). Elements must be primitive types (`PrimitiveType`) or type parameters (`TypeParamType`).
+
+| Polang Type | MLIR Type | Description |
+|-------------|-----------|-------------|
+| `()` | `!polang.tuple<>` | 0-tuple (unit) |
+| `(i64, f64)` | `!polang.tuple<!polang.integer<64, signed>, !polang.float<64>>` | 2-tuple of i64 and f64 |
+| `('a, 'b)` | `!polang.tuple<!polang.type_param<"a">, !polang.type_param<"b">>` | Generic tuple |
+
+### Type Constraints
+
+- **`PrimitiveType`**: Types that fit in a 64-bit slot (`IntegerType` and `FloatType` with width $\le 64$, `BoolType`, `IndexType`).
+- **`PrimitiveOrParamType`**: `PrimitiveType` or `TypeParamType`.
+- **`AnyType`**: All concrete Polang types (`PrimitiveType` + `TupleType`).
+- **`AnyTypeOrParam`**: `AnyType` or `TypeParamType`.
+
 ## Operations
 
 ### Constant Operations

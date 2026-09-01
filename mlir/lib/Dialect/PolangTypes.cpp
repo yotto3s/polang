@@ -22,6 +22,58 @@ using namespace polang;
 
 #pragma GCC diagnostic pop
 
+LogicalResult
+polang::TupleType::verify(function_ref<InFlightDiagnostic()> emitError,
+                          ArrayRef<Type> types) {
+  for (size_t i = 0; i < types.size(); ++i) {
+    Type elem = types[i];
+    if (auto intType = llvm::dyn_cast<polang::IntegerType>(elem)) {
+      if (intType.getWidth() > 64) {
+        return emitError() << "tuple element " << i
+                           << " integer width must be <= 64, but got "
+                           << intType.getWidth();
+      }
+      continue;
+    }
+    if (auto floatType = llvm::dyn_cast<polang::FloatType>(elem)) {
+      if (floatType.getWidth() > 64) {
+        return emitError() << "tuple element " << i
+                           << " float width must be <= 64, but got "
+                           << floatType.getWidth();
+      }
+      continue;
+    }
+    if (llvm::isa<BoolType, polang::IndexType, TypeParamType>(elem)) {
+      continue;
+    }
+    return emitError() << "tuple element " << i << " type (" << elem
+                       << ") must be a primitive type or type parameter";
+  }
+  return success();
+}
+
+Type polang::TupleType::parse(AsmParser& parser) {
+  if (parser.parseLess()) {
+    return {};
+  }
+  if (succeeded(parser.parseOptionalGreater())) {
+    return get(parser.getContext(), ArrayRef<Type>{});
+  }
+  SmallVector<Type> elementTypes;
+  if (parser.parseTypeList(elementTypes) || parser.parseGreater()) {
+    return {};
+  }
+  return getChecked(
+      [&] { return parser.emitError(parser.getCurrentLocation()); },
+      parser.getContext(), elementTypes);
+}
+
+void polang::TupleType::print(AsmPrinter& printer) const {
+  printer << "<";
+  llvm::interleaveComma(getTypes(), printer);
+  printer << ">";
+}
+
 void PolangDialect::registerTypes() {
   addTypes<
 #define GET_TYPEDEF_LIST

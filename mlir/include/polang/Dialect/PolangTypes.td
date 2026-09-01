@@ -121,6 +121,26 @@ def Polang_TypeParamType : Polang_Type<"TypeParam", "type_param"> {
   let assemblyFormat = "`<` $name `>`";
 }
 
+def Polang_TupleType : Polang_Type<"Tuple", "tuple"> {
+  let summary = "Tuple type containing zero or more types";
+  let description = [{
+    Represents a fixed-size heterogeneous product of types.
+    Can contain any Polang primitive types or type parameters.
+
+    Examples:
+    ```mlir
+    !polang.tuple<>                                   ; 0-tuple (unit)
+    !polang.tuple<!polang.index<unsigned>>            ; 1-tuple
+    !polang.tuple<!polang.index<unsigned>, !polang.index<unsigned>> ; 2-tuple
+    !polang.tuple<!polang.integer<64, signed>, !polang.type_param<"a">>
+    ```
+  }];
+
+  let parameters = (ins ArrayRefParameter<"::mlir::Type">:$types);
+  let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Type constraints
 //===----------------------------------------------------------------------===//
@@ -129,8 +149,24 @@ def Polang_AnyNumericType : AnyTypeOf<[
     Polang_IntegerType, Polang_FloatType, Polang_IndexType
 ], "Polang numeric type">;
 
+def Polang_PrimitiveType : Type<
+    CPred<"([](::mlir::Type t) {"
+          "  if (auto it = ::llvm::dyn_cast<::polang::IntegerType>(t)) return it.getWidth() <= 64;"
+          "  if (auto ft = ::llvm::dyn_cast<::polang::FloatType>(t)) return ft.getWidth() <= 64;"
+          "  return ::llvm::isa<::polang::BoolType, ::polang::IndexType>(t);"
+          "})($_self)">,
+    "Polang primitive type (fits in 64-bit slot)">;
+
+def Polang_PrimitiveOrParamType : Type<
+    CPred<"([](::mlir::Type t) {"
+          "  if (auto it = ::llvm::dyn_cast<::polang::IntegerType>(t)) return it.getWidth() <= 64;"
+          "  if (auto ft = ::llvm::dyn_cast<::polang::FloatType>(t)) return ft.getWidth() <= 64;"
+          "  return ::llvm::isa<::polang::BoolType, ::polang::IndexType, ::polang::TypeParamType>(t);"
+          "})($_self)">,
+    "Polang primitive type or type parameter">;
+
 def Polang_AnyType : AnyTypeOf<[
-    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_IndexType
+    Polang_PrimitiveType, Polang_TupleType
 ], "any Polang type">;
 
 // Type constraints that include type parameters (for generic functions)
@@ -139,8 +175,7 @@ def Polang_AnyNumericOrParam : AnyTypeOf<[
 ], "Polang numeric type or type parameter">;
 
 def Polang_AnyTypeOrParam : AnyTypeOf<[
-    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_IndexType,
-    Polang_TypeParamType
+    Polang_PrimitiveOrParamType, Polang_TupleType
 ], "any Polang type or type parameter">;
 
 #endif // POLANG_TYPES_TD

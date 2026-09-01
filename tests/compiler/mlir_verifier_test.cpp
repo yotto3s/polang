@@ -481,4 +481,28 @@ TEST_F(VerifierTest, CmpOpTypeMismatch) {
             std::string::npos);
 }
 
+TEST_F(VerifierTest, TupleTypeVerification) {
+  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+  auto i128Type = polang::IntegerType::get(&context, 128, Signedness::Signed);
+  auto validTuple = polang::TupleType::getChecked(
+      [&] { return emitError(UnknownLoc::get(&context)); }, &context,
+      ArrayRef<Type>{i64Type});
+  EXPECT_TRUE(validTuple != nullptr);
+
+  // Large integer (>64 bit) rejected
+  auto invalidIntTuple = polang::TupleType::getChecked(
+      [&] { return emitError(UnknownLoc::get(&context)); }, &context,
+      ArrayRef<Type>{i128Type});
+  EXPECT_TRUE(invalidIntTuple == nullptr);
+  EXPECT_NE(lastDiag.find("integer width must be <= 64"), std::string::npos);
+
+  // Nested tuple rejected
+  auto nestedTuple = polang::TupleType::getChecked(
+      [&] { return emitError(UnknownLoc::get(&context)); }, &context,
+      ArrayRef<Type>{validTuple});
+  EXPECT_TRUE(nestedTuple == nullptr);
+  EXPECT_NE(lastDiag.find("must be a primitive type or type parameter"),
+            std::string::npos);
+}
+
 } // namespace
