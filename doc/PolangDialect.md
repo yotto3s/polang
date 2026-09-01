@@ -368,8 +368,10 @@ The Polang dialect uses custom verifiers to catch type errors during compilation
 | `polang.if` | Condition must be bool, branches must yield same type |
 | `polang.return` | Return value type must match function signature |
 | `polang.call` | Function must exist, arity and argument types must match |
+| `polang.tuple` | Operand count and types must match result tuple type |
+| `polang.tuple.get` | Index must be within bounds and result type must match element type |
 
-**Type Compatibility:** Operations use a `typesAreCompatible()` helper that allows type variables during intermediate stages (before type inference resolves them).
+**Type Compatibility:** Operations use a `typesAreCompatible()` helper that allows type variables during intermediate stages (before monomorphization resolves them).
 
 ## Transformation Passes
 
