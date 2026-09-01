@@ -43,7 +43,7 @@ def Polang_IntegerType : Polang_Type<"Integer", "integer", [
 ]> {
   let summary = "Integer type with configurable width and signedness";
   let description = [{
-    Parameterized integer type supporting 8, 16, 32, and 64-bit widths,
+    Parameterized integer type supporting power-of-two bitwidths >= 8 (8, 16, 32, 64),
     both signed and unsigned.
 
     Examples:
@@ -59,11 +59,12 @@ def Polang_IntegerType : Polang_Type<"Integer", "integer", [
     "Signedness":$signedness
   );
   let assemblyFormat = "`<` $width `,` $signedness `>`";
+  let genVerifyDecl = 1;
 
   let extraClassDeclaration = [{
     bool isSigned() const { return getSignedness() == Signedness::Signed; }
     bool isUnsigned() const { return getSignedness() == Signedness::Unsigned; }
-    uint64_t typeSize() const { return (getWidth() + 7) / 8; }
+    uint64_t typeSize() const { return getWidth() / 8; }
   }];
 }
 
@@ -83,6 +84,7 @@ def Polang_FloatType : Polang_Type<"Float", "float", [
 
   let parameters = (ins "unsigned":$width);
   let assemblyFormat = "`<` $width `>`";
+  let genVerifyDecl = 1;
 
   let extraClassDeclaration = [{
     uint64_t typeSize() const { return getWidth() / 8; }

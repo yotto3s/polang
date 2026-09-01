@@ -16,6 +16,7 @@ target_link_libraries(polang-opt
   MLIRLLVMDialect
   MLIRControlFlowDialect
   MLIRTransforms
+  MLIRDLTIDialect
   MLIRIR
   MLIRParser
   MLIRPass

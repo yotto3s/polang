@@ -484,6 +484,50 @@ TEST_F(VerifierTest, CmpOpTypeMismatch) {
             std::string::npos);
 }
 
+TEST_F(VerifierTest, IntegerTypeVerification) {
+  // Valid power-of-two widths >= 8
+  EXPECT_TRUE(polang::IntegerType::getChecked(
+                  [&] { return emitError(UnknownLoc::get(&context)); },
+                  &context, 8u, Signedness::Signed) != nullptr);
+  EXPECT_TRUE(polang::IntegerType::getChecked(
+                  [&] { return emitError(UnknownLoc::get(&context)); },
+                  &context, 16u, Signedness::Signed) != nullptr);
+  EXPECT_TRUE(polang::IntegerType::getChecked(
+                  [&] { return emitError(UnknownLoc::get(&context)); },
+                  &context, 32u, Signedness::Signed) != nullptr);
+  EXPECT_TRUE(polang::IntegerType::getChecked(
+                  [&] { return emitError(UnknownLoc::get(&context)); },
+                  &context, 64u, Signedness::Signed) != nullptr);
+
+  // Non power-of-two widths rejected
+  EXPECT_TRUE(polang::IntegerType::getChecked(
+                  [&] { return emitError(UnknownLoc::get(&context)); },
+                  &context, 24u, Signedness::Signed) == nullptr);
+  EXPECT_NE(lastDiag.find("integer width must be a power of 2 >= 8"),
+            std::string::npos);
+
+  // Width < 8 rejected
+  EXPECT_TRUE(polang::IntegerType::getChecked(
+                  [&] { return emitError(UnknownLoc::get(&context)); },
+                  &context, 4u, Signedness::Signed) == nullptr);
+}
+
+TEST_F(VerifierTest, FloatTypeVerification) {
+  // Valid widths (32, 64)
+  EXPECT_TRUE(polang::FloatType::getChecked(
+                  [&] { return emitError(UnknownLoc::get(&context)); },
+                  &context, 32u) != nullptr);
+  EXPECT_TRUE(polang::FloatType::getChecked(
+                  [&] { return emitError(UnknownLoc::get(&context)); },
+                  &context, 64u) != nullptr);
+
+  // Invalid widths rejected
+  EXPECT_TRUE(polang::FloatType::getChecked(
+                  [&] { return emitError(UnknownLoc::get(&context)); },
+                  &context, 16u) == nullptr);
+  EXPECT_NE(lastDiag.find("float width must be 32 or 64"), std::string::npos);
+}
+
 TEST_F(VerifierTest, TupleTypeVerification) {
   OpBuilder builder(&context);
   auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);

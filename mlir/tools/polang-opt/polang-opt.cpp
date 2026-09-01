@@ -10,6 +10,7 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/DLTI/DLTI.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -29,7 +30,8 @@ int main(int argc, char** argv) {
                   mlir::memref::MemRefDialect,
                   mlir::scf::SCFDialect,
                   mlir::LLVM::LLVMDialect,
-                  mlir::cf::ControlFlowDialect>();
+                  mlir::cf::ControlFlowDialect,
+                  mlir::DLTIDialect>();
 
   polang::registerPolangTransformsPasses();
   polang::registerPolangConversionPasses();

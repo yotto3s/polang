@@ -23,6 +23,25 @@ using namespace polang;
 #pragma GCC diagnostic pop
 
 LogicalResult
+polang::IntegerType::verify(function_ref<InFlightDiagnostic()> emitError,
+                            unsigned width, Signedness /*signedness*/) {
+  if (width < 8 || !llvm::isPowerOf2_32(width)) {
+    return emitError() << "integer width must be a power of 2 >= 8, but got "
+                       << width;
+  }
+  return success();
+}
+
+LogicalResult
+polang::FloatType::verify(function_ref<InFlightDiagnostic()> emitError,
+                          unsigned width) {
+  if (width != 32 && width != 64) {
+    return emitError() << "float width must be 32 or 64, but got " << width;
+  }
+  return success();
+}
+
+LogicalResult
 polang::TupleType::verify(function_ref<InFlightDiagnostic()> emitError,
                           ArrayRef<Type> types) {
   for (size_t i = 0; i < types.size(); ++i) {
