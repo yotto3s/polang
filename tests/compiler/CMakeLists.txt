@@ -34,6 +34,8 @@ target_link_libraries(mlir_verifier_test PRIVATE
     MLIRSupport
     MLIRFuncDialect
     MLIRPass
+    MLIRDataLayoutInterfaces
+    MLIRDLTIDialect
 )
 add_dependencies(mlir_verifier_test PolangDialect PolangOpsIncGen PolangTypesIncGen)
 set_target_properties(mlir_verifier_test PROPERTIES

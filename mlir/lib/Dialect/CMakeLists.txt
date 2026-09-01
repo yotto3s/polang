@@ -15,4 +15,6 @@ add_mlir_dialect_library(PolangDialect
   MLIRPass
   MLIRSupport
   MLIRFuncDialect
+  MLIRDataLayoutInterfaces
+  MLIRDLTIDialect
 )

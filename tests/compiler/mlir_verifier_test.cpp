@@ -12,12 +12,14 @@
 #include "polang/Dialect/PolangOps.h"
 #include "polang/Dialect/PolangTypes.h"
 
+#include "mlir/Dialect/DLTI/DLTI.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/Verifier.h"
+#include "mlir/Interfaces/DataLayoutInterfaces.h"
 
 #pragma GCC diagnostic pop
 
@@ -33,6 +35,7 @@ class VerifierTest : public ::testing::Test {
 protected:
   void SetUp() override {
     context.getOrLoadDialect<PolangDialect>();
+    context.getOrLoadDialect<DLTIDialect>();
     // Capture diagnostics as strings
     diagHandler = context.getDiagEngine().registerHandler(
         [this](Diagnostic& diag) {
@@ -610,6 +613,50 @@ TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
   EXPECT_EQ(genericNested.getElementOffset(1), 8u);
   EXPECT_EQ(genericNested.getElementOffset(2), std::nullopt);
   EXPECT_EQ(genericNested.getElementOffsets(), std::nullopt);
+}
+
+TEST_F(VerifierTest, TargetDataLayoutInteraction) {
+  OpBuilder builder(&context);
+  auto isizeType = polang::IndexType::get(&context, Signedness::Signed);
+  auto usizeType = polang::IndexType::get(&context, Signedness::Unsigned);
+  auto i64Type = polang::IntegerType::get(&context, 64, Signedness::Signed);
+
+  // 1. Default DataLayout (64-bit index)
+  mlir::DataLayout defaultDL;
+  EXPECT_EQ(defaultDL.getTypeSize(isizeType), 8u);
+  EXPECT_EQ(defaultDL.getTypeSizeInBits(isizeType), 64u);
+  EXPECT_EQ(isizeType.typeSize(&defaultDL), 8u);
+  EXPECT_EQ(usizeType.typeSize(&defaultDL), 8u);
+
+  // 2. Custom 32-bit index DataLayout via module with DLTI spec
+  auto loc = UnknownLoc::get(&context);
+  OwningOpRef<ModuleOp> module32 = ModuleOp::create(loc);
+  auto entry = DataLayoutEntryAttr::get(
+      mlir::IndexType::get(&context), builder.getI64IntegerAttr(32));
+  auto spec = DataLayoutSpecAttr::get(
+      &context, ArrayRef<DataLayoutEntryInterface>{entry});
+  (*module32)->setAttr(DLTIDialect::kDataLayoutAttrName, spec);
+
+  mlir::DataLayout dl32(*module32);
+  EXPECT_EQ(dl32.getTypeSize(isizeType), 4u);
+  EXPECT_EQ(dl32.getTypeSizeInBits(isizeType), 32u);
+  EXPECT_EQ(isizeType.typeSize(&dl32), 4u);
+  EXPECT_EQ(usizeType.typeSize(&dl32), 4u);
+  EXPECT_EQ(polang::getTypeSize(isizeType, &dl32), 4u);
+
+  // 3. TupleType layout with 32-bit index and 64-bit alignment rule
+  auto tupleWithIndices =
+      polang::TupleType::get(&context, {isizeType, usizeType, i64Type});
+  // Element 0: isize (4 bytes) at offset 0
+  // Element 1: usize (4 bytes) at offset 8 (64-bit aligned)
+  // Element 2: i64 (8 bytes) at offset 16 (64-bit aligned)
+  // Total size: 24 bytes (3 slots)
+  EXPECT_EQ(tupleWithIndices.typeSize(&dl32), 24u);
+  EXPECT_EQ(tupleWithIndices.getNumSlots(&dl32), 3u);
+  EXPECT_EQ(tupleWithIndices.getElementOffsets(&dl32),
+            (SmallVector<uint64_t>{0, 8, 16}));
+  EXPECT_EQ(tupleWithIndices.getElementSlotOffsets(&dl32),
+            (SmallVector<uint64_t>{0, 1, 2}));
 }
 
 } // namespace

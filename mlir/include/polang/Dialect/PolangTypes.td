@@ -9,6 +9,7 @@
 
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
+include "mlir/Interfaces/DataLayoutInterfaces.td"
 include "polang/Dialect/PolangDialect.td"
 
 //===----------------------------------------------------------------------===//
@@ -37,7 +38,9 @@ def Polang_Signedness : I32EnumAttr<"Signedness", "integer signedness", [
 // Parameterized numeric types
 //===----------------------------------------------------------------------===//
 
-def Polang_IntegerType : Polang_Type<"Integer", "integer"> {
+def Polang_IntegerType : Polang_Type<"Integer", "integer", [
+    DeclareTypeInterfaceMethods<DataLayoutTypeInterface>
+]> {
   let summary = "Integer type with configurable width and signedness";
   let description = [{
     Parameterized integer type supporting 8, 16, 32, and 64-bit widths,
@@ -64,7 +67,9 @@ def Polang_IntegerType : Polang_Type<"Integer", "integer"> {
   }];
 }
 
-def Polang_FloatType : Polang_Type<"Float", "float"> {
+def Polang_FloatType : Polang_Type<"Float", "float", [
+    DeclareTypeInterfaceMethods<DataLayoutTypeInterface>
+]> {
   let summary = "Floating-point type with configurable width";
   let description = [{
     Parameterized floating-point type supporting 32 and 64-bit widths.
@@ -84,7 +89,9 @@ def Polang_FloatType : Polang_Type<"Float", "float"> {
   }];
 }
 
-def Polang_BoolType : Polang_Type<"Bool", "bool"> {
+def Polang_BoolType : Polang_Type<"Bool", "bool", [
+    DeclareTypeInterfaceMethods<DataLayoutTypeInterface>
+]> {
   let summary = "1-bit boolean type";
   let description = [{
     The Polang boolean type represents a true/false value.
@@ -96,7 +103,9 @@ def Polang_BoolType : Polang_Type<"Bool", "bool"> {
   }];
 }
 
-def Polang_IndexType : Polang_Type<"Index", "index"> {
+def Polang_IndexType : Polang_Type<"Index", "index", [
+    DeclareTypeInterfaceMethods<DataLayoutTypeInterface>
+]> {
   let summary = "Platform-native index type with signedness";
   let description = [{
     Represents isize (signed) and usize (unsigned) types that map to
@@ -116,7 +125,7 @@ def Polang_IndexType : Polang_Type<"Index", "index"> {
   let extraClassDeclaration = [{
     bool isSigned() const { return getSignedness() == Signedness::Signed; }
     bool isUnsigned() const { return getSignedness() == Signedness::Unsigned; }
-    uint64_t typeSize() const { return 8; }
+    uint64_t typeSize(const ::mlir::DataLayout *dataLayout = nullptr) const;
   }];
 }
 
@@ -131,7 +140,9 @@ def Polang_TypeParamType : Polang_Type<"TypeParam", "type_param"> {
   let assemblyFormat = "`<` $name `>`";
 }
 
-def Polang_TupleType : Polang_Type<"Tuple", "tuple"> {
+def Polang_TupleType : Polang_Type<"Tuple", "tuple", [
+    DeclareTypeInterfaceMethods<DataLayoutTypeInterface>
+]> {
   let summary = "Tuple type containing zero or more types";
   let description = [{
     Represents a fixed-size heterogeneous product of types.
@@ -154,35 +165,35 @@ def Polang_TupleType : Polang_Type<"Tuple", "tuple"> {
   let extraClassDeclaration = [{
     /// Size in bytes (computed with 64-bit member alignment), or std::nullopt
     /// if the tuple contains unsized/generic types (e.g. TypeParamType).
-    ::std::optional<uint64_t> typeSize() const;
+    ::std::optional<uint64_t> typeSize(const ::mlir::DataLayout *dataLayout = nullptr) const;
 
     /// Number of 64-bit words (slots) occupied by this tuple, or std::nullopt
     /// if unspecialized.
-    ::std::optional<uint64_t> getNumSlots() const {
-      auto sz = typeSize();
+    ::std::optional<uint64_t> getNumSlots(const ::mlir::DataLayout *dataLayout = nullptr) const {
+      auto sz = typeSize(dataLayout);
       if (!sz) return ::std::nullopt;
       return (*sz + 7) / 8;
     }
 
     /// Offset in bytes of the element at the specified index, or std::nullopt
     /// if any preceding element has unknown size.
-    ::std::optional<uint64_t> getElementOffset(size_t index) const;
+    ::std::optional<uint64_t> getElementOffset(size_t index, const ::mlir::DataLayout *dataLayout = nullptr) const;
 
     /// Offset in 64-bit slots of the element at the specified index, or std::nullopt
     /// if any preceding element has unknown size.
-    ::std::optional<uint64_t> getElementSlotOffset(size_t index) const {
-      auto off = getElementOffset(index);
+    ::std::optional<uint64_t> getElementSlotOffset(size_t index, const ::mlir::DataLayout *dataLayout = nullptr) const {
+      auto off = getElementOffset(index, dataLayout);
       if (!off) return ::std::nullopt;
       return *off / 8;
     }
 
     /// Offsets in bytes of all elements, or std::nullopt if any element has
     /// unknown size.
-    ::std::optional<::llvm::SmallVector<uint64_t>> getElementOffsets() const;
+    ::std::optional<::llvm::SmallVector<uint64_t>> getElementOffsets(const ::mlir::DataLayout *dataLayout = nullptr) const;
 
     /// Offsets in 64-bit slots of all elements, or std::nullopt if any element
     /// has unknown size.
-    ::std::optional<::llvm::SmallVector<uint64_t>> getElementSlotOffsets() const;
+    ::std::optional<::llvm::SmallVector<uint64_t>> getElementSlotOffsets(const ::mlir::DataLayout *dataLayout = nullptr) const;
   }];
 }
 
