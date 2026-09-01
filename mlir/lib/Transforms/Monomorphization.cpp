@@ -484,6 +484,12 @@ void registerPolangTransformsPasses() {
   mlir::registerPass([]() -> std::unique_ptr<::mlir::Pass> {
     return polang::createMonomorphizationPass();
   });
+  mlir::registerPass([]() -> std::unique_ptr<::mlir::Pass> {
+    return polang::createCheckConstantOverflowPass();
+  });
+  mlir::registerPass([]() -> std::unique_ptr<::mlir::Pass> {
+    return polang::createInsertOverflowChecksPass();
+  });
 }
 
 } // namespace polang

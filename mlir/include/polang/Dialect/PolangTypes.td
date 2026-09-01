@@ -152,25 +152,37 @@ def Polang_TupleType : Polang_Type<"Tuple", "tuple"> {
   let genVerifyDecl = 1;
 
   let extraClassDeclaration = [{
-    /// Size in bytes (computed with 64-bit member alignment).
-    uint64_t typeSize() const;
+    /// Size in bytes (computed with 64-bit member alignment), or std::nullopt
+    /// if the tuple contains unsized/generic types (e.g. TypeParamType).
+    ::std::optional<uint64_t> typeSize() const;
 
-    /// Number of 64-bit words (slots) occupied by this tuple.
-    uint64_t getNumSlots() const { return (typeSize() + 7) / 8; }
-
-    /// Offset in bytes of the element at the specified index.
-    uint64_t getElementOffset(size_t index) const;
-
-    /// Offset in 64-bit slots of the element at the specified index.
-    uint64_t getElementSlotOffset(size_t index) const {
-      return getElementOffset(index) / 8;
+    /// Number of 64-bit words (slots) occupied by this tuple, or std::nullopt
+    /// if unspecialized.
+    ::std::optional<uint64_t> getNumSlots() const {
+      auto sz = typeSize();
+      if (!sz) return ::std::nullopt;
+      return (*sz + 7) / 8;
     }
 
-    /// Offsets in bytes of all elements.
-    ::llvm::SmallVector<uint64_t> getElementOffsets() const;
+    /// Offset in bytes of the element at the specified index, or std::nullopt
+    /// if any preceding element has unknown size.
+    ::std::optional<uint64_t> getElementOffset(size_t index) const;
 
-    /// Offsets in 64-bit slots of all elements.
-    ::llvm::SmallVector<uint64_t> getElementSlotOffsets() const;
+    /// Offset in 64-bit slots of the element at the specified index, or std::nullopt
+    /// if any preceding element has unknown size.
+    ::std::optional<uint64_t> getElementSlotOffset(size_t index) const {
+      auto off = getElementOffset(index);
+      if (!off) return ::std::nullopt;
+      return *off / 8;
+    }
+
+    /// Offsets in bytes of all elements, or std::nullopt if any element has
+    /// unknown size.
+    ::std::optional<::llvm::SmallVector<uint64_t>> getElementOffsets() const;
+
+    /// Offsets in 64-bit slots of all elements, or std::nullopt if any element
+    /// has unknown size.
+    ::std::optional<::llvm::SmallVector<uint64_t>> getElementSlotOffsets() const;
   }];
 }
 

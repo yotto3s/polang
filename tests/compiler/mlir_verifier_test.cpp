@@ -533,8 +533,10 @@ TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
   auto emptyTuple = polang::TupleType::get(&context, {});
   EXPECT_EQ(emptyTuple.typeSize(), 0u);
   EXPECT_EQ(emptyTuple.getNumSlots(), 0u);
-  EXPECT_TRUE(emptyTuple.getElementOffsets().empty());
-  EXPECT_TRUE(emptyTuple.getElementSlotOffsets().empty());
+  ASSERT_TRUE(emptyTuple.getElementOffsets().has_value());
+  EXPECT_TRUE(emptyTuple.getElementOffsets()->empty());
+  ASSERT_TRUE(emptyTuple.getElementSlotOffsets().has_value());
+  EXPECT_TRUE(emptyTuple.getElementSlotOffsets()->empty());
 
   // 3. Flat tuple (i64, f64)
   auto flatTuple = polang::TupleType::get(&context, {i64Type, f64Type});
@@ -585,6 +587,29 @@ TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
   EXPECT_EQ(deepTuple.getNumSlots(), 5u);
   EXPECT_EQ(deepTuple.getElementOffsets(), (SmallVector<uint64_t>{0, 16}));
   EXPECT_EQ(deepTuple.getElementSlotOffsets(), (SmallVector<uint64_t>{0, 2}));
+
+  // 7. Unspecialized generic tuple (type_param<"a">, i64)
+  auto typeParamA = polang::TypeParamType::get(&context, "a");
+  auto genericTuple = polang::TupleType::get(&context, {typeParamA, i64Type});
+  EXPECT_EQ(genericTuple.typeSize(), std::nullopt);
+  EXPECT_EQ(genericTuple.getNumSlots(), std::nullopt);
+  EXPECT_EQ(genericTuple.getElementOffset(0), 0u);
+  EXPECT_EQ(genericTuple.getElementOffset(1), std::nullopt);
+  EXPECT_EQ(genericTuple.getElementSlotOffset(0), 0u);
+  EXPECT_EQ(genericTuple.getElementSlotOffset(1), std::nullopt);
+  EXPECT_EQ(genericTuple.getElementOffsets(), std::nullopt);
+  EXPECT_EQ(genericTuple.getElementSlotOffsets(), std::nullopt);
+
+  // 8. Nested unspecialized generic tuple (i64, (type_param<"a">, f64), bool)
+  auto genericInner = polang::TupleType::get(&context, {typeParamA, f64Type});
+  auto genericNested =
+      polang::TupleType::get(&context, {i64Type, genericInner, boolType});
+  EXPECT_EQ(genericNested.typeSize(), std::nullopt);
+  EXPECT_EQ(genericNested.getNumSlots(), std::nullopt);
+  EXPECT_EQ(genericNested.getElementOffset(0), 0u);
+  EXPECT_EQ(genericNested.getElementOffset(1), 8u);
+  EXPECT_EQ(genericNested.getElementOffset(2), std::nullopt);
+  EXPECT_EQ(genericNested.getElementOffsets(), std::nullopt);
 }
 
 } // namespace

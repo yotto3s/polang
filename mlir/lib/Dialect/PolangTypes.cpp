@@ -55,32 +55,36 @@ std::optional<uint64_t> polang::getTypeSize(Type type) {
   return std::nullopt;
 }
 
-uint64_t polang::TupleType::typeSize() const {
+std::optional<uint64_t> polang::TupleType::typeSize() const {
   uint64_t currentOffset = 0;
   for (Type elem : getTypes()) {
     currentOffset = llvm::alignTo(currentOffset, 8);
     auto sz = polang::getTypeSize(elem);
-    if (sz) {
-      currentOffset += *sz;
+    if (!sz) {
+      return std::nullopt;
     }
+    currentOffset += *sz;
   }
   return llvm::alignTo(currentOffset, 8);
 }
 
-uint64_t polang::TupleType::getElementOffset(size_t index) const {
+std::optional<uint64_t>
+polang::TupleType::getElementOffset(size_t index) const {
   assert(index < getTypes().size() && "element index out of bounds");
   uint64_t currentOffset = 0;
   for (size_t i = 0; i < index; ++i) {
     currentOffset = llvm::alignTo(currentOffset, 8);
     auto sz = polang::getTypeSize(getTypes()[i]);
-    if (sz) {
-      currentOffset += *sz;
+    if (!sz) {
+      return std::nullopt;
     }
+    currentOffset += *sz;
   }
   return llvm::alignTo(currentOffset, 8);
 }
 
-SmallVector<uint64_t> polang::TupleType::getElementOffsets() const {
+std::optional<SmallVector<uint64_t>>
+polang::TupleType::getElementOffsets() const {
   SmallVector<uint64_t> offsets;
   offsets.reserve(getTypes().size());
   uint64_t currentOffset = 0;
@@ -88,17 +92,23 @@ SmallVector<uint64_t> polang::TupleType::getElementOffsets() const {
     currentOffset = llvm::alignTo(currentOffset, 8);
     offsets.push_back(currentOffset);
     auto sz = polang::getTypeSize(elem);
-    if (sz) {
-      currentOffset += *sz;
+    if (!sz) {
+      return std::nullopt;
     }
+    currentOffset += *sz;
   }
   return offsets;
 }
 
-SmallVector<uint64_t> polang::TupleType::getElementSlotOffsets() const {
+std::optional<SmallVector<uint64_t>>
+polang::TupleType::getElementSlotOffsets() const {
+  auto byteOffsets = getElementOffsets();
+  if (!byteOffsets) {
+    return std::nullopt;
+  }
   SmallVector<uint64_t> slotOffsets;
-  slotOffsets.reserve(getTypes().size());
-  for (uint64_t byteOffset : getElementOffsets()) {
+  slotOffsets.reserve(byteOffsets->size());
+  for (uint64_t byteOffset : *byteOffsets) {
     slotOffsets.push_back(byteOffset / 8);
   }
   return slotOffsets;
