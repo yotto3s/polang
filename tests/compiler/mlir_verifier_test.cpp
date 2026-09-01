@@ -334,27 +334,18 @@ TEST_F(VerifierTest, CmpOpTypeMismatch) {
             std::string::npos);
 }
 
-TEST_F(VerifierTest, TupleTypeVerification) {
+TEST_F(VerifierTest, TupleTypeCreation) {
   OpBuilder builder(&context);
   auto i64Type = builder.getI64Type();
-  auto validTuple = polang::TupleType::getChecked(
-      [&] { return emitError(UnknownLoc::get(&context)); }, &context,
-      ArrayRef<Type>{i64Type});
+  auto validTuple = mlir::TupleType::get(&context, ArrayRef<Type>{i64Type});
   EXPECT_TRUE(validTuple != nullptr);
+  EXPECT_EQ(validTuple.size(), 1u);
 
   // Nested tuple is accepted
-  auto nestedTuple = polang::TupleType::getChecked(
-      [&] { return emitError(UnknownLoc::get(&context)); }, &context,
-      ArrayRef<Type>{validTuple, i64Type});
+  auto nestedTuple =
+      mlir::TupleType::get(&context, ArrayRef<Type>{validTuple, i64Type});
   EXPECT_TRUE(nestedTuple != nullptr);
-
-  // Non-Polang/non-MLIR standard type (e.g. NoneType) is rejected
-  auto invalidTuple = polang::TupleType::getChecked(
-      [&] { return emitError(UnknownLoc::get(&context)); }, &context,
-      ArrayRef<Type>{builder.getNoneType()});
-  EXPECT_TRUE(invalidTuple == nullptr);
-  EXPECT_NE(lastDiag.find("not a valid Polang type or type parameter"),
-            std::string::npos);
+  EXPECT_EQ(nestedTuple.size(), 2u);
 }
 
 TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
@@ -379,86 +370,79 @@ TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
   EXPECT_EQ(polang::getTypeSize(indexType), 8u);
 
   // 2. Empty tuple ()
-  auto emptyTuple = polang::TupleType::get(&context, {});
-  EXPECT_EQ(emptyTuple.typeSize(), 0u);
-  EXPECT_EQ(emptyTuple.getNumSlots(), 0u);
-  ASSERT_TRUE(emptyTuple.getElementOffsets().has_value());
-  EXPECT_TRUE(emptyTuple.getElementOffsets()->empty());
-  ASSERT_TRUE(emptyTuple.getElementSlotOffsets().has_value());
-  EXPECT_TRUE(emptyTuple.getElementSlotOffsets()->empty());
+  auto emptyTuple = mlir::TupleType::get(&context, {});
+  EXPECT_EQ(polang::getTupleTypeSize(emptyTuple), 0u);
+  ASSERT_TRUE(polang::getTupleElementOffsets(emptyTuple).has_value());
+  EXPECT_TRUE(polang::getTupleElementOffsets(emptyTuple)->empty());
+  ASSERT_TRUE(polang::getTupleElementSlotOffsets(emptyTuple).has_value());
+  EXPECT_TRUE(polang::getTupleElementSlotOffsets(emptyTuple)->empty());
 
   // 3. Flat tuple (i64, f64)
-  auto flatTuple = polang::TupleType::get(&context, {i64Type, f64Type});
-  EXPECT_EQ(flatTuple.typeSize(), 16u);
-  EXPECT_EQ(flatTuple.getNumSlots(), 2u);
-  EXPECT_EQ(flatTuple.getElementOffset(0), 0u);
-  EXPECT_EQ(flatTuple.getElementOffset(1), 8u);
-  EXPECT_EQ(flatTuple.getElementSlotOffset(0), 0u);
-  EXPECT_EQ(flatTuple.getElementSlotOffset(1), 1u);
-  EXPECT_EQ(flatTuple.getElementOffsets(), (SmallVector<uint64_t>{0, 8}));
-  EXPECT_EQ(flatTuple.getElementSlotOffsets(), (SmallVector<uint64_t>{0, 1}));
+  auto flatTuple = mlir::TupleType::get(&context, {i64Type, f64Type});
+  EXPECT_EQ(polang::getTupleTypeSize(flatTuple), 16u);
+  EXPECT_EQ(polang::getTupleElementOffset(flatTuple, 0), 0u);
+  EXPECT_EQ(polang::getTupleElementOffset(flatTuple, 1), 8u);
+  EXPECT_EQ(polang::getTupleElementSlotOffset(flatTuple, 0), 0u);
+  EXPECT_EQ(polang::getTupleElementSlotOffset(flatTuple, 1), 1u);
+  EXPECT_EQ(polang::getTupleElementOffsets(flatTuple), (SmallVector<uint64_t>{0, 8}));
+  EXPECT_EQ(polang::getTupleElementSlotOffsets(flatTuple), (SmallVector<uint64_t>{0, 1}));
 
   // 4. Flat tuple with sub-64-bit types (i8, i1, f32)
   auto sub64Tuple =
-      polang::TupleType::get(&context, {i8Type, i1Type, f32Type});
-  EXPECT_EQ(sub64Tuple.typeSize(), 24u);
-  EXPECT_EQ(sub64Tuple.getNumSlots(), 3u);
-  EXPECT_EQ(sub64Tuple.getElementOffsets(), (SmallVector<uint64_t>{0, 8, 16}));
-  EXPECT_EQ(sub64Tuple.getElementSlotOffsets(),
+      mlir::TupleType::get(&context, {i8Type, i1Type, f32Type});
+  EXPECT_EQ(polang::getTupleTypeSize(sub64Tuple), 24u);
+  EXPECT_EQ(polang::getTupleElementOffsets(sub64Tuple), (SmallVector<uint64_t>{0, 8, 16}));
+  EXPECT_EQ(polang::getTupleElementSlotOffsets(sub64Tuple),
             (SmallVector<uint64_t>{0, 1, 2}));
 
   // 5. Nested tuple (i64, (f64, i1), i32)
-  auto innerTuple = polang::TupleType::get(&context, {f64Type, i1Type});
-  EXPECT_EQ(innerTuple.typeSize(), 16u);
+  auto innerTuple = mlir::TupleType::get(&context, {f64Type, i1Type});
+  EXPECT_EQ(polang::getTupleTypeSize(innerTuple), 16u);
   auto nestedTuple =
-      polang::TupleType::get(&context, {i64Type, innerTuple, i32Type});
-  EXPECT_EQ(nestedTuple.typeSize(), 32u);
-  EXPECT_EQ(nestedTuple.getNumSlots(), 4u);
-  EXPECT_EQ(nestedTuple.getElementOffset(0), 0u);
-  EXPECT_EQ(nestedTuple.getElementOffset(1), 8u);
-  EXPECT_EQ(nestedTuple.getElementOffset(2), 24u);
-  EXPECT_EQ(nestedTuple.getElementSlotOffset(0), 0u);
-  EXPECT_EQ(nestedTuple.getElementSlotOffset(1), 1u);
-  EXPECT_EQ(nestedTuple.getElementSlotOffset(2), 3u);
-  EXPECT_EQ(nestedTuple.getElementOffsets(), (SmallVector<uint64_t>{0, 8, 24}));
-  EXPECT_EQ(nestedTuple.getElementSlotOffsets(),
+      mlir::TupleType::get(&context, {i64Type, innerTuple, i32Type});
+  EXPECT_EQ(polang::getTupleTypeSize(nestedTuple), 32u);
+  EXPECT_EQ(polang::getTupleElementOffset(nestedTuple, 0), 0u);
+  EXPECT_EQ(polang::getTupleElementOffset(nestedTuple, 1), 8u);
+  EXPECT_EQ(polang::getTupleElementOffset(nestedTuple, 2), 24u);
+  EXPECT_EQ(polang::getTupleElementSlotOffset(nestedTuple, 0), 0u);
+  EXPECT_EQ(polang::getTupleElementSlotOffset(nestedTuple, 1), 1u);
+  EXPECT_EQ(polang::getTupleElementSlotOffset(nestedTuple, 2), 3u);
+  EXPECT_EQ(polang::getTupleElementOffsets(nestedTuple), (SmallVector<uint64_t>{0, 8, 24}));
+  EXPECT_EQ(polang::getTupleElementSlotOffsets(nestedTuple),
             (SmallVector<uint64_t>{0, 1, 3}));
 
   // 6. Deeply nested tuple ((i64, f64), (i1, (i32, f32)))
-  auto pair1 = polang::TupleType::get(&context, {i64Type, f64Type});
-  auto pair2 = polang::TupleType::get(&context, {i32Type, f32Type});
-  auto group = polang::TupleType::get(&context, {i1Type, pair2});
-  EXPECT_EQ(pair1.typeSize(), 16u);
-  EXPECT_EQ(pair2.typeSize(), 16u);
-  EXPECT_EQ(group.typeSize(), 24u);
-  auto deepTuple = polang::TupleType::get(&context, {pair1, group});
-  EXPECT_EQ(deepTuple.typeSize(), 40u);
-  EXPECT_EQ(deepTuple.getNumSlots(), 5u);
-  EXPECT_EQ(deepTuple.getElementOffsets(), (SmallVector<uint64_t>{0, 16}));
-  EXPECT_EQ(deepTuple.getElementSlotOffsets(), (SmallVector<uint64_t>{0, 2}));
+  auto pair1 = mlir::TupleType::get(&context, {i64Type, f64Type});
+  auto pair2 = mlir::TupleType::get(&context, {i32Type, f32Type});
+  auto group = mlir::TupleType::get(&context, {i1Type, pair2});
+  EXPECT_EQ(polang::getTupleTypeSize(pair1), 16u);
+  EXPECT_EQ(polang::getTupleTypeSize(pair2), 16u);
+  EXPECT_EQ(polang::getTupleTypeSize(group), 24u);
+  auto deepTuple = mlir::TupleType::get(&context, {pair1, group});
+  EXPECT_EQ(polang::getTupleTypeSize(deepTuple), 40u);
+  EXPECT_EQ(polang::getTupleElementOffsets(deepTuple), (SmallVector<uint64_t>{0, 16}));
+  EXPECT_EQ(polang::getTupleElementSlotOffsets(deepTuple), (SmallVector<uint64_t>{0, 2}));
 
   // 7. Unspecialized generic tuple (type_param<"a">, i64)
   auto typeParamA = polang::TypeParamType::get(&context, "a");
-  auto genericTuple = polang::TupleType::get(&context, {typeParamA, i64Type});
-  EXPECT_EQ(genericTuple.typeSize(), std::nullopt);
-  EXPECT_EQ(genericTuple.getNumSlots(), std::nullopt);
-  EXPECT_EQ(genericTuple.getElementOffset(0), 0u);
-  EXPECT_EQ(genericTuple.getElementOffset(1), std::nullopt);
-  EXPECT_EQ(genericTuple.getElementSlotOffset(0), 0u);
-  EXPECT_EQ(genericTuple.getElementSlotOffset(1), std::nullopt);
-  EXPECT_EQ(genericTuple.getElementOffsets(), std::nullopt);
-  EXPECT_EQ(genericTuple.getElementSlotOffsets(), std::nullopt);
+  auto genericTuple = mlir::TupleType::get(&context, {typeParamA, i64Type});
+  EXPECT_EQ(polang::getTupleTypeSize(genericTuple), std::nullopt);
+  EXPECT_EQ(polang::getTupleElementOffset(genericTuple, 0), 0u);
+  EXPECT_EQ(polang::getTupleElementOffset(genericTuple, 1), std::nullopt);
+  EXPECT_EQ(polang::getTupleElementSlotOffset(genericTuple, 0), 0u);
+  EXPECT_EQ(polang::getTupleElementSlotOffset(genericTuple, 1), std::nullopt);
+  EXPECT_EQ(polang::getTupleElementOffsets(genericTuple), std::nullopt);
+  EXPECT_EQ(polang::getTupleElementSlotOffsets(genericTuple), std::nullopt);
 
   // 8. Nested unspecialized generic tuple (i64, (type_param<"a">, f64), i1)
-  auto genericInner = polang::TupleType::get(&context, {typeParamA, f64Type});
+  auto genericInner = mlir::TupleType::get(&context, {typeParamA, f64Type});
   auto genericNested =
-      polang::TupleType::get(&context, {i64Type, genericInner, i1Type});
-  EXPECT_EQ(genericNested.typeSize(), std::nullopt);
-  EXPECT_EQ(genericNested.getNumSlots(), std::nullopt);
-  EXPECT_EQ(genericNested.getElementOffset(0), 0u);
-  EXPECT_EQ(genericNested.getElementOffset(1), 8u);
-  EXPECT_EQ(genericNested.getElementOffset(2), std::nullopt);
-  EXPECT_EQ(genericNested.getElementOffsets(), std::nullopt);
+      mlir::TupleType::get(&context, {i64Type, genericInner, i1Type});
+  EXPECT_EQ(polang::getTupleTypeSize(genericNested), std::nullopt);
+  EXPECT_EQ(polang::getTupleElementOffset(genericNested, 0), 0u);
+  EXPECT_EQ(polang::getTupleElementOffset(genericNested, 1), 8u);
+  EXPECT_EQ(polang::getTupleElementOffset(genericNested, 2), std::nullopt);
+  EXPECT_EQ(polang::getTupleElementOffsets(genericNested), std::nullopt);
 }
 
 TEST_F(VerifierTest, TargetDataLayoutInteraction) {
@@ -488,12 +472,11 @@ TEST_F(VerifierTest, TargetDataLayoutInteraction) {
 
   // 3. TupleType layout with 32-bit index and 64-bit alignment rule
   auto tupleWithIndices =
-      polang::TupleType::get(&context, {indexType, indexType, i64Type});
-  EXPECT_EQ(tupleWithIndices.typeSize(&dl32), 24u);
-  EXPECT_EQ(tupleWithIndices.getNumSlots(&dl32), 3u);
-  EXPECT_EQ(tupleWithIndices.getElementOffsets(&dl32),
+      mlir::TupleType::get(&context, {indexType, indexType, i64Type});
+  EXPECT_EQ(polang::getTupleTypeSize(tupleWithIndices, &dl32), 24u);
+  EXPECT_EQ(polang::getTupleElementOffsets(tupleWithIndices, &dl32),
             (SmallVector<uint64_t>{0, 8, 16}));
-  EXPECT_EQ(tupleWithIndices.getElementSlotOffsets(&dl32),
+  EXPECT_EQ(polang::getTupleElementSlotOffsets(tupleWithIndices, &dl32),
             (SmallVector<uint64_t>{0, 1, 2}));
 }
 

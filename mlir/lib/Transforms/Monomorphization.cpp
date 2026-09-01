@@ -48,7 +48,7 @@ std::string getTypeString(Type type) {
   if (isa<mlir::IndexType>(type)) {
     return "index";
   }
-  if (auto tupleType = dyn_cast<polang::TupleType>(type)) {
+  if (auto tupleType = dyn_cast<mlir::TupleType>(type)) {
     size_t n = tupleType.getTypes().size();
     if (n == 0) {
       return "unit";
@@ -91,7 +91,7 @@ bool isTypeParam(Type type) {
   if (isa<TypeParamType>(type)) {
     return true;
   }
-  if (auto tupleType = dyn_cast<polang::TupleType>(type)) {
+  if (auto tupleType = dyn_cast<mlir::TupleType>(type)) {
     for (Type elem : tupleType.getTypes()) {
       if (isTypeParam(elem)) {
         return true;
@@ -109,7 +109,7 @@ Type applyTypeParamMapping(Type type, const llvm::StringMap<Type>& mapping) {
       return it->second;
     }
   }
-  if (auto tupleType = dyn_cast<polang::TupleType>(type)) {
+  if (auto tupleType = dyn_cast<mlir::TupleType>(type)) {
     SmallVector<Type> mappedTypes;
     bool changed = false;
     for (Type elem : tupleType.getTypes()) {
@@ -120,7 +120,7 @@ Type applyTypeParamMapping(Type type, const llvm::StringMap<Type>& mapping) {
       mappedTypes.push_back(mappedElem);
     }
     if (changed) {
-      return polang::TupleType::get(type.getContext(), mappedTypes);
+      return mlir::TupleType::get(type.getContext(), mappedTypes);
     }
   }
   return type;

@@ -31,13 +31,13 @@ bool typesAreCompatible(Type t1, Type t2) {
   if (isa<TypeParamType>(t1) || isa<TypeParamType>(t2)) {
     return true;
   }
-  if (auto tup1 = llvm::dyn_cast<polang::TupleType>(t1)) {
-    if (auto tup2 = llvm::dyn_cast<polang::TupleType>(t2)) {
+  if (auto tup1 = llvm::dyn_cast<mlir::TupleType>(t1)) {
+    if (auto tup2 = llvm::dyn_cast<mlir::TupleType>(t2)) {
       if (tup1.getTypes().size() != tup2.getTypes().size()) {
         return false;
       }
       for (size_t i = 0; i < tup1.getTypes().size(); ++i) {
-        if (!typesAreCompatible(tup1.getTypes()[i], tup2.getTypes()[i])) {
+        if (!typesAreCompatible(tup1.getType(i), tup2.getType(i))) {
           return false;
         }
       }

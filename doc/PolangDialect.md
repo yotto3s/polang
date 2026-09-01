@@ -47,21 +47,23 @@ Type parameters appear in `polang.generic_func` signatures and are bound to conc
 
 ### Tuple Types
 
-Represents a fixed-size heterogeneous product of types with arbitrary arity ($N \ge 0$). Elements can be standard MLIR types, nested `TupleType`s, or type parameters (`TypeParamType`).
+### Tuple Types
 
-`TupleType` implements MLIR's `DataLayoutTypeInterface`. Each element in a tuple occupies a 64-bit (8-byte) aligned slot in declaration order without re-ordering.
+Represents a fixed-size heterogeneous product of types with arbitrary arity ($N \ge 0$). Polang directly uses MLIR's built-in `mlir::TupleType` (`tuple<...>`). Elements can be standard MLIR types, nested `tuple`s, or type parameters (`TypeParamType`).
+
+`DataLayoutTypeInterface` is registered for `mlir::TupleType` in the Polang dialect. Each element in a tuple occupies a 64-bit (8-byte) aligned slot in declaration order without re-ordering.
 
 | Polang Type | MLIR Type | Description |
 |-------------|-----------|-------------|
-| `()` | `!polang.tuple<>` | 0-tuple (unit) |
-| `(i64, f64)` | `!polang.tuple<si64, f64>` | 2-tuple of si64 and f64 |
-| `(i64, (f64, bool))` | `!polang.tuple<si64, !polang.tuple<f64, i1>>` | Nested tuple |
-| `('a, 'b)` | `!polang.tuple<!polang.type_param<"a">, !polang.type_param<"b">>` | Generic tuple |
+| `()` | `tuple<>` | 0-tuple (unit) |
+| `(i64, f64)` | `tuple<si64, f64>` | 2-tuple of si64 and f64 |
+| `(i64, (f64, bool))` | `tuple<si64, tuple<f64, i1>>` | Nested tuple |
+| `('a, 'b)` | `tuple<!polang.type_param<"a">, !polang.type_param<"b">>` | Generic tuple |
 
 ### Type Constraints
 
 - **`Polang_AnyNumericOrParam`**: `AnyInteger`, `AnyFloat`, `Index`, `TypeParamType`.
-- **`Polang_AnyTypeOrParam`**: `AnyInteger`, `AnyFloat`, `Index`, `TupleType`, `TypeParamType`.
+- **`Polang_AnyTypeOrParam`**: `AnyInteger`, `AnyFloat`, `Index`, `AnyTuple`, `TypeParamType`.
 - **`Polang_I1OrParamType`**: `I1`, `TypeParamType`.
 
 ## Operations

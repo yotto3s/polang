@@ -277,13 +277,13 @@ std::string typeToString(Type type) {
   if (isa<mlir::IndexType>(type)) {
     return "index";
   }
-  if (auto tupleType = dyn_cast<polang::TupleType>(type)) {
+  if (auto tupleType = dyn_cast<mlir::TupleType>(type)) {
     std::string result = "(";
     for (size_t i = 0; i < tupleType.getTypes().size(); ++i) {
       if (i > 0) {
         result += ", ";
       }
-      result += typeToString(tupleType.getTypes()[i]);
+      result += typeToString(tupleType.getType(i));
     }
     result += ")";
     return result;
