@@ -60,7 +60,7 @@ Represents a fixed-size heterogeneous product of types with arbitrary arity ($N 
 
 ### Type Constraints
 
-- **`Polang_AnyNumericOrParam`**: `AnyInteger`, `AnyFloat`, `Index`, `TypeParamType`.
+- **`Polang_AnyNumericOrParam`**: `Polang_NonBoolInteger` (integer width > 1), `AnyFloat`, `Index`, `TypeParamType`.
 - **`Polang_AnyTypeOrParam`**: `AnyInteger`, `AnyFloat`, `Index`, `AnyTuple`, `TypeParamType`.
 - **`Polang_I1OrParamType`**: `I1`, `TypeParamType`.
 

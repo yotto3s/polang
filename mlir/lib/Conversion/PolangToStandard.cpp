@@ -659,10 +659,8 @@ void lowerFloatToIntCast(CastOp op, Value input, Type inputType,
 void lowerIndexToIntCast(CastOp op, Value input, Type resultType,
                          Type origInputType,
                          ConversionPatternRewriter& rewriter) {
-  const bool isUnsigned = isOrigTypeUnsigned(origInputType, op.getOperation(),
-                                             "input_is_unsigned") ||
-                          isOrigTypeUnsigned(op.getResult().getType(),
-                                             op.getOperation(), "is_unsigned");
+  const bool isUnsigned =
+      isOrigTypeUnsigned(origInputType, op.getOperation(), "input_is_unsigned");
   if (isUnsigned) {
     rewriter.replaceOpWithNewOp<arith::IndexCastUIOp>(op, resultType, input);
   } else {
@@ -672,12 +670,10 @@ void lowerIndexToIntCast(CastOp op, Value input, Type resultType,
 
 /// Lower integer to index cast (arith.index_cast / index_castui).
 void lowerIntToIndexCast(CastOp op, Value input, Type resultType,
-                         Type origResultType,
+                         Type origInputType,
                          ConversionPatternRewriter& rewriter) {
   const bool isUnsigned =
-      isOrigTypeUnsigned(origResultType, op.getOperation(), "is_unsigned") ||
-      isOrigTypeUnsigned(op.getInput().getType(), op.getOperation(),
-                         "input_is_unsigned");
+      isOrigTypeUnsigned(origInputType, op.getOperation(), "input_is_unsigned");
   if (isUnsigned) {
     rewriter.replaceOpWithNewOp<arith::IndexCastUIOp>(op, resultType, input);
   } else {
@@ -756,7 +752,7 @@ struct CastOpLowering : public OpConversionPattern<CastOp> {
     } else if (inputIsIndex && resultIsInt) {
       lowerIndexToIntCast(op, input, resultType, origInputType, rewriter);
     } else if (inputIsInt && resultIsIndex) {
-      lowerIntToIndexCast(op, input, resultType, origResultType, rewriter);
+      lowerIntToIndexCast(op, input, resultType, origInputType, rewriter);
     } else if (inputIsIndex && resultIsFloat) {
       lowerIndexToFloatCast(op, input, resultType, origInputType, op.getLoc(),
                             rewriter);
@@ -785,7 +781,8 @@ struct CastOpLowering : public OpConversionPattern<CastOp> {
 //===----------------------------------------------------------------------===//
 
 /// Convert a Polang comparison predicate to an MLIR floating-point predicate.
-arith::CmpFPredicate convertToFloatPredicate(CmpPredicate pred) {
+[[nodiscard]] arith::CmpFPredicate
+convertToFloatPredicate(CmpPredicate pred) noexcept {
   switch (pred) {
   case CmpPredicate::eq:
     return arith::CmpFPredicate::OEQ;
@@ -806,8 +803,8 @@ arith::CmpFPredicate convertToFloatPredicate(CmpPredicate pred) {
 /// Convert a Polang comparison predicate to an MLIR integer predicate.
 /// \param pred The Polang comparison predicate.
 /// \param isUnsigned Whether the integer type is unsigned.
-arith::CmpIPredicate convertToIntPredicate(CmpPredicate pred,
-                                           bool isUnsigned = false) {
+[[nodiscard]] arith::CmpIPredicate
+convertToIntPredicate(CmpPredicate pred, bool isUnsigned = false) noexcept {
   switch (pred) {
   case CmpPredicate::eq:
     return arith::CmpIPredicate::eq;
