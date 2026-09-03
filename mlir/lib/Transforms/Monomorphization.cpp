@@ -45,6 +45,9 @@ std::string getTypeString(Type type) {
   if (auto floatType = dyn_cast<mlir::FloatType>(type)) {
     return "f" + std::to_string(floatType.getWidth());
   }
+  if (auto indexType = dyn_cast<polang::IndexType>(type)) {
+    return indexType.isSigned() ? "isize" : "usize";
+  }
   if (isa<mlir::IndexType>(type)) {
     return "index";
   }

@@ -29,10 +29,15 @@ The Polang compiler leverages standard built-in MLIR types for primitives and tu
 | `u16` | `ui16` | `i16` | Unsigned 16-bit integer |
 | `u32` | `ui32` | `i32` | Unsigned 32-bit integer |
 | `u64` | `ui64` | `i64` | Unsigned 64-bit integer |
-| `isize` / `usize` | `index` | `i64` | Target index type |
+| `isize` | `!polang.index<signed>` | `i64` | Signed pointer-width index |
+| `usize` | `!polang.index<unsigned>` | `i64` | Unsigned pointer-width index |
 | `f32` | `f32` | `f32` | Single-precision float |
 | `f64` | `f64` | `f64` | Double-precision float |
 | `bool` | `i1` | `i1` | Boolean true/false |
+
+### Index Types
+
+The Polang dialect provides `!polang.index<signed>` and `!polang.index<unsigned>` with explicit signedness semantics, implementing `DataLayoutTypeInterface`. These lower to standard signless `mlir::IndexType` (`index`) during dialect conversion to standard MLIR.
 
 ### Type Parameter Type
 
@@ -60,8 +65,8 @@ Represents a fixed-size heterogeneous product of types with arbitrary arity ($N 
 
 ### Type Constraints
 
-- **`Polang_AnyNumericOrParam`**: `Polang_NonBoolInteger` (integer width > 1), `AnyFloat`, `Index`, `TypeParamType`.
-- **`Polang_AnyTypeOrParam`**: `AnyInteger`, `AnyFloat`, `Index`, `AnyTuple`, `TypeParamType`.
+- **`Polang_AnyNumericOrParam`**: `Polang_NonBoolInteger` (integer width > 1), `AnyFloat`, `Polang_IndexType`, `Index`, `TypeParamType`.
+- **`Polang_AnyTypeOrParam`**: `AnyInteger`, `AnyFloat`, `Polang_IndexType`, `Index`, `AnyTuple`, `TypeParamType`.
 - **`Polang_I1OrParamType`**: `I1`, `TypeParamType`.
 
 ## Operations

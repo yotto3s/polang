@@ -26,7 +26,7 @@
 
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangTypes.h"
-#include "polang/Dialect/PolangEnums.h.inc"
+#include "polang/Dialect/PolangEnums.h"
 
 #define GET_OP_CLASSES
 #include "polang/Dialect/PolangOps.h.inc"

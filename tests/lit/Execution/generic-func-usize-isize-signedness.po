@@ -1,0 +1,21 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test generic function specialization on usize vs isize *)
+poly_div : forall 'a:Numeric. 'a * 'a -> 'a
+poly_div(x, y) = x / y
+
+poly_lt : forall 'a:Numeric. 'a * 'a -> bool
+poly_lt(x, y) = x < y
+
+test : () -> bool
+test() =
+  let d1 = poly_div(10 as isize, 2 as isize) in
+  let d2 = poly_div(100 as usize, 10 as usize) in
+  let c1 = poly_lt(10 as usize, 20 as usize) in
+  let c2 = poly_lt((-1) as isize, 0 as isize) in
+  (d1 == (5 as isize)) && (d2 == (10 as usize)) && c1 && c2
+
+(* CHECK: true : bool
+*)
+test()

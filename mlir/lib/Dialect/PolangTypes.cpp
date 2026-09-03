@@ -22,6 +22,26 @@ using namespace polang;
 
 #pragma GCC diagnostic pop
 
+llvm::TypeSize polang::IndexType::getTypeSizeInBits(
+    const ::mlir::DataLayout& dataLayout,
+    ::mlir::DataLayoutEntryListRef /*params*/) const {
+  return llvm::TypeSize::getFixed(
+      dataLayout.getTypeSizeInBits(mlir::IndexType::get(getContext())));
+}
+
+uint64_t polang::IndexType::getABIAlignment(
+    const ::mlir::DataLayout& dataLayout,
+    ::mlir::DataLayoutEntryListRef /*params*/) const {
+  return dataLayout.getTypeABIAlignment(mlir::IndexType::get(getContext()));
+}
+
+uint64_t polang::IndexType::getPreferredAlignment(
+    const ::mlir::DataLayout& dataLayout,
+    ::mlir::DataLayoutEntryListRef /*params*/) const {
+  return dataLayout.getTypePreferredAlignment(
+      mlir::IndexType::get(getContext()));
+}
+
 namespace {
 
 struct BuiltinTupleDataLayoutModel

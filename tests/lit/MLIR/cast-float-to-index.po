@@ -2,12 +2,12 @@
 *)
 
 (* Test MLIR generation for float to isize cast *)
-(* CHECK:        polang.func @__polang_entry() -> index {
+(* CHECK:        polang.func @__polang_entry() -> !polang.index<signed> {
 *)
 (* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.float 3.140000e+00 : f64
 *)
-(* CHECK-NEXT:     %{{[0-9]+}} = polang.cast %{{[0-9]+}} : f64 -> index
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.cast %{{[0-9]+}} : f64 -> !polang.index<signed>
 *)
-(* CHECK-NEXT:     polang.return %{{[0-9]+}} : index
+(* CHECK-NEXT:     polang.return %{{[0-9]+}} : !polang.index<signed>
 *)
 3.14 as isize

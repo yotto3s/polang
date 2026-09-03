@@ -44,6 +44,9 @@ public:
       }
       return type;
     });
+    addConversion([](polang::IndexType type) -> Type {
+      return mlir::IndexType::get(type.getContext());
+    });
     // Handle type parameters that weren't resolved by monomorphization.
     // Default to i64 as fallback (should not be reached in normal flow).
     addConversion([](TypeParamType type) -> Type {
@@ -68,7 +71,7 @@ struct ConstantIntegerOpLowering
     (void)adaptor; // Unused, but required by MLIR interface
     Type resultType = op.getResult().getType();
 
-    if (isa<mlir::IndexType>(resultType)) {
+    if (isa<mlir::IndexType, polang::IndexType>(resultType)) {
       auto value = rewriter.create<arith::ConstantIndexOp>(
           op.getLoc(), op.getValue().getSExtValue());
       rewriter.replaceOp(op, value);
@@ -125,6 +128,9 @@ isOrigTypeUnsigned(Type origType, Operation* op = nullptr,
     if (attrName == "is_unsigned" && op->hasAttr("polang.is_unsigned")) {
       return true;
     }
+  }
+  if (auto idxType = dyn_cast<polang::IndexType>(origType)) {
+    return idxType.isUnsigned();
   }
   if (auto intType = dyn_cast<mlir::IntegerType>(origType)) {
     return intType.isUnsigned();

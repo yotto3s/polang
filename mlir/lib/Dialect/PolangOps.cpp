@@ -732,7 +732,7 @@ LogicalResult CastOp::verify() {
     if (auto intType = dyn_cast<mlir::IntegerType>(t)) {
       return intType.getWidth() > 1;
     }
-    return isa<mlir::FloatType, mlir::IndexType>(t);
+    return isa<mlir::FloatType, mlir::IndexType, polang::IndexType>(t);
   };
 
   if (!isNumericType(inputType)) {
@@ -750,9 +750,20 @@ LogicalResult CastOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult CmpOp::verify() {
-  if (!typesAreCompatible(getLhs().getType(), getRhs().getType())) {
-    return emitOpError("comparison operand types must be compatible");
+  Type lhsType = getLhs().getType();
+  Type rhsType = getRhs().getType();
+
+  // Allow type variables - they will be resolved by type inference pass
+  if (isa<TypeParamType>(lhsType) || isa<TypeParamType>(rhsType)) {
+    return success();
   }
+
+  // Operands must have compatible types
+  if (!typesAreCompatible(lhsType, rhsType)) {
+    return emitOpError("comparison operand types must be compatible, got ")
+           << lhsType << " and " << rhsType;
+  }
+
   return success();
 }
 
@@ -784,7 +795,7 @@ ParseResult ConstantIntegerOp::parse(OpAsmParser& parser,
   unsigned width = 64; // Default width for type parameters and index types
   if (auto intType = dyn_cast<mlir::IntegerType>(resultType)) {
     width = intType.getWidth();
-  } else if (!isa<mlir::IndexType>(resultType) &&
+  } else if (!isa<mlir::IndexType, polang::IndexType>(resultType) &&
              !isa<TypeParamType>(resultType)) {
     return parser.emitError(parser.getNameLoc(),
                             "expected integer, index, or type_param type");

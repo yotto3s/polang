@@ -2,12 +2,12 @@
 *)
 
 (* Test MLIR generation for usize cast *)
-(* CHECK:        polang.func @__polang_entry() -> index {
+(* CHECK:        polang.func @__polang_entry() -> !polang.index<unsigned> {
 *)
 (* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 42 : si64
 *)
-(* CHECK-NEXT:     %{{[0-9]+}} = polang.cast %{{[0-9]+}} : si64 -> index {is_unsigned}
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.cast %{{[0-9]+}} : si64 -> !polang.index<unsigned> {is_unsigned}
 *)
-(* CHECK-NEXT:     polang.return %{{[0-9]+}} : index
+(* CHECK-NEXT:     polang.return %{{[0-9]+}} : !polang.index<unsigned>
 *)
 42 as usize
