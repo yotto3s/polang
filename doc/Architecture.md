@@ -298,8 +298,8 @@ Type parameters are resolved by the type inference and monomorphization passes b
 
 | Polang Type | MLIR Type | Lowers To |
 |-------------|-----------|-----------|
-| `isize` | `index` | `i64` (platform pointer width) |
-| `usize` | `index` | `i64` (platform pointer width) |
+| `isize` | `!polang.index<signed>` | `i64` (platform pointer width via `index`) |
+| `usize` | `!polang.index<unsigned>` | `i64` (platform pointer width via `index`) |
 
 #### Other Types
 

@@ -10,11 +10,23 @@ poly_lt(x, y) = x < y
 
 test : () -> bool
 test() =
-  let d1 = poly_div(10 as isize, 2 as isize) in
-  let d2 = poly_div(100 as usize, 10 as usize) in
-  let c1 = poly_lt(10 as usize, 20 as usize) in
-  let c2 = poly_lt((-1) as isize, 0 as isize) in
-  (d1 == (5 as isize)) && (d2 == (10 as usize)) && c1 && c2
+  (* Signed isize division *)
+  let d_signed = poly_div((-10) as isize, 2 as isize) in
+  (* Unsigned usize division with high bit set: (-2 as isize) as usize / 2 *)
+  let u_high = (-2 as isize) as usize in
+  let d_unsigned = poly_div(u_high, 2 as usize) in
+  let expected_unsigned = u_high / (2 as usize) in
+  (* Unsigned comparison with high bit set: 0 < (-1 as isize as usize) is true for unsigned, false for signed *)
+  let c_unsigned_lt = poly_lt(0 as usize, (-1 as isize) as usize) in
+  let c_unsigned_gt = poly_lt((-1 as isize) as usize, 0 as usize) in
+  (* Signed comparison: -1 < 0 is true for signed, false for unsigned *)
+  let c_signed_lt = poly_lt((-1) as isize, 0 as isize) in
+  (d_signed == (-5 as isize)) &&
+  (d_unsigned == expected_unsigned) &&
+  (d_unsigned != ((-1 as isize) as usize)) &&
+  c_unsigned_lt &&
+  (!c_unsigned_gt) &&
+  c_signed_lt
 
 (* CHECK: true : bool
 *)

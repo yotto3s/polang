@@ -491,13 +491,36 @@ TEST_F(VerifierTest, TupleTypeSizeAndOffsetCalculation) {
 TEST_F(VerifierTest, TargetDataLayoutInteraction) {
   OpBuilder builder(&context);
   auto indexType = builder.getIndexType();
+  auto signedIndexType =
+      polang::IndexType::get(&context, polang::Signedness::Signed);
+  auto unsignedIndexType =
+      polang::IndexType::get(&context, polang::Signedness::Unsigned);
   auto i64Type = builder.getI64Type();
 
   // 1. Default DataLayout (64-bit index)
   mlir::DataLayout defaultDL;
   EXPECT_EQ(defaultDL.getTypeSize(indexType), 8u);
   EXPECT_EQ(defaultDL.getTypeSizeInBits(indexType), 64u);
+  EXPECT_EQ(defaultDL.getTypeABIAlignment(indexType), 4u);
+  EXPECT_EQ(defaultDL.getTypePreferredAlignment(indexType), 8u);
   EXPECT_EQ(polang::getTypeSize(indexType, &defaultDL), 8u);
+
+  // Custom polang::IndexType under default DataLayout
+  EXPECT_EQ(defaultDL.getTypeSize(signedIndexType), 8u);
+  EXPECT_EQ(defaultDL.getTypeSizeInBits(signedIndexType), 64u);
+  EXPECT_EQ(defaultDL.getTypeABIAlignment(signedIndexType),
+            defaultDL.getTypeABIAlignment(indexType));
+  EXPECT_EQ(defaultDL.getTypePreferredAlignment(signedIndexType),
+            defaultDL.getTypePreferredAlignment(indexType));
+  EXPECT_EQ(polang::getTypeSize(signedIndexType, &defaultDL), 8u);
+
+  EXPECT_EQ(defaultDL.getTypeSize(unsignedIndexType), 8u);
+  EXPECT_EQ(defaultDL.getTypeSizeInBits(unsignedIndexType), 64u);
+  EXPECT_EQ(defaultDL.getTypeABIAlignment(unsignedIndexType),
+            defaultDL.getTypeABIAlignment(indexType));
+  EXPECT_EQ(defaultDL.getTypePreferredAlignment(unsignedIndexType),
+            defaultDL.getTypePreferredAlignment(indexType));
+  EXPECT_EQ(polang::getTypeSize(unsignedIndexType, &defaultDL), 8u);
 
   // 2. Custom 32-bit index DataLayout via module with DLTI spec
   auto loc = UnknownLoc::get(&context);
@@ -511,7 +534,26 @@ TEST_F(VerifierTest, TargetDataLayoutInteraction) {
   mlir::DataLayout dl32(*module32);
   EXPECT_EQ(dl32.getTypeSize(indexType), 4u);
   EXPECT_EQ(dl32.getTypeSizeInBits(indexType), 32u);
+  EXPECT_EQ(dl32.getTypeABIAlignment(indexType), 4u);
+  EXPECT_EQ(dl32.getTypePreferredAlignment(indexType), 4u);
   EXPECT_EQ(polang::getTypeSize(indexType, &dl32), 4u);
+
+  // Custom polang::IndexType under 32-bit DataLayout
+  EXPECT_EQ(dl32.getTypeSize(signedIndexType), 4u);
+  EXPECT_EQ(dl32.getTypeSizeInBits(signedIndexType), 32u);
+  EXPECT_EQ(dl32.getTypeABIAlignment(signedIndexType),
+            dl32.getTypeABIAlignment(indexType));
+  EXPECT_EQ(dl32.getTypePreferredAlignment(signedIndexType),
+            dl32.getTypePreferredAlignment(indexType));
+  EXPECT_EQ(polang::getTypeSize(signedIndexType, &dl32), 4u);
+
+  EXPECT_EQ(dl32.getTypeSize(unsignedIndexType), 4u);
+  EXPECT_EQ(dl32.getTypeSizeInBits(unsignedIndexType), 32u);
+  EXPECT_EQ(dl32.getTypeABIAlignment(unsignedIndexType),
+            dl32.getTypeABIAlignment(indexType));
+  EXPECT_EQ(dl32.getTypePreferredAlignment(unsignedIndexType),
+            dl32.getTypePreferredAlignment(indexType));
+  EXPECT_EQ(polang::getTypeSize(unsignedIndexType, &dl32), 4u);
 
   // 3. TupleType layout with 32-bit index and 64-bit alignment rule
   auto tupleWithIndices =
