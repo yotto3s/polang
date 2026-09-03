@@ -2,6 +2,6 @@
 *)
 
 (* Test float to isize cast (truncates to integer) *)
-(* CHECK: 3 : index
+(* CHECK: 3 : isize
 *)
 3.14 as isize

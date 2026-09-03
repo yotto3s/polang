@@ -6,6 +6,6 @@
 add : forall 'a:Numeric. 'a * 'a -> 'a
 add(x, y) = x + y
 
-(* CHECK: 4 : index
+(* CHECK: 4 : usize
 *)
 add(1 as usize, 3)

@@ -2,7 +2,7 @@
 *)
 
 (* Test isize variable with type annotation *)
-(* CHECK: 42 : index
+(* CHECK: 42 : isize
 *)
 make_isize : i64 -> isize
 make_isize(x) = x as isize

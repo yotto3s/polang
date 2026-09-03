@@ -274,7 +274,10 @@ std::string typeToString(Type type) {
   if (auto floatType = dyn_cast<mlir::FloatType>(type)) {
     return "f" + std::to_string(floatType.getWidth());
   }
-  if (isa<polang::IndexType, mlir::IndexType>(type)) {
+  if (auto indexType = dyn_cast<polang::IndexType>(type)) {
+    return indexType.isSigned() ? "isize" : "usize";
+  }
+  if (isa<mlir::IndexType>(type)) {
     return "index";
   }
   if (auto tupleType = dyn_cast<mlir::TupleType>(type)) {

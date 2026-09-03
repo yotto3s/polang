@@ -13,6 +13,6 @@ identity_int(x) = x
 result : isize
 result = identity_int(double(21 as isize))
 
-(* CHECK: 42 : index
+(* CHECK: 42 : isize
 *)
 result

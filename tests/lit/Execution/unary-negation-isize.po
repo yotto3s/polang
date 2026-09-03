@@ -5,7 +5,7 @@
    ConstantIntOp requires IntegerType. Negating an isize value should
    work, producing the negated index value.
 *)
-(* CHECK: -42 : index
+(* CHECK: -42 : isize
 *)
 x : isize
 x = 42 as isize

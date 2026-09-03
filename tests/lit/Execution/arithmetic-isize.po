@@ -2,7 +2,7 @@
 *)
 
 (* Test arithmetic operations on isize values *)
-(* CHECK: 42 : index
+(* CHECK: 42 : isize
 *)
 add_isize : isize * isize -> isize
 add_isize(a, b) = a + b

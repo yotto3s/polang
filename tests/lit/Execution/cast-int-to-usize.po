@@ -2,6 +2,6 @@
 *)
 
 (* Test integer to usize cast *)
-(* CHECK: 42 : index
+(* CHECK: 42 : usize
 *)
 42 as usize

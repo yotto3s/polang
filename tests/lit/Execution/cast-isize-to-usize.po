@@ -2,7 +2,7 @@
 *)
 
 (* Test isize to usize cast (both are index, noop) *)
-(* CHECK: 42 : index
+(* CHECK: 42 : usize
 *)
 to_usize : isize -> usize
 to_usize(x) = x as usize
