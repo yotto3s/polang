@@ -3,16 +3,16 @@
 
 (* Test MLIR representation of f64 (default float type) *)
 
-(* CHECK: {{.*}}polang.constant.float {{.*}} : !polang.float<64>
+(* CHECK: {{.*}}polang.constant.float {{.*}} : f64
 *)
 a = 3.14
 
-(* CHECK: {{.*}}polang.constant.float {{.*}} : !polang.float<64>
+(* CHECK: {{.*}}polang.constant.float {{.*}} : f64
 *)
 b = 2.71828
 
 (* Explicit f64 annotation works since literal is f64 *)
-(* CHECK: {{.*}}polang.constant.float {{.*}} : !polang.float<64>
+(* CHECK: {{.*}}polang.constant.float {{.*}} : f64
 *)
 c : f64
 c = 1.5

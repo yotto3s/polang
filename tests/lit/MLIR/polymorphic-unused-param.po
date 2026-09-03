@@ -6,7 +6,7 @@
 (* Monomorphization creates a specialized version. *)
 
 (* The specialized function with concrete int type *)
-(* CHECK-DAG: {{.*}}polang.func @unused$i64(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+(* CHECK-DAG: {{.*}}polang.func @unused$i64(%{{.*}}: si64) -> si64{{.*}}
 *)
 
 (* Original generic function is erased *)

@@ -30,6 +30,9 @@ std::unique_ptr<mlir::Pass> createCheckConstantOverflowPass();
 /// Create a pass to insert runtime overflow checks for integer arithmetic.
 std::unique_ptr<mlir::Pass> createInsertOverflowChecksPass();
 
+/// Registers all Polang transformation passes.
+void registerPolangTransformsPasses();
+
 } // namespace polang
 
 #endif // POLANG_TRANSFORMS_PASSES_H

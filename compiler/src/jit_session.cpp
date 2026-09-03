@@ -176,21 +176,43 @@ std::optional<JitResult> JITSession::execute(const std::string& entryName,
     auto entryFn = sym->toPtr<int8_t (*)()>();
     return static_cast<bool>(entryFn());
   }
-  if (resultType == "i8" || resultType == "u8") {
+  if (resultType == "i8") {
     auto entryFn = sym->toPtr<int8_t (*)()>();
     return entryFn();
   }
-  if (resultType == "i16" || resultType == "u16") {
+  if (resultType == "u8") {
+    auto entryFn = sym->toPtr<uint8_t (*)()>();
+    return static_cast<int64_t>(entryFn());
+  }
+  if (resultType == "i16") {
     auto entryFn = sym->toPtr<int16_t (*)()>();
     return entryFn();
   }
-  if (resultType == "i32" || resultType == "u32") {
+  if (resultType == "u16") {
+    auto entryFn = sym->toPtr<uint16_t (*)()>();
+    return static_cast<int64_t>(entryFn());
+  }
+  if (resultType == "i32") {
     auto entryFn = sym->toPtr<int32_t (*)()>();
     return entryFn();
   }
-  // isize/usize are pointer-width (index type). Use the JIT data layout
+  if (resultType == "u32") {
+    auto entryFn = sym->toPtr<uint32_t (*)()>();
+    return static_cast<int64_t>(entryFn());
+  }
+  // usize/isize/index are pointer-width (index type). Use the JIT data layout
   // to determine the correct ABI return type, then widen to int64_t.
-  if (resultType == "isize" || resultType == "usize") {
+  if (resultType == "usize") {
+    const unsigned pointerBits =
+        impl->jit->getDataLayout().getPointerSizeInBits();
+    if (pointerBits <= 32U) {
+      auto entryFn = sym->toPtr<uint32_t (*)()>();
+      return static_cast<int64_t>(entryFn());
+    }
+    auto entryFn = sym->toPtr<uint64_t (*)()>();
+    return static_cast<int64_t>(entryFn());
+  }
+  if (resultType == "isize" || resultType == "index") {
     const unsigned pointerBits =
         impl->jit->getDataLayout().getPointerSizeInBits();
     if (pointerBits <= 32U) {

@@ -4,7 +4,7 @@
 (* Test that forall with Numeric constraint produces correct monomorphized MLIR. *)
 
 (* Specialized add for i64 *)
-(* CHECK-DAG: {{.*}}polang.func @add$i64_i64(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+(* CHECK-DAG: {{.*}}polang.func @add$i64_i64(%{{.*}}: si64, %{{.*}}: si64) -> si64{{.*}}
 *)
 
 (* Original generic erased *)

@@ -4,7 +4,7 @@
 (* Test that forall with multiple type variables produces correct MLIR. *)
 
 (* Specialized first for i64, bool *)
-(* CHECK-DAG: {{.*}}polang.func @first$i64_bool(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.bool) -> !polang.integer<64, signed>{{.*}}
+(* CHECK-DAG: {{.*}}polang.func @first$i64_bool(%{{.*}}: si64, %{{.*}}: i1) -> si64{{.*}}
 *)
 
 (* Original generic erased *)

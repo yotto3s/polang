@@ -4,9 +4,9 @@
 (* Test MLIR generation for usize cast *)
 (* CHECK:        polang.func @__polang_entry() -> !polang.index<unsigned> {
 *)
-(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 42 : !polang.integer<64, signed>
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 42 : si64
 *)
-(* CHECK-NEXT:     %{{[0-9]+}} = polang.cast %{{[0-9]+}} : !polang.integer<64, signed> -> !polang.index<unsigned>
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.cast %{{[0-9]+}} : si64 -> !polang.index<unsigned> {is_unsigned}
 *)
 (* CHECK-NEXT:     polang.return %{{[0-9]+}} : !polang.index<unsigned>
 *)

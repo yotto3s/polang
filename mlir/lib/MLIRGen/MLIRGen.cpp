@@ -24,6 +24,7 @@
 
 using polang::TypeNames;
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -135,21 +136,22 @@ public:
     if (expectedLiteralType != nullptr) {
       const auto meta = getTypeMetadata(expectedLiteralType->getTypeName());
       if (meta.isFloat()) {
-        auto type = polang::FloatType::get(builder.getContext(), meta.width);
+        auto type = meta.width == 32 ? (Type)builder.getF32Type()
+                                     : (Type)builder.getF64Type();
         result =
             builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
         resultType = expectedLiteralType->clone();
         return;
       }
     }
-    auto type =
-        polang::FloatType::get(builder.getContext(), DEFAULT_FLOAT_WIDTH);
+    auto type = builder.getF64Type();
     result = builder.create<ConstantFloatOp>(loc(node.loc), type, node.value);
     resultType = makeTypeSpec(TypeNames::GENERIC_FLOAT);
   }
 
   void visit(const NBoolean& node) override {
-    result = builder.create<ConstantBoolOp>(loc(node.loc), node.value);
+    result = builder.create<arith::ConstantIntOp>(loc(node.loc),
+                                                  node.value ? 1 : 0, 1);
     resultType = makeTypeSpec(TypeNames::BOOL);
   }
 
@@ -405,40 +407,44 @@ public:
     // Handle short-circuit operators BEFORE evaluating RHS
     if (node.op == yy::parser::token::TLAND) {
       // a && b: if a then b else false
-      Type boolType = builder.getType<BoolType>();
-      auto ifOp = builder.create<IfOp>(loc(node.loc), boolType, lhs);
+      Type boolType = builder.getI1Type();
+      auto ifOp = builder.create<scf::IfOp>(loc(node.loc), TypeRange{boolType},
+                                            lhs, /*withElseRegion=*/true);
 
       // Then region: evaluate rhs and yield it
       {
         OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
         node.rhs->accept(*this);
-        builder.create<YieldOp>(loc(node.loc), result);
+        builder.create<scf::YieldOp>(loc(node.loc), result);
       }
 
       // Else region: yield false
       {
         OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
-        Value falseVal = builder.create<ConstantBoolOp>(loc(node.loc), false);
-        builder.create<YieldOp>(loc(node.loc), falseVal);
+        Value falseVal =
+            builder.create<arith::ConstantIntOp>(loc(node.loc), 0, 1);
+        builder.create<scf::YieldOp>(loc(node.loc), falseVal);
       }
 
-      result = ifOp.getResult();
+      result = ifOp.getResult(0);
       resultType = makeTypeSpec(TypeNames::BOOL);
       return;
     }
     if (node.op == yy::parser::token::TLOR) {
       // a || b: if a then true else b
-      Type boolType = builder.getType<BoolType>();
-      auto ifOp = builder.create<IfOp>(loc(node.loc), boolType, lhs);
+      Type boolType = builder.getI1Type();
+      auto ifOp = builder.create<scf::IfOp>(loc(node.loc), TypeRange{boolType},
+                                            lhs, /*withElseRegion=*/true);
 
       // Then region: yield true
       {
         OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
-        Value trueVal = builder.create<ConstantBoolOp>(loc(node.loc), true);
-        builder.create<YieldOp>(loc(node.loc), trueVal);
+        Value trueVal =
+            builder.create<arith::ConstantIntOp>(loc(node.loc), 1, 1);
+        builder.create<scf::YieldOp>(loc(node.loc), trueVal);
       }
 
       // Else region: evaluate rhs and yield it
@@ -446,10 +452,10 @@ public:
         OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
         node.rhs->accept(*this);
-        builder.create<YieldOp>(loc(node.loc), result);
+        builder.create<scf::YieldOp>(loc(node.loc), result);
       }
 
-      result = ifOp.getResult();
+      result = ifOp.getResult(0);
       resultType = makeTypeSpec(TypeNames::BOOL);
       return;
     }
@@ -463,6 +469,9 @@ public:
 
     // Use switch for cleaner operator dispatch
     Type arithResultTy = lhs.getType();
+    const bool isUnsigned =
+        lhsType ? getTypeMetadata(lhsType->getTypeName()).isUnsigned() : false;
+
     switch (node.op) {
     // Arithmetic operations - use LHS type as result type
     case yy::parser::token::TPLUS:
@@ -477,14 +486,26 @@ public:
       result = builder.create<MulOp>(loc(node.loc), arithResultTy, lhs, rhs);
       resultType = std::move(lhsType);
       break;
-    case yy::parser::token::TDIV:
-      result = builder.create<DivOp>(loc(node.loc), arithResultTy, lhs, rhs);
+    case yy::parser::token::TDIV: {
+      auto divOp =
+          builder.create<DivOp>(loc(node.loc), arithResultTy, lhs, rhs);
+      if (isUnsigned) {
+        divOp->setAttr("is_unsigned", builder.getUnitAttr());
+      }
+      result = divOp;
       resultType = std::move(lhsType);
       break;
-    case yy::parser::token::TMOD:
-      result = builder.create<RemOp>(loc(node.loc), arithResultTy, lhs, rhs);
+    }
+    case yy::parser::token::TMOD: {
+      auto remOp =
+          builder.create<RemOp>(loc(node.loc), arithResultTy, lhs, rhs);
+      if (isUnsigned) {
+        remOp->setAttr("is_unsigned", builder.getUnitAttr());
+      }
+      result = remOp;
       resultType = std::move(lhsType);
       break;
+    }
     // Comparison operations - result is always bool
     case yy::parser::token::TCEQ:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::eq, lhs, rhs);
@@ -494,22 +515,46 @@ public:
       result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::ne, lhs, rhs);
       resultType = makeTypeSpec(TypeNames::BOOL);
       break;
-    case yy::parser::token::TCLT:
-      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::lt, lhs, rhs);
+    case yy::parser::token::TCLT: {
+      auto cmpOp =
+          builder.create<CmpOp>(loc(node.loc), CmpPredicate::lt, lhs, rhs);
+      if (isUnsigned) {
+        cmpOp->setAttr("is_unsigned", builder.getUnitAttr());
+      }
+      result = cmpOp;
       resultType = makeTypeSpec(TypeNames::BOOL);
       break;
-    case yy::parser::token::TCLE:
-      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::le, lhs, rhs);
+    }
+    case yy::parser::token::TCLE: {
+      auto cmpOp =
+          builder.create<CmpOp>(loc(node.loc), CmpPredicate::le, lhs, rhs);
+      if (isUnsigned) {
+        cmpOp->setAttr("is_unsigned", builder.getUnitAttr());
+      }
+      result = cmpOp;
       resultType = makeTypeSpec(TypeNames::BOOL);
       break;
-    case yy::parser::token::TCGT:
-      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::gt, lhs, rhs);
+    }
+    case yy::parser::token::TCGT: {
+      auto cmpOp =
+          builder.create<CmpOp>(loc(node.loc), CmpPredicate::gt, lhs, rhs);
+      if (isUnsigned) {
+        cmpOp->setAttr("is_unsigned", builder.getUnitAttr());
+      }
+      result = cmpOp;
       resultType = makeTypeSpec(TypeNames::BOOL);
       break;
-    case yy::parser::token::TCGE:
-      result = builder.create<CmpOp>(loc(node.loc), CmpPredicate::ge, lhs, rhs);
+    }
+    case yy::parser::token::TCGE: {
+      auto cmpOp =
+          builder.create<CmpOp>(loc(node.loc), CmpPredicate::ge, lhs, rhs);
+      if (isUnsigned) {
+        cmpOp->setAttr("is_unsigned", builder.getUnitAttr());
+      }
+      result = cmpOp;
       resultType = makeTypeSpec(TypeNames::BOOL);
       break;
+    }
     default:
       emitError(loc(node.loc)) << "Unknown binary operator: " << node.op;
       result = nullptr;
@@ -524,6 +569,9 @@ public:
       return;
     }
     const Value inputValue = result;
+    const bool inputIsUnsigned =
+        resultType ? getTypeMetadata(resultType->getTypeName()).isUnsigned()
+                   : false;
 
     // Get the target type
     Type targetType = getPolangType(*node.targetType);
@@ -533,7 +581,14 @@ public:
     }
 
     // Create the cast operation
-    result = builder.create<CastOp>(loc(node.loc), targetType, inputValue);
+    auto castOp = builder.create<CastOp>(loc(node.loc), targetType, inputValue);
+    if (inputIsUnsigned) {
+      castOp->setAttr("input_is_unsigned", builder.getUnitAttr());
+    }
+    if (getTypeMetadata(node.targetType->getTypeName()).isUnsigned()) {
+      castOp->setAttr("is_unsigned", builder.getUnitAttr());
+    }
+    result = castOp;
     resultType = node.targetType->clone();
   }
 
@@ -565,7 +620,8 @@ public:
     // Create if operation
     Type resultTy =
         ifResultType ? getPolangType(*ifResultType) : getDefaultType();
-    auto ifOp = builder.create<IfOp>(loc(node.loc), resultTy, condition);
+    auto ifOp = builder.create<scf::IfOp>(loc(node.loc), TypeRange{resultTy},
+                                          condition, /*withElseRegion=*/true);
 
     // Generate then region
     {
@@ -573,7 +629,7 @@ public:
       builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
       node.thenExpr->accept(*this);
       if (result) {
-        builder.create<YieldOp>(loc(node.thenExpr->loc), result);
+        builder.create<scf::YieldOp>(loc(node.thenExpr->loc), result);
       }
     }
 
@@ -583,11 +639,11 @@ public:
       builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
       node.elseExpr->accept(*this);
       if (result) {
-        builder.create<YieldOp>(loc(node.elseExpr->loc), result);
+        builder.create<scf::YieldOp>(loc(node.elseExpr->loc), result);
       }
     }
 
-    result = ifOp.getResult();
+    result = ifOp.getResult(0);
     resultType = std::move(ifResultType);
   }
 
@@ -1461,13 +1517,13 @@ private:
       // Create default value matching the return type
       Value defaultVal;
       if (isFloatType(inferredType)) {
-        auto floatTy = polang::FloatType::get(builder.getContext(),
-                                              getFloatWidth(inferredType));
+        auto floatTy = getFloatWidth(inferredType) == 32
+                           ? (Type)builder.getF32Type()
+                           : (Type)builder.getF64Type();
         defaultVal =
             builder.create<ConstantFloatOp>(loc(block.loc), floatTy, 0.0);
       } else if (inferredType == TypeNames::BOOL) {
-        // NOLINTNEXTLINE(bugprone-branch-clone) - creates different op types
-        defaultVal = builder.create<ConstantBoolOp>(loc(block.loc), false);
+        defaultVal = builder.create<arith::ConstantIntOp>(loc(block.loc), 0, 1);
       } else {
         // Use the return type (already resolved or type variable)
         defaultVal =

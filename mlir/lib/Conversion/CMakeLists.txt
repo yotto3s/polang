@@ -12,6 +12,7 @@ add_mlir_library(PolangConversion
   MLIRArithDialect
   MLIRFuncDialect
   MLIRSCFDialect
+  MLIRSCFTransforms
   MLIRMemRefDialect
   MLIRLLVMDialect
   MLIRTransforms

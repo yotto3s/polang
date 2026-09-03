@@ -5,7 +5,7 @@
 (* type from context (n == 0 and n - 1 constrain n to integer). *)
 
 (* Monomorphic function with concrete types *)
-(* CHECK: {{.*}}polang.func @countdown(%{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+(* CHECK: {{.*}}polang.func @countdown(%{{.*}}: si64) -> si64{{.*}}
 *)
 
 (* Verify recursive call uses the same function name *)

@@ -2,24 +2,24 @@
 *)
 
 (* Test function call *)
-(* CHECK:      polang.func @__polang_entry() -> !polang.integer<64, signed> {
+(* CHECK:      polang.func @__polang_entry() -> si64 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.integer 1 : !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.integer 1 : si64
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.integer 2 : !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.constant.integer 2 : si64
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.call @add(%{{[0-9]+}}, %{{[0-9]+}}) : (!polang.integer<64, signed>, !polang.integer<64, signed>) -> !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.call @add(%{{[0-9]+}}, %{{[0-9]+}}) : (si64, si64) -> si64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed>
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : si64
 *)
 (* CHECK-NEXT: }
 *)
 
-(* CHECK:      polang.func @add(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.integer<64, signed> {
+(* CHECK:      polang.func @add(%arg0: si64, %arg1: si64) -> si64 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.add %arg0, %arg1 : si64, si64 -> si64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.integer<64, signed>
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : si64
 *)
 (* CHECK-NEXT: }
 *)

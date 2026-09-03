@@ -8,8 +8,10 @@
 #define POLANG_TYPES_TD
 
 include "mlir/IR/AttrTypeBase.td"
-include "mlir/IR/EnumAttr.td"
+include "mlir/IR/CommonTypeConstraints.td"
+include "mlir/Interfaces/DataLayoutInterfaces.td"
 include "polang/Dialect/PolangDialect.td"
+include "polang/Dialect/PolangEnums.td"
 
 //===----------------------------------------------------------------------===//
 // Polang type definitions
@@ -21,92 +23,29 @@ class Polang_Type<string name, string typeMnemonic, list<Trait> traits = []>
 }
 
 //===----------------------------------------------------------------------===//
-// Signedness enum for integer types
+// Generic and compound types
 //===----------------------------------------------------------------------===//
 
-def Polang_Signed : I32EnumAttrCase<"Signed", 0, "signed">;
-def Polang_Unsigned : I32EnumAttrCase<"Unsigned", 1, "unsigned">;
-
-def Polang_Signedness : I32EnumAttr<"Signedness", "integer signedness", [
-    Polang_Signed, Polang_Unsigned
+def Polang_IndexType : Polang_Type<"Index", "index", [
+    DeclareTypeInterfaceMethods<DataLayoutTypeInterface>
 ]> {
-  let cppNamespace = "::polang";
-}
-
-//===----------------------------------------------------------------------===//
-// Parameterized numeric types
-//===----------------------------------------------------------------------===//
-
-def Polang_IntegerType : Polang_Type<"Integer", "integer"> {
-  let summary = "Integer type with configurable width and signedness";
+  let summary = "Pointer-width integer index type with signedness";
   let description = [{
-    Parameterized integer type supporting 8, 16, 32, and 64-bit widths,
-    both signed and unsigned.
+    A pointer-width integer index type with explicit signedness semantics.
 
     Examples:
     ```mlir
-    !polang.integer<32, signed>   ; i32
-    !polang.integer<8, unsigned>  ; u8
-    !polang.integer<64, signed>   ; i64
+    !polang.index<signed>    // isize
+    !polang.index<unsigned>  // usize
     ```
   }];
 
-  let parameters = (ins
-    "unsigned":$width,
-    "Signedness":$signedness
-  );
-  let assemblyFormat = "`<` $width `,` $signedness `>`";
-
-  let extraClassDeclaration = [{
-    bool isSigned() const { return getSignedness() == Signedness::Signed; }
-    bool isUnsigned() const { return getSignedness() == Signedness::Unsigned; }
-  }];
-}
-
-def Polang_FloatType : Polang_Type<"Float", "float"> {
-  let summary = "Floating-point type with configurable width";
-  let description = [{
-    Parameterized floating-point type supporting 32 and 64-bit widths.
-
-    Examples:
-    ```mlir
-    !polang.float<32>  ; f32
-    !polang.float<64>  ; f64
-    ```
-  }];
-
-  let parameters = (ins "unsigned":$width);
-  let assemblyFormat = "`<` $width `>`";
-}
-
-def Polang_BoolType : Polang_Type<"Bool", "bool"> {
-  let summary = "1-bit boolean type";
-  let description = [{
-    The Polang boolean type represents a true/false value.
-    It maps to `bool` in Polang source code.
-  }];
-}
-
-def Polang_IndexType : Polang_Type<"Index", "index"> {
-  let summary = "Platform-native index type with signedness";
-  let description = [{
-    Represents isize (signed) and usize (unsigned) types that map to
-    the platform-native pointer width. Both lower to MLIR's built-in
-    index type, with signedness tracked for correct cast lowering.
-
-    Examples:
-    ```mlir
-    !polang.index<signed>    ; isize
-    !polang.index<unsigned>  ; usize
-    ```
-  }];
-
-  let parameters = (ins "Signedness":$signedness);
+  let parameters = (ins "polang::Signedness":$signedness);
   let assemblyFormat = "`<` $signedness `>`";
 
   let extraClassDeclaration = [{
-    bool isSigned() const { return getSignedness() == Signedness::Signed; }
-    bool isUnsigned() const { return getSignedness() == Signedness::Unsigned; }
+    bool isSigned() const { return getSignedness() == polang::Signedness::Signed; }
+    bool isUnsigned() const { return getSignedness() == polang::Signedness::Unsigned; }
   }];
 }
 
@@ -125,22 +64,20 @@ def Polang_TypeParamType : Polang_Type<"TypeParam", "type_param"> {
 // Type constraints
 //===----------------------------------------------------------------------===//
 
-def Polang_AnyNumericType : AnyTypeOf<[
-    Polang_IntegerType, Polang_FloatType, Polang_IndexType
-], "Polang numeric type">;
+def Polang_NonBoolInteger : Type<
+    CPred<"::llvm::isa<::mlir::IntegerType>($_self) && ::llvm::cast<::mlir::IntegerType>($_self).getWidth() > 1">,
+    "integer type with width > 1", "::mlir::IntegerType">;
 
-def Polang_AnyType : AnyTypeOf<[
-    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_IndexType
-], "any Polang type">;
-
-// Type constraints that include type parameters (for generic functions)
 def Polang_AnyNumericOrParam : AnyTypeOf<[
-    Polang_IntegerType, Polang_FloatType, Polang_IndexType, Polang_TypeParamType
-], "Polang numeric type or type parameter">;
+    Polang_NonBoolInteger, AnyFloat, Polang_IndexType, Index, Polang_TypeParamType
+], "numeric type or type parameter">;
 
 def Polang_AnyTypeOrParam : AnyTypeOf<[
-    Polang_IntegerType, Polang_FloatType, Polang_BoolType, Polang_IndexType,
-    Polang_TypeParamType
-], "any Polang type or type parameter">;
+    AnyInteger, AnyFloat, Polang_IndexType, Index, AnyTuple, Polang_TypeParamType
+], "any type or type parameter">;
+
+def Polang_I1OrParamType : AnyTypeOf<[
+    I1, Polang_TypeParamType
+], "i1 (bool) or type parameter">;
 
 #endif // POLANG_TYPES_TD

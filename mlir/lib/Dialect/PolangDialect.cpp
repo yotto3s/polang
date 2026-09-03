@@ -25,6 +25,7 @@ using namespace polang;
 
 void PolangDialect::initialize() {
   registerTypes();
+  registerTupleDataLayoutInterface(getContext());
   addOperations<
 #define GET_OP_LIST
 #include "polang/Dialect/PolangOps.cpp.inc"

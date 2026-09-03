@@ -15,35 +15,29 @@ The dialect is defined using TableGen in `mlir/include/polang/Dialect/`.
 
 ## Types
 
-### Integer Types
+The Polang compiler leverages standard built-in MLIR types for primitives and tuples (`mlir::TupleType`), and defines a dialect-specific type for type parameters (`TypeParamType`).
 
-Parameterized integer type with configurable width and signedness.
+### Standard Primitive Types
 
-| Polang Type | MLIR Type | LLVM Type | Description |
-|-------------|-----------|-----------|-------------|
-| `i8` | `!polang.integer<8, signed>` | `i8` | Signed 8-bit integer |
-| `i16` | `!polang.integer<16, signed>` | `i16` | Signed 16-bit integer |
-| `i32` | `!polang.integer<32, signed>` | `i32` | Signed 32-bit integer |
-| `i64` | `!polang.integer<64, signed>` | `i64` | Signed 64-bit integer |
-| `u8` | `!polang.integer<8, unsigned>` | `i8` | Unsigned 8-bit integer |
-| `u16` | `!polang.integer<16, unsigned>` | `i16` | Unsigned 16-bit integer |
-| `u32` | `!polang.integer<32, unsigned>` | `i32` | Unsigned 32-bit integer |
-| `u64` | `!polang.integer<64, unsigned>` | `i64` | Unsigned 64-bit integer |
+| Polang Type | MLIR Built-in Type | LLVM Type | Description |
+|-------------|-------------------|-----------|-------------|
+| `i8` | `si8` | `i8` | Signed 8-bit integer |
+| `i16` | `si16` | `i16` | Signed 16-bit integer |
+| `i32` | `si32` | `i32` | Signed 32-bit integer |
+| `i64` | `si64` | `i64` | Signed 64-bit integer |
+| `u8` | `ui8` | `i8` | Unsigned 8-bit integer |
+| `u16` | `ui16` | `i16` | Unsigned 16-bit integer |
+| `u32` | `ui32` | `i32` | Unsigned 32-bit integer |
+| `u64` | `ui64` | `i64` | Unsigned 64-bit integer |
+| `isize` | `!polang.index<signed>` | `i64` | Signed pointer-width index |
+| `usize` | `!polang.index<unsigned>` | `i64` | Unsigned pointer-width index |
+| `f32` | `f32` | `f32` | Single-precision float |
+| `f64` | `f64` | `f64` | Double-precision float |
+| `bool` | `i1` | `i1` | Boolean true/false |
 
-### Float Types
+### Index Types
 
-Parameterized floating-point type with configurable width.
-
-| Polang Type | MLIR Type | LLVM Type | Description |
-|-------------|-----------|-----------|-------------|
-| `f32` | `!polang.float<32>` | `f32` | Single-precision float |
-| `f64` | `!polang.float<64>` | `f64` | Double-precision float |
-
-### Boolean Type
-
-| Polang Type | MLIR Type | LLVM Type | Description |
-|-------------|-----------|-----------|-------------|
-| `bool` | `!polang.bool` | `i1` | Boolean true/false |
+The Polang dialect provides `!polang.index<signed>` and `!polang.index<unsigned>` with explicit signedness semantics, implementing `DataLayoutTypeInterface`. These lower to standard signless `mlir::IndexType` (`index`) during dialect conversion to standard MLIR.
 
 ### Type Parameter Type
 
@@ -56,17 +50,36 @@ Type parameters represent named type variables in generic function templates. Th
 
 Type parameters appear in `polang.generic_func` signatures and are bound to concrete types by `polang.instantiate` operations at call sites.
 
+### Tuple Types
+
+Represents a fixed-size heterogeneous product of types with arbitrary arity ($N \ge 0$). Polang directly uses MLIR's built-in `mlir::TupleType` (`tuple<...>`). Elements can be standard MLIR types, nested `tuple`s, or type parameters (`TypeParamType`).
+
+`DataLayoutTypeInterface` is registered for `mlir::TupleType` in the Polang dialect. Each element in a tuple occupies a 64-bit (8-byte) aligned slot in declaration order without re-ordering.
+
+| Polang Type | MLIR Type | Description |
+|-------------|-----------|-------------|
+| `()` | `tuple<>` | 0-tuple (unit) |
+| `(i64, f64)` | `tuple<si64, f64>` | 2-tuple of si64 and f64 |
+| `(i64, (f64, bool))` | `tuple<si64, tuple<f64, i1>>` | Nested tuple |
+| `('a, 'b)` | `tuple<!polang.type_param<"a">, !polang.type_param<"b">>` | Generic tuple |
+
+### Type Constraints
+
+- **`Polang_AnyNumericOrParam`**: `Polang_NonBoolInteger` (integer width > 1), `AnyFloat`, `Polang_IndexType`, `Index`, `TypeParamType`.
+- **`Polang_AnyTypeOrParam`**: `AnyInteger`, `AnyFloat`, `Polang_IndexType`, `Index`, `AnyTuple`, `TypeParamType`.
+- **`Polang_I1OrParamType`**: `I1`, `TypeParamType`.
+
 ## Operations
 
 ### Constant Operations
 
 #### `polang.constant.integer`
 
-Produces a constant integer value.
+Produces a constant integer or index value.
 
 ```mlir
-%0 = polang.constant.integer 42 : !polang.integer<64, signed>
-%1 = polang.constant.integer 255 : !polang.integer<8, unsigned>
+%0 = polang.constant.integer 42 : si64
+%1 = polang.constant.integer 255 : ui8
 ```
 
 #### `polang.constant.float`
@@ -74,17 +87,8 @@ Produces a constant integer value.
 Produces a constant float value.
 
 ```mlir
-%0 = polang.constant.float 3.14 : !polang.float<64>
-%1 = polang.constant.float 1.5 : !polang.float<32>
-```
-
-#### `polang.constant.bool`
-
-Produces a constant boolean value.
-
-```mlir
-%0 = polang.constant.bool true : !polang.bool
-%1 = polang.constant.bool false : !polang.bool
+%0 = polang.constant.float 3.14 : f64
+%1 = polang.constant.float 1.5 : f32
 ```
 
 ### Arithmetic Operations
@@ -96,7 +100,7 @@ All arithmetic operations require operands and result to have compatible types.
 Addition of two numeric values.
 
 ```mlir
-%2 = polang.add %0, %1 : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+%2 = polang.add %0, %1 : si64, si64 -> si64
 ```
 
 #### `polang.sub`
@@ -104,7 +108,7 @@ Addition of two numeric values.
 Subtraction of second operand from first.
 
 ```mlir
-%2 = polang.sub %0, %1 : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+%2 = polang.sub %0, %1 : si64, si64 -> si64
 ```
 
 #### `polang.mul`
@@ -112,7 +116,7 @@ Subtraction of second operand from first.
 Multiplication of two numeric values.
 
 ```mlir
-%2 = polang.mul %0, %1 : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+%2 = polang.mul %0, %1 : si64, si64 -> si64
 ```
 
 #### `polang.div`
@@ -120,20 +124,20 @@ Multiplication of two numeric values.
 Division of first operand by second.
 
 ```mlir
-%2 = polang.div %0, %1 : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+%2 = polang.div %0, %1 : si64, si64 -> si64
 ```
 
 ### Comparison Operation
 
 #### `polang.cmp`
 
-Compares two numeric values and returns a boolean result.
+Compares two numeric values and returns an `i1` result.
 
 **Predicates:** `eq` (equal), `ne` (not equal), `lt` (less than), `le` (less or equal), `gt` (greater than), `ge` (greater or equal)
 
 ```mlir
-%2 = polang.cmp eq, %0, %1 : !polang.integer<64, signed>, !polang.integer<64, signed>
-%3 = polang.cmp gt, %a, %b : !polang.float<64>, !polang.float<64>
+%2 = polang.cmp eq, %0, %1 : si64, si64
+%3 = polang.cmp gt, %a, %b : f64, f64
 ```
 
 ### Type Conversion
@@ -147,10 +151,11 @@ Explicit type conversion between numeric types.
 - Float to float (widening/narrowing)
 - Integer to float
 - Float to integer (saturating truncation toward zero)
+- Index to/from integer and float
 
 ```mlir
-%0 = polang.cast %x : !polang.integer<32, signed> -> !polang.integer<64, signed>
-%1 = polang.cast %f : !polang.float<64> -> !polang.integer<32, signed>
+%0 = polang.cast %x : si32 -> si64
+%1 = polang.cast %f : f64 -> si32
 ```
 
 ### Function Operations
@@ -160,9 +165,9 @@ Explicit type conversion between numeric types.
 Defines a function with a name, type signature, and body.
 
 ```mlir
-polang.func @add(%a: !polang.integer<64, signed>, %b: !polang.integer<64, signed>) -> !polang.integer<64, signed> {
-  %c = polang.add %a, %b : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
-  polang.return %c : !polang.integer<64, signed>
+polang.func @add(%a: si64, %b: si64) -> si64 {
+  %c = polang.add %a, %b : si64, si64 -> si64
+  polang.return %c : si64
 }
 ```
 
@@ -176,7 +181,7 @@ polang.func @add(%a: !polang.integer<64, signed>, %b: !polang.integer<64, signed
 Calls a function with the given arguments.
 
 ```mlir
-%0 = polang.call @add(%a, %b) : (!polang.integer<64, signed>, !polang.integer<64, signed>) -> !polang.integer<64, signed>
+%0 = polang.call @add(%a, %b) : (si64, si64) -> si64
 ```
 
 #### `polang.return`
@@ -184,29 +189,27 @@ Calls a function with the given arguments.
 Returns a value from a function.
 
 ```mlir
-polang.return %0 : !polang.integer<64, signed>
+polang.return %0 : si64
 ```
 
 ### Control Flow Operations
 
-#### `polang.if`
-
-If-then-else expression. Both branches must yield a value of the same type.
+Control flow expressions (such as `if-then-else` and short-circuit `&&` / `||`) directly use standard MLIR operations (`scf.if` and `scf.yield`).
 
 ```mlir
-%0 = polang.if %cond : !polang.bool -> !polang.integer<64, signed> {
-  polang.yield %a : !polang.integer<64, signed>
+%0 = scf.if %cond -> (si64) {
+  scf.yield %a : si64
 } else {
-  polang.yield %b : !polang.integer<64, signed>
+  scf.yield %b : si64
 }
 ```
 
 #### `polang.yield`
 
-Yields a value from a region (used within if-then-else branches).
+Yields a value from a `polang.let_expr` body region.
 
 ```mlir
-polang.yield %0 : !polang.integer<64, signed>
+polang.yield %0 : si64
 ```
 
 ### Generic Function Operations
@@ -233,7 +236,7 @@ polang.generic_func @identity<a>(%arg0: !polang.type_param<"a">) -> !polang.type
 Calls a generic function with concrete type bindings for its type parameters.
 
 ```mlir
-%0 = polang.instantiate @identity<a = !polang.integer<64, signed>>(%x) : (!polang.integer<64, signed>) -> !polang.integer<64, signed>
+%0 = polang.instantiate @identity<a = si64>(%x) : (si64) -> si64
 ```
 
 **Attributes:**
@@ -245,20 +248,21 @@ Calls a generic function with concrete type bindings for its type parameters.
 
 #### `polang.let_expr`
 
-A let expression with separate regions for each binding and a body. Each binding region computes a value independently and yields it via `polang.yield.binding`. The body region receives bound values as block arguments.
+A let expression with separate regions for each binding and a body. Each binding region computes a value independently and yields it via `polang.yield.binding`. The body region receives bound values as block arguments and yields via `polang.yield`.
 
 ```mlir
-%0 = polang.let_expr ["x", "y"] {
-^bb0(%x: !polang.integer<64, signed>, %y: !polang.integer<64, signed>):
-  %sum = polang.add %x, %y : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
-  polang.yield %sum : !polang.integer<64, signed>
-} bindings {
-  %a = polang.constant.integer 10 : !polang.integer<64, signed>
-  polang.yield.binding %a : !polang.integer<64, signed>
-} {
-  %b = polang.constant.integer 20 : !polang.integer<64, signed>
-  polang.yield.binding %b : !polang.integer<64, signed>
-}
+%0 = polang.let_expr ["x", "y"] -> si64
+  binding {
+    polang.yield.binding %a : si64
+  }
+  binding {
+    polang.yield.binding %b : si64
+  }
+  body {
+  ^bb0(%x: si64, %y: si64):
+    %sum = polang.add %x, %y : si64, si64 -> si64
+    polang.yield %sum : si64
+  }
 ```
 
 **Attributes:**
@@ -269,7 +273,7 @@ A let expression with separate regions for each binding and a body. Each binding
 Terminates a binding region of a let expression and yields the bound value as input to the body region's corresponding block argument.
 
 ```mlir
-polang.yield.binding %0 : !polang.integer<64, signed>
+polang.yield.binding %0 : si64
 ```
 
 ### Global Variable Operations
@@ -279,11 +283,11 @@ polang.yield.binding %0 : !polang.integer<64, signed>
 Declares a module-level global variable. Used in the REPL for cross-module variable persistence. When `is_external` is set, the global is an extern declaration (defined in a previously compiled module; JIT resolves the symbol). Non-external globals may have an optional initializer region that computes the initial value.
 
 ```mlir
-polang.global @x : !polang.integer<64, signed> {
-  %v = polang.constant.int 42 : !polang.integer<64, signed>
-  polang.yield.global %v : !polang.integer<64, signed>
+polang.global @x : si64 {
+  %v = polang.constant.integer 42 : si64
+  polang.yield.global %v : si64
 }
-polang.global @y {is_external} : !polang.integer<64, signed>
+polang.global @y {is_external} : si64
 ```
 
 **Attributes:**
@@ -299,7 +303,7 @@ polang.global @y {is_external} : !polang.integer<64, signed>
 Yields the initial value from a `polang.global` initializer region.
 
 ```mlir
-polang.yield.global %v : !polang.integer<64, signed>
+polang.yield.global %v : si64
 ```
 
 #### `polang.global.load`
@@ -307,7 +311,7 @@ polang.yield.global %v : !polang.integer<64, signed>
 Loads the current value from a previously declared global variable.
 
 ```mlir
-%0 = polang.global.load @x : !polang.integer<64, signed>
+%0 = polang.global.load @x : si64
 ```
 
 ### Debug Operations
@@ -317,7 +321,7 @@ Loads the current value from a previously declared global variable.
 Prints a value to stdout (for debugging and output).
 
 ```mlir
-polang.print %0 : !polang.integer<64, signed>
+polang.print %0 : si64
 ```
 
 ## Operation Verifiers
@@ -326,14 +330,11 @@ The Polang dialect uses custom verifiers to catch type errors during compilation
 
 | Operation | Verification |
 |-----------|--------------|
-| `polang.add`, `polang.sub`, `polang.mul`, `polang.div` | Operands and result must have compatible types (allows type variables) |
+| `polang.add`, `polang.sub`, `polang.mul`, `polang.div` | Operands and result must have compatible types (allows type parameters) |
 | `polang.cmp` | Operands must have compatible types |
-| `polang.cast` | Source and target must be numeric types |
-| `polang.if` | Condition must be bool, branches must yield same type |
+| `polang.cast` | Source and target must be numeric or index types |
 | `polang.return` | Return value type must match function signature |
 | `polang.call` | Function must exist, arity and argument types must match |
-
-**Type Compatibility:** Operations use a `typesAreCompatible()` helper that allows type variables during intermediate stages (before type inference resolves them).
 
 ## Transformation Passes
 
@@ -352,20 +353,20 @@ Specializes polymorphic functions for each unique set of concrete type arguments
 
 Source:
 ```polang
-let identity(x) = x
+identity(x) = x
 identity(42)
 identity(true)
 ```
 
 After monomorphization:
 ```mlir
-polang.func @identity$i64(%arg0: !polang.integer<64, signed>) -> !polang.integer<64, signed> { ... }
-polang.func @identity$bool(%arg0: !polang.bool) -> !polang.bool { ... }
+polang.func @identity$i64(%arg0: si64) -> si64 { ... }
+polang.func @identity$bool(%arg0: i1) -> i1 { ... }
 ```
 
 ### PolangToStandard Pass (`polang-to-standard`)
 
-Lowers Polang dialect operations to standard MLIR dialects (arith, func, scf, memref).
+Lowers Polang dialect operations to standard MLIR dialects (arith, func, scf, memref, LLVM).
 
 **Operation Lowering:**
 
@@ -373,7 +374,6 @@ Lowers Polang dialect operations to standard MLIR dialects (arith, func, scf, me
 |------------------|-----------|
 | `polang.constant.integer` | `arith.constant` |
 | `polang.constant.float` | `arith.constant` |
-| `polang.constant.bool` | `arith.constant` |
 | `polang.add` (integer) | `arith.addi` |
 | `polang.add` (float) | `arith.addf` |
 | `polang.sub` (integer) | `arith.subi` |
@@ -389,8 +389,6 @@ Lowers Polang dialect operations to standard MLIR dialects (arith, func, scf, me
 | `polang.func` | `func.func` |
 | `polang.call` | `func.call` |
 | `polang.return` | `func.return` |
-| `polang.if` | `scf.if` |
-| `polang.yield` | `scf.yield` |
 | `polang.generic_func` | Erased (must be monomorphized first) |
 | `polang.instantiate` | Erased (replaced by `polang.call` during monomorphization) |
 | `polang.global` | `memref.global` (0-d memref) |
@@ -398,12 +396,13 @@ Lowers Polang dialect operations to standard MLIR dialects (arith, func, scf, me
 
 **Type Lowering:**
 
-| Polang Type | Standard Type |
-|-------------|---------------|
-| `!polang.integer<N, signed/unsigned>` | `iN` |
-| `!polang.float<32>` | `f32` |
-| `!polang.float<64>` | `f64` |
-| `!polang.bool` | `i1` |
+| Polang MLIR Type | Standard Lowered Type |
+|------------------|----------------------|
+| `siN` / `uiN` | `iN` (signless) |
+| `f32` | `f32` |
+| `f64` | `f64` |
+| `i1` | `i1` |
+| `index` | `index` |
 
 ## File Structure
 

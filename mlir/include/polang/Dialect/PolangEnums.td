@@ -28,4 +28,17 @@ def Polang_CmpPredicate : I64EnumAttr<
   let cppNamespace = "::polang";
 }
 
+//===----------------------------------------------------------------------===//
+// Signedness enum
+//===----------------------------------------------------------------------===//
+
+def Polang_SignednessSigned   : I64EnumAttrCase<"Signed", 0, "signed">;
+def Polang_SignednessUnsigned : I64EnumAttrCase<"Unsigned", 1, "unsigned">;
+
+def Polang_Signedness : I64EnumAttr<
+    "Signedness", "signedness semantics",
+    [Polang_SignednessSigned, Polang_SignednessUnsigned]> {
+  let cppNamespace = "::polang";
+}
+
 #endif // POLANG_ENUMS_TD

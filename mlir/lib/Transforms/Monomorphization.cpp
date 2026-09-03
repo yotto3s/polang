@@ -35,15 +35,32 @@ namespace {
 
 /// Get a type string for mangling
 std::string getTypeString(Type type) {
-  if (auto intType = dyn_cast<polang::IntegerType>(type)) {
-    return (intType.isSigned() ? "i" : "u") +
+  if (auto intType = dyn_cast<mlir::IntegerType>(type)) {
+    if (intType.getWidth() == 1) {
+      return "bool";
+    }
+    return (intType.isUnsigned() ? "u" : "i") +
            std::to_string(intType.getWidth());
   }
-  if (auto floatType = dyn_cast<polang::FloatType>(type)) {
+  if (auto floatType = dyn_cast<mlir::FloatType>(type)) {
     return "f" + std::to_string(floatType.getWidth());
   }
-  if (isa<BoolType>(type)) {
-    return "bool";
+  if (auto indexType = dyn_cast<polang::IndexType>(type)) {
+    return indexType.isSigned() ? "isize" : "usize";
+  }
+  if (isa<mlir::IndexType>(type)) {
+    return "index";
+  }
+  if (auto tupleType = dyn_cast<mlir::TupleType>(type)) {
+    size_t n = tupleType.getTypes().size();
+    if (n == 0) {
+      return "unit";
+    }
+    std::string s = "tup" + std::to_string(n);
+    for (Type elem : tupleType.getTypes()) {
+      s += "_" + getTypeString(elem);
+    }
+    return s;
   }
   return "unknown";
 }
@@ -73,7 +90,19 @@ std::string getSignatureKey(ArrayRef<Type> argTypes, Type returnType) {
 }
 
 /// Check if a type is a TypeParamType
-bool isTypeParam(Type type) { return isa<TypeParamType>(type); }
+bool isTypeParam(Type type) {
+  if (isa<TypeParamType>(type)) {
+    return true;
+  }
+  if (auto tupleType = dyn_cast<mlir::TupleType>(type)) {
+    for (Type elem : tupleType.getTypes()) {
+      if (isTypeParam(elem)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 /// Apply name-based type parameter mapping to a type
 Type applyTypeParamMapping(Type type, const llvm::StringMap<Type>& mapping) {
@@ -81,6 +110,20 @@ Type applyTypeParamMapping(Type type, const llvm::StringMap<Type>& mapping) {
     auto it = mapping.find(paramType.getName());
     if (it != mapping.end()) {
       return it->second;
+    }
+  }
+  if (auto tupleType = dyn_cast<mlir::TupleType>(type)) {
+    SmallVector<Type> mappedTypes;
+    bool changed = false;
+    for (Type elem : tupleType.getTypes()) {
+      Type mappedElem = applyTypeParamMapping(elem, mapping);
+      if (mappedElem != elem) {
+        changed = true;
+      }
+      mappedTypes.push_back(mappedElem);
+    }
+    if (changed) {
+      return mlir::TupleType::get(type.getContext(), mappedTypes);
     }
   }
   return type;
@@ -438,6 +481,18 @@ namespace polang {
 
 std::unique_ptr<Pass> createMonomorphizationPass() {
   return std::make_unique<MonomorphizationPass>();
+}
+
+void registerPolangTransformsPasses() {
+  mlir::registerPass([]() -> std::unique_ptr<::mlir::Pass> {
+    return polang::createMonomorphizationPass();
+  });
+  mlir::registerPass([]() -> std::unique_ptr<::mlir::Pass> {
+    return polang::createCheckConstantOverflowPass();
+  });
+  mlir::registerPass([]() -> std::unique_ptr<::mlir::Pass> {
+    return polang::createInsertOverflowChecksPass();
+  });
 }
 
 } // namespace polang

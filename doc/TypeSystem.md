@@ -47,21 +47,21 @@ Polang supports a variety of numeric types with explicit width and signedness, p
 
 | Type | Description | Size | MLIR Type | LLVM Type |
 |------|-------------|------|-----------|-----------|
-| `i8` | Signed 8-bit integer | 8-bit | `!polang.integer<8, signed>` | `i8` |
-| `i16` | Signed 16-bit integer | 16-bit | `!polang.integer<16, signed>` | `i16` |
-| `i32` | Signed 32-bit integer | 32-bit | `!polang.integer<32, signed>` | `i32` |
-| `i64` | Signed 64-bit integer | 64-bit | `!polang.integer<64, signed>` | `i64` |
-| `u8` | Unsigned 8-bit integer | 8-bit | `!polang.integer<8, unsigned>` | `i8` |
-| `u16` | Unsigned 16-bit integer | 16-bit | `!polang.integer<16, unsigned>` | `i16` |
-| `u32` | Unsigned 32-bit integer | 32-bit | `!polang.integer<32, unsigned>` | `i32` |
-| `u64` | Unsigned 64-bit integer | 64-bit | `!polang.integer<64, unsigned>` | `i64` |
+| `i8` | Signed 8-bit integer | 8-bit | `si8` | `i8` |
+| `i16` | Signed 16-bit integer | 16-bit | `si16` | `i16` |
+| `i32` | Signed 32-bit integer | 32-bit | `si32` | `i32` |
+| `i64` | Signed 64-bit integer | 64-bit | `si64` | `i64` |
+| `u8` | Unsigned 8-bit integer | 8-bit | `ui8` | `i8` |
+| `u16` | Unsigned 16-bit integer | 16-bit | `ui16` | `i16` |
+| `u32` | Unsigned 32-bit integer | 32-bit | `ui32` | `i32` |
+| `u64` | Unsigned 64-bit integer | 64-bit | `ui64` | `i64` |
 
 ### Floating-Point Types
 
 | Type | Description | Size | MLIR Type | LLVM Type |
 |------|-------------|------|-----------|-----------|
-| `f32` | Single-precision float | 32-bit | `!polang.float<32>` | `f32` |
-| `f64` | Double-precision float | 64-bit | `!polang.float<64>` | `f64` |
+| `f32` | Single-precision float | 32-bit | `f32` | `f32` |
+| `f64` | Double-precision float | 64-bit | `f64` | `f64` |
 
 ### Index Types
 
@@ -76,13 +76,13 @@ Index types map to the platform-native pointer width. `usize` is intended for ar
 
 | Type | Description | Size | MLIR Type | LLVM Type |
 |------|-------------|------|-----------|-----------|
-| `bool` | Boolean | 1-bit | `!polang.bool` | `i1` |
+| `bool` | Boolean | 1-bit | `i1` | `i1` |
 
 ### Unit Type
 
 | Type | Description | Size | MLIR Type | LLVM Type |
 |------|-------------|------|-----------|-----------|
-| `()` | Unit type (single value) | 0-bit | `!polang.unit` | n/a |
+| `()` | Unit type (single value) | 0-bit | `tuple<>` | n/a |
 
 The unit type `()` has exactly one value, also written `()`. It is used in function type signatures:
 
@@ -573,7 +573,7 @@ MLIRGen: generic_func @identity<a>(%arg0: !polang.type_param<"a">) -> !polang.ty
            ↓
 Monomorphization: Creates identity$i64 specialized version from instantiate call sites
            ↓
-Result: fn identity$i64(%arg0: !polang.integer<64, signed>) -> !polang.integer<64, signed>
+Result: fn identity$i64(%arg0: si64) -> si64
 ```
 
 ## Type Variables
@@ -692,7 +692,7 @@ This variant design makes the monomorphic/polymorphic distinction explicit at th
    └── Marks untyped polymorphic parameters as TYPEVAR
 
 3. MLIRGen generates MLIR (MLIRGen.cpp)
-   ├── Converts types to MLIR types (!polang.integer, etc.)
+   ├── Converts types to standard MLIR types (si64, f64, i1, index, tuple, etc.)
    ├── Generates polang.generic_func with !polang.type_param<"name"> for polymorphic functions
    └── Generates polang.instantiate at call sites with concrete type bindings
 
@@ -816,9 +816,9 @@ identity(true)               (* Creates identity$bool *)
 ```mlir
 polang.generic_func @identity<a>(%arg0: !polang.type_param<"a">) -> !polang.type_param<"a"> { ... }
 
-polang.func @identity$i64(%arg0: !polang.integer<64, signed>) -> !polang.integer<64, signed> { ... }
+polang.func @identity$i64(%arg0: si64) -> si64 { ... }
 
-polang.func @identity$bool(%arg0: !polang.bool) -> !polang.bool { ... }
+polang.func @identity$bool(%arg0: i1) -> i1 { ... }
 ```
 
 ### Uncalled Polymorphic Functions

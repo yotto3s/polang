@@ -5,12 +5,12 @@
 (* Body operations constrain the types to concrete values. *)
 
 (* Function resolved to integer (a + 0 constrains to integer) *)
-(* CHECK: {{.*}}polang.func @add3(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+(* CHECK: {{.*}}polang.func @add3(%{{.*}}: si64, %{{.*}}: si64, %{{.*}}: si64) -> si64{{.*}}
 *)
 add3(a, b, c) = (a + 0) + (b + 0) + (c + 0)
 
 (* Function resolved to float (a * 1.0 constrains to float) *)
-(* CHECK: {{.*}}polang.func @scale3(%{{.*}}: !polang.float<64>, %{{.*}}: !polang.float<64>, %{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}}
+(* CHECK: {{.*}}polang.func @scale3(%{{.*}}: f64, %{{.*}}: f64, %{{.*}}: f64) -> f64{{.*}}
 *)
 scale3(a, b, c) = (a * 1.0) + (b * 1.0) + (c * 1.0)
 

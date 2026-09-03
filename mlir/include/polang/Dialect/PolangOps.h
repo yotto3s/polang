@@ -26,9 +26,7 @@
 
 #include "polang/Dialect/PolangDialect.h"
 #include "polang/Dialect/PolangTypes.h"
-
-// Note: PolangEnums.h.inc is included via PolangTypes.h
-// to provide Signedness enum for IntegerType
+#include "polang/Dialect/PolangEnums.h"
 
 #define GET_OP_CLASSES
 #include "polang/Dialect/PolangOps.h.inc"

@@ -5,11 +5,11 @@
 (* creating multiple specialized versions through monomorphization. *)
 
 (* Specialized for float pair *)
-(* CHECK-DAG: {{.*}}polang.func @add$f64_f64(%{{.*}}: !polang.float<64>, %{{.*}}: !polang.float<64>) -> !polang.float<64>{{.*}}
+(* CHECK-DAG: {{.*}}polang.func @add$f64_f64(%{{.*}}: f64, %{{.*}}: f64) -> f64{{.*}}
 *)
 
 (* Specialized for int pair *)
-(* CHECK-DAG: {{.*}}polang.func @add$i64_i64(%{{.*}}: !polang.integer<64, signed>, %{{.*}}: !polang.integer<64, signed>) -> !polang.integer<64, signed>{{.*}}
+(* CHECK-DAG: {{.*}}polang.func @add$i64_i64(%{{.*}}: si64, %{{.*}}: si64) -> si64{{.*}}
 *)
 
 (* Original generic function is erased *)

@@ -4,25 +4,25 @@
 (* Test MLIR representation of unsigned integer types (u8, u16, u32, u64) *)
 
 (* Function with u8 parameters *)
-(* CHECK: {{.*}}polang.func @add_u8(%{{.*}}: !polang.integer<8, unsigned>, %{{.*}}: !polang.integer<8, unsigned>) -> !polang.integer<8, unsigned>{{.*}}
+(* CHECK: {{.*}}polang.func @add_u8(%{{.*}}: ui8, %{{.*}}: ui8) -> ui8{{.*}}
 *)
 add_u8 : u8 * u8 -> u8
 add_u8(a, b) = a + b
 
 (* Function with u16 parameters *)
-(* CHECK: {{.*}}polang.func @add_u16(%{{.*}}: !polang.integer<16, unsigned>, %{{.*}}: !polang.integer<16, unsigned>) -> !polang.integer<16, unsigned>{{.*}}
+(* CHECK: {{.*}}polang.func @add_u16(%{{.*}}: ui16, %{{.*}}: ui16) -> ui16{{.*}}
 *)
 add_u16 : u16 * u16 -> u16
 add_u16(a, b) = a + b
 
 (* Function with u32 parameters *)
-(* CHECK: {{.*}}polang.func @add_u32(%{{.*}}: !polang.integer<32, unsigned>, %{{.*}}: !polang.integer<32, unsigned>) -> !polang.integer<32, unsigned>{{.*}}
+(* CHECK: {{.*}}polang.func @add_u32(%{{.*}}: ui32, %{{.*}}: ui32) -> ui32{{.*}}
 *)
 add_u32 : u32 * u32 -> u32
 add_u32(a, b) = a + b
 
 (* Function with u64 parameters *)
-(* CHECK: {{.*}}polang.func @add_u64(%{{.*}}: !polang.integer<64, unsigned>, %{{.*}}: !polang.integer<64, unsigned>) -> !polang.integer<64, unsigned>{{.*}}
+(* CHECK: {{.*}}polang.func @add_u64(%{{.*}}: ui64, %{{.*}}: ui64) -> ui64{{.*}}
 *)
 add_u64 : u64 * u64 -> u64
 add_u64(a, b) = a + b

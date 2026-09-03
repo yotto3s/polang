@@ -2,14 +2,14 @@
 *)
 
 (* Test modulo operation *)
-(* CHECK:        polang.func @__polang_entry() -> !polang.integer<64, signed> {
+(* CHECK:        polang.func @__polang_entry() -> si64 {
 *)
-(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 10 : !polang.integer<64, signed>
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 10 : si64
 *)
-(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 3 : !polang.integer<64, signed>
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.constant.integer 3 : si64
 *)
-(* CHECK-NEXT:     %{{[0-9]+}} = polang.rem %{{[0-9]+}}, %{{[0-9]+}} : !polang.integer<64, signed>, !polang.integer<64, signed> -> !polang.integer<64, signed>
+(* CHECK-NEXT:     %{{[0-9]+}} = polang.rem %{{[0-9]+}}, %{{[0-9]+}} : si64, si64 -> si64
 *)
-(* CHECK-NEXT:     polang.return %{{[0-9]+}} : !polang.integer<64, signed>
+(* CHECK-NEXT:     polang.return %{{[0-9]+}} : si64
 *)
 10 % 3

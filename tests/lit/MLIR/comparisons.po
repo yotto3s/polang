@@ -2,11 +2,11 @@
 *)
 
 (* Test less-than comparison *)
-(* CHECK:      polang.func @cmp_lt(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.bool {
+(* CHECK:      polang.func @cmp_lt(%arg0: si64, %arg1: si64) -> i1 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp lt, %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp lt, %arg0, %arg1 : si64, si64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : i1
 *)
 (* CHECK-NEXT: }
 *)
@@ -14,11 +14,11 @@ cmp_lt : i64 * i64 -> bool
 cmp_lt(a, b) = a < b
 
 (* Test less-or-equal comparison *)
-(* CHECK:      polang.func @cmp_le(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.bool {
+(* CHECK:      polang.func @cmp_le(%arg0: si64, %arg1: si64) -> i1 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp le, %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp le, %arg0, %arg1 : si64, si64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : i1
 *)
 (* CHECK-NEXT: }
 *)
@@ -26,11 +26,11 @@ cmp_le : i64 * i64 -> bool
 cmp_le(a, b) = a <= b
 
 (* Test greater-than comparison *)
-(* CHECK:      polang.func @cmp_gt(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.bool {
+(* CHECK:      polang.func @cmp_gt(%arg0: si64, %arg1: si64) -> i1 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp gt, %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp gt, %arg0, %arg1 : si64, si64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : i1
 *)
 (* CHECK-NEXT: }
 *)
@@ -38,11 +38,11 @@ cmp_gt : i64 * i64 -> bool
 cmp_gt(a, b) = a > b
 
 (* Test greater-or-equal comparison *)
-(* CHECK:      polang.func @cmp_ge(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.bool {
+(* CHECK:      polang.func @cmp_ge(%arg0: si64, %arg1: si64) -> i1 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp ge, %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp ge, %arg0, %arg1 : si64, si64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : i1
 *)
 (* CHECK-NEXT: }
 *)
@@ -50,11 +50,11 @@ cmp_ge : i64 * i64 -> bool
 cmp_ge(a, b) = a >= b
 
 (* Test equality comparison *)
-(* CHECK:      polang.func @cmp_eq(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.bool {
+(* CHECK:      polang.func @cmp_eq(%arg0: si64, %arg1: si64) -> i1 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp eq, %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp eq, %arg0, %arg1 : si64, si64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : i1
 *)
 (* CHECK-NEXT: }
 *)
@@ -62,11 +62,11 @@ cmp_eq : i64 * i64 -> bool
 cmp_eq(a, b) = a == b
 
 (* Test not-equal comparison *)
-(* CHECK:      polang.func @cmp_ne(%arg0: !polang.integer<64, signed>, %arg1: !polang.integer<64, signed>) -> !polang.bool {
+(* CHECK:      polang.func @cmp_ne(%arg0: si64, %arg1: si64) -> i1 {
 *)
-(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp ne, %arg0, %arg1 : !polang.integer<64, signed>, !polang.integer<64, signed>
+(* CHECK-NEXT:   %{{[0-9]+}} = polang.cmp ne, %arg0, %arg1 : si64, si64
 *)
-(* CHECK-NEXT:   polang.return %{{[0-9]+}} : !polang.bool
+(* CHECK-NEXT:   polang.return %{{[0-9]+}} : i1
 *)
 (* CHECK-NEXT: }
 *)
