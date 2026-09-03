@@ -118,9 +118,13 @@ struct ConstantFloatOpLowering : public OpConversionPattern<ConstantFloatOp> {
 [[nodiscard]] bool
 isOrigTypeUnsigned(Type origType, Operation* op = nullptr,
                    StringRef attrName = "is_unsigned") noexcept {
-  if (op != nullptr && (op->hasAttr(attrName) || op->hasAttr("is_unsigned") ||
-                        op->hasAttr("polang.is_unsigned"))) {
-    return true;
+  if (op != nullptr) {
+    if (op->hasAttr(attrName)) {
+      return true;
+    }
+    if (attrName == "is_unsigned" && op->hasAttr("polang.is_unsigned")) {
+      return true;
+    }
   }
   if (auto intType = dyn_cast<mlir::IntegerType>(origType)) {
     return intType.isUnsigned();

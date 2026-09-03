@@ -1,0 +1,10 @@
+(* RUN: %polang_repl %s | %FileCheck %s
+*)
+
+(* Test signed-to-unsigned widening cast (ExtSIOp sign-extension) *)
+(* -1 as i8 widened to u16 should sign-extend to 65535 *)
+(* CHECK: 65535 : u16
+*)
+y : i8
+y = -1 as i8
+y as u16
